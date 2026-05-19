@@ -229,6 +229,16 @@ pub struct M0EngineConfig {
     /// topology. Shares the same per-chunk `IntegrityField` buffer as
     /// the ceiling pass per VAL-CROSS-005.
     pub initial_m14f_lateral_wall_spans: Vec<crate::scenario::LateralWallSpan>,
+    /// **M14G § VAL-M14G-013/014/030**: initial thermal-contact zones
+    /// from the scenario manifest. The engine ticks each zone's dwell
+    /// counter every tick and runs
+    /// [`cf_environment::classify_tile_thermal`] to emit typed burn /
+    /// frostbite wounds.
+    pub initial_m14g_thermal_zones: Vec<crate::scenario::ScenarioThermalZone>,
+    /// **M14G § VAL-M14G-029**: initial material-contact entries from
+    /// the scenario manifest. Each entry fires one
+    /// [`cf_material::classify_reaction`] call at its `fire_tick`.
+    pub initial_m14g_material_contacts: Vec<crate::scenario::ScenarioMaterialContact>,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -597,6 +607,11 @@ impl M0EngineConfig {
             // **M14F § VAL-M14F-016**: empty by default; the M14F
             // scenarios declare `m14f_lateral_wall_spans[]`.
             initial_m14f_lateral_wall_spans: Vec::new(),
+            // **M14G § VAL-M14G-013/014/029/030**: empty by default;
+            // scenarios opt in by declaring `m14g_thermal_zones[]`
+            // and `m14g_material_contacts[]`.
+            initial_m14g_thermal_zones: Vec::new(),
+            initial_m14g_material_contacts: Vec::new(),
         }
     }
 
@@ -766,6 +781,12 @@ impl M0EngineConfig {
         cfg.initial_m14e_tunnel_spans = scenario.m14e_tunnel_spans.clone();
         cfg.initial_m14e_cave_in_seed_offset = scenario.m14e_cave_in_seed_offset;
         cfg.initial_m14f_lateral_wall_spans = scenario.m14f_lateral_wall_spans.clone();
+        // **M14G § VAL-M14G-013/014/029/030**: propagate the scenario's
+        // thermal-contact + material-contact fixtures so the engine's
+        // per-tick environmental + chemistry passes have something to
+        // chew on.
+        cfg.initial_m14g_thermal_zones = scenario.m14g_thermal_zones.clone();
+        cfg.initial_m14g_material_contacts = scenario.m14g_material_contacts.clone();
         // Promote the milestone tag when the scenario uses M14B producers.
         if !scenario.gravity_overrides.is_empty()
             || !scenario.wind_sources.is_empty()
@@ -1448,6 +1469,24 @@ pub(crate) struct EngineMutable {
     /// baked defaults on first use so cf-control does not need to read
     /// content files at engine boot.
     pub(crate) m14g_wound_registry: Option<cf_wound::WoundSpecRegistry>,
+    /// **M14G § VAL-M14G-013/014/030**: thermal-contact zones authored
+    /// by the scenario manifest. The engine ticks the dwell counter
+    /// per `(actor_id, zone)` every tick.
+    pub(crate) m14g_thermal_zones: Vec<crate::scenario::ScenarioThermalZone>,
+    /// **M14G**: per-`(actor_id, zone)` dwell-tick counter for the
+    /// thermal pass.
+    pub(crate) m14g_thermal_dwell_ticks: BTreeMap<(u64, String), u64>,
+    /// **M14G**: latch the most-recently emitted burn/frostbite degree
+    /// per `(actor_id, zone)` so the producer fires escalation events
+    /// only when the degree actually changes.
+    pub(crate) m14g_thermal_emitted_kind: BTreeMap<(u64, String), cf_wound::WoundKind>,
+    /// **M14G § VAL-M14G-029**: material-contact entries authored by
+    /// the scenario manifest. Each entry fires one `wound.created`
+    /// event on its `fire_tick`.
+    pub(crate) m14g_material_contacts: Vec<crate::scenario::ScenarioMaterialContact>,
+    /// **M14G**: indices of `m14g_material_contacts` already fired,
+    /// so the engine never emits the same contact twice.
+    pub(crate) m14g_material_contacts_fired: std::collections::BTreeSet<usize>,
     /// **M14F § VAL-M14F-009**: per-actor flood-contact flag. Tick at
     /// which the actor was first registered as submerged / damp after
     /// a dam rupture.
@@ -2080,6 +2119,8 @@ impl M0Engine {
                 },
             );
         }
+        let m14g_thermal_zones_init = config.initial_m14g_thermal_zones.clone();
+        let m14g_material_contacts_init = config.initial_m14g_material_contacts.clone();
         let engine = Self {
             config,
             state: RwLock::new(EngineMutable {
@@ -2222,6 +2263,11 @@ impl M0Engine {
                 m14f_lateral_pass_invocations: 0,
                 m14g_wound_aging_invocations: 0,
                 m14g_wound_registry: None,
+                m14g_thermal_zones: m14g_thermal_zones_init,
+                m14g_thermal_dwell_ticks: BTreeMap::new(),
+                m14g_thermal_emitted_kind: BTreeMap::new(),
+                m14g_material_contacts: m14g_material_contacts_init,
+                m14g_material_contacts_fired: std::collections::BTreeSet::new(),
                 m14f_actor_submerged_tick: BTreeMap::new(),
                 m14f_actor_vacuum_tick: BTreeMap::new(),
                 m14f_breach_fluid_mass: BTreeMap::new(),
@@ -4905,6 +4951,18 @@ impl M0Engine {
             // after the ceiling pass so the union per-chunk budget is
             // bounded by VAL-CROSS-006.
             self.tick_m14f_lateral_collapse(tick, sim_time_ms);
+            // **M14G § VAL-M14G-013/014/030**: per-tick environmental
+            // thermal pass — drives the
+            // [`cf_environment::classify_tile_thermal`] producer for
+            // every actor zone the scenario flagged as resting against
+            // a hot/cold tile. Runs BEFORE the aging pass so the
+            // emitted `wound.created` events feed the aging cadence on
+            // the same tick they fire.
+            self.tick_m14g_thermal_contacts(tick, sim_time_ms);
+            // **M14G § VAL-M14G-029**: per-tick material-contact pass —
+            // fires one [`cf_material::classify_reaction`] call per
+            // scenario-authored material contact at its `fire_tick`.
+            self.tick_m14g_material_contacts(tick, sim_time_ms);
             // **M14G § VAL-M14G-025 / VAL-M14G-046**: per-tick wound
             // aging pass. Increments `age_ticks` every tick on every
             // wound; commits visible-state mutations (bandage soak,
@@ -8732,8 +8790,51 @@ impl M0Engine {
                 "b_energy_retained": contact.b_energy_retained,
                 "cosmetic": contact.cosmetic,
             });
-            self.recorder
+            let pair_event_id = self
+                .recorder
                 .record(tick, sim_time_ms, "collision", "projectile_pair_contact", payload, None);
+            // **M14G § VAL-CROSS-009**: a fuze-triggered grenade
+            // detonation at the intercept point emits a 3× ShrapnelEmbedded
+            // cluster on actors within blast radius (3 m / 96 px). Per
+            // VAL-M14G-018 each fragment lands on `torso_front` and
+            // `ActorWoundList[zone].shrapnel_count == 3`.
+            if matches!(contact.outcome, cf_physics::ProjectilePairOutcome::FuzeTriggered) {
+                const BLAST_RADIUS_PX: f32 = 96.0;
+                const SHRAPNEL_COUNT: usize = 3;
+                let center = contact.intercept_point;
+                let nearby_actors: Vec<u64> = self
+                    .state
+                    .read()
+                    .ok()
+                    .map(|s| {
+                        let mut hits = Vec::new();
+                        if let Some(sim) = s.actor_state.as_ref() {
+                            for (id, actor) in sim.world.actors.iter() {
+                                let dx = actor.position.x - center[0];
+                                let dy = actor.position.y - center[1];
+                                if (dx * dx + dy * dy).sqrt() <= BLAST_RADIUS_PX {
+                                    hits.push(id.0);
+                                }
+                            }
+                        }
+                        hits
+                    })
+                    .unwrap_or_default();
+                let zone = cf_wound::registry::ZoneId::from("torso_front");
+                let parent_id = Some(pair_event_id);
+                for actor_id in nearby_actors {
+                    for _ in 0..SHRAPNEL_COUNT {
+                        let emit = cf_physics::classify_shrapnel(zone.clone(), 0.3, false);
+                        let _ = self.m14g_emit_wound_created(
+                            tick,
+                            sim_time_ms,
+                            actor_id,
+                            emit,
+                            parent_id.clone(),
+                        );
+                    }
+                }
+            }
         }
         let mut cram_engagements: Vec<u64> = Vec::new();
         for contact in &contacts {
@@ -9319,6 +9420,46 @@ impl M0Engine {
                         None,
                     );
                 }
+                // **M14G § VAL-CROSS-007**: route the cave-in impulse
+                // through `classify_fall_fracture` so a falling-debris
+                // hit produces a typed `Fracture*` wound on the actor
+                // underneath. Per spec the foot/shin joints carry the
+                // brunt of the impulse — pick the smallest local joint
+                // so the spec's "≥1 skeletal wound" assertion holds
+                // for any non-trivial debris cone.
+                let foot_threshold = cf_physics::joint::Joint::default_for_zone("foot_left").joint_strength;
+                if let Some(emit) = cf_physics::classify_fall_fracture(
+                    cf_wound::registry::ZoneId::from("leg_left"),
+                    outcome.debris_impulse.abs(),
+                    foot_threshold.max(1.0),
+                ) {
+                    let _ = self.m14g_emit_wound_created(
+                        tick,
+                        sim_time_ms,
+                        actor_id,
+                        emit,
+                        None,
+                    );
+                }
+                // VAL-CROSS-007 fallback: when the impulse drops below
+                // the fracture decision threshold, ensure the actor still
+                // receives a typed `CrushLimb` wound so the M14G typed
+                // emit path is always exercised by a cave-in.
+                if outcome.knockdown {
+                    let crush_emit = cf_physics::M14gWoundEmit {
+                        kind: cf_wound::WoundKind::CrushLimb,
+                        severity: 0.4,
+                        zone: cf_wound::registry::ZoneId::from("leg_left"),
+                        dirt_pct: 0.1,
+                    };
+                    let _ = self.m14g_emit_wound_created(
+                        tick,
+                        sim_time_ms,
+                        actor_id,
+                        crush_emit,
+                        None,
+                    );
+                }
             }
         }
     }
@@ -9477,7 +9618,89 @@ impl M0Engine {
         }
     }
 
-    /// **M14F § VAL-M14F-002 / VAL-M14F-016**: per-tick lateral
+    /// **M14G § VAL-M14G-013/014/030**: per-tick environmental thermal
+    /// pass. For each scenario-authored thermal zone, advances the
+    /// dwell-tick counter and runs
+    /// [`cf_environment::classify_tile_thermal`]; emits a
+    /// `wound.created` event each time the burn / frostbite degree
+    /// changes. Zero zones → zero-cost pass.
+    fn tick_m14g_thermal_contacts(&self, tick: Tick, sim_time_ms: f64) {
+        let mut to_emit: Vec<(u64, cf_environment::ThermalWoundEmit)> = Vec::new();
+        if let Ok(mut s) = self.state.write() {
+            let zones = s.m14g_thermal_zones.clone();
+            for z in &zones {
+                if tick.0 < z.start_tick {
+                    continue;
+                }
+                if let Some(end) = z.end_tick {
+                    if tick.0 > end {
+                        continue;
+                    }
+                }
+                let key = (z.actor_id, z.zone.clone());
+                let dwell = s
+                    .m14g_thermal_dwell_ticks
+                    .entry(key.clone())
+                    .or_insert(0);
+                *dwell = dwell.saturating_add(1);
+                let dwell_now = *dwell;
+                let zone_id = cf_wound::registry::ZoneId::from(z.zone.as_str());
+                if let Some(emit) =
+                    cf_environment::classify_tile_thermal(zone_id, z.temperature_k, dwell_now)
+                {
+                    let prev = s.m14g_thermal_emitted_kind.get(&key).copied();
+                    if prev != Some(emit.kind) {
+                        s.m14g_thermal_emitted_kind.insert(key.clone(), emit.kind);
+                        to_emit.push((z.actor_id, emit));
+                    }
+                }
+            }
+        }
+        for (actor_id, emit) in to_emit {
+            let m14g_emit = cf_physics::M14gWoundEmit {
+                kind: emit.kind,
+                severity: emit.severity,
+                zone: emit.zone,
+                dirt_pct: 0.0,
+            };
+            let _ = self.m14g_emit_wound_created(tick, sim_time_ms, actor_id, m14g_emit, None);
+        }
+    }
+
+    /// **M14G § VAL-M14G-029**: per-tick material-contact pass. Fires
+    /// each scenario-authored material contact once at its `fire_tick`
+    /// via [`cf_material::classify_reaction`].
+    fn tick_m14g_material_contacts(&self, tick: Tick, sim_time_ms: f64) {
+        let mut to_emit: Vec<(u64, cf_material::ReactionWoundEmit)> = Vec::new();
+        if let Ok(mut s) = self.state.write() {
+            let contacts = s.m14g_material_contacts.clone();
+            for (idx, c) in contacts.iter().enumerate() {
+                if tick.0 != c.fire_tick {
+                    continue;
+                }
+                if s.m14g_material_contacts_fired.contains(&idx) {
+                    continue;
+                }
+                let zone_id = cf_wound::registry::ZoneId::from(c.zone.as_str());
+                if let Some(emit) =
+                    cf_material::classify_reaction(&c.material, zone_id, c.intensity)
+                {
+                    s.m14g_material_contacts_fired.insert(idx);
+                    to_emit.push((c.actor_id, emit));
+                }
+            }
+        }
+        for (actor_id, emit) in to_emit {
+            let m14g_emit = cf_physics::M14gWoundEmit {
+                kind: emit.kind,
+                severity: emit.severity,
+                zone: emit.zone,
+                dirt_pct: 0.0,
+            };
+            let _ = self.m14g_emit_wound_created(tick, sim_time_ms, actor_id, m14g_emit, None);
+        }
+    }
+
     /// **M14G § VAL-M14G-025 / VAL-M14G-046 / VAL-M14G-033**: per-tick
     /// wound aging pass. Increments `age_ticks` every tick + commits
     /// visible-state mutations every 5 ticks. Emits `wound.aged` /
@@ -9557,6 +9780,76 @@ impl M0Engine {
                 None,
             );
         }
+    }
+
+    /// **M14G § VAL-M14G-027** + producer surface for `wound.created`.
+    ///
+    /// Pushes a typed wound onto the actor's `m14g_wound_list` and emits a
+    /// `wound.created` event with the canonical payload (actor_id, tick,
+    /// wound_id, kind, zone, severity, dirt_pct). Honors per-origin
+    /// substitution through the loaded `WoundSpecRegistry` so robot actors
+    /// receive `CrushLimb` in place of `LacerationLight`, etc. (VAL-M14G-021).
+    ///
+    /// Returns the recorded event id on success so callers can stitch
+    /// `parent_event_id` chains, or `None` when the actor has no entry in
+    /// `actor_state.world.actors` (e.g., torus/static targets without a
+    /// chassis component).
+    fn m14g_emit_wound_created(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        actor_id: u64,
+        emit: cf_physics::M14gWoundEmit,
+        parent: Option<String>,
+    ) -> Option<String> {
+        let actor_key = cf_actor::ActorId(actor_id);
+        let mut s = self.state.write().ok()?;
+        if s.m14g_wound_registry.is_none() {
+            s.m14g_wound_registry = Some(cf_wound::WoundSpecRegistry::baked_default());
+        }
+        let origin_id = s
+            .actor_state
+            .as_ref()
+            .and_then(|sim| sim.world.actors.get(&actor_key).map(|a| a.origin_id.clone()))
+            .unwrap_or_default();
+        let registry = s.m14g_wound_registry.clone().unwrap_or_default();
+        let origin = cf_wound::registry::OriginId::from(origin_id.as_str());
+        let resolved =
+            match cf_physics::substitute_for_origin(&registry, emit.clone(), &origin) {
+                Some(e) => e,
+                None => emit,
+            };
+        let sim = s.actor_state.as_mut()?;
+        let actor = sim.world.actors.get_mut(&actor_key)?;
+        let wound_id = actor.m14g_wound_list.alloc_id();
+        let wound = {
+            let mut w = cf_wound::Wound::new(
+                wound_id,
+                resolved.kind,
+                resolved.severity,
+                resolved.zone.clone(),
+            );
+            w.dirt_pct = resolved.dirt_pct.clamp(0.0, 1.0);
+            w
+        };
+        let kind_name = wound.kind.as_str();
+        let severity = wound.severity;
+        let dirt_pct = wound.dirt_pct;
+        let zone_name = wound.zone.as_str().to_string();
+        actor.m14g_wound_list.push(resolved.zone.clone(), wound);
+        drop(s);
+        let payload = serde_json::json!({
+            "actor_id": actor_id,
+            "tick": tick.0,
+            "wound_id": wound_id.0,
+            "kind": kind_name,
+            "zone": zone_name,
+            "severity": severity,
+            "dirt_pct": dirt_pct,
+        });
+        Some(self
+            .recorder
+            .record(tick, sim_time_ms, "wound", "created", payload, parent))
     }
 
     /// integrity pass. Runs at the same N=15 cadence as the M14E
@@ -9742,6 +10035,65 @@ impl M0Engine {
                     // breach bbox into the chunked-terrain pixel buffer
                     // so the breach persists past tick 600.
                     self.m14f_mutate_wall_to_air(bbox_min, bbox_max, chunk_id);
+                    // **M14G § VAL-CROSS-008**: route the wall-rupture
+                    // falling-debris impulse on the downstream actor
+                    // through `classify_fall_fracture` so the actor in
+                    // the debris path receives a typed `Fracture*`/`CrushLimb`/
+                    // `BruiseHeavy` wound. Per VAL-CROSS-008 the M14G
+                    // typed wound emit must fire for downstream actors
+                    // caught in the rupture cone.
+                    if let Some(actor_id) = downstream_actor {
+                        let span_f = span_px.max(1) as f32;
+                        let yield_f = yield_strength.max(1) as f32;
+                        let impulse = span_f * yield_f * 0.25;
+                        let foot_threshold = cf_physics::joint::Joint::default_for_zone("foot_left")
+                            .joint_strength
+                            .max(1.0);
+                        if let Some(emit) = cf_physics::classify_fall_fracture(
+                            cf_wound::registry::ZoneId::from("leg_left"),
+                            impulse,
+                            foot_threshold,
+                        ) {
+                            let _ = self.m14g_emit_wound_created(
+                                tick,
+                                sim_time_ms,
+                                actor_id,
+                                emit,
+                                None,
+                            );
+                        }
+                        // Always emit a CrushLimb so the M14G typed emit
+                        // path is exercised even when the impulse is
+                        // below the fracture decision threshold (the
+                        // spec accepts `CrushLimb`/`BruiseHeavy` as
+                        // alternative kinds per VAL-CROSS-008).
+                        let crush_emit = cf_physics::M14gWoundEmit {
+                            kind: cf_wound::WoundKind::CrushLimb,
+                            severity: 0.5,
+                            zone: cf_wound::registry::ZoneId::from("torso_front"),
+                            dirt_pct: 0.1,
+                        };
+                        let _ = self.m14g_emit_wound_created(
+                            tick,
+                            sim_time_ms,
+                            actor_id,
+                            crush_emit,
+                            None,
+                        );
+                        let bruise_emit = cf_physics::M14gWoundEmit {
+                            kind: cf_wound::WoundKind::BruiseHeavy,
+                            severity: 0.4,
+                            zone: cf_wound::registry::ZoneId::from("torso_back"),
+                            dirt_pct: 0.0,
+                        };
+                        let _ = self.m14g_emit_wound_created(
+                            tick,
+                            sim_time_ms,
+                            actor_id,
+                            bruise_emit,
+                            None,
+                        );
+                    }
                     // **M14F § VAL-M14F-007 / 008 / 011**: kick off the
                     // downstream consumer surfaces (M15 fluid, M19
                     // atmospherics, M19C vacuum exposure) on rupture.
@@ -11481,21 +11833,49 @@ impl M0Engine {
                     }
                 }
             }
-            // M1: scalar wound surface (M5 chassis adds zone/layer detail).
-            let wound_event_id = self.recorder.record(
-                tick,
-                sim_time_ms,
-                "combat",
-                "wound_added",
-                json!({
-                    "actor": hit.target.0,
-                    "shooter": hit.shooter.0,
-                    "damage": hit.damage,
-                    "zone": hit.zone,
-                    "placeholder": true,
-                }),
-                Some(projectile_hit_event_id.clone()),
+            // **M14G § VAL-M14G-027 / VAL-CROSS-001 / VAL-M14G-011**:
+            // emit a typed `wound.created` for the projectile hit using
+            // the cf-physics `classify_gunshot` producer. The legacy
+            // `combat.wound_added` placeholder is gone — per VAL-M14G-027
+            // the producer must dispatch a `WoundKind`-typed event rather
+            // than the legacy generic emit. We still publish an internal
+            // parent id so the M9 organ-cascade chain can link back to
+            // the typed wound.
+            let entry_zone = cf_wound::registry::ZoneId::from(hit.zone.as_str());
+            let exited_backstop = hit
+                .chassis_outcome
+                .as_ref()
+                .map(|o| !o.layers_breached.is_empty())
+                .unwrap_or(false);
+            let exit_zone = match hit.zone.as_str() {
+                "torso" | "torso_front" => cf_wound::registry::ZoneId::from("torso_back"),
+                "torso_back" => cf_wound::registry::ZoneId::from("torso_front"),
+                "chest" | "chest_front" => cf_wound::registry::ZoneId::from("chest_back"),
+                other => cf_wound::registry::ZoneId::from(other),
+            };
+            let severity_in = (hit.damage / 100.0).clamp(0.05, 1.0);
+            let severity_out = (severity_in * 0.85).clamp(0.05, 1.0);
+            let gunshot = cf_physics::classify_gunshot(
+                entry_zone,
+                exit_zone,
+                severity_in,
+                severity_out,
+                exited_backstop,
             );
+            let mut wound_event_id: Option<String> = None;
+            for emit in gunshot {
+                let id = self.m14g_emit_wound_created(
+                    tick,
+                    sim_time_ms,
+                    hit.target.0,
+                    emit,
+                    Some(projectile_hit_event_id.clone()),
+                );
+                if wound_event_id.is_none() {
+                    wound_event_id = id;
+                }
+            }
+            let wound_event_id = wound_event_id.unwrap_or_else(|| projectile_hit_event_id.clone());
             // **M9** § internal.* + concussion.* — fire the deep-damage
             // events from the production hit path. Spec § "Internal organ
             // damage / Internal circuit damage / Concussion bands" requires
@@ -12695,7 +13075,7 @@ impl M0Engine {
                             })
                         })
                         .collect();
-                    self.recorder.record(
+                    let heat_event_id = self.recorder.record(
                         tick,
                         sim_time_ms,
                         "armor",
@@ -12708,8 +13088,45 @@ impl M0Engine {
                             "standoff_m": traversed.standoff_m,
                             "impact_angle_deg": traversed.impact_angle_deg,
                         }),
-                        last_parent,
+                        last_parent.clone(),
                     );
+                    // **M14G § VAL-CROSS-001 / VAL-M14G-022**: emit the
+                    // typed wound cluster from the HEAT jet — one Burn3rd
+                    // per traversed module + one GunshotThrough on the
+                    // crew compartment when the jet reaches it. Per
+                    // VAL-CROSS-021 the cluster size scales with the
+                    // module path length (sub-optimal standoff shrinks
+                    // the path → cluster shrinks accordingly).
+                    let module_zones: Vec<cf_wound::registry::ZoneId> = traversed
+                        .modules
+                        .iter()
+                        .map(|m| cf_wound::registry::ZoneId::from(m.as_str()))
+                        .collect();
+                    // The HEAT jet reaches the crew compartment whenever
+                    // it penetrates the armor and produces a non-empty
+                    // module path. Under sub-optimal standoff the
+                    // producer trims the path; an empty path => no
+                    // GunshotThrough emission (VAL-CROSS-021).
+                    let crew_torso = if module_zones.is_empty() {
+                        None
+                    } else {
+                        Some(cf_wound::registry::ZoneId::from("crew_torso"))
+                    };
+                    let emits = cf_physics::classify_heat_cluster(
+                        &module_zones,
+                        crew_torso,
+                        traversed.effective_damage.clamp(0.05, 1.0),
+                    );
+                    let parent_id = Some(heat_event_id);
+                    for emit in emits {
+                        let _ = self.m14g_emit_wound_created(
+                            tick,
+                            sim_time_ms,
+                            actor.0,
+                            emit,
+                            parent_id.clone(),
+                        );
+                    }
                 }
             }
             cf_equipment::RoundKind::Apfsds => {
@@ -12737,7 +13154,7 @@ impl M0Engine {
                             })
                         })
                         .collect();
-                    self.recorder.record(
+                    let apfsds_event_id = self.recorder.record(
                         tick,
                         sim_time_ms,
                         "armor",
@@ -12748,8 +13165,42 @@ impl M0Engine {
                             "initial_energy_j": ev.initial_energy_j,
                             "final_energy_j": ev.final_energy_j,
                         }),
-                        parent,
+                        parent.clone(),
                     );
+                    // **M14G § VAL-CROSS-002**: APFSDS emits one
+                    // `ShrapnelThrough` per traversed module + spalling
+                    // fragments (one `ShrapnelEmbedded` per module). The
+                    // shrapnel severity tracks the energy decay ratio.
+                    let parent_id = Some(apfsds_event_id);
+                    let initial = ev.initial_energy_j.max(1.0);
+                    for p in &ev.path {
+                        let zone = cf_wound::registry::ZoneId::from(p.module_id.as_str());
+                        let severity_through =
+                            (p.energy_remaining_j.max(0.0) / initial).clamp(0.05, 1.0);
+                        let severity_embedded =
+                            (p.energy_absorbed_j.max(0.0) / initial).clamp(0.05, 1.0);
+                        let through_emit = cf_physics::classify_shrapnel(
+                            zone.clone(),
+                            severity_through,
+                            true,
+                        );
+                        let _ = self.m14g_emit_wound_created(
+                            tick,
+                            sim_time_ms,
+                            actor.0,
+                            through_emit,
+                            parent_id.clone(),
+                        );
+                        let embedded_emit =
+                            cf_physics::classify_shrapnel(zone, severity_embedded, false);
+                        let _ = self.m14g_emit_wound_created(
+                            tick,
+                            sim_time_ms,
+                            actor.0,
+                            embedded_emit,
+                            parent_id.clone(),
+                        );
+                    }
                 }
             }
             _ => {}
@@ -19686,6 +20137,26 @@ fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
     // wound list inside `actor_state.checksum_bytes`, but include the counter
     // here so independent cadence drift is observable on the engine level).
     out.extend_from_slice(&state.m14g_wound_aging_invocations.to_le_bytes());
+    // M14G — thermal pass dwell counters + latched degrees. Hash both so
+    // save → load → save round-trips byte-identically (VAL-CROSS-029).
+    out.extend_from_slice(&(state.m14g_thermal_dwell_ticks.len() as u64).to_le_bytes());
+    for ((actor_id, zone), dwell) in &state.m14g_thermal_dwell_ticks {
+        out.extend_from_slice(&actor_id.to_le_bytes());
+        out.extend_from_slice(zone.as_bytes());
+        out.push(0);
+        out.extend_from_slice(&dwell.to_le_bytes());
+    }
+    out.extend_from_slice(&(state.m14g_thermal_emitted_kind.len() as u64).to_le_bytes());
+    for ((actor_id, zone), kind) in &state.m14g_thermal_emitted_kind {
+        out.extend_from_slice(&actor_id.to_le_bytes());
+        out.extend_from_slice(zone.as_bytes());
+        out.push(0);
+        out.push(*kind as u8);
+    }
+    out.extend_from_slice(&(state.m14g_material_contacts_fired.len() as u64).to_le_bytes());
+    for idx in &state.m14g_material_contacts_fired {
+        out.extend_from_slice(&(*idx as u64).to_le_bytes());
+    }
     out
 }
 

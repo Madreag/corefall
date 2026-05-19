@@ -179,6 +179,25 @@ pub struct Scenario {
     /// per VAL-CROSS-005).
     #[serde(default)]
     pub m14f_lateral_wall_spans: Vec<LateralWallSpan>,
+    /// **M14G § VAL-M14G-013/014/030**: thermal-contact zones authored
+    /// by the scenario manifest. Each entry models one actor zone in
+    /// sustained contact with a tile at a given temperature; the
+    /// engine ticks the dwell counter every tick and runs the
+    /// [`cf_environment::classify_tile_thermal`] producer to emit
+    /// typed [`cf_wound::WoundKind::Burn1st`]/`Burn2nd`/`Burn3rd` (hot)
+    /// or [`cf_wound::WoundKind::Frostbite1st`]/`Frostbite2nd`/`Frostbite3rd`
+    /// (cold) records.
+    #[serde(default)]
+    pub m14g_thermal_zones: Vec<ScenarioThermalZone>,
+    /// **M14G § VAL-M14G-029**: material-contact zones authored by the
+    /// scenario manifest. Each entry models one actor zone in contact
+    /// with a hazardous material; the engine ticks one
+    /// [`cf_material::classify_reaction`] call per tick at the
+    /// supplied intensity and emits typed
+    /// [`cf_wound::WoundKind::AcidBurn`] / `ChemicalBurn` records on
+    /// the supplied zone.
+    #[serde(default)]
+    pub m14g_material_contacts: Vec<ScenarioMaterialContact>,
 }
 
 /// **M14D** § one scenario projectile entry feeding the pair-CCD pool.
@@ -342,6 +361,56 @@ fn default_lateral_topology() -> String {
 
 fn default_sealed_room_pressure() -> f32 {
     101.0
+}
+
+/// **M14G § VAL-M14G-013/014/030**: per-tick thermal contact fixture.
+/// Models an actor zone resting against a tile at a steady temperature
+/// so the engine can fire the burn / frostbite escalation ladder
+/// deterministically.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioThermalZone {
+    /// Actor id receiving the thermal contact.
+    pub actor_id: u64,
+    /// Body zone tag (e.g. `"foot_right"`, `"hand_left"`).
+    pub zone: String,
+    /// Steady tile temperature in Kelvin. ≥ 320 K = hot ladder, ≤ 260 K
+    /// = cold ladder, otherwise safe band (no emit).
+    pub temperature_k: f32,
+    /// Optional tick at which the dwell counter starts (the actor must
+    /// actually be on the tile from `start_tick` onward). Default 0.
+    #[serde(default)]
+    pub start_tick: u64,
+    /// Optional tick at which the contact ends (inclusive). `None`
+    /// means the contact persists for the rest of the scenario run.
+    #[serde(default)]
+    pub end_tick: Option<u64>,
+}
+
+/// **M14G § VAL-M14G-029**: per-tick material-contact fixture. Models
+/// an actor zone touching a hazardous material (acid / refrigerant /
+/// ammonia / chlorine) at constant intensity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioMaterialContact {
+    /// Actor id receiving the material contact.
+    pub actor_id: u64,
+    /// Body zone tag.
+    pub zone: String,
+    /// Material name (canonical lowercase: `"acid"`, `"refrigerant"`,
+    /// etc.).
+    pub material: String,
+    /// Contact intensity ∈ [0, 1]; passed to
+    /// [`cf_material::classify_reaction`].
+    #[serde(default = "default_material_intensity")]
+    pub intensity: f32,
+    /// Tick on which the wound is emitted. The engine fires the
+    /// classify_reaction call once on this tick (mirrors a one-frame
+    /// chemistry contact). Default 0 = first tick after init.
+    #[serde(default)]
+    pub fire_tick: u64,
+}
+
+fn default_material_intensity() -> f32 {
+    0.5
 }
 
 /// **M14C** § one scripted director step. The engine compares the current
@@ -1684,6 +1753,8 @@ mod tests {
             m14e_tunnel_spans: vec![],
             m14e_cave_in_seed_offset: 0,
             m14f_lateral_wall_spans: vec![],
+            m14g_thermal_zones: vec![],
+            m14g_material_contacts: vec![],
         };
         assert!(matches!(
             scenario.validate("t.ron"),
