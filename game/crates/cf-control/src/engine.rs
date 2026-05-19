@@ -1509,7 +1509,7 @@ pub(crate) struct EngineMutable {
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the
 /// per-tier emission edges + the topology hook (mineshaft / dam /
 /// sealed_room) the lateral pass consumes on rupture.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct M14fLateralChunkState {
     #[allow(dead_code)]
     pub span_id: String,
@@ -1547,7 +1547,7 @@ pub(crate) struct M14fLateralChunkState {
 
 /// **M14E** § Per-chunk integrity-field runtime state. Lives on
 /// `EngineState.m14e_chunks` keyed by chunk coord.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct M14eChunkState {
     pub field: cf_terrain::IntegrityField,
     #[allow(dead_code)]
@@ -19409,10 +19409,20 @@ impl M0Engine {
     /// suitable for F5 quicksave. Captures every actor's M5 [`cf_save::SaveBlob`]
     /// payload. Terrain chunks + projectiles are captured as opaque JSON so
     /// the same encoder works across heterogeneous content.
+    ///
+    /// **M14G § VAL-CROSS-029** extension: in addition to the M5 SaveBlob
+    /// payload, the save now carries an opaque `corefall.m14_state` entry
+    /// in `mod_payload` that round-trips the M14C/D/E/F/G runtime state
+    /// (`ActorWoundList` per actor, projectile pool, ceiling integrity
+    /// buffers, lateral integrity buffers, breach/pressure trackers,
+    /// thermal dwell ticks, etc.). The entry is append-only — existing
+    /// SaveBlob fields are unchanged. [`Self::load_world_save`] reads the
+    /// same key back when restoring a save.
     pub fn snapshot_world_save(&self) -> cf_save::WorldSave {
         let state = self.state.read().expect("engine state poisoned");
         let world_tick = state.clock.tick().0;
         let mut actors = Vec::new();
+        let mut wound_lists: BTreeMap<u64, cf_wound::ActorWoundList> = BTreeMap::new();
         if let Some(sim) = state.actor_state.as_ref() {
             for actor in sim.world.actors.values() {
                 let rifle = sim.rifles.get(&actor.id);
@@ -19448,6 +19458,20 @@ impl M0Engine {
                     jet_active: actor.jet_active,
                     mod_payload: std::collections::BTreeMap::new(),
                 });
+                wound_lists.insert(actor.id.0, actor.m14g_wound_list.clone());
+            }
+        }
+        let mut mod_payload = std::collections::BTreeMap::new();
+        let m14_state = M14SaveExtension::capture(&state, wound_lists);
+        match serde_json::to_value(&m14_state) {
+            Ok(v) => {
+                mod_payload.insert(M14_SAVE_EXTENSION_KEY.to_string(), v);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "snapshot_world_save: failed to serialize M14 save extension; emitting empty mod_payload"
+                );
             }
         }
         cf_save::WorldSave {
@@ -19456,8 +19480,62 @@ impl M0Engine {
             actors,
             terrain_chunks: Vec::new(),
             projectiles: Vec::new(),
-            mod_payload: std::collections::BTreeMap::new(),
+            mod_payload,
         }
+    }
+
+    /// **M14G § VAL-CROSS-029**: restore engine state from a previously
+    /// captured [`cf_save::WorldSave`]. Reverses [`Self::snapshot_world_save`]:
+    /// rewires every per-actor field captured in the SaveBlob (HP, status,
+    /// position, chassis incl. M14C ERA flags) AND the M14C/D/E/F/G runtime
+    /// state stashed in `mod_payload["corefall.m14_state"]`. Returns `true`
+    /// on success.
+    ///
+    /// After load the engine's clock points at `save.world_tick`, so a
+    /// subsequent [`Self::snapshot_world_save`] call (with zero
+    /// intervening `drive_tick`) produces a WorldSave byte-equal to the
+    /// one passed in.
+    pub fn load_world_save(&self, save: &cf_save::WorldSave) -> bool {
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        state.clock.set_tick(cf_sim_core::Tick(save.world_tick));
+        self.current_tick
+            .store(save.world_tick, std::sync::atomic::Ordering::Relaxed);
+        if let Some(sim) = state.actor_state.as_mut() {
+            for blob in &save.actors {
+                let actor_key = cf_actor::ActorId(blob.actor_id);
+                if let Some(actor) = sim.world.actors.get_mut(&actor_key) {
+                    actor.team = blob.team.clone();
+                    actor.origin_id = blob.origin_id.clone();
+                    actor.position = cf_actor::Vec2::new(blob.position[0], blob.position[1]);
+                    actor.velocity = cf_actor::Vec2::new(blob.velocity[0], blob.velocity[1]);
+                    actor.aim = cf_actor::Vec2::new(blob.aim[0], blob.aim[1]);
+                    actor.hp = blob.hp;
+                    actor.hp_max = blob.hp_max;
+                    actor.on_ground = blob.on_ground;
+                    actor.chassis = blob.chassis.clone();
+                    actor.gear_dropped_by_limb_loss = blob.gear_dropped_by_limb_loss;
+                    actor.chassis_detached = blob.chassis_detached;
+                    actor.crouch_active = blob.crouch_active;
+                    actor.climb_active = blob.climb_active;
+                    actor.jet_active = blob.jet_active;
+                }
+            }
+        }
+        if let Some(value) = save.mod_payload.get(M14_SAVE_EXTENSION_KEY) {
+            match serde_json::from_value::<M14SaveExtension>(value.clone()) {
+                Ok(ext) => ext.apply(&mut state),
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        "load_world_save: failed to deserialize M14 save extension; engine state left at initial scenario values"
+                    );
+                }
+            }
+        }
+        true
     }
 
     /// **M4B § F5 quicksave**: write the current world to `dir/quicksave.cfsave`
@@ -20224,6 +20302,237 @@ fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
         out.extend_from_slice(&(*idx as u64).to_le_bytes());
     }
     out
+}
+
+/// **M14G § VAL-CROSS-029**: mod-payload key under which
+/// [`M0Engine::snapshot_world_save`] stashes the M14C/D/E/F/G runtime
+/// state in [`cf_save::WorldSave::mod_payload`]. Append-only — readers
+/// that don't understand this key still round-trip the value verbatim
+/// per the SaveBlob "Mod-extending fields survive migration" contract.
+pub(crate) const M14_SAVE_EXTENSION_KEY: &str = "corefall.m14_state";
+
+/// **M14G § VAL-CROSS-029**: serializable wrapper around the M14C/D/E/F/G
+/// engine state that participates in the save/load round-trip.
+/// `capture` reads from a read-locked [`EngineMutable`] reference;
+/// `apply` writes back into a write-locked one. Both round-trip through
+/// the [`M14_SAVE_EXTENSION_KEY`] entry in [`cf_save::WorldSave::mod_payload`].
+///
+/// `serde_json` only supports string-shaped map keys at the wire level,
+/// so every M14 state surface that uses a tuple key (`(i32, i32)` for
+/// chunk coordinates, `(u64, String)` for `(actor, zone)`) is captured
+/// as a `Vec<(key, value)>` here and reassembled into its native
+/// `BTreeMap<TupleKey, _>` shape inside [`Self::apply`].
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct M14SaveExtension {
+    /// Per-actor [`cf_wound::ActorWoundList`] — captures the M14G
+    /// `ActorWoundList` field on each [`cf_actor::Actor`].
+    pub actor_wound_lists: Vec<(u64, cf_wound::ActorWoundList)>,
+    /// M14D projectile-pair pool — captures the in-flight projectiles
+    /// the per-tick CCD pass operates on.
+    pub m14d_projectile_pool: Vec<cf_physics::ProjectileSnapshot>,
+    /// M14E chunked integrity buffers (256-byte per-chunk
+    /// `IntegrityField` + support_beam anchored flag + crack/cave-in
+    /// state + cadence deadlines).
+    pub m14e_chunks: Vec<((i32, i32), M14eChunkState)>,
+    /// M14E cumulative beam/cave-in event counters.
+    pub m14e_total_cave_ins: u32,
+    pub m14e_total_beams_placed: u32,
+    pub m14e_total_beams_destroyed: u32,
+    /// M14E per-actor crafting-resource ledger (iron/wood debits).
+    pub m14e_actor_resources: Vec<(u64, BTreeMap<String, i64>)>,
+    /// M14E deterministic cave-in RNG cursor.
+    pub m14e_rng_state: u64,
+    /// M14E pass invocation counter (cadence schedule trace).
+    pub m14e_pass_invocations: u64,
+    /// M14E knockdown latch keyed by actor id.
+    pub m14e_actor_knockdown: Vec<(u64, bool)>,
+    /// M14E last-tick of a chunk's cave-in (drives 15-tick cascade
+    /// window).
+    pub m14e_last_cave_in_tick: Vec<((i32, i32), u64)>,
+    /// M14E tunnel-creak audio cue counter.
+    pub m14e_tunnel_creak_count: u32,
+    /// M14E cave-in thunder audio cue counter.
+    pub m14e_cave_in_thunder_count: u32,
+    /// M14E plasma-cutter active flag per actor.
+    pub m14e_plasma_cutter_active: Vec<(u64, bool)>,
+    /// M14F lateral integrity buffers + brace_strut state per chunk.
+    pub m14f_lateral_chunks: Vec<((i32, i32), M14fLateralChunkState)>,
+    /// M14F lateral pass invocation count (cadence trace).
+    pub m14f_lateral_pass_invocations: u64,
+    /// M14F per-actor flood-contact tick.
+    pub m14f_actor_submerged_tick: Vec<(u64, u64)>,
+    /// M14F per-actor vacuum-exposure tick.
+    pub m14f_actor_vacuum_tick: Vec<(u64, u64)>,
+    /// M14F cumulative fluid mass passed through each dam-chunk breach.
+    pub m14f_breach_fluid_mass: Vec<((i32, i32), u64)>,
+    /// M14F (room_kpa, vacuum_kpa) pressure pair per sealed-room chunk.
+    pub m14f_breach_pressure_kpa: Vec<((i32, i32), (f32, f32))>,
+    /// M14G aging-pass invocation count.
+    pub m14g_wound_aging_invocations: u64,
+    /// M14G thermal dwell counter per (actor, zone).
+    pub m14g_thermal_dwell_ticks: Vec<((u64, String), u64)>,
+    /// M14G latched thermal degree per (actor, zone).
+    pub m14g_thermal_emitted_kind: Vec<((u64, String), cf_wound::WoundKind)>,
+    /// M14G material-contact one-shot fired set.
+    pub m14g_material_contacts_fired: Vec<usize>,
+    /// **M14G**: per-actor rifle state at save tick — `(actor_id,
+    /// rifle_preset, ammo_in_mag, reload_remaining_ticks,
+    /// fire_cooldown_ticks)`. Restored alongside the SaveBlob's
+    /// per-actor rifle fields so the loaded engine's `sim.rifles`
+    /// matches the source state for VAL-CROSS-029 byte-equality.
+    pub rifle_states: Vec<RifleStateSnapshot>,
+}
+
+/// **M14G § VAL-CROSS-029**: serializable view of one `cf_equipment::RifleState`
+/// stamp used by [`M14SaveExtension`].
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct RifleStateSnapshot {
+    pub actor_id: u64,
+    pub preset_id: String,
+    pub ammo_in_mag: u32,
+    pub reload_remaining_ticks: u32,
+    pub fire_cooldown_ticks: u32,
+}
+
+impl M14SaveExtension {
+    pub(crate) fn capture(
+        state: &EngineMutable,
+        actor_wound_lists: BTreeMap<u64, cf_wound::ActorWoundList>,
+    ) -> Self {
+        let rifle_states: Vec<RifleStateSnapshot> = state
+            .actor_state
+            .as_ref()
+            .map(|sim| {
+                sim.rifles
+                    .iter()
+                    .map(|(actor_id, r)| RifleStateSnapshot {
+                        actor_id: actor_id.0,
+                        preset_id: r.spec.preset_id.clone(),
+                        ammo_in_mag: r.ammo_in_mag,
+                        reload_remaining_ticks: r.reload_remaining_ticks,
+                        fire_cooldown_ticks: r.fire_cooldown_ticks,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Self {
+            actor_wound_lists: actor_wound_lists.into_iter().collect(),
+            m14d_projectile_pool: state.m14d_projectile_pair_pool.clone(),
+            m14e_chunks: state.m14e_chunks.iter().map(|(k, v)| (*k, v.clone())).collect(),
+            m14e_total_cave_ins: state.m14e_total_cave_ins,
+            m14e_total_beams_placed: state.m14e_total_beams_placed,
+            m14e_total_beams_destroyed: state.m14e_total_beams_destroyed,
+            m14e_actor_resources: state
+                .m14e_actor_resources
+                .iter()
+                .map(|(k, v)| (*k, v.clone()))
+                .collect(),
+            m14e_rng_state: state.m14e_rng_state,
+            m14e_pass_invocations: state.m14e_pass_invocations,
+            m14e_actor_knockdown: state
+                .m14e_actor_knockdown
+                .iter()
+                .map(|(k, v)| (*k, *v))
+                .collect(),
+            m14e_last_cave_in_tick: state
+                .m14e_last_cave_in_tick
+                .iter()
+                .map(|(k, v)| (*k, *v))
+                .collect(),
+            m14e_tunnel_creak_count: state.m14e_tunnel_creak_count,
+            m14e_cave_in_thunder_count: state.m14e_cave_in_thunder_count,
+            m14e_plasma_cutter_active: state
+                .m14e_plasma_cutter_active
+                .iter()
+                .map(|(k, v)| (*k, *v))
+                .collect(),
+            m14f_lateral_chunks: state
+                .m14f_lateral_chunks
+                .iter()
+                .map(|(k, v)| (*k, v.clone()))
+                .collect(),
+            m14f_lateral_pass_invocations: state.m14f_lateral_pass_invocations,
+            m14f_actor_submerged_tick: state
+                .m14f_actor_submerged_tick
+                .iter()
+                .map(|(k, v)| (*k, *v))
+                .collect(),
+            m14f_actor_vacuum_tick: state
+                .m14f_actor_vacuum_tick
+                .iter()
+                .map(|(k, v)| (*k, *v))
+                .collect(),
+            m14f_breach_fluid_mass: state
+                .m14f_breach_fluid_mass
+                .iter()
+                .map(|(k, v)| (*k, *v))
+                .collect(),
+            m14f_breach_pressure_kpa: state
+                .m14f_breach_pressure_kpa
+                .iter()
+                .map(|(k, v)| (*k, *v))
+                .collect(),
+            m14g_wound_aging_invocations: state.m14g_wound_aging_invocations,
+            m14g_thermal_dwell_ticks: state
+                .m14g_thermal_dwell_ticks
+                .iter()
+                .map(|(k, v)| (k.clone(), *v))
+                .collect(),
+            m14g_thermal_emitted_kind: state
+                .m14g_thermal_emitted_kind
+                .iter()
+                .map(|(k, v)| (k.clone(), *v))
+                .collect(),
+            m14g_material_contacts_fired: state
+                .m14g_material_contacts_fired
+                .iter()
+                .copied()
+                .collect(),
+            rifle_states,
+        }
+    }
+
+    pub(crate) fn apply(self, state: &mut EngineMutable) {
+        if let Some(sim) = state.actor_state.as_mut() {
+            for (actor_id, list) in self.actor_wound_lists {
+                if let Some(actor) = sim.world.actors.get_mut(&cf_actor::ActorId(actor_id)) {
+                    actor.m14g_wound_list = list;
+                }
+            }
+            for rifle_snap in self.rifle_states {
+                if let Some(r) = sim.rifles.get_mut(&cf_actor::ActorId(rifle_snap.actor_id)) {
+                    if r.spec.preset_id == rifle_snap.preset_id {
+                        r.ammo_in_mag = rifle_snap.ammo_in_mag;
+                        r.reload_remaining_ticks = rifle_snap.reload_remaining_ticks;
+                        r.fire_cooldown_ticks = rifle_snap.fire_cooldown_ticks;
+                    }
+                }
+            }
+        }
+        state.m14d_projectile_pair_pool = self.m14d_projectile_pool;
+        state.m14e_chunks = self.m14e_chunks.into_iter().collect();
+        state.m14e_total_cave_ins = self.m14e_total_cave_ins;
+        state.m14e_total_beams_placed = self.m14e_total_beams_placed;
+        state.m14e_total_beams_destroyed = self.m14e_total_beams_destroyed;
+        state.m14e_actor_resources = self.m14e_actor_resources.into_iter().collect();
+        state.m14e_rng_state = self.m14e_rng_state;
+        state.m14e_pass_invocations = self.m14e_pass_invocations;
+        state.m14e_actor_knockdown = self.m14e_actor_knockdown.into_iter().collect();
+        state.m14e_last_cave_in_tick = self.m14e_last_cave_in_tick.into_iter().collect();
+        state.m14e_tunnel_creak_count = self.m14e_tunnel_creak_count;
+        state.m14e_cave_in_thunder_count = self.m14e_cave_in_thunder_count;
+        state.m14e_plasma_cutter_active = self.m14e_plasma_cutter_active.into_iter().collect();
+        state.m14f_lateral_chunks = self.m14f_lateral_chunks.into_iter().collect();
+        state.m14f_lateral_pass_invocations = self.m14f_lateral_pass_invocations;
+        state.m14f_actor_submerged_tick = self.m14f_actor_submerged_tick.into_iter().collect();
+        state.m14f_actor_vacuum_tick = self.m14f_actor_vacuum_tick.into_iter().collect();
+        state.m14f_breach_fluid_mass = self.m14f_breach_fluid_mass.into_iter().collect();
+        state.m14f_breach_pressure_kpa = self.m14f_breach_pressure_kpa.into_iter().collect();
+        state.m14g_wound_aging_invocations = self.m14g_wound_aging_invocations;
+        state.m14g_thermal_dwell_ticks = self.m14g_thermal_dwell_ticks.into_iter().collect();
+        state.m14g_thermal_emitted_kind = self.m14g_thermal_emitted_kind.into_iter().collect();
+        state.m14g_material_contacts_fired = self.m14g_material_contacts_fired.into_iter().collect();
+    }
 }
 
 /// M4A: outcome of one dig used to update the HUD tool-validity cache.

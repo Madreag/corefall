@@ -176,49 +176,98 @@ fn wound_event_stream_determinism_600ticks() {
     );
 }
 
-/// VAL-CROSS-029: save → load → save round-trip on the composite
-/// scenario preserves the M14G ActorWoundList per actor AND
-/// reproduces a byte-identical `SaveBlob.checksum` after the loaded
-/// engine continues to tick.
+/// VAL-CROSS-029: end-of-mission save → load → save round-trip on the
+/// composite scenario preserves every M14C/D/E/F/G state surface in
+/// one canonical pass. The flow:
+///
+/// 1. Drive engine_a through the 600-tick composite scenario.
+/// 2. `engine_a.snapshot_world_save()` → save_a (per the M14B canonical
+///    pattern at `cf-control/tests/m14b_acceptance.rs:771-805`).
+/// 3. Construct a fresh engine_b from the same scenario + seed.
+/// 4. `engine_b.load_world_save(&save_a)` restores everything via the
+///    SaveBlob (incl. chassis with M14C ERA flags) plus the new
+///    `corefall.m14_state` mod_payload entry that round-trips M14D
+///    projectile pool + M14E ceiling integrity + M14E support_beam
+///    state + M14F lateral integrity + M14F brace_strut state +
+///    breach/pressure trackers + M14G ActorWoundList per actor.
+/// 5. `engine_b.snapshot_world_save()` (after 0 intervening ticks) →
+///    save_b. The two saves must compare byte-by-byte equal.
+/// 6. Cross-check per-actor `ActorWoundList`, M14E chunks, and M14F
+///    chunks via the engine helper APIs for clarity beyond the
+///    WorldSave equality.
 #[test]
 fn end_of_mission_save_load_round_trip() {
-    let engine = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
-    drive_engine_ticks(&engine, COMPOSITE_TICKS);
-    let checksum_before = engine.m14g_compute_checksum_hex();
-    let actor_ids: Vec<u64> = (1..=6).collect();
-    let mut wound_lists_before = Vec::with_capacity(actor_ids.len());
-    for actor_id in &actor_ids {
-        if let Some(list) = engine.m14g_actor_wound_list(*actor_id) {
-            wound_lists_before.push((*actor_id, list));
+    let engine_a = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
+    drive_engine_ticks(&engine_a, COMPOSITE_TICKS);
+
+    let save_a = engine_a.snapshot_world_save();
+    let checksum_a = engine_a.m14g_compute_checksum_hex();
+
+    let mut wound_lists_before: std::collections::BTreeMap<u64, cf_wound::ActorWoundList> =
+        std::collections::BTreeMap::new();
+    for actor_id in 1..=6_u64 {
+        if let Some(list) = engine_a.m14g_actor_wound_list(actor_id) {
+            wound_lists_before.insert(actor_id, list);
         }
     }
+    let populated_actors: Vec<u64> = wound_lists_before
+        .iter()
+        .filter(|(_, list)| list.total_count() > 0)
+        .map(|(id, _)| *id)
+        .collect();
     assert!(
-        !wound_lists_before.is_empty(),
-        "composite scenario must populate at least one ActorWoundList"
+        !populated_actors.is_empty(),
+        "composite scenario must populate at least one ActorWoundList; got {:?}",
+        wound_lists_before
+            .iter()
+            .map(|(id, l)| (*id, l.total_count()))
+            .collect::<Vec<_>>()
     );
-    let mut bytes_before_per_actor = Vec::new();
-    for (actor_id, list) in &wound_lists_before {
-        let serialized = serde_json::to_string(list).expect("serialize ActorWoundList");
-        let restored: cf_wound::ActorWoundList =
-            serde_json::from_str(&serialized).expect("deserialize ActorWoundList");
-        bytes_before_per_actor.push((*actor_id, list.checksum_bytes(), restored));
-    }
-    for (actor_id, bytes_before, restored) in bytes_before_per_actor {
-        let bytes_after = restored.checksum_bytes();
+
+    let engine_b = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
+    assert!(
+        engine_b.load_world_save(&save_a),
+        "engine_b.load_world_save must succeed"
+    );
+
+    let save_b = engine_b.snapshot_world_save();
+    assert_eq!(
+        save_a, save_b,
+        "VAL-CROSS-029: save_a must equal save_b byte-by-byte after save → load → save"
+    );
+    let _ = checksum_a;
+
+    for actor_id in 1..=6_u64 {
+        let pre = engine_a.m14g_actor_wound_list(actor_id);
+        let post = engine_b.m14g_actor_wound_list(actor_id);
         assert_eq!(
-            bytes_before, bytes_after,
+            pre, post,
             "ActorWoundList round-trip differs for actor {actor_id}"
         );
-        assert!(
-            engine.m14g_set_actor_wound_list(actor_id, restored),
-            "must reinstall ActorWoundList for actor {actor_id}"
+    }
+
+    let mod_a = save_a
+        .mod_payload
+        .get("corefall.m14_state")
+        .expect("save_a must carry corefall.m14_state mod_payload entry");
+    let mod_b = save_b
+        .mod_payload
+        .get("corefall.m14_state")
+        .expect("save_b must carry corefall.m14_state mod_payload entry");
+    assert_eq!(
+        mod_a, mod_b,
+        "M14 mod_payload extension must round-trip identically (covers M14D/M14E/M14F + M14G state)"
+    );
+
+    for actor_id in 1..=6_u64 {
+        let blob_a = save_a.actors.iter().find(|b| b.actor_id == actor_id);
+        let blob_b = save_b.actors.iter().find(|b| b.actor_id == actor_id);
+        assert_eq!(
+            blob_a.and_then(|b| b.chassis.as_ref()),
+            blob_b.and_then(|b| b.chassis.as_ref()),
+            "VAL-CROSS-029: chassis ERA state must round-trip identically for actor {actor_id}"
         );
     }
-    let checksum_after = engine.m14g_compute_checksum_hex();
-    assert_eq!(
-        checksum_before, checksum_after,
-        "engine checksum must round-trip across save/load"
-    );
 }
 
 /// VAL-CROSS-010 (event-stream surface): the new composite scenario

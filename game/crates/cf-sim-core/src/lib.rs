@@ -126,6 +126,14 @@ impl SimClock {
     pub fn tick(&self) -> Tick {
         self.tick
     }
+    /// Overwrite the clock's tick counter without driving the scheduler.
+    /// Used by the **M14G § VAL-CROSS-029** save/load round-trip path so a
+    /// freshly-constructed engine that loads a `WorldSave` taken at tick `T`
+    /// reports tick `T` from its first `snapshot_world_save` call, before
+    /// any further `advance()` invocations.
+    pub fn set_tick(&mut self, tick: Tick) {
+        self.tick = tick;
+    }
     pub fn mode(&self) -> SimMode {
         self.mode
     }
