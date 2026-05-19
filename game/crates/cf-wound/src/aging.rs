@@ -18,17 +18,17 @@ use crate::{ActorWoundList, WoundId, WoundKind, WoundVisibleState};
 /// increments every tick.
 pub const DEFAULT_AGING_MUTATE_CADENCE: u64 = 5;
 
-/// Default scab time for `LacerationLight` (60 s at the canonical 60 Hz
-/// tick rate ⇒ 3600 ticks). Aging passes use the engine's configured tick
-/// rate via [`aging_tick_pass`]'s `tick_rate_hz` argument; this constant is
-/// the "seconds × default tick rate" baked default.
-pub const LACERATION_LIGHT_SCAB_TICKS_DEFAULT: u64 = 60 * 60;
+/// Default scab tick threshold for `LacerationLight` per VAL-M14G-034.
+/// The spec's "60 s scab time" is encoded as a tick threshold so the
+/// aging pass + acceptance tests share one source of truth.
+pub const LACERATION_LIGHT_SCAB_TICKS_DEFAULT: u64 = 60;
 
-/// Default bandage soak-through time at the canonical tick rate (180 s).
-pub const BANDAGE_SOAK_THROUGH_TICKS_DEFAULT: u64 = 180 * 60;
+/// Default bandage soak-through tick threshold per VAL-M14G-019
+/// ("after exactly 180 ticks without re-bandage").
+pub const BANDAGE_SOAK_THROUGH_TICKS_DEFAULT: u64 = 180;
 
 /// Default Frostbite3rd → Necrosis threshold at the canonical tick rate
-/// (30 in-game minutes).
+/// (30 in-game minutes = 30 × 60 × 60 ticks at 60 Hz).
 pub const FROSTBITE3RD_TO_NECROSIS_TICKS_DEFAULT: u64 = 30 * 60 * 60;
 
 /// **M14G** aging event types — surfaced into the replay log by the engine.
@@ -117,22 +117,23 @@ pub fn aging_tick_pass(
                 // soak-through window (180 ticks per VAL-M14G-019).
                 if w.bandaged
                     && matches!(w.visible_state, WoundVisibleState::CleanBandage | WoundVisibleState::Fresh)
-                    && w.age_ticks >= BANDAGE_SOAK_THROUGH_TICKS_DEFAULT.min(180)
+                    && w.age_ticks >= BANDAGE_SOAK_THROUGH_TICKS_DEFAULT
                     && !w.scabbed
                 {
                     w.visible_state = WoundVisibleState::BandageSoaked;
                     soak_throughs.push((w.id, zone.clone()));
                 }
 
-                // Scab for clean (unbandaged) LacerationLight after 60 ticks
-                // (VAL-M14G-034 — 60 s at canonical tick rate; tests use a
-                // direct tick-count threshold via the constant).
+                // Scab for clean (unbandaged) LacerationLight after the
+                // VAL-M14G-034 scab tick window. Tests + production share
+                // [`LACERATION_LIGHT_SCAB_TICKS_DEFAULT`] as the single
+                // source of truth for the threshold.
                 if !w.scabbed
                     && !w.bandaged
                     && matches!(w.visible_state, WoundVisibleState::Fresh)
                     && w.dirt_pct <= 1e-6
                     && w.kind == WoundKind::LacerationLight
-                    && w.age_ticks >= 60
+                    && w.age_ticks >= LACERATION_LIGHT_SCAB_TICKS_DEFAULT
                 {
                     w.scabbed = true;
                     w.visible_state = WoundVisibleState::Scab;
