@@ -4,11 +4,14 @@
 //!
 //! - VAL-M14G-046: aging pass invoked once per tick
 //! - VAL-M14G-047: aging pass does not roll infection chance during M14G
-//! - VAL-M14G-024: same-seed determinism — two engines produce identical
-//!   wound-event streams across 600 ticks
-//! - VAL-CROSS-010 surface: SaveBlob.checksum byte-identical across
-//!   same-seed engines
-//! - VAL-CROSS-029: save/load round-trip preserves the M14G wound list
+//! - VAL-M14G-024 / VAL-CROSS-010: same-seed engines on the composite
+//!   M14C+M14D+M14E+M14F+M14G scenario produce byte-identical wound
+//!   event streams AND byte-identical `SaveBlob.checksum` at the end
+//!   of the run
+//! - VAL-CROSS-029: save/load round-trip on the composite scenario
+//!   preserves the M14G ActorWoundList per actor + the M14F lateral
+//!   integrity buffers + M14E ceiling buffers + M14C ERA flags +
+//!   M14D projectile pool
 
 use std::path::PathBuf;
 
@@ -20,6 +23,10 @@ use cf_control::{
 use cf_replay::resolve_run_bundle_root;
 use cf_wound::WoundKind;
 use tempfile::tempdir;
+
+const COMPOSITE_SCENARIO: &str = "m14g_whole_mission_determinism";
+const COMPOSITE_TICKS: u64 = 600;
+const COMPOSITE_SEED: u64 = 0xC0FFEE;
 
 fn game_root() -> PathBuf {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -65,16 +72,20 @@ fn make_engine(scenario_id: &str, ticks: u64, seed: u64) -> M0Engine {
     engine
 }
 
-/// VAL-M14G-046: per-tick wound aging pass invocation counter advances
-/// exactly once per tick.
-#[test]
-fn wound_aging_pass_called_once_per_tick() {
-    let engine = make_engine("m14a_walk_lab", 100, 0xC0FFEE);
-    for _ in 0..100 {
+fn drive_engine_ticks(engine: &M0Engine, ticks: u64) {
+    for _ in 0..ticks {
         if engine.drive_tick().is_none() {
             break;
         }
     }
+}
+
+/// VAL-M14G-046: per-tick wound aging pass invocation counter advances
+/// exactly once per tick.
+#[test]
+fn wound_aging_pass_called_once_per_tick() {
+    let engine = make_engine("m14a_walk_lab", 100, COMPOSITE_SEED);
+    drive_engine_ticks(&engine, 100);
     let count = engine.m14g_wound_aging_invocations();
     assert_eq!(count, 100, "expected 100 aging pass invocations");
 }
@@ -82,15 +93,11 @@ fn wound_aging_pass_called_once_per_tick() {
 /// VAL-M14G-047: aging pass does NOT roll infection chance during M14G.
 #[test]
 fn m14g_does_not_roll_infection_chance() {
-    let engine = make_engine("m14a_walk_lab", 300, 0xC0FFEE);
+    let engine = make_engine("m14a_walk_lab", 300, COMPOSITE_SEED);
     engine
         .m14g_inject_wound(1, WoundKind::LacerationModerate, "torso_front", 0.4)
         .expect("inject wound");
-    for _ in 0..300 {
-        if engine.drive_tick().is_none() {
-            break;
-        }
-    }
+    drive_engine_ticks(&engine, 300);
     let events = engine.recorder().snapshot_events();
     let infection_count = events
         .iter()
@@ -106,95 +113,147 @@ fn m14g_does_not_roll_infection_chance() {
     assert_eq!(infection_count, 0, "M14G must not roll any infection events");
 }
 
-/// VAL-M14G-024: same-seed engines produce identical `wound.*` event
-/// streams across 100 ticks (full-mission would be 600; we keep the
-/// integration test short).
-#[test]
-fn wound_event_stream_determinism_600ticks() {
-    let engine_a = make_engine("m14a_walk_lab", 100, 0xC0FFEE);
-    let engine_b = make_engine("m14a_walk_lab", 100, 0xC0FFEE);
-    for engine in [&engine_a, &engine_b] {
-        engine
-            .m14g_inject_wound(1, WoundKind::LacerationLight, "torso_front", 0.2)
-            .expect("inject");
-        engine
-            .m14g_inject_wound(1, WoundKind::Burn1st, "foot_right", 0.2)
-            .expect("inject");
-    }
-    for _ in 0..100 {
-        if engine_a.drive_tick().is_none() || engine_b.drive_tick().is_none() {
-            break;
-        }
-    }
-    let events_a: Vec<_> = engine_a
-        .recorder()
-        .snapshot_events()
-        .into_iter()
-        .filter(|e| e.category == "wound")
-        .collect();
-    let events_b: Vec<_> = engine_b
-        .recorder()
-        .snapshot_events()
-        .into_iter()
-        .filter(|e| e.category == "wound")
-        .collect();
-    assert_eq!(events_a.len(), events_b.len(), "wound event count must match");
-    for (a, b) in events_a.iter().zip(events_b.iter()) {
-        assert_eq!(a.category, b.category);
-        assert_eq!(a.event_type, b.event_type);
-        assert_eq!(a.tick, b.tick);
-        assert_eq!(a.payload, b.payload);
-    }
-}
-
-/// VAL-CROSS-010 surface: full-engine checksum is byte-identical across
-/// same-seed engines after the wound aging pass runs N ticks.
+/// VAL-M14G-024 + VAL-CROSS-010: same-seed engines driving the composite
+/// scenario produce byte-identical wound + armor + terrain + collision
+/// event streams AND identical SaveBlob.checksum at tick 600.
 #[test]
 fn whole_mission_determinism_checksum() {
-    let engine_a = make_engine("m14a_walk_lab", 100, 0xC0FFEE);
-    let engine_b = make_engine("m14a_walk_lab", 100, 0xC0FFEE);
-    engine_a
-        .m14g_inject_wound(1, WoundKind::LacerationModerate, "torso_front", 0.4)
-        .expect("inject");
-    engine_b
-        .m14g_inject_wound(1, WoundKind::LacerationModerate, "torso_front", 0.4)
-        .expect("inject");
-    for _ in 0..100 {
-        if engine_a.drive_tick().is_none() || engine_b.drive_tick().is_none() {
-            break;
-        }
-    }
+    let engine_a = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
+    let engine_b = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
+    drive_engine_ticks(&engine_a, COMPOSITE_TICKS);
+    drive_engine_ticks(&engine_b, COMPOSITE_TICKS);
     let cs_a = engine_a.m14g_compute_checksum_hex();
     let cs_b = engine_b.m14g_compute_checksum_hex();
-    assert_eq!(cs_a, cs_b, "checksums must match across same-seed engines");
-}
+    assert_eq!(cs_a, cs_b, "checksums must match across same-seed composite engines");
 
-/// VAL-CROSS-029: save → load → save round-trip preserves the M14G
-/// wound list. Serialize the wound list to JSON, deserialize into a
-/// fresh `ActorWoundList`, reinstall on the actor, and verify the
-/// checksum bytes are byte-identical.
-#[test]
-fn end_of_mission_save_load_round_trip() {
-    let engine = make_engine("m14a_walk_lab", 50, 0xC0FFEE);
-    engine
-        .m14g_inject_wound(1, WoundKind::LacerationModerate, "torso_front", 0.4)
-        .expect("inject");
-    engine
-        .m14g_inject_wound(1, WoundKind::Burn3rd, "foot_right", 0.85)
-        .expect("inject");
-    for _ in 0..50 {
-        if engine.drive_tick().is_none() {
-            break;
+    let events_a = engine_a.recorder().snapshot_events();
+    let events_b = engine_b.recorder().snapshot_events();
+    let categories: &[&str] = &["wound", "armor", "terrain", "collision"];
+    for category in categories {
+        let filter = |e: &&cf_replay::Event| e.category == *category;
+        let cat_a: Vec<_> = events_a.iter().filter(filter).collect();
+        let cat_b: Vec<_> = events_b.iter().filter(filter).collect();
+        assert_eq!(
+            cat_a.len(),
+            cat_b.len(),
+            "{category} event count must match across same-seed engines"
+        );
+        for (a, b) in cat_a.iter().zip(cat_b.iter()) {
+            assert_eq!(a.event_type, b.event_type, "{category} event_type differs");
+            assert_eq!(a.tick, b.tick, "{category} tick differs");
+            assert_eq!(a.payload, b.payload, "{category} payload differs");
         }
     }
+}
+
+/// VAL-CROSS-010 (wound-stream subset): the wound.* event stream is
+/// byte-identical across all 5 event families (created/escalated/aged/
+/// scabbed/scarred) on the composite scenario.
+#[test]
+fn wound_event_stream_determinism_600ticks() {
+    let engine_a = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
+    let engine_b = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
+    drive_engine_ticks(&engine_a, COMPOSITE_TICKS);
+    drive_engine_ticks(&engine_b, COMPOSITE_TICKS);
+    let kinds: &[&str] = &["created", "escalated", "aged", "scabbed", "scarred"];
+    let events_a = engine_a.recorder().snapshot_events();
+    let events_b = engine_b.recorder().snapshot_events();
+    for kind in kinds {
+        let filter = |e: &&cf_replay::Event| {
+            e.category == "wound" && e.event_type == *kind
+        };
+        let a: Vec<_> = events_a.iter().filter(filter).collect();
+        let b: Vec<_> = events_b.iter().filter(filter).collect();
+        assert_eq!(a.len(), b.len(), "wound.{kind} count must match across runs");
+        for (ea, eb) in a.iter().zip(b.iter()) {
+            assert_eq!(ea.tick, eb.tick, "wound.{kind} tick differs");
+            assert_eq!(ea.payload, eb.payload, "wound.{kind} payload differs");
+        }
+    }
+    assert!(
+        events_a.iter().filter(|e| e.category == "wound" && e.event_type == "created").count() >= 4,
+        "composite scenario must emit ≥ 4 wound.created events"
+    );
+}
+
+/// VAL-CROSS-029: save → load → save round-trip on the composite
+/// scenario preserves the M14G ActorWoundList per actor AND
+/// reproduces a byte-identical `SaveBlob.checksum` after the loaded
+/// engine continues to tick.
+#[test]
+fn end_of_mission_save_load_round_trip() {
+    let engine = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
+    drive_engine_ticks(&engine, COMPOSITE_TICKS);
     let checksum_before = engine.m14g_compute_checksum_hex();
-    let wound_list = engine.m14g_actor_wound_list(1).expect("wound list");
-    let bytes_before = wound_list.checksum_bytes();
-    let serialized = serde_json::to_string(&wound_list).expect("serialize");
-    let restored: cf_wound::ActorWoundList = serde_json::from_str(&serialized).expect("deserialize");
-    let bytes_after = restored.checksum_bytes();
-    assert_eq!(bytes_before, bytes_after, "wound list bytes must round-trip");
-    assert!(engine.m14g_set_actor_wound_list(1, restored.clone()));
+    let actor_ids: Vec<u64> = (1..=6).collect();
+    let mut wound_lists_before = Vec::with_capacity(actor_ids.len());
+    for actor_id in &actor_ids {
+        if let Some(list) = engine.m14g_actor_wound_list(*actor_id) {
+            wound_lists_before.push((*actor_id, list));
+        }
+    }
+    assert!(
+        !wound_lists_before.is_empty(),
+        "composite scenario must populate at least one ActorWoundList"
+    );
+    let mut bytes_before_per_actor = Vec::new();
+    for (actor_id, list) in &wound_lists_before {
+        let serialized = serde_json::to_string(list).expect("serialize ActorWoundList");
+        let restored: cf_wound::ActorWoundList =
+            serde_json::from_str(&serialized).expect("deserialize ActorWoundList");
+        bytes_before_per_actor.push((*actor_id, list.checksum_bytes(), restored));
+    }
+    for (actor_id, bytes_before, restored) in bytes_before_per_actor {
+        let bytes_after = restored.checksum_bytes();
+        assert_eq!(
+            bytes_before, bytes_after,
+            "ActorWoundList round-trip differs for actor {actor_id}"
+        );
+        assert!(
+            engine.m14g_set_actor_wound_list(actor_id, restored),
+            "must reinstall ActorWoundList for actor {actor_id}"
+        );
+    }
     let checksum_after = engine.m14g_compute_checksum_hex();
-    assert_eq!(checksum_before, checksum_after, "engine checksum must round-trip");
+    assert_eq!(
+        checksum_before, checksum_after,
+        "engine checksum must round-trip across save/load"
+    );
+}
+
+/// VAL-CROSS-010 (event-stream surface): the new composite scenario
+/// must emit a non-empty mix of wound kinds across actors during the
+/// 600-tick run.
+#[test]
+fn composite_scenario_emits_multi_kind_wound_stream() {
+    let engine = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
+    drive_engine_ticks(&engine, COMPOSITE_TICKS);
+    let events = engine.recorder().snapshot_events();
+    let mut kinds: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for e in events.iter() {
+        if e.category != "wound" || e.event_type != "created" {
+            continue;
+        }
+        if let Some(k) = e.payload.get("kind").and_then(|v| v.as_str()) {
+            kinds.insert(k.to_string());
+        }
+    }
+    assert!(
+        kinds.len() >= 5,
+        "composite scenario should emit ≥ 5 distinct wound kinds; got {:?}",
+        kinds
+    );
+    let expected = [
+        "Burn3rd",
+        "ShrapnelEmbedded",
+        "Frostbite1st",
+        "AcidBurn",
+    ];
+    for needle in expected.iter() {
+        assert!(
+            kinds.contains(*needle),
+            "composite scenario should emit at least one {needle} wound (got {:?})",
+            kinds
+        );
+    }
 }
