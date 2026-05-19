@@ -238,3 +238,63 @@ fn val_m14g_runtime_material_contact_wounds_emit_via_engine() {
         "expected ≥ 1 ChemicalBurn from material contact pass; got {chemical}"
     );
 }
+
+/// VAL-M14G-023 runtime evidence: load `m14g_melee_face.ron`, let the
+/// engine settle the scenario, then dispatch one `MeleeShoulderCheck`
+/// from actor 1 facing right. The blunt-impulse hit lands on actor 2
+/// within shoulder-check reach; the engine's M14G producer routes the
+/// hit through `classify_blunt_face_hit` and emits
+/// `wound.created kind=DentalDamage severity=0.6 zone=head_front`.
+#[test]
+fn val_m14g_runtime_blunt_face_dental_damage() {
+    let path = locate_scenario("m14g_melee_face");
+    let scenario = Scenario::load_from_file(&path).expect("scenario parses");
+    let config = M0EngineConfig::for_loaded_scenario(&scenario, path);
+    let engine = M0Engine::new(config);
+    engine.record_run_started();
+    for _ in 0..2 {
+        if engine.drive_tick().is_none() {
+            break;
+        }
+    }
+    let accepted = engine.m14g_dispatch_melee_shoulder_check();
+    assert!(accepted, "MeleeShoulderCheck dispatch must be accepted");
+    for _ in 0..3 {
+        if engine.drive_tick().is_none() {
+            break;
+        }
+    }
+    let events = engine.recorder().snapshot_events();
+    let dental_events: Vec<_> = events
+        .iter()
+        .filter(|e| e.category == "wound" && e.event_type == "created")
+        .filter(|e| {
+            e.payload
+                .get("kind")
+                .and_then(|v| v.as_str())
+                .map(|k| k == "DentalDamage")
+                .unwrap_or(false)
+        })
+        .collect();
+    assert!(
+        !dental_events.is_empty(),
+        "expected ≥ 1 wound.created kind=DentalDamage; got wound events: {:?}",
+        events
+            .iter()
+            .filter(|e| e.category == "wound")
+            .map(|e| (
+                e.event_type.clone(),
+                e.payload.get("kind").and_then(|v| v.as_str()).map(String::from)
+            ))
+            .collect::<Vec<_>>()
+    );
+    for e in &dental_events {
+        let zone = e.payload.get("zone").and_then(|v| v.as_str()).unwrap_or("");
+        let severity = e.payload.get("severity").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        assert_eq!(zone, "head_front", "DentalDamage must land on head_front");
+        assert!(
+            (severity - 0.6_f64).abs() < 1e-2,
+            "DentalDamage severity must be ≈ 0.6; got {severity}"
+        );
+    }
+}

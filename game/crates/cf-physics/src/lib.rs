@@ -67,7 +67,7 @@ pub use joint::{
 };
 pub use m14g_producer::{
     classify_blunt_face_hit, classify_fall_fracture, classify_gunshot, classify_heat_cluster, classify_shrapnel,
-    substitute_for_origin, M14gWoundEmit,
+    substitute_for_origin, M14gWoundEmit, M14G_TOOTH_THRESHOLD,
 };
 pub use limb_path_interop::LimbPathInterop;
 pub use penetration_m14c::{

@@ -23,6 +23,16 @@
 use cf_wound::registry::{OriginId, WoundSpecRegistry, ZoneId};
 use cf_wound::{Wound, WoundId, WoundKind};
 
+/// **VAL-M14G-023**: tooth-impulse threshold for [`classify_blunt_face_hit`].
+///
+/// Calibrated so the M6 blunt melee weapons (`rifle_bash` damage 15,
+/// `baton` damage 12, `shoulder_check` damage 10, `sledgehammer` damage 35,
+/// `stun_baton` jolt 14) clear the threshold and emit `DentalDamage` when
+/// the engine routes a face-aligned blunt hit through the M14G producer;
+/// the lighter `kick` (damage 8) stays below the threshold and falls back
+/// to `BruiseHeavy` via `classify_blunt_face_hit`'s alternate branch.
+pub const M14G_TOOTH_THRESHOLD: f32 = 9.5;
+
 /// **VAL-M14G-027/028**: typed wound emit candidate from a single
 /// penetration-ray hit. Carries the kind, severity (computed from absorbed
 /// damage), zone, and the per-origin substitution applied if the actor's

@@ -9441,10 +9441,15 @@ impl M0Engine {
                         None,
                     );
                 }
-                // VAL-CROSS-007 fallback: when the impulse drops below
-                // the fracture decision threshold, ensure the actor still
-                // receives a typed `CrushLimb` wound so the M14G typed
-                // emit path is always exercised by a cave-in.
+                // VAL-CROSS-007 belt-and-suspenders: the cave-in's
+                // primary emit comes from `classify_fall_fracture` above
+                // (Fracture* on impulse ≥ 0.7 × severance threshold).
+                // The fallback CrushLimb emit ALWAYS fires on knockdown
+                // regardless of whether the fracture branch already
+                // emitted — VAL-CROSS-007 accepts ANY skeletal kind on
+                // cave-in debris, so two typed wounds is strictly more
+                // permissive than zero. The double-emit is intentional
+                // and stays gated only by `outcome.knockdown`.
                 if outcome.knockdown {
                     let crush_emit = cf_physics::M14gWoundEmit {
                         kind: cf_wound::WoundKind::CrushLimb,
@@ -10062,11 +10067,18 @@ impl M0Engine {
                                 None,
                             );
                         }
-                        // Always emit a CrushLimb so the M14G typed emit
-                        // path is exercised even when the impulse is
-                        // below the fracture decision threshold (the
-                        // spec accepts `CrushLimb`/`BruiseHeavy` as
-                        // alternative kinds per VAL-CROSS-008).
+                        // VAL-CROSS-008 belt-and-suspenders: the
+                        // wall-rupture's primary emit comes from
+                        // `classify_fall_fracture` above
+                        // (Fracture* on impulse ≥ 0.7 × severance
+                        // threshold). The fallback CrushLimb +
+                        // BruiseHeavy emits ALWAYS fire alongside the
+                        // fracture branch — VAL-CROSS-008 accepts ANY
+                        // {Fracture*, CrushLimb, BruiseHeavy} on the
+                        // downstream actor in the debris cone, so an
+                        // over-emit is strictly more permissive than
+                        // gating on `.is_none()`. The double-emit is
+                        // intentional and stays unconditional.
                         let crush_emit = cf_physics::M14gWoundEmit {
                             kind: cf_wound::WoundKind::CrushLimb,
                             severity: 0.5,
@@ -16550,6 +16562,29 @@ impl M0Engine {
         false
     }
 
+    /// **M14G § VAL-M14G-023 test helper**: dispatch a one-shot
+    /// `MeleeShoulderCheck` via the M6 dispatch path so the engine's
+    /// melee-resolve code (including the blunt-face dental-damage emit)
+    /// fires exactly the same way it would for a cfctl-driven hit.
+    /// Returns `true` when the dispatch was Accepted by the engine
+    /// (player + target present + actions allowed).
+    pub fn m14g_dispatch_melee_shoulder_check(&self) -> bool {
+        let tick = Tick(self.current_tick.load(std::sync::atomic::Ordering::Relaxed));
+        let sim_time_ms = tick.0 as f64 * (1000.0 / f64::from(self.config.tick_rate_hz.max(1)));
+        let state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        let result = self.dispatch_m6_action(
+            crate::m6_actions::M6Action::MeleeShoulderCheck,
+            cf_actor::IntentSource::Cfctl,
+            tick,
+            sim_time_ms,
+            state,
+        );
+        matches!(result.status, crate::state::ControlEnvelopeStatus::Accepted)
+    }
+
     /// **M8 helper**: record a `control.command_accepted` envelope log.
     pub(crate) fn record_command_accepted(&self, tick: Tick, sim_time_ms: f64, method: &str, extra: serde_json::Value) {
         let mut payload = json!({"method": method});
@@ -18271,6 +18306,37 @@ impl M0Engine {
             if let Some(payload) = hit_stop_payload {
                 #[rustfmt::skip]
                 let _ = self.recorder.record(tick, sim_time_ms, "camera", "hit_stop", payload, None);
+            }
+            // **M14G § VAL-M14G-023**: blunt-face dental damage emit.
+            // Per spec, every melee blunt-impulse hit whose target zone
+            // is face-aligned `head_front` AND whose impulse magnitude
+            // exceeds the tooth threshold emits `wound.created` with
+            // `kind=DentalDamage severity=0.6 zone=head_front`. The
+            // producer (`classify_blunt_face_hit`) returns DentalDamage
+            // above-threshold and BruiseHeavy below; the engine only
+            // routes the DentalDamage branch through `m14g_emit_wound_created`
+            // here so the lighter blunt hits don't double-emit a
+            // BruiseHeavy alongside the M14 damage path.
+            let preset_damage_kind = cf_equipment::m6_melee_presets()
+                .into_iter()
+                .find(|m| m.kind == emit.kind)
+                .map(|p| p.damage_kind)
+                .unwrap_or_default();
+            if preset_damage_kind == "blunt" && emit.damage > cf_physics::M14G_TOOTH_THRESHOLD {
+                let dental = cf_physics::classify_blunt_face_hit(
+                    cf_wound::registry::ZoneId::from("head_front"),
+                    emit.damage,
+                    cf_physics::M14G_TOOTH_THRESHOLD,
+                );
+                if matches!(dental.kind, cf_wound::WoundKind::DentalDamage) {
+                    let _ = self.m14g_emit_wound_created(
+                        tick,
+                        sim_time_ms,
+                        emit.target,
+                        dental,
+                        Some(melee_event_id.clone()),
+                    );
+                }
             }
         }
         if let Some(target_id) = knockdown_emit {
