@@ -339,9 +339,10 @@ impl Wound {
             return 0.0;
         }
         let raw = base_rate_at_severity * self.severity;
+        #[allow(clippy::match_same_arms)]
         match self.visible_state {
             WoundVisibleState::Fresh => raw,
-            WoundVisibleState::CleanBandage => raw * 0.5_f32.min(1.0) * 0.0_f32.max(0.0) + raw * 0.0_f32,
+            WoundVisibleState::CleanBandage => 0.0,
             // Bandage soak-through halves the pre-bandage rate (spec).
             WoundVisibleState::BandageSoaked => raw * 0.5,
             WoundVisibleState::SutureLine => raw * 0.25,
