@@ -221,11 +221,14 @@ mod tests {
         assert_eq!(pair[1].zone.as_str(), "torso_back");
     }
 
-    /// VAL-M14G-027: producer never emits a generic-wound kind. Fuzz 100 random
-    /// gunshot/shrapnel/blunt scenarios and confirm each produces a typed
-    /// WoundKind from the canonical set.
+    /// VAL-M14G-027 (standalone helper coverage): `classify_gunshot`
+    /// always returns typed `GunshotEntry`/`GunshotExit`/`GunshotThrough`
+    /// kinds — never a legacy generic wound. Engine-level
+    /// "zero `combat.wound_added` events" coverage lives in
+    /// `cf-control::tests` (runtime evidence) since this fixture only
+    /// exercises the producer surface.
     #[test]
-    fn no_generic_wound_emit() {
+    fn classify_gunshot_returns_only_typed_kinds() {
         for i in 0..100 {
             let through = i % 2 == 0;
             let kinds = classify_gunshot(
