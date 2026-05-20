@@ -1803,6 +1803,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-flask"
+version = "0.0.1"
+dependencies = [
+ "cf-material",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-fortification"
 version = "0.0.1"
 dependencies = [
@@ -1868,6 +1879,8 @@ dependencies = [
 name = "cf-material"
 version = "0.0.1"
 dependencies = [
+ "cf-flask",
+ "cf-terrain",
  "cf-wound",
  "serde",
  "serde_json",

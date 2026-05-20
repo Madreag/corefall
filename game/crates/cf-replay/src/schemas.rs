@@ -567,6 +567,19 @@ const SCHEMA_UX_PLAN_COMPOSED: &str = include_str!("../schemas/event/ux_plan_com
 const SCHEMA_UX_PLAN_EXECUTED: &str = include_str!("../schemas/event/ux_plan_executed.json");
 const SCHEMA_UX_PLAN_ABORTED: &str = include_str!("../schemas/event/ux_plan_aborted.json");
 
+// **M15 § Active Material Kernel**: material/reaction + phase + CA step events,
+// flask throw + drink events, alchemy invoke + complete events.
+const SCHEMA_MATERIAL_REACTION_TRIGGERED: &str =
+    include_str!("../schemas/event/material_reaction_triggered.json");
+const SCHEMA_MATERIAL_PHASE_TRANSITION: &str =
+    include_str!("../schemas/event/material_phase_transition.json");
+const SCHEMA_MATERIAL_CELLULAR_STEP: &str = include_str!("../schemas/event/material_cellular_step.json");
+const SCHEMA_FLASK_THROWN: &str = include_str!("../schemas/event/flask_thrown.json");
+const SCHEMA_FLASK_CONSUMED: &str = include_str!("../schemas/event/flask_consumed.json");
+const SCHEMA_ALCHEMY_RECIPE_INVOKED: &str = include_str!("../schemas/event/alchemy_recipe_invoked.json");
+const SCHEMA_ALCHEMY_RECIPE_COMPLETED: &str =
+    include_str!("../schemas/event/alchemy_recipe_completed.json");
+
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
 /// constraint"; the recorder envelope itself is checked by the bundle
@@ -1025,6 +1038,15 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ux", "plan_composed") => Some(SCHEMA_UX_PLAN_COMPOSED),
         ("ux", "plan_executed") => Some(SCHEMA_UX_PLAN_EXECUTED),
         ("ux", "plan_aborted") => Some(SCHEMA_UX_PLAN_ABORTED),
+        // **M15 § Active Material Kernel**: per-pixel reaction + phase
+        // + CA step events, flask throw/drink, alchemy invoke/complete.
+        ("material", "reaction_triggered") => Some(SCHEMA_MATERIAL_REACTION_TRIGGERED),
+        ("material", "phase_transition") => Some(SCHEMA_MATERIAL_PHASE_TRANSITION),
+        ("material", "cellular_step") => Some(SCHEMA_MATERIAL_CELLULAR_STEP),
+        ("flask", "thrown") => Some(SCHEMA_FLASK_THROWN),
+        ("flask", "consumed") => Some(SCHEMA_FLASK_CONSUMED),
+        ("alchemy", "recipe_invoked") => Some(SCHEMA_ALCHEMY_RECIPE_INVOKED),
+        ("alchemy", "recipe_completed") => Some(SCHEMA_ALCHEMY_RECIPE_COMPLETED),
         _ => None,
     }
 }

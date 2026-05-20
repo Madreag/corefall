@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/alchemy.recipe_completed.v0.1",
+  "title": "alchemy.recipe_completed",
+  "description": "M15 § Alchemy system — recipe finishes after cooldown. Carries the output material id + units produced. Producer: cf-material::alchemy::step_station when the queued recipe's remaining_ticks reaches 0. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "alchemy" },
+    "event_type": { "const": "recipe_completed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "recipe_id": { "type": "string" },
+        "station_id": { "type": "integer", "minimum": 0 },
+        "output": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "output_units": { "type": "integer", "minimum": 0 },
+        "completed_tick": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["recipe_id", "station_id", "output", "output_units", "completed_tick"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

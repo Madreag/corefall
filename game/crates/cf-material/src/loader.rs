@@ -336,6 +336,8 @@ fn known_material_fields() -> &'static [&'static str] {
         "low_pass_cutoff_hz",
         // M14E § per-material load-bearing baseline for the integrity field.
         "structural_support_strength",
+        // M14F § per-material lateral yield strength for wall collapse.
+        "lateral_yield_strength",
     ]
 }
 

@@ -46,12 +46,25 @@ use std::{collections::BTreeMap, path::Path};
 
 use serde::{Deserialize, Serialize};
 
+pub mod alchemy;
 pub mod loader;
+pub mod phase;
 pub mod reactions;
 pub mod registry;
 
+pub use alchemy::{
+    default_alchemy_registry, step_station, try_invoke_recipe, AlchemyInput, AlchemyRecipe, AlchemyRegistry,
+    AlchemyStation, QueuedInvocation, RecipeCompletion, RecipeInvocation, RecipeInvokeError,
+};
 pub use loader::{load_registry_from_file, validate_registry_json, RegistryValidationError, RegistryValidationReport};
-pub use reactions::{classify_reaction, ReactionWoundEmit};
+pub use phase::{
+    default_phase_registry, phase_transition_event, PhaseDirection, PhaseRegistry, PhaseState, PhaseTransition,
+    PhaseTransitionEvent,
+};
+pub use reactions::{
+    classify_reaction, default_reaction_registry, evaluate_reaction_pair, reaction_event, MaterialReaction,
+    ReactionRegistry, ReactionTriggeredEvent, ReactionWoundEmit,
+};
 
 /// Material schema version stamped into every registry JSON file. M2 ships
 /// v1; M5.6 will bump when the active material kernel starts reading the

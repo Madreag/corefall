@@ -59,6 +59,7 @@ members = [
   "crates/cf-prosthetic",
   "crates/cf-veteran",
   "crates/cf-storyteller",
+  "crates/cf-flask",
 ]
 
 [workspace.package]

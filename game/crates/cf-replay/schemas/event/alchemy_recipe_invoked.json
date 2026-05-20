@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/alchemy.recipe_invoked.v0.1",
+  "title": "alchemy.recipe_invoked",
+  "description": "M15 § Alchemy system — player invokes a recipe at an alchemy station. Fires immediately on invoke; the corresponding `alchemy.recipe_completed` fires after the recipe cooldown_ticks elapses. Producer: cf-material::alchemy::try_invoke_recipe. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "alchemy" },
+    "event_type": { "const": "recipe_invoked" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "recipe_id": { "type": "string" },
+        "station_id": { "type": "integer", "minimum": 0 },
+        "invoked_tick": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["recipe_id", "station_id", "invoked_tick"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

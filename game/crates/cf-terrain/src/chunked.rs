@@ -1290,6 +1290,29 @@ impl ChunkedTerrain {
         self.chunks.len()
     }
 
+    /// **M15** § enumerate every allocated chunk's `(cx, cy)` in
+    /// `(cx, cy)` ascending order. The CA stepper iterates this list
+    /// per tick to apply Margolus rules.
+    pub fn allocated_chunk_coords(&self) -> Vec<(i32, i32)> {
+        self.chunks.keys().map(|c| (c.cx, c.cy)).collect()
+    }
+
+    /// **M15** § set the material at world-space pixel `(px, py)` with
+    /// an explicit tick stamp. Routes through the canonical
+    /// `set_pixel_at_tick` path so the per-chunk `last_modified_tick`,
+    /// `dirty_rect`, and `dirty_chunks` set all stay coherent. Per the
+    /// M3 preservation rules (M15 spec § "Preservation rules from M3"
+    /// rule 1) every CA / reaction / phase-change pixel write MUST go
+    /// through this entry point (not the lower-level chunk APIs).
+    /// Returns true if the pixel changed.
+    pub fn set_material_pixel(&mut self, px: i64, py: i64, mat: MaterialId, tick: u64) -> bool {
+        let prev_tick = self.current_tick;
+        self.current_tick = tick;
+        let changed = self.set_pixel_internal(px, py, mat);
+        self.current_tick = prev_tick;
+        changed
+    }
+
     /// **M3 audit pass 5 (2026-05-13)**: per-chunk blake3 hex summaries for
     /// every allocated chunk. Used by the engine to populate the
     /// `chunk_summary` field on `determinism.sim_checksum` payloads per

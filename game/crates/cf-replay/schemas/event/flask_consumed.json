@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/flask.consumed.v0.1",
+  "title": "flask.consumed",
+  "description": "M15 § Flask system — flask drunk event. Fires when an actor consumes a flask. `health_delta` is positive for heal potions, negative for poison/acid; `applied_affliction` carries the M16 affliction id (null for neutral kinds). Producer: cf-flask::drink_flask. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "flask" },
+    "event_type": { "const": "consumed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "flask_id": { "type": "integer", "minimum": 0 },
+        "drinker_id": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string", "enum": ["water", "oil", "acid", "fuel", "heal_potion", "poison", "alchemy_mix"] },
+        "health_delta": { "type": "number" },
+        "applied_affliction": { "type": ["string", "null"] }
+      },
+      "required": ["flask_id", "drinker_id", "kind", "health_delta"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

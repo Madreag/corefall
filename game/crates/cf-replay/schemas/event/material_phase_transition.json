@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/material.phase_transition.v0.1",
+  "title": "material.phase_transition",
+  "description": "M15 § Active Material Kernel — per-pixel phase transition. Fires when a tile crosses a phase threshold (water → steam at 373.15 K; obsidian → lava at 1373 K; etc.). Producer: cf-material::phase state machine. The reverse direction fires on cooling past the same threshold. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "material" },
+    "event_type": { "const": "phase_transition" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "material": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "product_material": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "from_state": { "type": "string", "enum": ["solid", "liquid", "gas", "plasma", "powder"] },
+        "to_state": { "type": "string", "enum": ["solid", "liquid", "gas", "plasma", "powder"] },
+        "pos": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "temperature_k": { "type": "number" },
+        "latent_heat_j_per_kg": { "type": "number" },
+        "direction": { "type": "string", "enum": ["forward", "reverse"] }
+      },
+      "required": ["material", "product_material", "from_state", "to_state", "pos", "temperature_k", "latent_heat_j_per_kg", "direction"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

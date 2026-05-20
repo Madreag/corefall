@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/material.cellular_step.v0.1",
+  "title": "material.cellular_step",
+  "description": "M15 § Active Material Kernel — per-tick CA step summary. Reports the Margolus parity, number of pixels moved this tick, and the list of dirty chunks for the next render upload. Producer: cf-terrain::ca step_ca. Cosmetic-leaning; the actual state change shows up via the per-chunk dirty rect surface, but this summary feeds replay-viewer debug overlays. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "material" },
+    "event_type": { "const": "cellular_step" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "parity": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "pixels_moved": { "type": "integer", "minimum": 0 },
+        "dirty_chunks": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer" },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "reactions_evaluated": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["parity", "pixels_moved", "dirty_chunks"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/material.reaction_triggered.v0.1",
+  "title": "material.reaction_triggered",
+  "description": "M15 § Active Material Kernel — per-pixel reaction trigger. Fires when two adjacent pixels match a MaterialReaction entry from the M15D registry (acid+iron, water+lava, oil+fire, etc.). Producer: cf-material::reactions evaluator dispatched by the CA stepper. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "material" },
+    "event_type": { "const": "reaction_triggered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reaction_id": { "type": "string" },
+        "material_a": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "material_b": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "output": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "byproduct": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 },
+        "pos": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "energy_release_j": { "type": "number" },
+        "auto_ignite": { "type": "boolean" }
+      },
+      "required": ["reaction_id", "material_a", "material_b", "output", "pos", "energy_release_j", "auto_ignite"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

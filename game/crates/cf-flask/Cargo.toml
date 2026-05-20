@@ -1,5 +1,5 @@
 [package]
-name = "cf-material"
+name = "cf-flask"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,8 +11,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-cf-wound = { path = "../cf-wound" }
+cf-material = { path = "../cf-material" }
 
 [dev-dependencies]
-cf-flask = { path = "../cf-flask" }
-cf-terrain = { path = "../cf-terrain" }
