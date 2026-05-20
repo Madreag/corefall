@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/cardiac.defib_attempted.v0.1",
+  "title": "cardiac.defib_attempted",
+  "description": "M14H § Defibrillator shock — fires per defib attempt with the success roll. Probability = 50% baseline + 10% per consecutive CPR round preceding (capped at 100%). 4 charges per pack.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "cardiac" },
+    "event_type": { "const": "defib_attempted" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "success_probability_x1000": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "roll_x1000": { "type": "integer", "minimum": 0, "maximum": 999 },
+        "passed": { "type": "boolean" },
+        "charges_remaining": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick", "success_probability_x1000", "roll_x1000", "passed", "charges_remaining"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

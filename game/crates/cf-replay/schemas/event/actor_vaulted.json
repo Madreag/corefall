@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.vaulted.v0.1",
+  "title": "actor.vaulted",
+  "description": "M14J auto-vault over a chest-high obstacle. Fires when the swept-volume detect commits the actor to a 200ms Vault cinematic.",
+  "type": "object",
+  "required": ["actor", "tick", "obstacle_height"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "obstacle_height": {"type": "number", "minimum": 0},
+    "duration_ms": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

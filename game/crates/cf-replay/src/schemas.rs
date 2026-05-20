@@ -164,6 +164,63 @@ const SCHEMA_WOUND_ESCALATED: &str = include_str!("../schemas/event/wound_escala
 const SCHEMA_WOUND_AGED: &str = include_str!("../schemas/event/wound_aged.json");
 const SCHEMA_WOUND_SCABBED: &str = include_str!("../schemas/event/wound_scabbed.json");
 const SCHEMA_WOUND_SCARRED: &str = include_str!("../schemas/event/wound_scarred.json");
+// **M14H** — Treatment producers + surgery + cardiac + scan + triage event schemas (18 new).
+const SCHEMA_TREATMENT_APPLIED: &str = include_str!("../schemas/event/treatment_applied.json");
+const SCHEMA_TREATMENT_COMPLETED: &str = include_str!("../schemas/event/treatment_completed.json");
+const SCHEMA_TREATMENT_FAILED: &str = include_str!("../schemas/event/treatment_failed.json");
+const SCHEMA_TREATMENT_CANCELLED: &str = include_str!("../schemas/event/treatment_cancelled.json");
+const SCHEMA_CARDIAC_ARRESTED: &str = include_str!("../schemas/event/cardiac_arrested.json");
+const SCHEMA_CARDIAC_CPR_ROUND: &str = include_str!("../schemas/event/cardiac_cpr_round.json");
+const SCHEMA_CARDIAC_DEFIB_ATTEMPTED: &str =
+    include_str!("../schemas/event/cardiac_defib_attempted.json");
+const SCHEMA_CARDIAC_RESTORED: &str = include_str!("../schemas/event/cardiac_restored.json");
+const SCHEMA_CARDIAC_EXPIRED: &str = include_str!("../schemas/event/cardiac_expired.json");
+const SCHEMA_SURGERY_PHASE_STARTED: &str =
+    include_str!("../schemas/event/surgery_phase_started.json");
+const SCHEMA_SURGERY_PHASE_COMPLETED: &str =
+    include_str!("../schemas/event/surgery_phase_completed.json");
+const SCHEMA_SURGERY_SKILL_CHECK: &str = include_str!("../schemas/event/surgery_skill_check.json");
+const SCHEMA_SURGERY_COMPLETED: &str = include_str!("../schemas/event/surgery_completed.json");
+const SCHEMA_SURGERY_FAILED: &str = include_str!("../schemas/event/surgery_failed.json");
+const SCHEMA_SCAN_STARTED: &str = include_str!("../schemas/event/scan_started.json");
+const SCHEMA_SCAN_COMPLETED: &str = include_str!("../schemas/event/scan_completed.json");
+const SCHEMA_TRIAGE_QUEUE_CHANGED: &str =
+    include_str!("../schemas/event/triage_queue_changed.json");
+const SCHEMA_PATIENT_ASSESSED: &str = include_str!("../schemas/event/patient_assessed.json");
+// **M14I** — Long-term consequences + scars + phantom limbs + aging + veteran persistence event schemas (13 new).
+const SCHEMA_SCAR_ACQUIRED: &str = include_str!("../schemas/event/scar_acquired.json");
+const SCHEMA_PHANTOM_LIMB_ACQUIRED: &str =
+    include_str!("../schemas/event/phantom_limb_acquired.json");
+const SCHEMA_PHANTOM_LIMB_PANIC_ATTACK: &str =
+    include_str!("../schemas/event/phantom_limb_panic_attack.json");
+const SCHEMA_MEMORY_LOSS_MINOR_ACQUIRED: &str =
+    include_str!("../schemas/event/memory_loss_minor_acquired.json");
+const SCHEMA_MEMORY_LOSS_MAJOR_ACQUIRED: &str =
+    include_str!("../schemas/event/memory_loss_major_acquired.json");
+const SCHEMA_AGE_YEAR_ADVANCED: &str = include_str!("../schemas/event/age_year_advanced.json");
+const SCHEMA_AGE_RETIREMENT_OFFERED: &str =
+    include_str!("../schemas/event/age_retirement_offered.json");
+const SCHEMA_AGE_TERMINAL_ROLL: &str = include_str!("../schemas/event/age_terminal_roll.json");
+const SCHEMA_PROSTHETIC_INSTALLED: &str =
+    include_str!("../schemas/event/prosthetic_installed.json");
+const SCHEMA_PROSTHETIC_MALFUNCTIONED: &str =
+    include_str!("../schemas/event/prosthetic_malfunctioned.json");
+const SCHEMA_PROSTHETIC_MAINTAINED: &str =
+    include_str!("../schemas/event/prosthetic_maintained.json");
+const SCHEMA_DISEASE_EXPOSED: &str = include_str!("../schemas/event/disease_exposed.json");
+const SCHEMA_VETERAN_RETIRED: &str = include_str!("../schemas/event/veteran_retired.json");
+// **M14J** — Actor advanced mobility event schemas (11 new).
+const SCHEMA_M14J_ACTOR_VAULTED: &str = include_str!("../schemas/event/actor_vaulted.json");
+const SCHEMA_M14J_ACTOR_WALL_JUMPED: &str = include_str!("../schemas/event/actor_wall_jumped.json");
+const SCHEMA_M14J_GRAPPLE_FIRED: &str = include_str!("../schemas/event/grapple_fired.json");
+const SCHEMA_M14J_GRAPPLE_EMBEDDED: &str = include_str!("../schemas/event/grapple_embedded.json");
+const SCHEMA_M14J_ROPE_RELEASED: &str = include_str!("../schemas/event/rope_released.json");
+const SCHEMA_M14J_ZIPLINE_DEPLOYED: &str = include_str!("../schemas/event/zipline_deployed.json");
+const SCHEMA_M14J_ZIPLINE_CLIPPED: &str = include_str!("../schemas/event/zipline_clipped.json");
+const SCHEMA_M14J_ACTOR_MOUNTED: &str = include_str!("../schemas/event/actor_mounted.json");
+const SCHEMA_M14J_ACTOR_DISMOUNTED: &str = include_str!("../schemas/event/actor_dismounted.json");
+const SCHEMA_M14J_SWIM_STROKE: &str = include_str!("../schemas/event/swim_stroke.json");
+const SCHEMA_M14J_ACTOR_DROWNED: &str = include_str!("../schemas/event/actor_drowned.json");
 const SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED: &str = include_str!("../schemas/event/armor_schurzen_pre_detonated.json");
 const SCHEMA_ARMOR_MULTI_HIT_DEGRADATION: &str = include_str!("../schemas/event/armor_multi_hit_degradation.json");
 const SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED: &str = include_str!("../schemas/event/armor_reactive_armor_consumed.json");
@@ -636,6 +693,52 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("wound", "aged") => Some(SCHEMA_WOUND_AGED),
         ("wound", "scabbed") => Some(SCHEMA_WOUND_SCABBED),
         ("wound", "scarred") => Some(SCHEMA_WOUND_SCARRED),
+        // **M14H** § Field-medic workflow + surgery + cardiac + triage event surface.
+        ("treatment", "applied") => Some(SCHEMA_TREATMENT_APPLIED),
+        ("treatment", "completed") => Some(SCHEMA_TREATMENT_COMPLETED),
+        ("treatment", "failed") => Some(SCHEMA_TREATMENT_FAILED),
+        ("treatment", "cancelled") => Some(SCHEMA_TREATMENT_CANCELLED),
+        ("cardiac", "arrested") => Some(SCHEMA_CARDIAC_ARRESTED),
+        ("cardiac", "cpr_round") => Some(SCHEMA_CARDIAC_CPR_ROUND),
+        ("cardiac", "defib_attempted") => Some(SCHEMA_CARDIAC_DEFIB_ATTEMPTED),
+        ("cardiac", "restored") => Some(SCHEMA_CARDIAC_RESTORED),
+        ("cardiac", "expired") => Some(SCHEMA_CARDIAC_EXPIRED),
+        ("surgery", "phase_started") => Some(SCHEMA_SURGERY_PHASE_STARTED),
+        ("surgery", "phase_completed") => Some(SCHEMA_SURGERY_PHASE_COMPLETED),
+        ("surgery", "skill_check") => Some(SCHEMA_SURGERY_SKILL_CHECK),
+        ("surgery", "completed") => Some(SCHEMA_SURGERY_COMPLETED),
+        ("surgery", "failed") => Some(SCHEMA_SURGERY_FAILED),
+        ("scan", "started") => Some(SCHEMA_SCAN_STARTED),
+        ("scan", "completed") => Some(SCHEMA_SCAN_COMPLETED),
+        ("triage", "queue_changed") => Some(SCHEMA_TRIAGE_QUEUE_CHANGED),
+        ("patient", "assessed") => Some(SCHEMA_PATIENT_ASSESSED),
+        // **M14I** § Long-term consequences + scars + phantom limbs +
+        // aging + prosthetic loop + veteran retirement event surface.
+        ("scar", "acquired") => Some(SCHEMA_SCAR_ACQUIRED),
+        ("phantom_limb", "acquired") => Some(SCHEMA_PHANTOM_LIMB_ACQUIRED),
+        ("phantom_limb", "panic_attack") => Some(SCHEMA_PHANTOM_LIMB_PANIC_ATTACK),
+        ("memory_loss", "minor_acquired") => Some(SCHEMA_MEMORY_LOSS_MINOR_ACQUIRED),
+        ("memory_loss", "major_acquired") => Some(SCHEMA_MEMORY_LOSS_MAJOR_ACQUIRED),
+        ("age", "year_advanced") => Some(SCHEMA_AGE_YEAR_ADVANCED),
+        ("age", "retirement_offered") => Some(SCHEMA_AGE_RETIREMENT_OFFERED),
+        ("age", "terminal_roll") => Some(SCHEMA_AGE_TERMINAL_ROLL),
+        ("prosthetic", "installed") => Some(SCHEMA_PROSTHETIC_INSTALLED),
+        ("prosthetic", "malfunctioned") => Some(SCHEMA_PROSTHETIC_MALFUNCTIONED),
+        ("prosthetic", "maintained") => Some(SCHEMA_PROSTHETIC_MAINTAINED),
+        ("disease", "exposed") => Some(SCHEMA_DISEASE_EXPOSED),
+        ("veteran", "retired") => Some(SCHEMA_VETERAN_RETIRED),
+        // **M14J**: actor advanced mobility events.
+        ("actor", "vaulted") => Some(SCHEMA_M14J_ACTOR_VAULTED),
+        ("actor", "wall_jumped") => Some(SCHEMA_M14J_ACTOR_WALL_JUMPED),
+        ("actor", "mounted") => Some(SCHEMA_M14J_ACTOR_MOUNTED),
+        ("actor", "dismounted") => Some(SCHEMA_M14J_ACTOR_DISMOUNTED),
+        ("actor", "drowned") => Some(SCHEMA_M14J_ACTOR_DROWNED),
+        ("grapple", "fired") => Some(SCHEMA_M14J_GRAPPLE_FIRED),
+        ("grapple", "embedded") => Some(SCHEMA_M14J_GRAPPLE_EMBEDDED),
+        ("rope", "released") => Some(SCHEMA_M14J_ROPE_RELEASED),
+        ("zipline", "deployed") => Some(SCHEMA_M14J_ZIPLINE_DEPLOYED),
+        ("zipline", "clipped") => Some(SCHEMA_M14J_ZIPLINE_CLIPPED),
+        ("swim", "stroke") => Some(SCHEMA_M14J_SWIM_STROKE),
         ("armor", "schurzen_pre_detonated") => Some(SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED),
         ("armor", "multi_hit_degradation") => Some(SCHEMA_ARMOR_MULTI_HIT_DEGRADATION),
         ("armor", "reactive_armor_consumed") => Some(SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED),

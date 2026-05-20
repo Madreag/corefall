@@ -1,0 +1,33 @@
+// **M14J** grappling-hook gun (T2 ranged equipment).
+// Spec § "Fire a grappling-hook gun (T2 equipment, 20 steel + 5 motor +
+// 10 rope; built at T2 fabricator) at any surface within 30 m".
+
+(
+  id: "grapple_gun_t2",
+  display_name: "Grappling-Hook Gun (T2)",
+  mass_kg: 4.0,
+  dimensions: (w: 2, h: 3),
+  bulk_volume_l: 4.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: Some(800),
+  repair_recipe: None,
+  material_weight_breakdown: {
+    "steel": 20.0,
+    "motor": 5.0,
+    "rope": 10.0,
+  },
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+  // M14J-specific tunables surfaced for HUD + storyteller hooks.
+  range_m: 30.0,
+  rope_climb_speed_m_s: 0.8,
+  rappel_speed_m_s: 1.5,
+  long_distance_threshold_m: 25.0,
+)

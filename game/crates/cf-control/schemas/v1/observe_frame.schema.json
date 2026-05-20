@@ -104,6 +104,14 @@
         }
       ]
     },
+    "mount_links": {
+      "description": "**M14J § cf-control::observe — observe.mount_link list** — every\nactive rider/critter pairing (rider_id + critter_id + combined_mass).",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/MountLinkView"
+      }
+    },
     "player_actor_id": {
       "description": "Convenience pointer to the player actor in `actors` by id, if any.",
       "type": [
@@ -120,6 +128,14 @@
       "default": [],
       "items": {
         "$ref": "#/$defs/ReactorView"
+      }
+    },
+    "ropes": {
+      "description": "**M14J § cf-control::observe — observe.rope list** — every embedded\ngrapple rope + zip-line cable currently in the world. Pulled from\n`EngineMutable::m14j_ropes`; consumers read endpoints + tautness.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RopeView"
       }
     },
     "run_id": {
@@ -180,6 +196,14 @@
           "type": "null"
         }
       ]
+    },
+    "ziplines": {
+      "description": "**M14J § cf-control::observe — observe.zipline list** — subset of\n`ropes` that are deployed zip-line cables (canonical high/low ends\n+ active rider count).",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ZiplineView"
+      }
     }
   },
   "required": [
@@ -1448,6 +1472,50 @@
         "placeholder"
       ]
     },
+    "MountLinkView": {
+      "description": "**M14J § \"observe.mount_link list\"** — projection of one rider/critter\npairing.",
+      "type": "object",
+      "properties": {
+        "combined_mass_kg": {
+          "type": "number",
+          "format": "float"
+        },
+        "critter_id": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "firing_during_motion": {
+          "type": "boolean"
+        },
+        "mount_speed_retained": {
+          "type": "number",
+          "format": "float"
+        },
+        "ride_direction": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "rider_id": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "rider_id",
+        "critter_id",
+        "combined_mass_kg",
+        "mount_speed_retained",
+        "ride_direction",
+        "firing_during_motion"
+      ]
+    },
     "ObjectiveHelp": {
       "description": "**M11**: objective-help verbosity (tutorial / mission text density).",
       "type": "string",
@@ -1585,6 +1653,69 @@
         "hp",
         "max_hp",
         "destroyed"
+      ]
+    },
+    "RopeView": {
+      "description": "**M14J § \"observe.rope list\"** — projection of one embedded verlet\nrope + its endpoints + tautness state.",
+      "type": "object",
+      "properties": {
+        "embedded": {
+          "type": "boolean"
+        },
+        "end": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "id": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "is_zipline": {
+          "description": "`true` if this rope is tagged as a zip-line cable (consult\n`ziplines[]` for the canonical orientation).",
+          "type": "boolean"
+        },
+        "segment_count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "segment_length_m": {
+          "type": "number",
+          "format": "float"
+        },
+        "start": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "taut": {
+          "type": "boolean"
+        },
+        "total_length_m": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end",
+        "segment_count",
+        "segment_length_m",
+        "total_length_m",
+        "taut",
+        "embedded",
+        "is_zipline"
       ]
     },
     "RunStatus": {
@@ -2163,6 +2294,66 @@
           "type": "string",
           "const": "spacious"
         }
+      ]
+    },
+    "ZiplineView": {
+      "description": "**M14J § \"observe.zipline list\"** — projection of one deployed zip-line\ncable in canonical (high_end, low_end) orientation.",
+      "type": "object",
+      "properties": {
+        "brake_decel_m_s2": {
+          "type": "number",
+          "format": "float"
+        },
+        "height_delta_m": {
+          "type": "number",
+          "format": "float"
+        },
+        "high_end": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "id": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "low_end": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "max_speed_m_s": {
+          "type": "number",
+          "format": "float"
+        },
+        "rider_count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "span_m": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "id",
+        "high_end",
+        "low_end",
+        "span_m",
+        "height_delta_m",
+        "max_speed_m_s",
+        "brake_decel_m_s2",
+        "rider_count"
       ]
     }
   }

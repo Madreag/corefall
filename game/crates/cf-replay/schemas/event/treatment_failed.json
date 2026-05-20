@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/treatment.failed.v0.1",
+  "title": "treatment.failed",
+  "description": "M14H § Treatment producers — fires when the apply-state-machine rejects (pre-flight or in-flight). reason is one of: wrong_origin (Gherkin scenario 6), missing_tool, missing_skill, out_of_charges, dirty_wound_failure, blood_incompatibility, cancelled.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "treatment" },
+    "event_type": { "const": "failed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string" },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "wrong_origin",
+            "missing_tool",
+            "missing_skill",
+            "out_of_charges",
+            "dirty_wound_failure",
+            "blood_incompatibility",
+            "cancelled"
+          ]
+        }
+      },
+      "required": ["actor_id", "tick", "kind", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

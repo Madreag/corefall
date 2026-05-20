@@ -1153,6 +1153,28 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
         validate_wound_spec_ron(path, report);
         return;
     }
+    // **M14H** § treatments/*.ron validation.
+    if path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|s| s.to_str())
+        == Some("treatments")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        validate_treatment_spec_ron(path, report);
+        return;
+    }
+    // **M14I** § prosthetics/*.ron validation.
+    if path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|s| s.to_str())
+        == Some("prosthetics")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        validate_prosthetic_spec_ron(path, report);
+        return;
+    }
     // **M6**: validate the four equipment registries under `content/equipment/`.
     // This must come BEFORE the scenarios fallthrough so the registry RONs
     // aren't mis-routed to `validate_scenario`.
@@ -2590,6 +2612,109 @@ fn validate_ttd_floors_interim(path: &Path, report: &mut ValidationReport) {
                 v.floors.len(),
                 v.compound_modifiers.len()
             ),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
+}
+
+/// **M14H § VAL-M14H-001**: validate one `content/treatments/<id>.ron`
+/// file against the [`cf_treatment::TreatmentSpec`] schema. Rejects
+/// files that reference an unknown `TreatmentKind`, omit any required
+/// field, or carry a non-finite apply window.
+fn validate_treatment_spec_ron(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let spec: cf_treatment::TreatmentSpec = match ron::from_str(&raw) {
+        Ok(s) => s,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("treatment_spec parse: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    if !(spec.apply_seconds_min.is_finite() && spec.apply_seconds_min >= 0.0) {
+        messages.push("apply_seconds_min must be finite + non-negative".to_string());
+    }
+    if !(spec.apply_seconds_max.is_finite() && spec.apply_seconds_max >= spec.apply_seconds_min) {
+        messages.push("apply_seconds_max must be finite + >= min".to_string());
+    }
+    if spec.display_name.trim().is_empty() {
+        messages.push("display_name must be non-empty".to_string());
+    }
+    if let Some(charges) = spec.charges {
+        if charges == 0 {
+            messages.push("charges must be > 0 when set".to_string());
+        }
+    }
+    if let Some(doses) = spec.doses_per_course {
+        if doses == 0 {
+            messages.push("doses_per_course must be > 0 when set".to_string());
+        }
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!("treatment_spec kind={:?}", spec.kind),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
+}
+
+/// **M14I § VAL-M14I-PROSTHETIC**: validate one
+/// `content/prosthetics/<name>.ron` file against the
+/// [`cf_prosthetic::ProstheticSpec`] schema. Rejects files that reference
+/// an unknown `ProstheticKind`, leave `target_zones` empty, or carry an
+/// invalid functional-restoration / maintenance-interval / install-seconds.
+fn validate_prosthetic_spec_ron(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let spec: cf_prosthetic::ProstheticSpec = match ron::from_str(&raw) {
+        Ok(s) => s,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("prosthetic_spec parse: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    if spec.display_name.trim().is_empty() {
+        messages.push("display_name must be non-empty".to_string());
+    }
+    if spec.target_zones.is_empty() {
+        messages.push("target_zones must contain at least one zone".to_string());
+    }
+    if spec.compatible_origins.is_empty() {
+        messages.push("compatible_origins must contain at least one origin".to_string());
+    }
+    if !(spec.functional_restoration.is_finite()
+        && spec.functional_restoration >= 0.0
+        && spec.functional_restoration <= 1.0)
+    {
+        messages.push("functional_restoration must be finite + in [0, 1]".to_string());
+    }
+    if !(spec.maintenance_interval_seconds.is_finite()
+        && spec.maintenance_interval_seconds > 0.0)
+    {
+        messages.push("maintenance_interval_seconds must be finite + > 0".to_string());
+    }
+    if !(spec.install_seconds.is_finite() && spec.install_seconds >= 0.0) {
+        messages.push("install_seconds must be finite + non-negative".to_string());
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!("prosthetic_spec kind={:?} tier={:?}", spec.kind, spec.tier),
         );
     } else {
         report.add_error(path.to_path_buf(), messages.join("; "));

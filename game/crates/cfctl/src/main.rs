@@ -416,6 +416,89 @@ enum ActAction {
         #[arg(long)]
         segment_id: u64,
     },
+    /// **M14H**: `act.player.treat kind=<TreatmentKind> target=<actor_id>`.
+    /// Applies a treatment producer to the target actor. `kind` is one of
+    /// the 22 M14H canonical TreatmentKind names (PascalCase, e.g.
+    /// `FieldBandageV1`, `Sutures V1`, `DefibrillatorV1`).
+    PlayerTreat {
+        #[arg(long)]
+        kind: String,
+        #[arg(long)]
+        target: u64,
+    },
+    /// **M14H**: `act.player.scan target=<actor_id>` — start a 30s Medical
+    /// Scanner read.
+    PlayerScan {
+        #[arg(long)]
+        target: u64,
+    },
+    /// **M14H**: `act.player.cpr_round target=<actor_id>` — apply one CPR
+    /// round.
+    PlayerCprRound {
+        #[arg(long)]
+        target: u64,
+    },
+    /// **M14H**: `act.player.defib target=<actor_id>` — deliver a defib
+    /// shock.
+    PlayerDefib {
+        #[arg(long)]
+        target: u64,
+    },
+    /// **M14H**: `act.player.surgery_start target=<actor_id>
+    /// wounds_to_treat=<u32> [surgeon_t1] [seed=<u64>]`.
+    PlayerSurgeryStart {
+        #[arg(long)]
+        target: u64,
+        #[arg(long)]
+        wounds_to_treat: u32,
+        #[arg(long, default_value_t = false)]
+        surgeon_t1: bool,
+        #[arg(long)]
+        seed: Option<u64>,
+    },
+    /// **M14H**: `act.player.triage_select target=<actor_id?>` — open the
+    /// Patient Detail panel. Omit `target` to clear the selection.
+    PlayerTriageSelect {
+        #[arg(long)]
+        target: Option<u64>,
+    },
+    /// **M14J**: `act.player.vault` — manual vault override (auto-vault is detect-driven).
+    PlayerVault,
+    /// **M14J**: `act.player.wall_jump` — wall-jump while in contact grace.
+    PlayerWallJump,
+    /// **M14J**: `act.player.fire_grapple target_x=<f32> target_y=<f32>`.
+    PlayerFireGrapple {
+        #[arg(long)]
+        target_x: f32,
+        #[arg(long)]
+        target_y: f32,
+    },
+    /// **M14J**: `act.player.rope_input climb=<-1..1> [swing=<-1..1>]`.
+    PlayerRopeInput {
+        #[arg(long)]
+        climb: f32,
+        #[arg(long, default_value_t = 0.0)]
+        swing: f32,
+    },
+    /// **M14J**: `act.player.release_rope` — release embedded rope.
+    PlayerReleaseRope,
+    /// **M14J**: `act.player.zipline_clip line_id=<u64>`.
+    PlayerZiplineClip {
+        #[arg(long)]
+        line_id: u64,
+    },
+    /// **M14J**: `act.player.zipline_brake engaged=<bool>`.
+    PlayerZiplineBrake {
+        #[arg(long)]
+        engaged: bool,
+    },
+    /// **M14J**: `act.player.mount critter_id=<u64>`.
+    PlayerMount {
+        #[arg(long)]
+        critter_id: u64,
+    },
+    /// **M14J**: `act.player.dismount`.
+    PlayerDismount,
 }
 
 #[derive(Debug, Subcommand)]
@@ -1444,6 +1527,90 @@ async fn cmd_act(
                 )
                 .await?
         }
+        ActAction::PlayerTreat { kind, target } => {
+            session
+                .send_request(
+                    "act.player.treat",
+                    json!({"kind": kind, "target_actor_id": target}),
+                )
+                .await?
+        }
+        ActAction::PlayerScan { target } => {
+            session
+                .send_request("act.player.scan", json!({"target_actor_id": target}))
+                .await?
+        }
+        ActAction::PlayerCprRound { target } => {
+            session
+                .send_request(
+                    "act.player.cpr_round",
+                    json!({"target_actor_id": target}),
+                )
+                .await?
+        }
+        ActAction::PlayerDefib { target } => {
+            session
+                .send_request("act.player.defib", json!({"target_actor_id": target}))
+                .await?
+        }
+        ActAction::PlayerSurgeryStart {
+            target,
+            wounds_to_treat,
+            surgeon_t1,
+            seed,
+        } => {
+            let mut payload = serde_json::Map::new();
+            payload.insert("target_actor_id".into(), json!(target));
+            payload.insert("wounds_to_treat".into(), json!(wounds_to_treat));
+            payload.insert("surgeon_t1".into(), json!(surgeon_t1));
+            if let Some(s) = seed {
+                payload.insert("seed".into(), json!(s));
+            }
+            session
+                .send_request("act.player.surgery_start", Value::Object(payload))
+                .await?
+        }
+        ActAction::PlayerTriageSelect { target } => {
+            let mut payload = serde_json::Map::new();
+            if let Some(t) = target {
+                payload.insert("target_actor_id".into(), json!(t));
+            }
+            session
+                .send_request("act.player.triage_select", Value::Object(payload))
+                .await?
+        }
+        ActAction::PlayerVault => session.send_request("act.player.vault", json!({})).await?,
+        ActAction::PlayerWallJump => session.send_request("act.player.wall_jump", json!({})).await?,
+        ActAction::PlayerFireGrapple { target_x, target_y } => {
+            session
+                .send_request(
+                    "act.player.fire_grapple",
+                    json!({"target_x": target_x, "target_y": target_y}),
+                )
+                .await?
+        }
+        ActAction::PlayerRopeInput { climb, swing } => {
+            session
+                .send_request("act.player.rope_input", json!({"climb": climb, "swing": swing}))
+                .await?
+        }
+        ActAction::PlayerReleaseRope => session.send_request("act.player.release_rope", json!({})).await?,
+        ActAction::PlayerZiplineClip { line_id } => {
+            session
+                .send_request("act.player.zipline_clip", json!({"line_id": line_id}))
+                .await?
+        }
+        ActAction::PlayerZiplineBrake { engaged } => {
+            session
+                .send_request("act.player.zipline_brake", json!({"engaged": engaged}))
+                .await?
+        }
+        ActAction::PlayerMount { critter_id } => {
+            session
+                .send_request("act.player.mount", json!({"critter_id": critter_id}))
+                .await?
+        }
+        ActAction::PlayerDismount => session.send_request("act.player.dismount", json!({})).await?,
     };
     println!("{}", serde_json::to_string(&result).unwrap());
     session.close().await?;

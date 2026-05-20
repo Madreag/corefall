@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/patient.assessed.v0.1",
+  "title": "patient.assessed",
+  "description": "M14H § Field-medic decision tree Step 1 (Assess) — fires when the AI medic doctrine records a fresh assessment of a target's wounds + active afflictions. step labels the current decision-tree node.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "patient" },
+    "event_type": { "const": "assessed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "medic_actor_id": { "type": "integer" },
+        "target_actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "step": {
+          "type": "string",
+          "enum": ["assess", "triage", "stabilize", "treat", "monitor"]
+        },
+        "compound_ttd_seconds": { "type": "number" },
+        "wound_count": { "type": "integer", "minimum": 0 },
+        "highest_priority_treatment": { "type": ["string", "null"] }
+      },
+      "required": ["medic_actor_id", "target_actor_id", "tick", "step"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

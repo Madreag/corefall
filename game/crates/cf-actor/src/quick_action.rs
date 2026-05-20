@@ -65,6 +65,22 @@ pub struct QuickActionSlot {
     /// `true` when this slot is disabled by an active hazard (EM disruption,
     /// comms blackout) — sets the rejection reason for invocations.
     pub disabled_by_hazard: bool,
+    /// **M14J** § "context-sensitive (only visible when the situation
+    /// supports them)" — `true` when the slot's contextual prerequisite is
+    /// currently satisfied (e.g. vault is only visible when a vault
+    /// candidate is in the parkour signal). Defaults to `true` for slots
+    /// without a context predicate.
+    #[serde(default = "default_context_available")]
+    pub context_available: bool,
+    /// **M14J** § set to a slice id when this slot represents one of the
+    /// 4 advanced-mobility pie slices (`vault` / `grapple` / `mount` /
+    /// `zip_brake`). Empty string for non-M14J slots.
+    #[serde(default)]
+    pub m14j_slice_id: String,
+}
+
+fn default_context_available() -> bool {
+    true
 }
 
 impl QuickActionSlot {
@@ -251,6 +267,14 @@ pub struct QuickActionBarState {
     pub q_press_tick: u64,
     /// `true` while the Q key is held.
     pub q_held: bool,
+    /// **M14J § "Quick-action wheel (M14A) gets four new pie slices:
+    /// `[Vault] [Grapple] [Mount/Dismount] [Zip-Brake]` — context-sensitive
+    /// (only visible when the situation supports them)"**. Lives parallel
+    /// to the 8-slot bar so the radial renderer can overlay them when
+    /// `context_available` flips to true. Engine flips the flag per-tick
+    /// based on actor state.
+    #[serde(default)]
+    pub m14j_slices: Vec<QuickActionSlot>,
 }
 
 impl QuickActionBarState {
@@ -261,8 +285,63 @@ impl QuickActionBarState {
         bar.slots[2] = QuickActionSlot::melee("knife_m6_default");
         bar.slots[3] = QuickActionSlot::grenade("frag_m6_default", 3);
         bar.slots[4] = QuickActionSlot::consumable("medkit", 1);
+        // **M14J § "Quick-action wheel (M14A) gets four new pie slices:
+        // `[Vault] [Grapple] [Mount/Dismount] [Zip-Brake]` — context-sensitive
+        // (only visible when the situation supports them)". The slices live
+        // in a parallel overlay (not in the 8-slot bar) so they don't
+        // displace the player's primary weapon/melee/grenade slots.
+        bar.register_m14j_slices();
         bar.radial.sim_time_multiplier = 1.0;
         bar
+    }
+
+    /// **M14J** § "register the four new context-sensitive slices via the
+    /// M14A `qab.register` API". Pushes the four slices into the parallel
+    /// `m14j_slices` overlay. All slices start with `context_available=false`
+    /// so they appear only when the engine sets the relevant context flag.
+    pub fn register_m14j_slices(&mut self) {
+        self.m14j_slices.clear();
+        for (slice_id, cooldown) in [
+            ("vault", 12u32),
+            ("grapple", 60),
+            ("mount_dismount", 12),
+            ("zip_brake", 6),
+        ] {
+            let mut s = QuickActionSlot::ability(slice_id, cooldown);
+            s.m14j_slice_id = slice_id.to_string();
+            s.context_available = false;
+            self.m14j_slices.push(s);
+        }
+    }
+
+    /// **M14J** § returns the list of registered M14J slice ids + whether
+    /// they're currently context-available. Used by the HUD + observe surface.
+    pub fn m14j_context_slices(&self) -> Vec<(String, bool)> {
+        self.m14j_slices
+            .iter()
+            .map(|s| (s.m14j_slice_id.clone(), s.context_available))
+            .collect()
+    }
+
+    /// **M14J** § per-tick update of the M14J slice context flags. Called
+    /// by the engine with the actor's current parkour/rope/mount/zipline
+    /// state booleans.
+    pub fn update_m14j_context(
+        &mut self,
+        vault_available: bool,
+        grapple_available: bool,
+        mount_available: bool,
+        zip_brake_available: bool,
+    ) {
+        for s in self.m14j_slices.iter_mut() {
+            match s.m14j_slice_id.as_str() {
+                "vault" => s.context_available = vault_available,
+                "grapple" => s.context_available = grapple_available,
+                "mount_dismount" => s.context_available = mount_available,
+                "zip_brake" => s.context_available = zip_brake_available,
+                _ => {}
+            }
+        }
     }
 
     pub fn powered_armor_default() -> Self {

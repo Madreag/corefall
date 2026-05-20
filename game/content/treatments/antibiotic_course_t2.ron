@@ -1,0 +1,14 @@
+(
+    kind: antibiotic_course_t2,
+    display_name: "Antibiotic Course (T2)",
+    apply_seconds_min: 5.0,
+    apply_seconds_max: 5.0,
+    tool: none,
+    skill: medic_t2,
+    risk: resistance_and_side_effects,
+    revives_downed: false,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: Some(21),
+    dose_interval_hours: Some(6.0),
+)

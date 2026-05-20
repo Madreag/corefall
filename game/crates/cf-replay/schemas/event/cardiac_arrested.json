@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/cardiac.arrested.v0.1",
+  "title": "cardiac.arrested",
+  "description": "M14H § Cardiac arrest + CPR/defib loop — fires when an actor enters cardiac arrest (affliction.shocked + heart organ <30% OR M16C anxiety-acute-arrest). trigger labels the cause; grace_seconds carries the 100s window.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "cardiac" },
+    "event_type": { "const": "arrested" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "trigger": {
+          "type": "string",
+          "enum": ["shocked_heart_crit", "anxiety_acute_arrest", "manual"]
+        },
+        "grace_seconds": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["actor_id", "tick", "trigger", "grace_seconds"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

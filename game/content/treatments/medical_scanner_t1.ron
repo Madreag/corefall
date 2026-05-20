@@ -1,0 +1,14 @@
+(
+    kind: medical_scanner_t1,
+    display_name: "Medical Scanner (T1)",
+    apply_seconds_min: 30.0,
+    apply_seconds_max: 30.0,
+    tool: scanner_device,
+    skill: medic_t1,
+    risk: none,
+    revives_downed: false,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: None,
+    dose_interval_hours: None,
+)

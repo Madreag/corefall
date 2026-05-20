@@ -73,6 +73,7 @@ use cf_sim_core::Rng;
 // (`cf_ai::perception::*` / `cf_ai::guard_state::*` / `cf_ai::difficulty::*`)
 // compile cleanly.
 pub mod components;
+pub mod critter_mount_doctrine;
 pub mod difficulty;
 pub mod guard_state;
 pub mod perception;
@@ -87,6 +88,7 @@ pub mod systems;
 pub mod archetype;
 pub mod auto_repair;
 pub mod auto_triage;
+pub mod medic_doctrine;
 pub mod autonomy;
 pub mod behavior_tree;
 pub mod bot_memory;
@@ -155,6 +157,9 @@ pub mod squad_state;
 
 pub use archetype::Archetype;
 pub use auto_repair::{AutoRepairInitiatedEvent, AutoRepairMission, AutoRepairProgressedEvent, AutoRepairState};
+pub use critter_mount_doctrine::{
+    select_gait_for_free_critter, select_gait_for_ride_input, CritterGait, CritterMountGoal,
+};
 pub use auto_triage::{AutoTriageAppliedEvent, AutoTriageInitiatedEvent, AutoTriageMission, AutoTriageState};
 pub use autonomy::{AutonomyMode, DoctrineMode};
 pub use behavior_tree::{BehaviorAction, BehaviorTreeLayer, BtNode};

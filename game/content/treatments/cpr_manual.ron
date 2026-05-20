@@ -1,0 +1,14 @@
+(
+    kind: cpr_manual,
+    display_name: "CPR (Manual)",
+    apply_seconds_min: 20.0,
+    apply_seconds_max: 20.0,
+    tool: none,
+    skill: none,
+    risk: bruise_per_extended_cpr,
+    revives_downed: true,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: None,
+    dose_interval_hours: None,
+)

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/scar.acquired.v0.1",
+  "title": "scar.acquired",
+  "description": "M14I § Scar timeline — fires when a wound closes via sutures / cauterize / surgery and the actor gains a ScarRecord. Carries the source WoundKind, zone, severity_at_close, closure_method (TreatmentKind), and the resolved FunctionalDebuff tag.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "scar" },
+    "event_type": { "const": "acquired" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "scar_id": { "type": "integer", "minimum": 0 },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "LacerationLight",
+            "LacerationModerate",
+            "LacerationSevere",
+            "Puncture",
+            "StabThrough",
+            "GunshotEntry",
+            "GunshotExit",
+            "GunshotThrough",
+            "ShrapnelEmbedded",
+            "ShrapnelThrough",
+            "BruiseLight",
+            "BruiseHeavy",
+            "CrushLimb",
+            "Concussion",
+            "FractureSimple",
+            "FractureCompound",
+            "FractureComminuted",
+            "Dislocation",
+            "SprainStrain",
+            "Burn1st",
+            "Burn2nd",
+            "Burn3rd",
+            "Frostbite1st",
+            "Frostbite2nd",
+            "Frostbite3rd",
+            "AcidBurn",
+            "ChemicalBurn",
+            "EyeInjury",
+            "EarInjury",
+            "DentalDamage"
+          ]
+        },
+        "zone": { "type": "string" },
+        "severity_at_close": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "closure_method": { "type": "string" },
+        "functional_debuff": { "type": "string" },
+        "cosmetic_decal_id": { "type": "string" }
+      },
+      "required": ["actor_id", "tick", "scar_id", "kind", "zone", "severity_at_close", "closure_method", "functional_debuff"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

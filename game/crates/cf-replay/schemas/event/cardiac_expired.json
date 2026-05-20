@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/cardiac.expired.v0.1",
+  "title": "cardiac.expired",
+  "description": "M14H § Cardiac expiration — fires when the cardiac-arrest grace window elapses without successful defib + CPR support. Actor transitions to DEAD.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "cardiac" },
+    "event_type": { "const": "expired" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

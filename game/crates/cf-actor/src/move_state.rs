@@ -152,6 +152,44 @@ impl UpperBodyState {
     }
 }
 
+/// **M14J** § "swim refinement supersedes M16's `swim` placeholder" — the
+/// actor's per-tick aquatic locomotion mode. `None` when the actor is not
+/// in a water tile. `Surface*` variants are above the surface using
+/// horizontal strokes; `Dive` / `Tread` are submerged.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SwimKind {
+    /// Actor is not in water.
+    #[default]
+    None = 0,
+    /// At water surface, horizontal breast stroke.
+    SurfaceBreast = 1,
+    /// At water surface, horizontal freestyle burst.
+    SurfaceFreestyle = 2,
+    /// Submerged, vertical-down dive path.
+    Dive = 3,
+    /// Submerged, idle keep-head-above tread.
+    Tread = 4,
+}
+
+impl SwimKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SwimKind::None => "none",
+            SwimKind::SurfaceBreast => "breast",
+            SwimKind::SurfaceFreestyle => "freestyle",
+            SwimKind::Dive => "dive",
+            SwimKind::Tread => "tread",
+        }
+    }
+
+    /// True when the swim kind places the actor below the water surface.
+    pub fn is_submerged(self) -> bool {
+        matches!(self, SwimKind::Dive | SwimKind::Tread)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,16 @@
+(
+    kind: prosthetic_ear_t1,
+    display_name: "Prosthetic Ear (T1)",
+    tier: t1,
+    target_zones: [
+        "head",
+    ],
+    compatible_origins: [
+        "human",
+        "android_organic_side",
+        "powered_organic",
+    ],
+    functional_restoration: 0.70,
+    maintenance_interval_seconds: 68.99383983572895,
+    install_seconds: 60.0,
+)

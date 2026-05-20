@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerFireGrappleParams",
+  "description": "**M14J** § `act.player.fire_grapple { target_x, target_y }` — fire the\ngrappling-hook gun at a world-space point. On hit the rope embeds + a\nverlet rope spawns in cf-physics::rope.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "target_x": {
+      "type": "number",
+      "format": "float"
+    },
+    "target_y": {
+      "type": "number",
+      "format": "float"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_x",
+    "target_y"
+  ]
+}

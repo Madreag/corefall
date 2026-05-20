@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/grapple.fired.v0.1",
+  "title": "grapple.fired",
+  "description": "M14J grappling-hook gun fired at a target. Fires before the hook traverses; pair with grapple.embedded on contact.",
+  "type": "object",
+  "required": ["actor", "tick", "target_x", "target_y"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "target_x": {"type": "number"},
+    "target_y": {"type": "number"},
+    "range_m": {"type": "number", "minimum": 0}
+  },
+  "additionalProperties": true
+}

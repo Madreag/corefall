@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.mounted.v0.1",
+  "title": "actor.mounted",
+  "description": "M14J actor mounted a saddled critter. rider and critter actor ids; combined_mass_kg is the rider+critter aggregate for M14A walk-speed curves.",
+  "type": "object",
+  "required": ["actor", "tick", "critter_id"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "critter_id": {"type": "integer", "minimum": 0},
+    "combined_mass_kg": {"type": "number", "minimum": 0}
+  },
+  "additionalProperties": true
+}

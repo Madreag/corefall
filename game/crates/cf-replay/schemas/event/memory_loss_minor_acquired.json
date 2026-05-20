@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/memory_loss.minor_acquired.v0.1",
+  "title": "memory_loss.minor_acquired",
+  "description": "M14I § Memory loss — fires when an actor accumulates the 5th KO-threshold-crossing concussion (default; tunable via long_term::MEMORY_LOSS_MINOR_THRESHOLD).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "memory_loss" },
+    "event_type": { "const": "minor_acquired" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "concussion_count": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick", "concussion_count"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

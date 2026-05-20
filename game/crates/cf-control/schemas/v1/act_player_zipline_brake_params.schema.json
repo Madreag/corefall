@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerZiplineBrakeParams",
+  "description": "**M14J** § `act.player.zipline_brake { engaged: bool }` — engage or\nrelease the zip-line brake.",
+  "type": "object",
+  "properties": {
+    "engaged": {
+      "type": "boolean"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "engaged"
+  ]
+}

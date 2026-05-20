@@ -1,0 +1,14 @@
+(
+    kind: sutures_v1,
+    display_name: "Sutures",
+    apply_seconds_min: 30.0,
+    apply_seconds_max: 30.0,
+    tool: suture_kit,
+    skill: medic_t1,
+    risk: failure_roll_on_dirty_wound,
+    revives_downed: false,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: None,
+    dose_interval_hours: None,
+)

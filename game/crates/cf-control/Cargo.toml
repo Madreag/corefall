@@ -52,7 +52,16 @@ cf-save = { path = "../cf-save" }
 cf-net = { path = "../cf-net" }
 cf-render-2d = { path = "../cf-render-2d", default-features = false }
 cf-wound = { path = "../cf-wound" }
+cf-treatment = { path = "../cf-treatment" }
+cf-scar = { path = "../cf-scar" }
+cf-aging = { path = "../cf-aging" }
+cf-prosthetic = { path = "../cf-prosthetic" }
+cf-veteran = { path = "../cf-veteran" }
+cf-storyteller = { path = "../cf-storyteller" }
+cf-ui = { path = "../cf-ui" }
 cf-environment = { path = "../cf-environment" }
+rand_core = { workspace = true }
+rand_xoshiro = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -61,7 +70,10 @@ cf-tools-replay-viewer = { path = "../cf-tools-replay-viewer" }
 cf-replay-export = { path = "../cf-replay-export" }
 cf-audio = { path = "../cf-audio" }
 cf-asset-ledger = { path = "../cf-asset-ledger" }
-cf-ui = { path = "../cf-ui" }
+cf-ai = { path = "../cf-ai" }
+cf-actor = { path = "../cf-actor" }
+cf-equipment = { path = "../cf-equipment" }
+cf-physics = { path = "../cf-physics" }
 blake3 = { workspace = true }
 hex = { workspace = true }
 tempfile = "3"

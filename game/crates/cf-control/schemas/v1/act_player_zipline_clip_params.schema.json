@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerZiplineClipParams",
+  "description": "**M14J** § `act.player.zipline_clip { line_id }` — clip onto a\ndeployed zip line at its high end.",
+  "type": "object",
+  "properties": {
+    "line_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "line_id"
+  ]
+}

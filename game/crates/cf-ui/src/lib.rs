@@ -85,6 +85,8 @@ pub mod focus_ring;
 pub mod module_strip;
 pub mod priority_indicator;
 pub mod silhouette;
+pub mod surgery_panel;
+pub mod triage_panel;
 pub mod triage_window;
 
 // **M12** § cinematic story beats + juice + comic-style overlay (optional).
@@ -119,6 +121,9 @@ pub mod walk_strip;
 
 // **M14G** § per-zone wound silhouette badges.
 pub mod wound_strip;
+
+// **M14I** § per-veteran narrative tab (consumed by M48C pilot dossier).
+pub mod veteran_dossier;
 
 pub use mission_resolved_modal::{
     render_comic_death_recap, render_death_recap_with_mode, render_recap_text as render_death_recap_text,

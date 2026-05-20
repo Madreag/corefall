@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerDismountParams",
+  "description": "**M14J** § `act.player.dismount` — dismount from a critter. Instant\nwhen stationary; 200ms stagger + 70% velocity inherit when mid-motion.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version"
+  ]
+}

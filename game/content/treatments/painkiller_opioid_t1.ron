@@ -1,0 +1,14 @@
+(
+    kind: painkiller_opioid_t1,
+    display_name: "Opioid Painkiller (T1)",
+    apply_seconds_min: 3.0,
+    apply_seconds_max: 3.0,
+    tool: none,
+    skill: medic_t1,
+    risk: addiction_per_m16_c,
+    revives_downed: false,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: None,
+    dose_interval_hours: None,
+)

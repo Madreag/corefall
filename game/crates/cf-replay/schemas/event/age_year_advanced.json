@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/age.year_advanced.v0.1",
+  "title": "age.year_advanced",
+  "description": "M14I § Biological aging clock — fires once per in-game year for every biological-origin actor (humans, android_organic_side, powered_organic, heavy_biomech). Robots / crystallines never emit. caloric_max_decay / max_speed_decay / heal_rate_decay are cumulative ratios in [0, 1].",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "age" },
+    "event_type": { "const": "year_advanced" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "new_age_years": { "type": "number", "minimum": 0 },
+        "caloric_max_decay": { "type": "number", "minimum": 0 },
+        "max_speed_decay": { "type": "number", "minimum": 0 },
+        "heal_rate_decay": { "type": "number", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick", "new_age_years"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

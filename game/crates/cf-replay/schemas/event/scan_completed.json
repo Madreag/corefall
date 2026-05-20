@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/scan.completed.v0.1",
+  "title": "scan.completed",
+  "description": "M14H § Medical Scanner — fires when a 30s scan completes and the scan report is committed to the Patient Detail panel.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "scan" },
+    "event_type": { "const": "completed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "scanner_actor_id": { "type": "integer" },
+        "target_actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "wound_count": { "type": "integer", "minimum": 0 },
+        "disease_count": { "type": "integer", "minimum": 0 },
+        "psych_count": { "type": "integer", "minimum": 0 },
+        "pain_total": { "type": "number", "minimum": 0.0 },
+        "compound_ttd_seconds": { "type": "number" }
+      },
+      "required": [
+        "scanner_actor_id",
+        "target_actor_id",
+        "tick",
+        "wound_count",
+        "disease_count",
+        "psych_count",
+        "pain_total"
+      ]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

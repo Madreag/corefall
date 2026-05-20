@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/swim.stroke.v0.1",
+  "title": "swim.stroke",
+  "description": "M14J swim limb-path completed a stroke cycle. stroke_kind is one of breast / freestyle / dive / tread; stamina_remaining is the post-stroke swim stamina.",
+  "type": "object",
+  "required": ["actor", "tick", "stroke_kind"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "stroke_kind": {"type": "string", "enum": ["breast", "freestyle", "dive", "tread"]},
+    "stamina_remaining": {"type": "number"},
+    "drain_multiplier": {"type": "number"}
+  },
+  "additionalProperties": true
+}

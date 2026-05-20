@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerRopeInputParams",
+  "description": "**M14J** § `act.player.rope_input { climb: -1..1, swing: -1..1 }` —\npull rope hand-over-hand or rappel + add tangential swing input at\nthe bob.",
+  "type": "object",
+  "properties": {
+    "climb": {
+      "description": "-1.0 (rappel away) to +1.0 (climb toward anchor).",
+      "type": "number",
+      "format": "float"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "swing": {
+      "description": "-1.0 to +1.0 — tangential swing input at the bob.",
+      "type": "number",
+      "format": "float",
+      "default": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "climb"
+  ]
+}

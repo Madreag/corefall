@@ -50,6 +50,7 @@ pub mod penetration_m14c;
 pub mod penetration_ray;
 pub mod projectile;
 pub mod ragdoll;
+pub mod rope;
 pub mod sharpness;
 pub mod swept;
 pub mod zone_state;
@@ -90,6 +91,10 @@ pub use projectile::{
 };
 pub use ragdoll::{
     cave_in_fall_impulse_chain, cave_in_joint_impulse, step_ragdoll, CaveInImpulseOutcome, Ragdoll, RagdollState,
+};
+pub use rope::{
+    pendulum_release_velocity, Rope, RopeEndpoint, RopeId, RopeNode, DEFAULT_SEGMENT_COUNT,
+    DEFAULT_SOLVER_ITERATIONS,
 };
 pub use sharpness::{decay_damage, DecayBand, SharpnessInputs, SharpnessOutcome};
 pub use swept::{

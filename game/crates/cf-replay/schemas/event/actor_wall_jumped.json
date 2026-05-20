@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.wall_jumped.v0.1",
+  "title": "actor.wall_jumped",
+  "description": "M14J wall-jump grants perpendicular impulse. chain_index counts up per wall-jump since last ground contact (0..2). Spec § Acceptance criteria.",
+  "type": "object",
+  "required": ["actor", "tick", "chain_index"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "chain_index": {"type": "integer", "minimum": 0, "maximum": 2},
+    "wall_normal_sign": {"type": "number"},
+    "impulse_perpendicular": {"type": "number"}
+  },
+  "additionalProperties": true
+}

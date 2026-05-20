@@ -36,8 +36,12 @@ cf-replay = { path = "../cf-replay" }
 cf-save = { path = "../cf-save" }
 cf-trench = { path = "../cf-trench" }
 cf-wound = { path = "../cf-wound" }
+cf-treatment = { path = "../cf-treatment" }
+cf-prosthetic = { path = "../cf-prosthetic" }
 
 [dev-dependencies]
 blake3 = { workspace = true }
 serde_json = { workspace = true }
 cf-wound = { path = "../cf-wound" }
+cf-treatment = { path = "../cf-treatment" }
+cf-prosthetic = { path = "../cf-prosthetic" }

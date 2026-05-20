@@ -1,0 +1,14 @@
+(
+    kind: anti_radiation_chelation,
+    display_name: "Anti-Radiation Chelation",
+    apply_seconds_min: 60.0,
+    apply_seconds_max: 60.0,
+    tool: iv_kit,
+    skill: medic_t1,
+    risk: nausea_side_effect,
+    revives_downed: false,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: None,
+    dose_interval_hours: None,
+)

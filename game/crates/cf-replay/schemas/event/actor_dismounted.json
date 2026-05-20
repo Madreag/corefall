@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.dismounted.v0.1",
+  "title": "actor.dismounted",
+  "description": "M14J actor dismounted a critter. mid_motion=true triggers the 200ms stagger + 70% velocity inherit per spec. Storyteller treats mid_motion=true as story-grade.",
+  "type": "object",
+  "required": ["actor", "tick", "critter_id", "mid_motion"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "critter_id": {"type": "integer", "minimum": 0},
+    "mid_motion": {"type": "boolean"},
+    "inherited_velocity_x": {"type": "number"},
+    "inherited_velocity_y": {"type": "number"}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerTreatParams",
+  "description": "**M14H** § `act.player.treat` — apply a treatment producer.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "description": "Canonical TreatmentKind id (PascalCase, e.g. \"FieldBandageV1\").",
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "target_actor_id": {
+      "description": "Target actor id (the patient).",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "target_actor_id"
+  ]
+}

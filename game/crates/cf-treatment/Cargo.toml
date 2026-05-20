@@ -1,0 +1,19 @@
+[package]
+name = "cf-treatment"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+ron = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rand_xoshiro = { workspace = true }
+rand_core = { workspace = true }
+cf-wound = { path = "../cf-wound" }
+
+[dev-dependencies]

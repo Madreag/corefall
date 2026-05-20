@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/triage.queue_changed.v0.1",
+  "title": "triage.queue_changed",
+  "description": "M14H § Triage UX — fires when the Patient Queue panel re-sorts (a row added, removed, or its compound_TTD changed). selected_actor_id surfaces the currently-open Patient Detail panel.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "triage" },
+    "event_type": { "const": "queue_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "tick": { "type": "integer", "minimum": 0 },
+        "row_count": { "type": "integer", "minimum": 0 },
+        "selected_actor_id": { "type": ["integer", "null"] },
+        "actor_ids_sorted": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "required": ["tick", "row_count", "actor_ids_sorted"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,33 @@
+// **M14J** zip-line deployment kit (T2 equipment).
+// Spec § "Clip onto a zip line (deployed by player attaching two grappling-
+// hook anchors with a zip_kit, T2 equipment) at the high end".
+
+(
+  id: "zip_kit_t2",
+  display_name: "Zip Line Deployment Kit (T2)",
+  mass_kg: 3.5,
+  dimensions: (w: 2, h: 2),
+  bulk_volume_l: 5.0,
+  stackable: false,
+  max_stack: 1,
+  category: tool,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: Some(400),
+  repair_recipe: None,
+  material_weight_breakdown: {
+    "steel": 10.0,
+    "rope": 25.0,
+    "motor": 3.0,
+  },
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+  // M14J-specific tunables.
+  max_speed_m_s: 12.0,
+  brake_decel_m_s2: 3.0,
+  max_span_m: 60.0,
+  min_height_delta_m: 0.5,
+)

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/cardiac.restored.v0.1",
+  "title": "cardiac.restored",
+  "description": "M14H § Cardiac restoration — fires when a defib attempt's success roll passes and the actor's rhythm restarts.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "cardiac" },
+    "event_type": { "const": "restored" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

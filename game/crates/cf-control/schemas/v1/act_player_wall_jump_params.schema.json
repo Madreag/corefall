@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerWallJumpParams",
+  "description": "**M14J** § `act.player.wall_jump` — invoke a wall-jump within\n`WALL_CONTACT_GRACE_MS` of wall contact. Chain limit is 3 before\nnext ground contact.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version"
+  ]
+}

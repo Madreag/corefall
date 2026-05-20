@@ -1,0 +1,14 @@
+(
+    kind: iv_fluids_v1,
+    display_name: "IV Fluids",
+    apply_seconds_min: 120.0,
+    apply_seconds_max: 120.0,
+    tool: iv_kit,
+    skill: medic_t1,
+    risk: infiltration_risk,
+    revives_downed: false,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: None,
+    dose_interval_hours: None,
+)

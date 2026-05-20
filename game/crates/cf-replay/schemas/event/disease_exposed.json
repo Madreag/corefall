@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/disease.exposed.v0.1",
+  "title": "disease.exposed",
+  "description": "M14I § Long-term radiation → cancer hand-off — fires once when cumulative_dose crosses the cancer threshold. M16B consumer drives the cancer.lifecycle FSM from this event.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "disease" },
+    "event_type": { "const": "exposed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "vector": { "type": "string" },
+        "cumulative_dose": { "type": "number", "minimum": 0 },
+        "threshold": { "type": "number", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick", "vector"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

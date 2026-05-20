@@ -53,6 +53,12 @@ members = [
   "crates/cf-replay-export",
   "crates/cf-cinematic",
   "crates/cf-wound",
+  "crates/cf-treatment",
+  "crates/cf-scar",
+  "crates/cf-aging",
+  "crates/cf-prosthetic",
+  "crates/cf-veteran",
+  "crates/cf-storyteller",
 ]
 
 [workspace.package]

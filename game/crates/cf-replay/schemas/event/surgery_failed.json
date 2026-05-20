@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/surgery.failed.v0.1",
+  "title": "surgery.failed",
+  "description": "M14H § Surgery 5-phase failure — fires when bleed-out / failed skill check / dirty-tool infection / iatrogenic wound aborts the session.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "surgery" },
+    "event_type": { "const": "failed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "bleed_out_open",
+            "bleed_out_operate",
+            "skill_check_failed",
+            "infection_from_dirty_tool",
+            "iatrogenic_wound",
+            "cancelled"
+          ]
+        }
+      },
+      "required": ["actor_id", "tick", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

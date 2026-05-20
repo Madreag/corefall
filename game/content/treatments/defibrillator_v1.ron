@@ -1,0 +1,14 @@
+(
+    kind: defibrillator_v1,
+    display_name: "Defibrillator",
+    apply_seconds_min: 5.0,
+    apply_seconds_max: 5.0,
+    tool: none,
+    skill: medic_t1,
+    risk: burn_at_chest_per_shock,
+    revives_downed: true,
+    origin_aware: true,
+    charges: Some(4),
+    doses_per_course: None,
+    dose_interval_hours: None,
+)

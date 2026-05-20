@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/phantom_limb.acquired.v0.1",
+  "title": "phantom_limb.acquired",
+  "description": "M14I § Phantom-limb — fires when an actor's limb is severed via attachable.detached and the actor survives the DYING dwell. Subsequent per-week panic-attack rolls fire via phantom_limb.panic_attack.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "phantom_limb" },
+    "event_type": { "const": "acquired" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "zone": { "type": "string" },
+        "tick_severed": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick", "zone"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,14 @@
+(
+    kind: antidote_universal_t1,
+    display_name: "Universal Antidote (T1)",
+    apply_seconds_min: 5.0,
+    apply_seconds_max: 5.0,
+    tool: none,
+    skill: medic_t1,
+    risk: incompatible_with_severe_poison,
+    revives_downed: false,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: None,
+    dose_interval_hours: None,
+)

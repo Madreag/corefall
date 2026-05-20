@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerSurgeryStartParams",
+  "description": "**M14H** § `act.player.surgery_start` — begin a 5-phase surgery on a target.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "seed": {
+      "description": "Optional seed override for deterministic skill-check rolls.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "surgeon_t1": {
+      "description": "True if the surgeon has surgeon_t1 (90% pass rate); false → medic_t1.",
+      "type": "boolean"
+    },
+    "target_actor_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "wounds_to_treat": {
+      "description": "Number of wounds to remove (drives the Operate-phase repeat count).",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_actor_id",
+    "wounds_to_treat",
+    "surgeon_t1"
+  ]
+}

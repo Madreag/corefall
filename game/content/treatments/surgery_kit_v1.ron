@@ -1,0 +1,14 @@
+(
+    kind: surgery_kit_v1,
+    display_name: "Surgery Kit",
+    apply_seconds_min: 60.0,
+    apply_seconds_max: 180.0,
+    tool: surgery_table_and_surgeon,
+    skill: surgeon_t1,
+    risk: bleed_out_during_surgery,
+    revives_downed: false,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: None,
+    dose_interval_hours: None,
+)

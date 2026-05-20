@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/zipline.clipped.v0.1",
+  "title": "zipline.clipped",
+  "description": "M14J actor clipped onto a deployed zip line. line_id matches the rope_id assigned at zipline.deployed.",
+  "type": "object",
+  "required": ["actor", "tick", "rope_id"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "rope_id": {"type": "integer", "minimum": 0},
+    "from_end": {"type": "string", "enum": ["high", "low"]}
+  },
+  "additionalProperties": true
+}

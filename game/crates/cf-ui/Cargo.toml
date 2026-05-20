@@ -18,3 +18,8 @@ cf-fortification = { path = "../cf-fortification" }
 cf-terrain = { path = "../cf-terrain" }
 cf-trench = { path = "../cf-trench" }
 cf-wound = { path = "../cf-wound" }
+cf-treatment = { path = "../cf-treatment" }
+cf-scar = { path = "../cf-scar" }
+cf-aging = { path = "../cf-aging" }
+cf-prosthetic = { path = "../cf-prosthetic" }
+cf-veteran = { path = "../cf-veteran" }

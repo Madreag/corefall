@@ -1,0 +1,32 @@
+// **M14J** universal saddle (mounts on any tamed M27 critter).
+// Spec § "Mount a tamed M27 critter (horse / lattice-pet / saddled drone-
+// quad / domesticated bovine-equivalent)".
+
+(
+  id: "saddle_universal",
+  display_name: "Universal Saddle",
+  mass_kg: 6.0,
+  dimensions: (w: 3, h: 2),
+  bulk_volume_l: 8.0,
+  stackable: false,
+  max_stack: 1,
+  category: tool,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: false,
+  durability_max: Some(1200),
+  repair_recipe: None,
+  material_weight_breakdown: {
+    "leather": 4.0,
+    "steel": 1.5,
+    "rope": 0.5,
+  },
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+  // M14J-specific tunables.
+  mount_speed_retention: 0.80,
+  dismount_motion_inherit_fraction: 0.70,
+  mount_motion_aim_spread_rad: 0.10,
+)

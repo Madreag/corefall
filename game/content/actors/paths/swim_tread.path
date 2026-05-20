@@ -1,0 +1,17 @@
+(
+    schema_version: 1,
+    chassis_archetype: "infantry_v1",
+    move_state: "stand",
+    side: "fg",
+    start: (0.0, 4.0),
+    segments: [
+        (-2.0, 4.0),
+        (0.0, 4.0),
+        (2.0, 4.0),
+        (0.0, 4.0),
+    ],
+    travel_speed: [0.2, 0.3, 0.4],
+    travel_speed_multiplier: 1.0,
+    push_force: 40.0,
+    foot_collisions_disabled_segment: -1,
+)

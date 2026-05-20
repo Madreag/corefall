@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerInstallProstheticParams",
+  "description": "**M14I** § `act.player.install_prosthetic` — install one prosthetic on\na target actor. Requires medic_t2 + surgery table; runs the 60s install\nsequence inline + emits `prosthetic.installed` on completion.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "description": "Canonical ProstheticKind id (snake_case, e.g. \"prosthetic_leg_t1\").",
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "target_actor_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "zone": {
+      "description": "Target zone (e.g. \"leg_right\"). Must be in the prosthetic's\n`target_zones` allow-list.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_actor_id",
+    "kind",
+    "zone"
+  ]
+}

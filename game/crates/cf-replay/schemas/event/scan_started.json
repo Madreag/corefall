@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/scan.started.v0.1",
+  "title": "scan.started",
+  "description": "M14H § Medical Scanner diagnostic — fires when act.player.scan begins a 30s scan against the targeted actor.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "scan" },
+    "event_type": { "const": "started" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "scanner_actor_id": { "type": "integer" },
+        "target_actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "duration_seconds": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["scanner_actor_id", "target_actor_id", "tick", "duration_seconds"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

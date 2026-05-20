@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/surgery.skill_check.v0.1",
+  "title": "surgery.skill_check",
+  "description": "M14H § Surgery Operate-phase skill check — fires per-wound during the Operate phase. medic_t1 = 70% pass rate; surgeon_t1 = 90% pass rate. Roll uses seeded Xoshiro256StarStar so identical seed + identical patient reproduces identical results (Gherkin scenario 7).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "surgery" },
+    "event_type": { "const": "skill_check" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "step_index": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "boolean" },
+        "roll_x1000": { "type": "integer", "minimum": 0, "maximum": 999 },
+        "threshold_x1000": { "type": "integer", "minimum": 0, "maximum": 1000 }
+      },
+      "required": ["actor_id", "tick", "step_index", "passed", "roll_x1000", "threshold_x1000"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

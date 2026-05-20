@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/age.terminal_roll.v0.1",
+  "title": "age.terminal_roll",
+  "description": "M14I § Biological aging clock — fires per in-game week once an actor has crossed the per-origin terminal age (default 80 for humans). When outcome=death the actor flips to Status::Dead with cause=\"old_age\".",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "age" },
+    "event_type": { "const": "terminal_roll" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "probability_x1000": { "type": "integer", "minimum": 0 },
+        "outcome": { "type": "string", "enum": ["survived", "death"] }
+      },
+      "required": ["actor_id", "tick", "outcome"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

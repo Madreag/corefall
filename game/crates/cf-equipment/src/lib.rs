@@ -55,6 +55,7 @@ pub mod cram;
 pub mod deployables;
 pub mod durability;
 pub mod fire_modes;
+pub mod grapple_gun;
 pub mod grenade;
 pub mod heavy;
 pub mod inventory;
@@ -75,8 +76,17 @@ pub mod tool;
 pub mod weapon;
 pub mod weapon_swap;
 pub mod weapons_m14c;
+pub mod zip_kit;
 
 pub use bipod::{Bipod, BipodState, BIPOD_BLOOM_FACTOR, BIPOD_RECOIL_FACTOR};
+pub use grapple_gun::{
+    fire_grapple, GrappleFireOutcome, GRAPPLE_GUN_T2_ID, GRAPPLE_LONG_DISTANCE_M, GRAPPLE_MAX_RANGE_M,
+    ROPE_CLIMB_SPEED_M_PER_S, ROPE_RAPPEL_SPEED_M_PER_S, SADDLE_UNIVERSAL_ID,
+};
+pub use zip_kit::{
+    deploy_zip_kit, zipline_step_speed, ZipKitDeployOutcome, ZIPLINE_BRAKE_DECEL_M_PER_S2,
+    ZIPLINE_MAX_SPAN_M, ZIPLINE_MAX_SPEED_M_PER_S, ZIPLINE_MIN_HEIGHT_DELTA_M, ZIP_KIT_T2_ID,
+};
 pub use cram::{Cram, DEFAULT_CRAM_COOLDOWN_TICKS};
 pub use durability::{Durability, DURABILITY_MAX};
 pub use fire_modes::{

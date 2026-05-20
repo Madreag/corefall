@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/phantom_limb.panic_attack.v0.1",
+  "title": "phantom_limb.panic_attack",
+  "description": "M14I § Phantom-limb — fires once per in-game week per phantom limb when the panic-roll passes. M16C consumer activates the psych.panic_attack lifecycle. Prosthetic install reduces the panic-roll multiplier to 0.25× but never to zero.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "phantom_limb" },
+    "event_type": { "const": "panic_attack" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "zone": { "type": "string" },
+        "roll_index": { "type": "integer", "minimum": 1 },
+        "prosthetic_installed": { "type": "boolean" }
+      },
+      "required": ["actor_id", "tick", "zone"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

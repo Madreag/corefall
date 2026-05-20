@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerVaultParams",
+  "description": "**M14J** § `act.player.vault` — manual vault override; auto-vault is\ndetect-driven. Enters Stance::Vault for `VAULT_DURATION_MS` ms and\nemits `actor.vaulted`.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version"
+  ]
+}

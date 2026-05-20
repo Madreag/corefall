@@ -10,6 +10,8 @@ publish.workspace = true
 serde = { workspace = true }
 tracing = { workspace = true }
 ron = { workspace = true }
+rand_core = { workspace = true }
+rand_xoshiro = { workspace = true }
 cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
 cf-chassis = { path = "../cf-chassis" }
@@ -17,6 +19,10 @@ cf-atmos = { path = "../cf-atmos" }
 cf-trench = { path = "../cf-trench" }
 cf-fortification = { path = "../cf-fortification" }
 cf-wound = { path = "../cf-wound" }
+cf-treatment = { path = "../cf-treatment" }
+cf-scar = { path = "../cf-scar" }
+cf-aging = { path = "../cf-aging" }
+cf-prosthetic = { path = "../cf-prosthetic" }
 
 [dev-dependencies]
 serde_json = { workspace = true }

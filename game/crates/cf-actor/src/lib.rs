@@ -73,18 +73,24 @@ pub mod atmosphere_contact;
 pub mod attachable;
 pub mod attitude;
 pub mod body_armor_slot;
+pub mod cardiac;
 pub mod components;
+pub mod m14h_state;
 pub mod constants;
 pub mod cover;
 pub mod gib;
 pub mod inventory;
 pub mod lean;
 pub mod limb_path;
+pub mod long_term;
 pub mod m14a_constants;
+pub mod m14j_sim;
 pub mod mass;
 pub mod mass_aggregator;
 pub mod material_contact;
+pub mod mount;
 pub mod move_state;
+pub mod parkour;
 pub mod quick_action;
 pub mod resource_drain;
 pub mod sim;
@@ -92,6 +98,7 @@ pub mod sim_overlay;
 pub mod stamina;
 pub mod stance;
 pub mod systems;
+pub mod traits;
 pub mod ttd;
 pub mod walking_sim;
 
@@ -130,7 +137,22 @@ pub use limb_path::{
     default_infantry_registry, default_infantry_stand, default_infantry_walk_bg,
     default_infantry_walk_fg, LimbPath, LimbPathRegistry, LimbPathSpeed, PathSide,
 };
-pub use move_state::{MoveState, ProneState, UpperBodyState};
+pub use move_state::{MoveState, ProneState, SwimKind, UpperBodyState};
+pub use mount::{
+    mounted_aim_spread, resolve_dismount, DismountOutcome, MountState, DISMOUNT_MID_MOTION_STAGGER_MS,
+    DISMOUNT_STATIONARY_SPEED_THRESHOLD, DISMOUNT_VELOCITY_INHERIT_FRACTION, MOUNT_MOTION_AIM_SPREAD_RAD,
+    MOUNT_TOP_SPEED_RETAINED,
+};
+pub use parkour::{
+    apply_vault, detect_vault, detect_wall, wall_jump_velocity_delta, ParkourSignal, VaultCandidate,
+    WallCandidate, MAX_CHAINED_WALL_JUMPS, VAULT_DURATION_MS, VAULT_FORWARD_SWEEP_M,
+    VAULT_MAX_OBSTACLE_HEIGHT_M, WALL_CONTACT_GRACE_MS, WALL_JUMP_DURATION_MS, WALL_JUMP_PERPENDICULAR_FRACTION,
+};
+pub use m14j_sim::{
+    actor_has_dive_suit, actor_has_helmet_seal, mount_motion_aim_penalty, populate_vault_candidate,
+    populate_wall_candidate, tick_m14j_actor, tick_m14j_full, M14jTickEvents, CLIMB_VERTICAL_SPEED_M_PER_S,
+    SWIM_BREATH_DRAIN_SECONDS_PER_SEC, SWIM_STROKE_PERIOD_MS,
+};
 pub use quick_action::{
     InvokeOutcome, QuickActionBarState, QuickActionSlot, QuickActionSlotKind, RadialPhase,
     RadialState, QUICK_ACTION_DEADZONE_PX, QUICK_ACTION_OPEN_MS, QUICK_ACTION_SLOT_COUNT,
@@ -440,6 +462,27 @@ pub enum Stance {
     /// movement inputs are suspended, and primary fire is rebound to
     /// the fortification's mounted weapon.
     Crewing = 27,
+    /// **M14J**: wall-jump — actor reflects off a vertical surface mid-air
+    /// with a perpendicular impulse. 200 ms cinematic stance.
+    WallJump = 28,
+    /// **M14J**: rope hanging — actor suspended below an embedded grapple
+    /// anchor, climbing / rappelling vertically.
+    RopeHanging = 29,
+    /// **M14J**: rope swinging — actor adds tangential input at the bob of
+    /// a pendulum and can release at the apex.
+    RopeSwinging = 30,
+    /// **M14J**: ziplining — sliding down a deployed zip line cable.
+    Ziplining = 31,
+    /// **M14J**: mounted — actor is paired to a critter chassis as the
+    /// rider. The bound critter id lives on
+    /// [`ActorState::mounted_critter_id`].
+    Mounted = 32,
+    /// **M14J**: swim_surface — horizontal swim at the water surface using
+    /// the breast-stroke / freestyle limb paths.
+    SwimSurface = 33,
+    /// **M14J**: swim_submerged — underwater swim using the dive / tread
+    /// limb paths.
+    SwimSubmerged = 34,
 }
 
 impl Stance {
@@ -480,6 +523,13 @@ impl Stance {
             Stance::KnifeThrow => "knife_throw",
             Stance::Swim => "swim",
             Stance::Crewing => "crewing",
+            Stance::WallJump => "wall_jump",
+            Stance::RopeHanging => "rope_hanging",
+            Stance::RopeSwinging => "rope_swinging",
+            Stance::Ziplining => "ziplining",
+            Stance::Mounted => "mounted",
+            Stance::SwimSurface => "swim_surface",
+            Stance::SwimSubmerged => "swim_submerged",
         }
     }
 
@@ -1093,6 +1143,24 @@ pub struct ActorState {
     /// `checksum_bytes` (VAL-CROSS-029).
     #[serde(default)]
     pub m14g_wound_list: cf_wound::ActorWoundList,
+    /// **M14H** persistent cardiac-arrest state (CPR + defib loop).
+    #[serde(default)]
+    pub m14h_cardiac: cardiac::ActorCardiacComponent,
+    /// **M14H** per-zone tourniquet apply tick — for the 90-min necrosis
+    /// trigger (spec § "Necrosis if not removed").
+    #[serde(default)]
+    pub m14h_tourniquets: std::collections::BTreeMap<cf_wound::registry::ZoneId, u64>,
+    /// **M14H** active buffs (combat_stim, painkiller, anti_anxiety) with
+    /// expiry tick; per-tick pass clears expired buffs.
+    #[serde(default)]
+    pub m14h_buffs: Vec<m14h_state::ActiveBuff>,
+    /// **M14H** tick of last defibrillator shock — used to enforce the
+    /// 8s recharge interval per spec table.
+    #[serde(default)]
+    pub m14h_last_defib_tick: Option<u64>,
+    /// **M14H** active antibiotic course (doses remaining + next-dose tick).
+    #[serde(default)]
+    pub m14h_antibiotic_course: Option<m14h_state::AntibioticCourseState>,
     /// **M6**: side-view facing direction. Updates on aim; flips sprite.
     #[serde(default)]
     pub facing: FacingDirection,
@@ -1318,6 +1386,69 @@ pub struct ActorState {
     /// per-zone hazard contact (zone_name → tick).
     #[serde(default)]
     pub last_hazard_contact_tick: std::collections::BTreeMap<String, u64>,
+    /// **M14I** § per-actor long-term-consequence aggregate (scars,
+    /// biological age, prosthetics, traits, severed-limb tracking,
+    /// concussion count, chronic pain baseline, radiation dose).
+    #[serde(default)]
+    pub m14i_long_term: crate::long_term::LongTermState,
+    /// **M14J** § per-actor parkour signal — vault + wall-jump detect cache.
+    #[serde(default)]
+    pub parkour_signal: crate::parkour::ParkourSignal,
+    /// **M14J** § per-actor mount state. `Some(_)` while the rider is paired
+    /// with a critter; `None` when unmounted. Living on the rider keeps the
+    /// save/load round trip simple (the critter side just notes whether it
+    /// has any rider via `is_being_ridden`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mount: Option<crate::mount::MountState>,
+    /// **M14J** § flag indicating the critter is currently carrying a rider
+    /// (mirrored on the critter actor for fast lookups during gait
+    /// selection + AI doctrine).
+    #[serde(default)]
+    pub is_being_ridden: bool,
+    /// **M14J** § rope id this actor is currently attached to as a bob (the
+    /// far end of the embedded grapple line). `None` when the actor is not
+    /// holding any rope.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub holding_rope: Option<cf_physics::RopeId>,
+    /// **M14J** § rope id this actor is currently clipped onto as a zip-line
+    /// rider. `None` when the actor is not zip-lining.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zipline_attached: Option<cf_physics::RopeId>,
+    /// **M14J** § zip-line brake currently engaged. While `true` the slide
+    /// decelerates at -3 m/s² per spec.
+    #[serde(default)]
+    pub zipline_brake_engaged: bool,
+    /// **M14J** § cinematic timer for the wall-jump → airborne transition
+    /// (200 ms). 0 when not in a wall-jump animation.
+    #[serde(default)]
+    pub wall_jump_ticks_remaining_ms: u32,
+    /// **M14J** § swim breath in seconds — counts down while
+    /// `Stance::SwimSubmerged`. Reset on surface contact. 0 triggers
+    /// drowning per spec § "Submerged swim dive transitions to drowning".
+    #[serde(default = "default_swim_breath_seconds")]
+    pub swim_breath_seconds: f32,
+    /// **M14J** § the actor's current swim stance: surface vs submerged.
+    /// Distinct from the legacy `Stance::Swim` so the M14A walking loop
+    /// can swap limb paths via `move_state` + a small swim-state machine.
+    #[serde(default)]
+    pub swim_kind: crate::move_state::SwimKind,
+    /// **M14J** § race-aware swim-stamina drain multiplier. Sourced from
+    /// the actor's origin: Human 1.0×, Aqueous 0.5×, Robotic = sinks
+    /// (drain rate has no effect since they don't actually swim).
+    #[serde(default = "default_swim_drain_multiplier")]
+    pub swim_drain_multiplier: f32,
+    /// **M14J** § actor is "Robotic" origin which cannot swim (sinks).
+    /// Mirror flag for fast checks.
+    #[serde(default)]
+    pub swim_disabled_sinks: bool,
+}
+
+fn default_swim_breath_seconds() -> f32 {
+    30.0
+}
+
+fn default_swim_drain_multiplier() -> f32 {
+    1.0
 }
 
 /// **M14A** § "Atmospheric overlay" — re-export of [`cf_atmos::AtmosphereSample`]
@@ -1485,6 +1616,11 @@ impl ActorState {
             resources: ResourceAccumulators::default(),
             afflictions: Vec::new(),
             m14g_wound_list: cf_wound::ActorWoundList::new(),
+            m14h_cardiac: cardiac::ActorCardiacComponent::new(),
+            m14h_tourniquets: std::collections::BTreeMap::new(),
+            m14h_buffs: Vec::new(),
+            m14h_last_defib_tick: None,
+            m14h_antibiotic_course: None,
             facing: FacingDirection::Right,
             stamina: Stamina::full(),
             lean_state: LeanState::default(),
@@ -1539,6 +1675,18 @@ impl ActorState {
             armor_scratch_level: std::collections::BTreeMap::new(),
             atmosphere_sample: AtmosphereSample::default(),
             last_hazard_contact_tick: std::collections::BTreeMap::new(),
+            m14i_long_term: crate::long_term::LongTermState::default(),
+            parkour_signal: crate::parkour::ParkourSignal::default(),
+            mount: None,
+            is_being_ridden: false,
+            holding_rope: None,
+            zipline_attached: None,
+            zipline_brake_engaged: false,
+            wall_jump_ticks_remaining_ms: 0,
+            swim_breath_seconds: default_swim_breath_seconds(),
+            swim_kind: crate::move_state::SwimKind::None,
+            swim_drain_multiplier: default_swim_drain_multiplier(),
+            swim_disabled_sinks: false,
         }
     }
 
@@ -2091,9 +2239,45 @@ impl ActorState {
 
     /// Derived stance for HUD + `cfctl observe`. M5 routes through
     /// [`Stance::from_chassis`] so crouch / climb / jet / eject signals propagate.
+    ///
+    /// **M14J** § extends with: vault cinematic, wall-jump cinematic,
+    /// rope hanging / swinging, zip-lining, mount, and swim surface / submerged.
     pub fn stance(&self) -> Stance {
         if self.knockdown_ticks_remaining > 0 {
             return Stance::KnockedDown;
+        }
+        // **M14J**: advanced-mobility stances take priority over the M5
+        // kinematic stance derivation because they pin the actor's locomotion
+        // mode independent of velocity / on_ground.
+        if self.parkour_signal.vault_ticks_remaining_ms > 0 {
+            return Stance::Vault;
+        }
+        if self.wall_jump_ticks_remaining_ms > 0 {
+            return Stance::WallJump;
+        }
+        if self.zipline_attached.is_some() {
+            return Stance::Ziplining;
+        }
+        if self.mount.is_some() {
+            return Stance::Mounted;
+        }
+        if self.holding_rope.is_some() {
+            // If the actor has lateral velocity past a threshold along the
+            // rope-hanging axis we treat it as a swing.
+            let swing_speed = self.velocity.x.abs();
+            if swing_speed > 1.5 {
+                return Stance::RopeSwinging;
+            }
+            return Stance::RopeHanging;
+        }
+        match self.swim_kind {
+            crate::move_state::SwimKind::SurfaceBreast | crate::move_state::SwimKind::SurfaceFreestyle => {
+                return Stance::SwimSurface;
+            }
+            crate::move_state::SwimKind::Dive | crate::move_state::SwimKind::Tread => {
+                return Stance::SwimSubmerged;
+            }
+            crate::move_state::SwimKind::None => {}
         }
         let ejecting = self
             .chassis
@@ -2283,6 +2467,64 @@ impl ActorState {
         {
             out.push(1);
             out.extend_from_slice(&self.m14g_wound_list.checksum_bytes());
+        }
+        // **M14H § save/load determinism**: append cardiac + tourniquet +
+        // buff + antibiotic-course state when any field deviates from
+        // default. Append-only.
+        let cardiac_default = cardiac::ActorCardiacComponent::default();
+        if self.m14h_cardiac != cardiac_default
+            || !self.m14h_tourniquets.is_empty()
+            || !self.m14h_buffs.is_empty()
+            || self.m14h_last_defib_tick.is_some()
+            || self.m14h_antibiotic_course.is_some()
+        {
+            out.push(1);
+            out.push(if self.m14h_cardiac.in_arrest { 1 } else { 0 });
+            out.extend_from_slice(&self.m14h_cardiac.onset_tick.to_le_bytes());
+            out.extend_from_slice(&self.m14h_cardiac.cpr_rounds_total.to_le_bytes());
+            out.extend_from_slice(&self.m14h_cardiac.consecutive_cpr_rounds.to_le_bytes());
+            out.extend_from_slice(&self.m14h_cardiac.charges_remaining.to_le_bytes());
+            out.extend_from_slice(&self.m14h_cardiac.defib_shocks.to_le_bytes());
+            out.push(if self.m14h_cardiac.chest_bruised { 1 } else { 0 });
+            out.extend_from_slice(&(self.m14h_tourniquets.len() as u64).to_le_bytes());
+            for (zone, tick) in &self.m14h_tourniquets {
+                out.extend_from_slice(zone.as_str().as_bytes());
+                out.push(0);
+                out.extend_from_slice(&tick.to_le_bytes());
+            }
+            out.extend_from_slice(&(self.m14h_buffs.len() as u64).to_le_bytes());
+            for buff in &self.m14h_buffs {
+                out.push(buff.kind as u8);
+                out.extend_from_slice(&buff.applied_tick.to_le_bytes());
+                out.extend_from_slice(&buff.expires_tick.to_le_bytes());
+            }
+            match self.m14h_last_defib_tick {
+                Some(t) => {
+                    out.push(1);
+                    out.extend_from_slice(&t.to_le_bytes());
+                }
+                None => out.push(0),
+            }
+            match self.m14h_antibiotic_course.as_ref() {
+                Some(s) => {
+                    out.push(1);
+                    out.push(s.tier);
+                    out.extend_from_slice(&s.doses_taken.to_le_bytes());
+                    out.extend_from_slice(&s.doses_required.to_le_bytes());
+                    out.extend_from_slice(&s.dose_interval_hours.to_le_bytes());
+                    out.extend_from_slice(&s.next_dose_tick.to_le_bytes());
+                    out.push(if s.resistance_risk { 1 } else { 0 });
+                }
+                None => out.push(0),
+            }
+        }
+        // **M14I § long-term-consequence persistence**: append per-actor
+        // long-term state (scars, biological age, prosthetics, traits,
+        // severed-limb tracking, concussion count, chronic-pain
+        // baseline, radiation dose). Append-only.
+        if !self.m14i_long_term.is_empty() {
+            out.push(1);
+            out.extend_from_slice(&self.m14i_long_term.checksum_bytes());
         }
         out
     }

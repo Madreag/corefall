@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerMountParams",
+  "description": "**M14J** § `act.player.mount { critter_id }` — mount a tamed saddled\ncritter. Enters Stance::Mounted; combined mass is rider + critter.",
+  "type": "object",
+  "properties": {
+    "critter_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "critter_id"
+  ]
+}

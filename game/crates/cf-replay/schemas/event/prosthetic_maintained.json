@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/prosthetic.maintained.v0.1",
+  "title": "prosthetic.maintained",
+  "description": "M14I § Prosthetic loop — fires when act.player.maintain_prosthetic completes. Resets wear_pct to 0 and clears the malfunction flag.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "prosthetic" },
+    "event_type": { "const": "maintained" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string" },
+        "zone": { "type": "string" }
+      },
+      "required": ["actor_id", "tick", "kind", "zone"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

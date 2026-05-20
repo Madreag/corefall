@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/treatment.cancelled.v0.1",
+  "title": "treatment.cancelled",
+  "description": "M14H § Treatment producers — fires when act.player.treat_cancel aborts an in-flight apply before completion.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "treatment" },
+    "event_type": { "const": "cancelled" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string" },
+        "apply_seconds_remaining": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["actor_id", "tick", "kind"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

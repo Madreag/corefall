@@ -749,6 +749,188 @@ pub struct SystemShutdownParams {
     pub write_run_bundle: Option<bool>,
 }
 
+/// **M14H** § `act.player.treat` — apply a treatment producer.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerTreatParams {
+    pub schema_version: u32,
+    /// Canonical TreatmentKind id (PascalCase, e.g. "FieldBandageV1").
+    pub kind: String,
+    /// Target actor id (the patient).
+    pub target_actor_id: u64,
+}
+
+/// **M14H** § `act.player.scan` — start a 30s Medical Scanner read.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerScanParams {
+    pub schema_version: u32,
+    pub target_actor_id: u64,
+}
+
+/// **M14H** § `act.player.cpr_round` — apply one CPR round.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerCprRoundParams {
+    pub schema_version: u32,
+    pub target_actor_id: u64,
+}
+
+/// **M14H** § `act.player.defib` — deliver a defibrillator shock.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerDefibParams {
+    pub schema_version: u32,
+    pub target_actor_id: u64,
+}
+
+/// **M14H** § `act.player.surgery_start` — begin a 5-phase surgery on a target.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerSurgeryStartParams {
+    pub schema_version: u32,
+    pub target_actor_id: u64,
+    /// Number of wounds to remove (drives the Operate-phase repeat count).
+    pub wounds_to_treat: u32,
+    /// True if the surgeon has surgeon_t1 (90% pass rate); false → medic_t1.
+    pub surgeon_t1: bool,
+    /// Optional seed override for deterministic skill-check rolls.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub seed: Option<u64>,
+}
+
+/// **M14H** § `act.player.triage_select` — open Patient Detail panel for one
+/// patient. `target_actor_id = None` clears the selection.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerTriageSelectParams {
+    pub schema_version: u32,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub target_actor_id: Option<u64>,
+}
+
+/// **M14I** § `act.player.install_prosthetic` — install one prosthetic on
+/// a target actor. Requires medic_t2 + surgery table; runs the 60s install
+/// sequence inline + emits `prosthetic.installed` on completion.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerInstallProstheticParams {
+    pub schema_version: u32,
+    pub target_actor_id: u64,
+    /// Canonical ProstheticKind id (snake_case, e.g. "prosthetic_leg_t1").
+    pub kind: String,
+    /// Target zone (e.g. "leg_right"). Must be in the prosthetic's
+    /// `target_zones` allow-list.
+    pub zone: String,
+}
+
+/// **M14I** § `act.player.maintain_prosthetic` — run a maintenance pass
+/// on an installed prosthetic. Resets wear_pct to 0 + clears the
+/// malfunction flag.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerMaintainProstheticParams {
+    pub schema_version: u32,
+    pub target_actor_id: u64,
+    pub zone: String,
+}
+
+/// **M14I** § `act.player.retire_veteran` — commit an actor's retirement.
+/// Only valid once `age.retirement_offered` has fired and the actor is at
+/// least `retirement_age + 5`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerRetireVeteranParams {
+    pub schema_version: u32,
+    pub target_actor_id: u64,
+}
+
+/// **M14J** § `act.player.vault` — manual vault override; auto-vault is
+/// detect-driven. Enters Stance::Vault for `VAULT_DURATION_MS` ms and
+/// emits `actor.vaulted`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerVaultParams {
+    pub schema_version: u32,
+}
+
+/// **M14J** § `act.player.wall_jump` — invoke a wall-jump within
+/// `WALL_CONTACT_GRACE_MS` of wall contact. Chain limit is 3 before
+/// next ground contact.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerWallJumpParams {
+    pub schema_version: u32,
+}
+
+/// **M14J** § `act.player.fire_grapple { target_x, target_y }` — fire the
+/// grappling-hook gun at a world-space point. On hit the rope embeds + a
+/// verlet rope spawns in cf-physics::rope.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerFireGrappleParams {
+    pub schema_version: u32,
+    pub target_x: f32,
+    pub target_y: f32,
+}
+
+/// **M14J** § `act.player.rope_input { climb: -1..1, swing: -1..1 }` —
+/// pull rope hand-over-hand or rappel + add tangential swing input at
+/// the bob.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerRopeInputParams {
+    pub schema_version: u32,
+    /// -1.0 (rappel away) to +1.0 (climb toward anchor).
+    pub climb: f32,
+    /// -1.0 to +1.0 — tangential swing input at the bob.
+    #[serde(default)]
+    pub swing: f32,
+}
+
+/// **M14J** § `act.player.release_rope` — release the embedded grapple
+/// rope; actor inherits the pendulum velocity at the instant of release.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerReleaseRopeParams {
+    pub schema_version: u32,
+}
+
+/// **M14J** § `act.player.zipline_clip { line_id }` — clip onto a
+/// deployed zip line at its high end.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerZiplineClipParams {
+    pub schema_version: u32,
+    pub line_id: u64,
+}
+
+/// **M14J** § `act.player.zipline_brake { engaged: bool }` — engage or
+/// release the zip-line brake.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerZiplineBrakeParams {
+    pub schema_version: u32,
+    pub engaged: bool,
+}
+
+/// **M14J** § `act.player.mount { critter_id }` — mount a tamed saddled
+/// critter. Enters Stance::Mounted; combined mass is rider + critter.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerMountParams {
+    pub schema_version: u32,
+    pub critter_id: u64,
+}
+
+/// **M14J** § `act.player.dismount` — dismount from a critter. Instant
+/// when stationary; 200ms stagger + 70% velocity inherit when mid-motion.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerDismountParams {
+    pub schema_version: u32,
+}
+
 /// Dump every M0 schema as `(filename, json-string)` pairs.
 ///
 /// `cargo run -p cf-control --example dump_schemas` regenerates the static
@@ -857,6 +1039,28 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerPauseCinematicParams>("act_player_pause_cinematic_params"),
         entry::<ActPlayerReplayCinematicParams>("act_player_replay_cinematic_params"),
         entry::<SrvDumpCinematicStateParams>("srv_dump_cinematic_state_params"),
+        // **M14H**: field-medic workflow + surgery + defib + triage cfctl surface.
+        entry::<ActPlayerTreatParams>("act_player_treat_params"),
+        entry::<ActPlayerScanParams>("act_player_scan_params"),
+        entry::<ActPlayerCprRoundParams>("act_player_cpr_round_params"),
+        entry::<ActPlayerDefibParams>("act_player_defib_params"),
+        entry::<ActPlayerSurgeryStartParams>("act_player_surgery_start_params"),
+        entry::<ActPlayerTriageSelectParams>("act_player_triage_select_params"),
+        // **M14I**: long-term-consequence cfctl surface.
+        entry::<ActPlayerInstallProstheticParams>("act_player_install_prosthetic_params"),
+        entry::<ActPlayerMaintainProstheticParams>("act_player_maintain_prosthetic_params"),
+        entry::<ActPlayerRetireVeteranParams>("act_player_retire_veteran_params"),
+        // **M14J**: actor advanced mobility — vault / wall_jump / grapple
+        // gun / rope / zip line / mount cfctl surface.
+        entry::<ActPlayerVaultParams>("act_player_vault_params"),
+        entry::<ActPlayerWallJumpParams>("act_player_wall_jump_params"),
+        entry::<ActPlayerFireGrappleParams>("act_player_fire_grapple_params"),
+        entry::<ActPlayerRopeInputParams>("act_player_rope_input_params"),
+        entry::<ActPlayerReleaseRopeParams>("act_player_release_rope_params"),
+        entry::<ActPlayerZiplineClipParams>("act_player_zipline_clip_params"),
+        entry::<ActPlayerZiplineBrakeParams>("act_player_zipline_brake_params"),
+        entry::<ActPlayerMountParams>("act_player_mount_params"),
+        entry::<ActPlayerDismountParams>("act_player_dismount_params"),
     ] {
         out.insert(name, body);
     }

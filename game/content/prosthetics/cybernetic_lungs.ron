@@ -1,0 +1,17 @@
+(
+    kind: cybernetic_lungs,
+    display_name: "Cybernetic Lungs",
+    tier: t2,
+    target_zones: [
+        "torso_front",
+    ],
+    compatible_origins: [
+        "human",
+        "android_organic_side",
+        "powered_organic",
+        "heavy_biomech",
+    ],
+    functional_restoration: 0.90,
+    maintenance_interval_seconds: 68.99383983572895,
+    install_seconds: 60.0,
+)

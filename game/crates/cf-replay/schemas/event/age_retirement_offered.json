@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/age.retirement_offered.v0.1",
+  "title": "age.retirement_offered",
+  "description": "M14I § Biological aging clock — fires once when an actor crosses the per-origin retirement age (default 55 for humans). The M41 veteran roster surfaces a Retire action; AI prefers non-combat assignments.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "age" },
+    "event_type": { "const": "retirement_offered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "age_in_game_years": { "type": "number", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick", "age_in_game_years"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

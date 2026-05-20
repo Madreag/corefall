@@ -979,7 +979,7 @@ pub(crate) struct EngineMutable {
     next_guard_projectile_id: u64,
     /// M2: chunked pixel terrain. `None` for scenarios that have not opted
     /// into chunked terrain. Coexists with `breach_world`.
-    chunked_terrain: Option<cf_terrain::ChunkedTerrain>,
+    pub(crate) chunked_terrain: Option<cf_terrain::ChunkedTerrain>,
     /// M2.5: reactor world (damageable static actors). `None` when no reactor
     /// is declared.
     reactor_world: Option<cf_mission::ReactorWorld>,
@@ -1487,6 +1487,16 @@ pub(crate) struct EngineMutable {
     /// **M14G**: indices of `m14g_material_contacts` already fired,
     /// so the engine never emits the same contact twice.
     pub(crate) m14g_material_contacts_fired: std::collections::BTreeSet<usize>,
+    /// **M14I**: persistent veteran roster (cf-veteran). Snapshots the
+    /// per-actor `LongTermState` for downstream M41 consumers (roster
+    /// UI, narrative tab).
+    pub(crate) m14i_veteran_roster: cf_veteran::VeteranRoster,
+    /// **M14I**: registry of pending retirement narratives. Populated
+    /// when `act.player.retire_veteran` fires. M48 storyteller consumes
+    /// the canonical `narrative.veteran_retired` event ids registered
+    /// here.
+    pub(crate) m14i_retirement_narratives:
+        cf_storyteller::retirement_event::RetirementNarrativeRegistry,
     /// **M14F § VAL-M14F-009**: per-actor flood-contact flag. Tick at
     /// which the actor was first registered as submerged / damp after
     /// a dam rupture.
@@ -1503,6 +1513,20 @@ pub(crate) struct EngineMutable {
     /// side) per sealed-room chunk. Updated each tick after rupture
     /// so the delta monotonically decreases toward equilibrium.
     pub(crate) m14f_breach_pressure_kpa: BTreeMap<(i32, i32), (f32, f32)>,
+    /// **M14J § verlet-rope world** — every embedded grapple line + zip-line
+    /// cable in the scene, keyed by [`cf_physics::RopeId`]. The engine
+    /// advances each rope each tick via `cf_physics::rope::Rope::step`.
+    pub(crate) m14j_ropes: BTreeMap<cf_physics::RopeId, cf_physics::Rope>,
+    /// **M14J § rope-id allocator**. Bumped on every grapple embed +
+    /// zip-kit deploy.
+    pub(crate) m14j_next_rope_id: u64,
+    /// **M14J § zipline kind tag** — true entry means this rope is a
+    /// deployed zip-line (not a grapple rope). The slide engine consults
+    /// this to apply gravity-along-cable + brake-deceleration.
+    pub(crate) m14j_zipline_ropes: std::collections::BTreeSet<cf_physics::RopeId>,
+    /// **M14J § zipline rider slide speed** — per-rider current speed
+    /// along the cable (m/s, positive = toward low end).
+    pub(crate) m14j_zipline_speed_by_rider: BTreeMap<u64, f32>,
 }
 
 /// **M14F** § Per-chunk lateral-wall runtime state. Lives on
@@ -2261,6 +2285,9 @@ impl M0Engine {
                 m14e_plasma_cutter_active: BTreeMap::new(),
                 m14f_lateral_chunks,
                 m14f_lateral_pass_invocations: 0,
+                m14i_veteran_roster: cf_veteran::VeteranRoster::new(),
+                m14i_retirement_narratives:
+                    cf_storyteller::retirement_event::RetirementNarrativeRegistry::new(),
                 m14g_wound_aging_invocations: 0,
                 m14g_wound_registry: None,
                 m14g_thermal_zones: m14g_thermal_zones_init,
@@ -2272,6 +2299,10 @@ impl M0Engine {
                 m14f_actor_vacuum_tick: BTreeMap::new(),
                 m14f_breach_fluid_mass: BTreeMap::new(),
                 m14f_breach_pressure_kpa: BTreeMap::new(),
+                m14j_ropes: BTreeMap::new(),
+                m14j_next_rope_id: 1,
+                m14j_zipline_ropes: std::collections::BTreeSet::new(),
+                m14j_zipline_speed_by_rider: BTreeMap::new(),
             }),
             recorder,
             current_tick,
@@ -4970,6 +5001,17 @@ impl M0Engine {
             // 5 ticks. Does NOT roll infection chance (deferred to
             // M14H per VAL-M14G-047).
             self.tick_m14g_wound_aging(tick, sim_time_ms);
+            // **M14I**: per-tick long-term-consequence pass. Drives the
+            // biological aging clock (per-year stat degradation +
+            // retirement + per-week terminal-roll), prosthetic wear,
+            // phantom-limb panic cadence, and radiation→cancer
+            // hand-off.
+            self.m14i_tick(tick, sim_time_ms);
+            // **M14J**: per-tick rope/zipline integration + swim breath
+            // drain + drowning emission. Steps every verlet rope, advances
+            // zip-line riders along the cable, and fires `actor.drowned`
+            // when a submerged actor's breath reaches 0.
+            self.m14j_tick(tick, sim_time_ms);
             // **M12B** § Per-tick doppler emission for in-flight
             // projectiles. Spec § "Doppler shift on supersonic projectile
             // flyby": "audio.doppler_shifted fires per tick with the
@@ -9874,6 +9916,7 @@ impl M0Engine {
         let severity = wound.severity;
         let dirt_pct = wound.dirt_pct;
         let zone_name = wound.zone.as_str().to_string();
+        let wound_kind = wound.kind;
         actor.m14g_wound_list.push(resolved.zone.clone(), wound);
         drop(s);
         let payload = serde_json::json!({
@@ -9885,9 +9928,16 @@ impl M0Engine {
             "severity": severity,
             "dirt_pct": dirt_pct,
         });
-        Some(self
+        let event_id = self
             .recorder
-            .record(tick, sim_time_ms, "wound", "created", payload, parent))
+            .record(tick, sim_time_ms, "wound", "created", payload, parent);
+        // **M14I**: Concussion wounds at KO-threshold severity (>= 0.5)
+        // increment the actor's concussion_count + may emit
+        // memory_loss.minor/major.
+        if matches!(wound_kind, cf_wound::WoundKind::Concussion) && severity >= 0.5 {
+            self.m14i_record_concussion(actor_id, tick, sim_time_ms);
+        }
+        Some(event_id)
     }
 
     /// **M14G § VAL-M14G-013 / VAL-M14G-014 / VAL-M14G-036**: upgrade an
@@ -12389,7 +12439,7 @@ impl M0Engine {
                             ray_direction[0] * (eval.impulse_out / 80.0).clamp(0.0, 500.0),
                             ray_direction[1] * (eval.impulse_out / 80.0).clamp(0.0, 500.0),
                         ];
-                        let _ = self.recorder.record(
+                        let detached_event_id = self.recorder.record(
                             tick,
                             sim_time_ms,
                             "attachable",
@@ -12408,6 +12458,18 @@ impl M0Engine {
                                 "cause": "kinetic_pierce",
                             }),
                             Some(projectile_hit_event_id.clone()),
+                        );
+                        // **M14I**: register the severed limb so the
+                        // post-survival pass can promote it to phantom_limb.
+                        // Chains phantom_limb.acquired to attachable.detached
+                        // so the cause-chain walker traces back to the
+                        // projectile hit.
+                        self.m14i_record_phantom_limb_with_parent(
+                            hit.target.0,
+                            zone_label.as_str(),
+                            tick,
+                            sim_time_ms,
+                            Some(detached_event_id),
                         );
                     }
                     // Emit `physics.impulse_propagated` for the joint that
@@ -22176,6 +22238,83 @@ impl EngineHandle for M0Engine {
                     .collect()
             })
             .unwrap_or_default();
+        // **M14J § "observe.rope / observe.zipline / observe.mount_link"**
+        // project the live rope world + mount pairings.
+        let ropes_view: Vec<crate::state::RopeView> = state
+            .m14j_ropes
+            .iter()
+            .map(|(rid, r)| {
+                let start = r.nodes.first().map(|n| n.position).unwrap_or([0.0, 0.0]);
+                let end = r.nodes.last().map(|n| n.position).unwrap_or([0.0, 0.0]);
+                crate::state::RopeView {
+                    id: rid.raw(),
+                    start,
+                    end,
+                    segment_count: r.segment_count,
+                    segment_length_m: r.segment_length_m,
+                    total_length_m: r.total_length_m(),
+                    taut: r.taut,
+                    embedded: r.embedded,
+                    is_zipline: state.m14j_zipline_ropes.contains(rid),
+                }
+            })
+            .collect();
+        let ziplines_view: Vec<crate::state::ZiplineView> = state
+            .m14j_zipline_ropes
+            .iter()
+            .filter_map(|rid| {
+                let rope = state.m14j_ropes.get(rid)?;
+                let start = rope.nodes.first().map(|n| n.position).unwrap_or([0.0, 0.0]);
+                let end = rope.nodes.last().map(|n| n.position).unwrap_or([0.0, 0.0]);
+                let (high_end, low_end) = if start[1] > end[1] { (start, end) } else { (end, start) };
+                let dx = end[0] - start[0];
+                let dy = end[1] - start[1];
+                let span = (dx * dx + dy * dy).sqrt();
+                let height_delta = (start[1] - end[1]).abs();
+                let rider_count = state
+                    .actor_state
+                    .as_ref()
+                    .map(|sim| {
+                        sim.world
+                            .actors
+                            .values()
+                            .filter(|a| a.zipline_attached == Some(*rid))
+                            .count() as u32
+                    })
+                    .unwrap_or(0);
+                Some(crate::state::ZiplineView {
+                    id: rid.raw(),
+                    high_end,
+                    low_end,
+                    span_m: span,
+                    height_delta_m: height_delta,
+                    max_speed_m_s: cf_equipment::ZIPLINE_MAX_SPEED_M_PER_S,
+                    brake_decel_m_s2: cf_equipment::ZIPLINE_BRAKE_DECEL_M_PER_S2,
+                    rider_count,
+                })
+            })
+            .collect();
+        let mount_links_view: Vec<crate::state::MountLinkView> = state
+            .actor_state
+            .as_ref()
+            .map(|sim| {
+                sim.world
+                    .actors
+                    .iter()
+                    .filter_map(|(rider_id, a)| {
+                        let m = a.mount?;
+                        Some(crate::state::MountLinkView {
+                            rider_id: rider_id.0,
+                            critter_id: m.critter_id.0,
+                            combined_mass_kg: m.combined_mass_kg,
+                            mount_speed_retained: cf_actor::MOUNT_TOP_SPEED_RETAINED,
+                            ride_direction: m.ride_direction,
+                            firing_during_motion: m.firing_during_motion,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let frame = ObserveFrame {
             schema_version: SCHEMA_VERSION,
             run_id: self.recorder.run_id().to_string(),
@@ -22228,6 +22367,9 @@ impl EngineHandle for M0Engine {
             trench_segment_at_pos: None,
             cells,
             gravity_vectors,
+            ropes: ropes_view,
+            ziplines: ziplines_view,
+            mount_links: mount_links_view,
         };
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
@@ -26625,6 +26767,146 @@ impl EngineHandle for M0Engine {
                     );
                 }
                 CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerTreat {
+                kind,
+                target_actor_id,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m14h_treat(kind, target_actor_id, source, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerScan {
+                target_actor_id,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m14h_scan(target_actor_id, source, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerCprRound {
+                target_actor_id,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m14h_cpr_round(target_actor_id, source, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerDefib {
+                target_actor_id,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m14h_defib(target_actor_id, source, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerSurgeryStart {
+                target_actor_id,
+                wounds_to_treat,
+                surgeon_t1,
+                seed,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m14h_surgery_start(
+                    target_actor_id,
+                    wounds_to_treat,
+                    surgeon_t1,
+                    seed,
+                    source,
+                    tick,
+                    sim_time_ms,
+                )
+            }
+            ControlCommand::ActPlayerTriageSelect {
+                target_actor_id,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m14h_triage_select(target_actor_id, source, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerInstallProsthetic {
+                target_actor_id,
+                kind,
+                zone,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m14i_install_prosthetic(
+                    target_actor_id,
+                    kind,
+                    zone,
+                    source,
+                    tick,
+                    sim_time_ms,
+                )
+            }
+            ControlCommand::ActPlayerMaintainProsthetic {
+                target_actor_id,
+                zone,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m14i_maintain_prosthetic(
+                    target_actor_id,
+                    zone,
+                    source,
+                    tick,
+                    sim_time_ms,
+                )
+            }
+            ControlCommand::ActPlayerRetireVeteran {
+                target_actor_id,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m14i_retire_veteran(target_actor_id, source, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerVault { source } => {
+                drop(state);
+                let _ = source;
+                self.dispatch_m14j_vault(tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerWallJump { source } => {
+                drop(state);
+                let _ = source;
+                self.dispatch_m14j_wall_jump(tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerFireGrapple {
+                target_x,
+                target_y,
+                source,
+            } => {
+                drop(state);
+                let _ = source;
+                self.dispatch_m14j_fire_grapple(target_x, target_y, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerRopeInput { climb, swing, source } => {
+                drop(state);
+                let _ = source;
+                self.dispatch_m14j_rope_input(climb, swing, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerReleaseRope { source } => {
+                drop(state);
+                let _ = source;
+                self.dispatch_m14j_release_rope(tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerZiplineClip { line_id, source } => {
+                drop(state);
+                let _ = source;
+                self.dispatch_m14j_zipline_clip(line_id, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerZiplineBrake { engaged, source } => {
+                drop(state);
+                let _ = source;
+                self.dispatch_m14j_zipline_brake(engaged, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerMount { critter_id, source } => {
+                drop(state);
+                let _ = source;
+                self.dispatch_m14j_mount(critter_id, tick, sim_time_ms)
+            }
+            ControlCommand::ActPlayerDismount { source } => {
+                drop(state);
+                let _ = source;
+                self.dispatch_m14j_dismount(tick, sim_time_ms)
             }
         }
     }

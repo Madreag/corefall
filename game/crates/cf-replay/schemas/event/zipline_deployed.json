@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/zipline.deployed.v0.1",
+  "title": "zipline.deployed",
+  "description": "M14J zip-line cable deployed between two embedded grapple-hook anchors. rope_id is the verlet rope spawned in cf-physics::rope.",
+  "type": "object",
+  "required": ["actor", "tick", "rope_id", "high_end_x", "high_end_y", "low_end_x", "low_end_y"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "rope_id": {"type": "integer", "minimum": 0},
+    "high_end_x": {"type": "number"},
+    "high_end_y": {"type": "number"},
+    "low_end_x": {"type": "number"},
+    "low_end_y": {"type": "number"},
+    "span_m": {"type": "number", "minimum": 0},
+    "height_delta_m": {"type": "number", "minimum": 0}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.drowned.v0.1",
+  "title": "actor.drowned",
+  "description": "M14J supersedes M16's placeholder drown event. Fires when an actor's swim breath reaches 0 while submerged. depth_m is the depth below the water surface.",
+  "type": "object",
+  "required": ["actor", "tick", "breath_held_s", "depth_m"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "breath_held_s": {"type": "number", "minimum": 0},
+    "depth_m": {"type": "number"},
+    "race": {"type": "string"}
+  },
+  "additionalProperties": true
+}

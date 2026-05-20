@@ -144,6 +144,28 @@ impl BodyArmorSlot {
         body_sealed && helmet_sealed
     }
 
+    /// **M14J** § "helmet seal" — true when the helmet slot carries a
+    /// sealed helmet (per M19C/M6C PPE seal flag). Used by the M14J swim
+    /// integration to suppress drowning while submerged.
+    pub fn helmet_seal_active(&self) -> bool {
+        ppe_preset(&self.helmet.item_id).map_or(false, |p| p.sealed)
+    }
+
+    /// **M14J** § "M19C dive-suit shell" — true when the body slot carries
+    /// a dive-suit / hardsuit / EVA suit (per M19C/M6C PPE). Used by the
+    /// M14J swim integration to suppress drowning.
+    pub fn dive_suit_equipped(&self) -> bool {
+        match ppe_preset(&self.body.item_id) {
+            Some(p) => matches!(
+                p.kind,
+                cf_equipment::PpeKind::Hardsuit
+                    | cf_equipment::PpeKind::EvaSuit
+                    | cf_equipment::PpeKind::HazmatSuit
+            ) || p.sealed,
+            None => false,
+        }
+    }
+
     /// Apply a kinetic hit to the slot associated with `zone`. Returns
     /// the damage that reaches the actor's HP pool + a flag the engine
     /// can use to emit `body_armor.degraded`.

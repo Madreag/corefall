@@ -14,6 +14,7 @@ cf-actor = { path = "../cf-actor" }
 cf-sim-core = { path = "../cf-sim-core" }
 cf-trench = { path = "../cf-trench" }
 cf-fortification = { path = "../cf-fortification" }
+cf-treatment = { path = "../cf-treatment" }
 
 [dev-dependencies]
 serde_json = { workspace = true }

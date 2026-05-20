@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/surgery.phase_completed.v0.1",
+  "title": "surgery.phase_completed",
+  "description": "M14H § Surgery 5-phase minigame — fires on exit from each phase (Open / Diagnose / Operate / Close / Recover) before the next phase begins.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "surgery" },
+    "event_type": { "const": "phase_completed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "phase": {
+          "type": "string",
+          "enum": ["Open", "Diagnose", "Operate", "Close", "Recover"]
+        }
+      },
+      "required": ["actor_id", "tick", "phase"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -102,6 +102,13 @@ use crate::{
         ActPlayerReplayCinematicParams, ActPlayerResetParams, ActPlayerSelectItemParams, ActPlayerSetDroneModeParams,
         ActPlayerSharpAimParams, ActPlayerSkipCinematicParams, ActPlayerWeaponCycleParams, ActSquadAssignRoleParams,
         ActSquadIssueParams, ActSquadSetFormationParams,
+        ActPlayerTreatParams, ActPlayerScanParams, ActPlayerCprRoundParams, ActPlayerDefibParams,
+        ActPlayerSurgeryStartParams, ActPlayerTriageSelectParams,
+        ActPlayerInstallProstheticParams, ActPlayerMaintainProstheticParams,
+        ActPlayerRetireVeteranParams,
+        ActPlayerDismountParams, ActPlayerFireGrappleParams, ActPlayerMountParams, ActPlayerReleaseRopeParams,
+        ActPlayerRopeInputParams, ActPlayerVaultParams, ActPlayerWallJumpParams, ActPlayerZiplineBrakeParams,
+        ActPlayerZiplineClipParams,
         InspectActorParams, InspectAiParams, InspectChassisParams, InspectEquipmentParams, InspectMissionParams,
         ObserveActorParams, ObserveAiParams, ObserveChassisSilhouetteParams, ObserveMissionParams,
         ObserveOnceParams, ObservePerceptionParams, ObserveSubscribeParams, RunBundleWriteParams,
@@ -1130,6 +1137,104 @@ pub enum ControlCommand {
     ActPlayerRepairTrenchModule {
         module_id: String,
         segment_id: u64,
+        source: IntentSource,
+    },
+    /// **M14H**: apply a treatment producer to a target. `kind` is the
+    /// canonical PascalCase TreatmentKind id; the engine resolves it via
+    /// `cf_treatment::TreatmentKind::from_str`.
+    ActPlayerTreat {
+        kind: String,
+        target_actor_id: u64,
+        source: IntentSource,
+    },
+    /// **M14H**: start a 30s Medical Scanner read against a target.
+    ActPlayerScan {
+        target_actor_id: u64,
+        source: IntentSource,
+    },
+    /// **M14H**: apply one CPR round (20s of compressions) to a target
+    /// in cardiac arrest.
+    ActPlayerCprRound {
+        target_actor_id: u64,
+        source: IntentSource,
+    },
+    /// **M14H**: deliver a defibrillator shock to a target.
+    ActPlayerDefib {
+        target_actor_id: u64,
+        source: IntentSource,
+    },
+    /// **M14H**: begin a 5-phase surgery on a target.
+    ActPlayerSurgeryStart {
+        target_actor_id: u64,
+        wounds_to_treat: u32,
+        surgeon_t1: bool,
+        seed: Option<u64>,
+        source: IntentSource,
+    },
+    /// **M14H**: open / clear the Patient Detail panel selection.
+    ActPlayerTriageSelect {
+        target_actor_id: Option<u64>,
+        source: IntentSource,
+    },
+    /// **M14I**: install a prosthetic on a target actor's severed zone.
+    ActPlayerInstallProsthetic {
+        target_actor_id: u64,
+        kind: String,
+        zone: String,
+        source: IntentSource,
+    },
+    /// **M14I**: run a maintenance pass on an installed prosthetic.
+    ActPlayerMaintainProsthetic {
+        target_actor_id: u64,
+        zone: String,
+        source: IntentSource,
+    },
+    /// **M14I**: commit an actor's retirement.
+    ActPlayerRetireVeteran {
+        target_actor_id: u64,
+        source: IntentSource,
+    },
+    /// **M14J**: manual vault override.
+    ActPlayerVault {
+        source: IntentSource,
+    },
+    /// **M14J**: wall-jump while in wall-contact grace window.
+    ActPlayerWallJump {
+        source: IntentSource,
+    },
+    /// **M14J**: fire grappling-hook gun at a world target.
+    ActPlayerFireGrapple {
+        target_x: f32,
+        target_y: f32,
+        source: IntentSource,
+    },
+    /// **M14J**: continuous rope climb / rappel + swing input.
+    ActPlayerRopeInput {
+        climb: f32,
+        swing: f32,
+        source: IntentSource,
+    },
+    /// **M14J**: release rope; inherit pendulum exit velocity.
+    ActPlayerReleaseRope {
+        source: IntentSource,
+    },
+    /// **M14J**: clip onto a deployed zip line.
+    ActPlayerZiplineClip {
+        line_id: u64,
+        source: IntentSource,
+    },
+    /// **M14J**: engage / release zip-line brake.
+    ActPlayerZiplineBrake {
+        engaged: bool,
+        source: IntentSource,
+    },
+    /// **M14J**: mount a tamed critter.
+    ActPlayerMount {
+        critter_id: u64,
+        source: IntentSource,
+    },
+    /// **M14J**: dismount from a critter.
+    ActPlayerDismount {
         source: IntentSource,
     },
 }
@@ -3234,6 +3339,260 @@ async fn process_request<E: EngineHandle>(
             let value = engine.dump_cinematic_state().await;
             Some(success_response(request.id, value))
         }
+        "act.player.treat" => {
+            let p: ActPlayerTreatParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if cf_treatment::TreatmentKind::from_str(&p.kind).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_treatment_kind"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerTreat {
+                    kind: p.kind,
+                    target_actor_id: p.target_actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.scan" => {
+            let p: ActPlayerScanParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerScan {
+                    target_actor_id: p.target_actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.cpr_round" => {
+            let p: ActPlayerCprRoundParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerCprRound {
+                    target_actor_id: p.target_actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.defib" => {
+            let p: ActPlayerDefibParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerDefib {
+                    target_actor_id: p.target_actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.surgery_start" => {
+            let p: ActPlayerSurgeryStartParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerSurgeryStart {
+                    target_actor_id: p.target_actor_id,
+                    wounds_to_treat: p.wounds_to_treat,
+                    surgeon_t1: p.surgeon_t1,
+                    seed: p.seed,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.triage_select" => {
+            let p: ActPlayerTriageSelectParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerTriageSelect {
+                    target_actor_id: p.target_actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.install_prosthetic" => {
+            let p: ActPlayerInstallProstheticParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if cf_prosthetic::ProstheticKind::from_str(&p.kind).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_prosthetic_kind"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerInstallProsthetic {
+                    target_actor_id: p.target_actor_id,
+                    kind: p.kind,
+                    zone: p.zone,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.maintain_prosthetic" => {
+            let p: ActPlayerMaintainProstheticParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerMaintainProsthetic {
+                    target_actor_id: p.target_actor_id,
+                    zone: p.zone,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.retire_veteran" => {
+            let p: ActPlayerRetireVeteranParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerRetireVeteran {
+                    target_actor_id: p.target_actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // ==================================================================
+        // **M14J**: actor advanced mobility cfctl surface.
+        // ==================================================================
+        "act.player.vault" => {
+            let _p: ActPlayerVaultParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerVault {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.wall_jump" => {
+            let _p: ActPlayerWallJumpParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerWallJump {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.fire_grapple" => {
+            let p: ActPlayerFireGrappleParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if !p.target_x.is_finite() || !p.target_y.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite_target"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerFireGrapple {
+                    target_x: p.target_x,
+                    target_y: p.target_y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.rope_input" => {
+            let p: ActPlayerRopeInputParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if !p.climb.is_finite() || !p.swing.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite_rope_input"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerRopeInput {
+                    climb: p.climb.clamp(-1.0, 1.0),
+                    swing: p.swing.clamp(-1.0, 1.0),
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.release_rope" => {
+            let _p: ActPlayerReleaseRopeParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerReleaseRope {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.zipline_clip" => {
+            let p: ActPlayerZiplineClipParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerZiplineClip {
+                    line_id: p.line_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.zipline_brake" => {
+            let p: ActPlayerZiplineBrakeParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerZiplineBrake {
+                    engaged: p.engaged,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.mount" => {
+            let p: ActPlayerMountParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerMount {
+                    critter_id: p.critter_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.dismount" => {
+            let _p: ActPlayerDismountParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerDismount {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
         "act.input.capture_controls" => {
             let p: ActInputCaptureControlsParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -4714,6 +5073,9 @@ mod tests {
                 trench_segment_at_pos: None,
                 cells: vec![],
                 gravity_vectors: vec![],
+                ropes: vec![],
+                ziplines: vec![],
+                mount_links: vec![],
             }
         }
         async fn settings_snapshot(&self) -> Settings {

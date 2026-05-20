@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/treatment.applied.v0.1",
+  "title": "treatment.applied",
+  "description": "M14H § Treatment producers — fires when act.player.treat passes the pre-flight gate (origin / tool / skill / charges) and the apply-state-machine transitions Pending → Applying. Payload carries the canonical TreatmentKind name, actor + tick + apply_seconds.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "treatment" },
+    "event_type": { "const": "applied" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "field_bandage_v1",
+            "trauma_pack_v1",
+            "tourniquet_v1",
+            "sutures_v1",
+            "cauterize_v1",
+            "splint_v1",
+            "surgery_kit_v1",
+            "defibrillator_v1",
+            "cpr_manual",
+            "transfusion_bag_v1",
+            "iv_fluids_v1",
+            "oxygen_therapy_v1",
+            "antibiotic_course_t1",
+            "antibiotic_course_t2",
+            "antidote_universal_t1",
+            "antidote_organophosphate",
+            "anti_radiation_chelation",
+            "painkiller_opioid_t1",
+            "anti_anxiety_benzo_t1",
+            "combat_stim_t1",
+            "medical_scanner_t1",
+            "hospital_bed_v1"
+          ]
+        },
+        "apply_seconds": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["actor_id", "tick", "kind", "apply_seconds"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

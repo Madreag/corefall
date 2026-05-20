@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/grapple.embedded.v0.1",
+  "title": "grapple.embedded",
+  "description": "M14J grapple hook embedded in a tile. anchor_x / anchor_y carry the contact point; rope_id is the verlet rope spawned in cf-physics::rope. long_distance=true when range >= 25m (M25 story-grade hook).",
+  "type": "object",
+  "required": ["actor", "tick", "anchor_x", "anchor_y", "rope_id"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "anchor_x": {"type": "number"},
+    "anchor_y": {"type": "number"},
+    "rope_id": {"type": "integer", "minimum": 0},
+    "rope_length_m": {"type": "number", "minimum": 0},
+    "long_distance": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

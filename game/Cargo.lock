@@ -1498,16 +1498,34 @@ dependencies = [
 name = "cf-actor"
 version = "0.0.1"
 dependencies = [
+ "cf-aging",
  "cf-atmos",
  "cf-chassis",
  "cf-equipment",
  "cf-fortification",
  "cf-physics",
+ "cf-prosthetic",
+ "cf-scar",
+ "cf-treatment",
  "cf-trench",
  "cf-wound",
+ "rand_core 0.10.1",
+ "rand_xoshiro",
  "ron",
  "serde",
  "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "cf-aging"
+version = "0.0.1"
+dependencies = [
+ "rand_core 0.10.1",
+ "rand_xoshiro",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
@@ -1518,6 +1536,7 @@ dependencies = [
  "cf-actor",
  "cf-fortification",
  "cf-sim-core",
+ "cf-treatment",
  "cf-trench",
  "ron",
  "serde",
@@ -1678,6 +1697,7 @@ dependencies = [
  "async-trait",
  "blake3",
  "cf-actor",
+ "cf-aging",
  "cf-ai",
  "cf-asset-ledger",
  "cf-atmos",
@@ -1700,22 +1720,29 @@ dependencies = [
  "cf-photo",
  "cf-physics",
  "cf-priority",
+ "cf-prosthetic",
  "cf-render-2d",
  "cf-replay",
  "cf-replay-export",
  "cf-replay-scrub",
  "cf-save",
+ "cf-scar",
  "cf-sim-core",
  "cf-squad",
  "cf-squad-ui",
+ "cf-storyteller",
  "cf-terrain",
  "cf-tools-replay-viewer",
+ "cf-treatment",
  "cf-trench",
  "cf-ui",
+ "cf-veteran",
  "cf-wound",
  "chrono",
  "futures-util",
  "hex",
+ "rand_core 0.10.1",
+ "rand_xoshiro",
  "ron",
  "schemars",
  "serde",
@@ -1870,8 +1897,10 @@ dependencies = [
  "cf-equipment",
  "cf-fortification",
  "cf-material",
+ "cf-prosthetic",
  "cf-replay",
  "cf-save",
+ "cf-treatment",
  "cf-trench",
  "cf-wound",
  "clap",
@@ -1952,6 +1981,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-prosthetic"
+version = "0.0.1"
+dependencies = [
+ "cf-wound",
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-render-2d"
 version = "0.0.1"
 dependencies = [
@@ -2025,6 +2066,17 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "cf-scar"
+version = "0.0.1"
+dependencies = [
+ "cf-wound",
+ "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "tracing",
 ]
@@ -2122,6 +2174,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-storyteller"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-terrain"
 version = "0.0.1"
 dependencies = [
@@ -2162,6 +2223,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-treatment"
+version = "0.0.1"
+dependencies = [
+ "cf-wound",
+ "rand_core 0.10.1",
+ "rand_xoshiro",
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-trench"
 version = "0.0.1"
 dependencies = [
@@ -2177,14 +2252,33 @@ version = "0.0.1"
 dependencies = [
  "bevy",
  "cf-actor",
+ "cf-aging",
  "cf-ai",
  "cf-equipment",
  "cf-fortification",
+ "cf-prosthetic",
+ "cf-scar",
  "cf-terrain",
+ "cf-treatment",
  "cf-trench",
+ "cf-veteran",
  "cf-wound",
  "serde",
  "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "cf-veteran"
+version = "0.0.1"
+dependencies = [
+ "cf-aging",
+ "cf-prosthetic",
+ "cf-scar",
+ "cf-wound",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 

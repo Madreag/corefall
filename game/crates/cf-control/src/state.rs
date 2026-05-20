@@ -95,6 +95,63 @@ pub struct ObserveFrame {
     /// actor's position this tick. Empty for scenarios with no actors.
     #[serde(default)]
     pub gravity_vectors: Vec<ActorGravityView>,
+    /// **M14J § cf-control::observe — observe.rope list** — every embedded
+    /// grapple rope + zip-line cable currently in the world. Pulled from
+    /// `EngineMutable::m14j_ropes`; consumers read endpoints + tautness.
+    #[serde(default)]
+    pub ropes: Vec<RopeView>,
+    /// **M14J § cf-control::observe — observe.zipline list** — subset of
+    /// `ropes` that are deployed zip-line cables (canonical high/low ends
+    /// + active rider count).
+    #[serde(default)]
+    pub ziplines: Vec<ZiplineView>,
+    /// **M14J § cf-control::observe — observe.mount_link list** — every
+    /// active rider/critter pairing (rider_id + critter_id + combined_mass).
+    #[serde(default)]
+    pub mount_links: Vec<MountLinkView>,
+}
+
+/// **M14J § "observe.rope list"** — projection of one embedded verlet
+/// rope + its endpoints + tautness state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct RopeView {
+    pub id: u64,
+    pub start: [f32; 2],
+    pub end: [f32; 2],
+    pub segment_count: u32,
+    pub segment_length_m: f32,
+    pub total_length_m: f32,
+    pub taut: bool,
+    pub embedded: bool,
+    /// `true` if this rope is tagged as a zip-line cable (consult
+    /// `ziplines[]` for the canonical orientation).
+    pub is_zipline: bool,
+}
+
+/// **M14J § "observe.zipline list"** — projection of one deployed zip-line
+/// cable in canonical (high_end, low_end) orientation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ZiplineView {
+    pub id: u64,
+    pub high_end: [f32; 2],
+    pub low_end: [f32; 2],
+    pub span_m: f32,
+    pub height_delta_m: f32,
+    pub max_speed_m_s: f32,
+    pub brake_decel_m_s2: f32,
+    pub rider_count: u32,
+}
+
+/// **M14J § "observe.mount_link list"** — projection of one rider/critter
+/// pairing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct MountLinkView {
+    pub rider_id: u64,
+    pub critter_id: u64,
+    pub combined_mass_kg: f32,
+    pub mount_speed_retained: f32,
+    pub ride_direction: [f32; 2],
+    pub firing_during_motion: bool,
 }
 
 /// **M14B** § per-cell atmosphere projection for `observe.frame.cells`.

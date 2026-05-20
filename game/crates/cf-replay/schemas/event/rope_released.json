@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/rope.released.v0.1",
+  "title": "rope.released",
+  "description": "M14J actor releases an embedded grappling rope. exit_velocity carries the pendulum velocity at the moment of release (sqrt(2*g*L*(1-cos(theta)))).",
+  "type": "object",
+  "required": ["actor", "tick", "rope_id"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0},
+    "rope_id": {"type": "integer", "minimum": 0},
+    "exit_velocity_x": {"type": "number"},
+    "exit_velocity_y": {"type": "number"},
+    "theta_rad_at_release": {"type": "number"}
+  },
+  "additionalProperties": true
+}

@@ -142,6 +142,11 @@ pub fn derive_stance(inputs: StanceInputs) -> Stance {
 /// Returns true when the actor in this stance is allowed to fire ranged
 /// weapons. Cinematic stances (Slide/Vault/Climb/Dive/StealthAttack/
 /// KnifeThrow) lock the weapon trigger.
+///
+/// **M14J** § "Mounted rider fires one-handed weapon at gallop" — mounted
+/// + zip-lining + rope-hanging + swim-surface allow firing (the rider /
+/// rope-bob / swimmer can still aim their free arm). Wall-jump locks fire
+/// during the 200 ms cinematic.
 #[must_use]
 pub fn fire_allowed_in_stance(stance: Stance) -> bool {
     matches!(
@@ -159,11 +164,18 @@ pub fn fire_allowed_in_stance(stance: Stance) -> bool {
             | Stance::Airborne
             | Stance::Climbing
             | Stance::Jetting
+            | Stance::Mounted
+            | Stance::Ziplining
+            | Stance::RopeHanging
+            | Stance::SwimSurface
     )
 }
 
 /// Returns true when the stance is one of the M6 cinematic transition
 /// states (animation-bound; can't be interrupted by ordinary movement).
+///
+/// **M14J** § parkour cinematics — vault + wall-jump are 200ms cinematic
+/// windows that cannot be interrupted by ordinary input.
 #[must_use]
 pub fn is_cinematic(stance: Stance) -> bool {
     matches!(
@@ -176,6 +188,7 @@ pub fn is_cinematic(stance: Stance) -> bool {
             | Stance::PipeClimb
             | Stance::StealthAttack
             | Stance::KnifeThrow
+            | Stance::WallJump
     )
 }
 
@@ -214,6 +227,18 @@ pub fn stance_bloom_factor(stance: Stance) -> f32 {
         Stance::Airborne => 3.0,
         Stance::Slide => 0.9,
         Stance::Dive | Stance::Vault => 2.5,
+        // **M14J**: rope-hang is slightly tighter than airborne; rope-swing is
+        // less stable (still moving on a pendulum); zip-line trades tighter
+        // grouping for forced glide; mount = 2.0× (a galloping critter is
+        // less stable than standing); swim_surface = 2.0×; submerged dive
+        // floats heavily.
+        Stance::RopeHanging => 2.0,
+        Stance::RopeSwinging => 4.0,
+        Stance::Ziplining => 2.5,
+        Stance::Mounted => 2.0,
+        Stance::WallJump => 5.0,
+        Stance::SwimSurface => 2.0,
+        Stance::SwimSubmerged => 4.0,
         _ => 1.0,
     }
 }

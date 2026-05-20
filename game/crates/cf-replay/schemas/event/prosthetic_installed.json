@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/prosthetic.installed.v0.1",
+  "title": "prosthetic.installed",
+  "description": "M14I § Prosthetic loop — fires when act.player.install_prosthetic completes its 60s surgery sequence. The actor's severed zone transitions Severed → Prosthetic and the long-term aggregate credits the configured functional-restoration ratio.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "prosthetic" },
+    "event_type": { "const": "installed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string" },
+        "tier": { "type": "string", "enum": ["t1", "t2", "t3"] },
+        "zone": { "type": "string" },
+        "functional_restoration": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["actor_id", "tick", "kind", "tier", "zone"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

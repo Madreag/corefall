@@ -1067,7 +1067,28 @@ fn step_one_actor<R: FnMut() -> u64>(
         // applies to ALL particles of this shot (CCCP `Round.RTTRatio` is
         // per-shot, not per-particle).
         let particle_count = spec.particle_count.max(1);
-        let half_spread = spec.spread_radians * 0.5;
+        // **M14J § "Mounted rider fires one-handed weapon at gallop" —
+        // adds 0.1 rad mount_motion penalty when riding a moving critter.
+        let mount_spread_bonus = {
+            let actor_for_mount = state.world.actors.get(&actor_id);
+            match actor_for_mount.and_then(|a| a.mount) {
+                Some(m) => {
+                    let critter_speed = state
+                        .world
+                        .actors
+                        .get(&m.critter_id)
+                        .map(|c| (c.velocity.x.powi(2) + c.velocity.y.powi(2)).sqrt())
+                        .unwrap_or(0.0);
+                    if critter_speed > crate::mount::DISMOUNT_STATIONARY_SPEED_THRESHOLD {
+                        crate::mount::MOUNT_MOTION_AIM_SPREAD_RAD
+                    } else {
+                        0.0
+                    }
+                }
+                None => 0.0,
+            }
+        };
+        let half_spread = (spec.spread_radians + mount_spread_bonus) * 0.5;
         // Angle of the base aim (radians).
         let base_angle = aim.y.atan2(aim.x);
         let base_speed = (base_velocity.x * base_velocity.x + base_velocity.y * base_velocity.y).sqrt();

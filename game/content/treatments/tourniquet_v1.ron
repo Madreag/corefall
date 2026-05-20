@@ -1,0 +1,14 @@
+(
+    kind: tourniquet_v1,
+    display_name: "Tourniquet",
+    apply_seconds_min: 8.0,
+    apply_seconds_max: 8.0,
+    tool: none,
+    skill: none,
+    risk: necrosis_if_unreleased,
+    revives_downed: false,
+    origin_aware: true,
+    charges: None,
+    doses_per_course: None,
+    dose_interval_hours: None,
+)
