@@ -53,19 +53,22 @@ pub enum RopeEndpoint {
 
 impl RopeEndpoint {
     /// World-space position of this endpoint, resolved against the optional
-    /// actor position lookup. Returns `[0.0, 0.0]` when an `Actor` endpoint
-    /// references an actor the caller did not provide a position for.
+    /// actor position lookup. Returns `None` when an `Actor` endpoint
+    /// references an actor the caller did not provide a position for —
+    /// callers MUST handle the `None` case (e.g. detach the rope or pin
+    /// the node to a safe default). Returning `Some([0.0, 0.0])` on a
+    /// missing actor would silently snap rope nodes to world origin and
+    /// produce bogus pendulum forces; see audit finding #2.
     #[must_use]
-    pub fn world_position<F>(&self, actor_pos: F) -> [f32; 2]
+    pub fn world_position<F>(&self, actor_pos: F) -> Option<[f32; 2]>
     where
         F: Fn(u64) -> Option<[f32; 2]>,
     {
         match self {
-            RopeEndpoint::Anchored { position } => *position,
-            RopeEndpoint::Actor { actor_id, offset } => match actor_pos(*actor_id) {
-                Some([x, y]) => [x + offset[0], y + offset[1]],
-                None => [0.0, 0.0],
-            },
+            RopeEndpoint::Anchored { position } => Some(*position),
+            RopeEndpoint::Actor { actor_id, offset } => {
+                actor_pos(*actor_id).map(|[x, y]| [x + offset[0], y + offset[1]])
+            }
         }
     }
 
@@ -122,10 +125,44 @@ pub struct Rope {
 impl Rope {
     /// Build a fresh rope with `segment_count` segments evenly distributed
     /// between `start` and `end`'s current world positions.
+    ///
+    /// For `Actor`-typed endpoints the lookup falls through to `None` (no
+    /// actor lookup is provided at construction time), so the corresponding
+    /// node falls back to the OTHER endpoint's position. Callers MUST
+    /// re-pin actor-attached endpoints to the actor's live position
+    /// immediately after construction (and every tick thereafter) via
+    /// [`Rope::pin_start`] / [`Rope::pin_end`] — see audit finding #2.
+    /// [`Rope::new_with_positions`] is the safer constructor when both
+    /// initial positions are known.
     #[must_use]
     pub fn new(id: RopeId, start: RopeEndpoint, end: RopeEndpoint, segment_count: u32, gravity: [f32; 2]) -> Self {
         let start_pos = start.world_position(|_| None);
         let end_pos = end.world_position(|_| None);
+        // Fall back so neither end snaps to world origin when one end is an
+        // un-resolved Actor endpoint (caller must pin it next tick).
+        let (start_pos, end_pos) = match (start_pos, end_pos) {
+            (Some(s), Some(e)) => (s, e),
+            (Some(s), None) => (s, s),
+            (None, Some(e)) => (e, e),
+            (None, None) => ([0.0, 0.0], [0.0, 0.0]),
+        };
+        Self::new_with_positions(id, start, end, start_pos, end_pos, segment_count, gravity)
+    }
+
+    /// **Audit finding #2 fix**: explicit-position constructor. Use this
+    /// when both initial endpoint positions are known (e.g. when the
+    /// engine has live actor positions in hand). Avoids the silent
+    /// "snap to origin" failure mode of [`Rope::new`] for Actor endpoints.
+    #[must_use]
+    pub fn new_with_positions(
+        id: RopeId,
+        start: RopeEndpoint,
+        end: RopeEndpoint,
+        start_pos: [f32; 2],
+        end_pos: [f32; 2],
+        segment_count: u32,
+        gravity: [f32; 2],
+    ) -> Self {
         let dx = end_pos[0] - start_pos[0];
         let dy = end_pos[1] - start_pos[1];
         let total_len = (dx * dx + dy * dy).sqrt().max(0.0);
@@ -152,6 +189,38 @@ impl Rope {
             taut: true,
             embedded: false,
         }
+    }
+
+    /// **Audit finding #2 fix**: per-tick re-pin of `Actor`-typed endpoints
+    /// to the live actor position. Callers (e.g. engine `m14j_tick`) pass
+    /// a `(actor_id → live position)` lookup. Anchored endpoints stay
+    /// pinned to their original world position. Returns `false` when an
+    /// Actor endpoint references an actor the caller could not resolve
+    /// (signals the caller to detach the rope or treat it as orphaned).
+    pub fn retrack_endpoints<F>(&mut self, mut actor_pos: F) -> bool
+    where
+        F: FnMut(u64) -> Option<[f32; 2]>,
+    {
+        let mut all_resolved = true;
+        match self.start {
+            RopeEndpoint::Anchored { position } => self.pin_start(position),
+            RopeEndpoint::Actor { actor_id, offset } => match actor_pos(actor_id) {
+                Some([x, y]) => self.pin_start([x + offset[0], y + offset[1]]),
+                None => {
+                    all_resolved = false;
+                }
+            },
+        }
+        match self.end {
+            RopeEndpoint::Anchored { position } => self.pin_end(position),
+            RopeEndpoint::Actor { actor_id, offset } => match actor_pos(actor_id) {
+                Some([x, y]) => self.pin_end([x + offset[0], y + offset[1]]),
+                None => {
+                    all_resolved = false;
+                }
+            },
+        }
+        all_resolved
     }
 
     /// Total length of the rope across all segment-constraints.
@@ -416,8 +485,76 @@ mod tests {
             offset: [0.0, -4.0],
         };
         let lookup = |id: u64| if id == 42 { Some([100.0, 50.0]) } else { None };
-        let pos = ep.world_position(lookup);
+        let pos = ep.world_position(lookup).expect("known actor must resolve");
         assert!((pos[0] - 100.0).abs() < 1e-6);
         assert!((pos[1] - 46.0).abs() < 1e-6);
+    }
+
+    /// **Audit finding #2 fix**: `world_position` returns `None` for an
+    /// `Actor` endpoint when the lookup fails. Callers MUST handle this
+    /// case — silently returning `[0.0, 0.0]` (the old behavior) would
+    /// snap rope nodes to world origin.
+    #[test]
+    fn endpoint_missing_actor_returns_none() {
+        let ep = RopeEndpoint::Actor {
+            actor_id: 999,
+            offset: [0.0, 0.0],
+        };
+        let lookup = |_id: u64| -> Option<[f32; 2]> { None };
+        assert!(ep.world_position(lookup).is_none());
+    }
+
+    /// **Audit finding #2 fix**: `retrack_endpoints` per-tick re-pins
+    /// `Actor`-typed endpoints to the live actor position, so the rope's
+    /// actor end follows the player instead of staying frozen at the
+    /// initial node positions.
+    #[test]
+    fn retrack_endpoints_follows_actor() {
+        let mut rope = Rope::new_with_positions(
+            RopeId(1),
+            anchored(0.0, 10.0),
+            RopeEndpoint::Actor {
+                actor_id: 42,
+                offset: [0.0, 0.0],
+            },
+            [0.0, 10.0],
+            [8.0, 10.0],
+            8,
+            [0.0, -9.81],
+        );
+        let before = rope.bob_position();
+        let all_ok = rope.retrack_endpoints(|id| {
+            if id == 42 {
+                Some([12.0, 6.0])
+            } else {
+                None
+            }
+        });
+        assert!(all_ok);
+        let after = rope.bob_position();
+        assert!((after[0] - 12.0).abs() < 1e-6, "bob must track actor x; got {}", after[0]);
+        assert!((after[1] - 6.0).abs() < 1e-6, "bob must track actor y; got {}", after[1]);
+        assert_ne!(before, after);
+    }
+
+    /// **Audit finding #2 fix**: `retrack_endpoints` returns `false` when
+    /// an `Actor` endpoint cannot be resolved — signals the caller (engine)
+    /// to treat the rope as orphaned.
+    #[test]
+    fn retrack_endpoints_reports_unresolved_actor() {
+        let mut rope = Rope::new_with_positions(
+            RopeId(1),
+            anchored(0.0, 10.0),
+            RopeEndpoint::Actor {
+                actor_id: 42,
+                offset: [0.0, 0.0],
+            },
+            [0.0, 10.0],
+            [8.0, 10.0],
+            8,
+            [0.0, -9.81],
+        );
+        let all_ok = rope.retrack_endpoints(|_| None);
+        assert!(!all_ok, "missing actor lookup must return false");
     }
 }

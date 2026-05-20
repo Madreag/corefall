@@ -150,8 +150,9 @@ pub use parkour::{
 };
 pub use m14j_sim::{
     actor_has_dive_suit, actor_has_helmet_seal, mount_motion_aim_penalty, populate_vault_candidate,
-    populate_wall_candidate, tick_m14j_actor, tick_m14j_full, M14jTickEvents, CLIMB_VERTICAL_SPEED_M_PER_S,
-    SWIM_BREATH_DRAIN_SECONDS_PER_SEC, SWIM_STROKE_PERIOD_MS,
+    populate_wall_candidate, tick_m14j_actor, tick_m14j_full, M14jTickEvents,
+    CLIMB_PATH_PROGRESS_DIVISOR_MS, CLIMB_VERTICAL_SPEED_M_PER_S, SWIM_BREATH_DRAIN_SECONDS_PER_SEC,
+    SWIM_MAX_BREATH_SECONDS, SWIM_STAMINA_PER_STROKE, SWIM_STROKE_PERIOD_MS,
 };
 pub use quick_action::{
     InvokeOutcome, QuickActionBarState, QuickActionSlot, QuickActionSlotKind, RadialPhase,

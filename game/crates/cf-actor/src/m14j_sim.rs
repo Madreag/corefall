@@ -41,6 +41,23 @@ pub const SWIM_BREATH_DRAIN_SECONDS_PER_SEC: f32 = 1.0;
 /// actor advances at 1 m/s vertical".
 pub const CLIMB_VERTICAL_SPEED_M_PER_S: f32 = 1.0;
 
+/// **M14J** § maximum breath reservoir (seconds) — baseline for a Human
+/// origin. Race-aware scaling lives on `ActorState::swim_drain_multiplier`
+/// (M17 origin reaction table); when the actor is at surface this is the
+/// cap that breath recovers toward. Spec § "breath_held_s reaching 0 →
+/// drowning" + "drains at race-aware rate". Audit finding #5a/#8 fix.
+pub const SWIM_MAX_BREATH_SECONDS: f32 = 30.0;
+
+/// **M14J § swim stamina per stroke** — fraction of stamina drained per
+/// stroke cycle, scaled by `swim_drain_multiplier`. Spec § "stroke rate
+/// consumes M16 swim-stamina". Audit finding #5a/#8 fix.
+pub const SWIM_STAMINA_PER_STROKE: f32 = 0.05;
+
+/// **M14J § climb path tick scaling** — fraction of a stride cycle advanced
+/// per ms on the Climb limb path while `climb_active`. Spec § "climbs a
+/// ladder rung-by-rung". Audit finding #5a/#8 fix.
+pub const CLIMB_PATH_PROGRESS_DIVISOR_MS: f32 = 350.0;
+
 /// **M14J** § "stamina_remaining" payload value: the `actor.stamina.current`
 /// surface scaled to a unit interval. Surfaced via [`M14jTickEvents`] for the
 /// `swim.stroke` event payload.
@@ -184,7 +201,7 @@ pub fn tick_m14j_actor(actor: &mut ActorState, dt_ms: u32, tick: u64) -> M14jTic
         actor.velocity.x *= 0.5;
         // Climbing path advance — one tick worth of progress.
         if let Some(path) = actor.limb_paths.get_mut(MoveState::Climb, PathSide::Fg) {
-            path.report_progress(dt_ms as f32 / 350.0, dt_ms);
+            path.report_progress(dt_ms as f32 / CLIMB_PATH_PROGRESS_DIVISOR_MS, dt_ms);
         }
     }
 
@@ -200,8 +217,8 @@ pub fn tick_m14j_actor(actor: &mut ActorState, dt_ms: u32, tick: u64) -> M14jTic
             events.swim_stroke_emitted = Some(actor.swim_kind);
             events.swim_drain_multiplier_snapshot = actor.swim_drain_multiplier;
             events.stamina_remaining_snapshot = stamina_unit(actor);
-            // Drain swim stamina at race-aware rate; one stroke = ~0.05 unit.
-            let drain = 0.05 * actor.swim_drain_multiplier.max(0.0);
+            // Drain swim stamina at race-aware rate.
+            let drain = SWIM_STAMINA_PER_STROKE * actor.swim_drain_multiplier.max(0.0);
             actor.stamina.consume(drain);
             actor.last_stride_tick = tick;
         }
@@ -230,9 +247,13 @@ pub fn tick_m14j_actor(actor: &mut ActorState, dt_ms: u32, tick: u64) -> M14jTic
             // accounting happens in M19C's o2 module.)
         }
     } else if matches!(actor.swim_kind, SwimKind::SurfaceBreast | SwimKind::SurfaceFreestyle) {
-        // At surface: recover breath at the same rate as it drains submerged.
-        let max_breath = 30.0_f32;
-        actor.swim_breath_seconds = (actor.swim_breath_seconds + dt_seconds * SWIM_BREATH_DRAIN_SECONDS_PER_SEC).min(max_breath);
+        // At surface: recover breath at the same rate as it drains submerged,
+        // capped at SWIM_MAX_BREATH_SECONDS. Caller (engine) is responsible
+        // for ensuring `swim_kind == SurfaceBreast|SurfaceFreestyle` only
+        // when the actor is actually over water — separation of concerns
+        // keeps the actor tick pure (no terrain lookups).
+        actor.swim_breath_seconds =
+            (actor.swim_breath_seconds + dt_seconds * SWIM_BREATH_DRAIN_SECONDS_PER_SEC).min(SWIM_MAX_BREATH_SECONDS);
     }
 
     events

@@ -254,13 +254,20 @@ impl M0Engine {
                     let id = RopeId(state.m14j_next_rope_id);
                     state.m14j_next_rope_id += 1;
                     let segments = DEFAULT_SEGMENT_COUNT as u32;
-                    let mut rope = Rope::new(
+                    // **Audit finding #2 fix**: use `new_with_positions` so
+                    // the actor-end node initializes to the player's live
+                    // position rather than world origin (the legacy
+                    // `Rope::new` falls back to `[0,0]` for Actor endpoints
+                    // because no actor lookup is available at construction).
+                    let mut rope = Rope::new_with_positions(
                         id,
                         RopeEndpoint::Anchored { position: anchor },
                         RopeEndpoint::Actor {
                             actor_id: player_id.0,
                             offset: [0.0, 0.0],
                         },
+                        anchor,
+                        origin,
                         segments,
                         [0.0, -9.81],
                     );
@@ -902,6 +909,43 @@ impl M0Engine {
             }
         }
         if let Ok(mut state) = self.state.write() {
+            // **Audit finding #2 fix**: per-tick re-pin `Actor`-typed rope
+            // endpoints to the live actor position so the bob actually
+            // follows the player (previously the bob was stuck at the
+            // initial node position from construction). Detach orphaned
+            // ropes whose actor disappeared.
+            let live_actor_positions: BTreeMap<u64, [f32; 2]> = state
+                .actor_state
+                .as_ref()
+                .map(|sim| {
+                    sim.world
+                        .actors
+                        .iter()
+                        .map(|(id, a)| (id.0, [a.position.x, a.position.y]))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let mut orphaned_ropes: Vec<RopeId> = Vec::new();
+            for (rid, rope) in state.m14j_ropes.iter_mut() {
+                let all_resolved = rope.retrack_endpoints(|id| live_actor_positions.get(&id).copied());
+                if !all_resolved {
+                    orphaned_ropes.push(*rid);
+                }
+            }
+            for rid in orphaned_ropes {
+                state.m14j_ropes.remove(&rid);
+                state.m14j_zipline_ropes.remove(&rid);
+                if let Some(sim) = state.actor_state.as_mut() {
+                    for actor in sim.world.actors.values_mut() {
+                        if actor.holding_rope == Some(rid) {
+                            actor.holding_rope = None;
+                        }
+                        if actor.zipline_attached == Some(rid) {
+                            actor.zipline_attached = None;
+                        }
+                    }
+                }
+            }
             // 1) Step every rope.
             for rope in state.m14j_ropes.values_mut() {
                 rope.step(dt, cf_physics::DEFAULT_SOLVER_ITERATIONS);

@@ -44,6 +44,15 @@ pub const DISMOUNT_MID_MOTION_STAGGER_MS: u32 = 200;
 /// added when a mounted rider fires a one-handed weapon at gallop.
 pub const MOUNT_MOTION_AIM_SPREAD_RAD: f32 = 0.1;
 
+/// **Audit finding #9 fix** — defensive upper bound on rider + critter
+/// combined mass (kg). The biggest plausible saddled-critter pairing is
+/// a heavy mech (~1500 kg) carrying a heavy trooper (~380 kg) ≈ 1900 kg.
+/// 10000 kg is a 5× safety margin; any combined mass beyond this
+/// indicates corrupt origin data or a malformed scenario and gets
+/// clamped here so the M14A walk-speed curves don't divide by an
+/// effectively-infinite mass.
+pub const MAX_COMBINED_MASS_KG: f32 = 10_000.0;
+
 /// **M14J** § per-rider mount state. Lives on the rider's
 /// [`ActorState`](crate::ActorState) so save/load round-trips preserve
 /// the pairing. `None` when the rider is not mounted.
@@ -62,13 +71,19 @@ pub struct MountState {
 }
 
 impl MountState {
-    /// Construct a fresh mount pairing.
+    /// Construct a fresh mount pairing. **Audit finding #9 fix**: combined
+    /// mass is sanitized (non-finite → 0, clamped to `[0, MAX_COMBINED_MASS_KG]`)
+    /// so the M14A walk-speed curves never receive NaN / Inf / nonsensical
+    /// totals that would propagate through the critter chassis.
     #[must_use]
     pub fn new(critter_id: ActorId, rider_mass_kg: f32, critter_mass_kg: f32) -> Self {
+        let rider = if rider_mass_kg.is_finite() { rider_mass_kg.max(0.0) } else { 0.0 };
+        let critter = if critter_mass_kg.is_finite() { critter_mass_kg.max(0.0) } else { 0.0 };
+        let combined = (rider + critter).min(MAX_COMBINED_MASS_KG);
         Self {
             critter_id,
             ride_direction: [0.0, 0.0],
-            combined_mass_kg: rider_mass_kg.max(0.0) + critter_mass_kg.max(0.0),
+            combined_mass_kg: combined,
             firing_during_motion: false,
         }
     }
@@ -139,6 +154,24 @@ mod tests {
     fn mount_state_caches_combined_mass() {
         let m = MountState::new(ActorId(42), 80.0, 350.0);
         assert!((m.combined_mass_kg - 430.0).abs() < 1e-6);
+    }
+
+    /// **Audit finding #9 fix**: combined mass is clamped at
+    /// `MAX_COMBINED_MASS_KG` so a corrupt scenario can't drive the M14A
+    /// walk-speed curves with effectively-infinite mass.
+    #[test]
+    fn mount_state_clamps_excessive_mass() {
+        let m = MountState::new(ActorId(1), 1.0e9, 1.0e9);
+        assert!((m.combined_mass_kg - MAX_COMBINED_MASS_KG).abs() < 1e-3);
+    }
+
+    /// **Audit finding #9 fix**: non-finite inputs collapse to 0 instead
+    /// of poisoning the combined mass with NaN / Inf.
+    #[test]
+    fn mount_state_sanitizes_non_finite() {
+        let m = MountState::new(ActorId(1), f32::NAN, f32::INFINITY);
+        assert!(m.combined_mass_kg.is_finite());
+        assert_eq!(m.combined_mass_kg, 0.0);
     }
 
     #[test]
