@@ -171,6 +171,28 @@ impl HeatField {
     pub fn is_at_ambient(&self, epsilon_k: f32) -> bool {
         self.temperature_k.iter().all(|t| (t - self.ambient_k).abs() <= epsilon_k)
     }
+
+    /// **M15B** § Radiative cooling toward ambient. Each cell is lerped
+    /// toward [`Self::ambient_k`] by `cool_mix` per call. This
+    /// simulates radiation losses to the world-outside-the-heat-grid
+    /// at ambient temperature — without it, heat injected into the
+    /// field never returns to ambient (the per-tick `diffuse()` only
+    /// spreads heat between cells but conserves total heat).
+    ///
+    /// Typical per-tick mix: 0.005-0.02 (much smaller than diffuse mix
+    /// so conduction dominates within the active region but a
+    /// pixel-far-from-fire still cools).
+    pub fn cool_toward_ambient(&mut self, cool_mix: f32) {
+        let mix = cool_mix.clamp(0.0, 1.0);
+        if mix == 0.0 {
+            return;
+        }
+        let ambient = self.ambient_k;
+        for t in &mut self.temperature_k {
+            *t = *t * (1.0 - mix) + ambient * mix;
+            *t = t.clamp(2.7, 1.0e5);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -229,6 +251,38 @@ mod tests {
         assert!(f.temperature_at_cell(0, 0) <= 1.0e5);
         f.set_temperature(0, 0, -1000.0);
         assert!(f.temperature_at_cell(0, 0) >= 2.7);
+    }
+
+    /// VAL-M15B-heat-008: cool_toward_ambient lerps hot cells back to
+    /// ambient at the specified rate. With mix=0.10 a 1200K cell falls
+    /// to ~ambient after ~50 ticks (1200 → 273 over (1-0.9)^50 = ~0.5%
+    /// remaining excess above ambient).
+    #[test]
+    fn cool_toward_ambient_returns_hot_cell_to_ambient() {
+        let mut f = HeatField::default();
+        f.set_temperature(10, 10, 1200.0);
+        for _ in 0..100 {
+            f.cool_toward_ambient(0.10);
+        }
+        let final_temp = f.temperature_at_cell(10, 10);
+        // After 100 iterations at mix=0.10 we expect (1-0.10)^100 ≈ 2.6e-5
+        // of the original excess to remain. Cell should be ≈ ambient.
+        assert!(
+            (final_temp - AMBIENT_TEMPERATURE_K_DEFAULT).abs() < 1.0,
+            "cell should cool to ambient, got {final_temp}"
+        );
+    }
+
+    /// VAL-M15B-heat-009: cool_toward_ambient is a no-op at mix=0.
+    #[test]
+    fn cool_toward_ambient_noop_at_zero_mix() {
+        let mut f = HeatField::default();
+        f.set_temperature(10, 10, 1200.0);
+        let before = f.temperature_at_cell(10, 10);
+        for _ in 0..50 {
+            f.cool_toward_ambient(0.0);
+        }
+        assert!((f.temperature_at_cell(10, 10) - before).abs() < 1e-3);
     }
 
     /// VAL-M15-heat-007: serde round-trip.

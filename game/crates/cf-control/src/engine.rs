@@ -538,6 +538,14 @@ fn inject_thermal_sources_and_diffuse(state: &mut EngineMutable) {
     // Spread heat to neighbors so phase transitions fire in the
     // SURROUNDING cells, not just the source pixel's cell.
     state.heat_field.diffuse(DIFFUSE_MIX);
+    // **M15B** § Radiative cooling toward ambient. Without this, heat
+    // injected into the field never returns to ambient (the diffuse
+    // pass conserves total heat — it only spreads). A cell that
+    // briefly held fire stays at 1200K forever, slowly dissipating
+    // into neighbors. With cooling, isolated hot cells return to
+    // ambient over ~100 ticks.
+    const COOL_MIX: f32 = 0.01; // 1% per tick toward ambient
+    state.heat_field.cool_toward_ambient(COOL_MIX);
 }
 
 /// **M15 § HeatField initialization** — populate the per-cell heat
