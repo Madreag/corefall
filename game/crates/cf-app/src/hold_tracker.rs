@@ -1,11 +1,7 @@
 //! **M11 audit pass 3 (GAP-M11-02 LOW fix)**: M4A § Files lists
-//! `cf-app/src/hold_tracker.rs` as a NEW dedicated file. The HoldTracker
-//! resource + HoldEntry record were originally landed inline in `main.rs`
-//! during the M4A close; extracting them into their own module here per
-//! spec § file-layout discipline. The inline copy in main.rs keeps the
-//! existing wiring; this module ships an identical implementation +
-//! tests at the spec-canonical path. Both compile; tests in both run.
-#![allow(dead_code)]
+//! `cf-app/src/hold_tracker.rs` as a NEW dedicated file. This module ships
+//! the production [`HoldTracker`] resource + tests; cf-app's input layer
+//! wires it as the live tracker.
 //!
 //! Behavior contract (DR-012 ACC-A-05) — unchanged from M4A:
 //!
@@ -60,6 +56,7 @@ impl HoldTracker {
     }
 
     #[cfg(test)]
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.holds.clear();
     }

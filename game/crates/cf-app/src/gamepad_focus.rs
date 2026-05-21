@@ -1,10 +1,7 @@
 //! **M11 audit pass 3 (GAP-M11-02 LOW fix)**: M4A § Files lists
-//! `cf-app/src/gamepad_focus.rs` as a NEW dedicated file. The
-//! `gamepad_focus_direction` helper was originally inline in `main.rs`;
-//! extracting it into its own module here per spec § file-layout discipline.
-//! The inline copy in main.rs keeps the existing wiring; this module
-//! ships an identical implementation at the spec-canonical path.
-#![allow(dead_code)]
+//! `cf-app/src/gamepad_focus.rs` as a NEW dedicated file. This module ships
+//! the production `gamepad_focus_direction` helper; cf-app's input layer
+//! wires it as the live translator.
 
 use bevy::input::gamepad::{Gamepad, GamepadAxis, GamepadButton, GamepadInput};
 
