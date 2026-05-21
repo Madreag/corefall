@@ -1,7 +1,7 @@
 # Corefall — Refactor Ledger
 
 **Purpose**: persistent cross-session memory. Read this FIRST when resuming work.
-Last updated: 5/21/2026 12:30 AM MST
+Last updated: 5/21/2026 2:15 AM MST
 
 ---
 
@@ -88,6 +88,40 @@ Last updated: 5/21/2026 12:30 AM MST
   lookups are the real cost — need parallel + cache optimization)
 - 4285 tests passing
 - Committed as fd39e529
+
+### Session 11 (5/21/2026): Big refactor pass — user mandated "no more deferrals"
+- AGENTS.md: added comment-brevity, <2000 LOC file split, content-driven config rules
+- Parallel CA stepper via snapshot-then-apply (rayon par_iter):
+  - bench m15-ca-burst p50 22ms → 5.2ms, p99 55ms → 5.5ms (10x speedup)
+  - apply_chunk_ca_to_buffer respects world bounds (not just chunk bounds)
+  - parallel_matches_serial_byte_identical test proves determinism
+  - CaStepperState.parallel + MaterialKernel::with_parallel propagate flag
+- Chemistry rate modulation:
+  - Added activation_k (Arrhenius), pressure_order, violent, flash_color_hex
+    to MaterialReaction
+  - effective_rate_per_tick(temp, pressure) computes rate gates
+  - fires_at(tick, x, y, temp, pressure) deterministic firing gate
+  - Marked 4 reactions violent with realistic flash colors:
+    gunpowder+fire (FFCC00), gunpowder+lava (FFAA00), H2+O2 (00CCFF),
+    acid+alkali (F0F0F0)
+- Visual effects:
+  - violent_burst event emitted alongside reaction_triggered when violent=true
+  - material_violent_burst.json schema registered in cf-replay
+- ThermalSourceTable created in cf-material loaded from
+  content/materials/thermal_sources.json (replaces hardcoded constants
+  in engine.rs)
+- MaterialId u8 → u16 refactor:
+  - 256-material cap lifted to 65535
+  - ReactionLookup table flat 256*256 → HashMap<(u16,u16), Vec<u32>>
+    (65536*65536 dense was impossible)
+  - primary_reactive_bitmap [bool;256] → Vec<bool>
+  - checksum_bytes bumped to v2 (LE byte order)
+  - Touched 25 .rs files; type-driven by compiler
+- engine.rs split start: extracted engine_m15.rs (107 LOC) with M15 glue
+  - engine.rs: 29602 → 29488 LOC
+- try_penetrate_batch4 SIMD-friendly batched penetration
+- 4294 tests passing
+- Commits: 05fdc125 (agents), a3f01c41 (parallel CA), more...
 
 ### Session 10 (5/21/2026): Modder warnings + radiative heat cooling
 - ReactionRegistry / PhaseRegistry / PrecipitationConfig loaders now emit

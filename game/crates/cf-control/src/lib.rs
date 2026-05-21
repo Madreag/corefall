@@ -14,6 +14,7 @@
 
 pub mod components;
 pub mod engine;
+pub mod engine_build;
 pub mod engine_m15;
 pub mod envelope;
 pub mod m4b_save;
