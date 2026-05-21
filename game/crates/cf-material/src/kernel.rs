@@ -611,11 +611,10 @@ fn find_adjacent_air_cell(
     None
 }
 
-/// Parallel phase-transition dispatch. Phase writes are WITHIN-CHUNK
-/// only (the pixel changes identity at its own coord), so chunks are
-/// fully independent and parallelize across rayon without per-color
-/// phasing.
-fn dispatch_phase_parallel(
+pub(crate) use crate::kernel_parallel::{dispatch_phase_parallel, dispatch_reactions_4color_parallel};
+
+#[allow(dead_code)]
+fn DEAD_dispatch_phase_parallel(
     terrain: &mut ChunkedTerrain,
     scan_chunks: &[(i32, i32)],
     phase: &PhaseRegistry,
@@ -737,7 +736,8 @@ fn process_chunk_phase_to_snap(
 /// colors. Each color phase: snapshot in parallel, process in parallel
 /// against snapshots, serial writeback. Cross-color writes are visible
 /// to subsequent color phases.
-fn dispatch_reactions_4color_parallel(
+#[allow(dead_code)]
+fn DEAD_dispatch_reactions_4color_parallel(
     terrain: &mut ChunkedTerrain,
     scan_chunks: &[(i32, i32)],
     reactions: &ReactionRegistry,

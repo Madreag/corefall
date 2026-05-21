@@ -747,14 +747,14 @@ pub struct M0Engine {
     /// the panic reporter (which fires from a panicking thread, possibly while another
     /// thread holds `state`) can record `system.panic` at the right tick without
     /// blocking on the `RwLock`. Also drives `sim_time_ms` for the panic event.
-    current_tick: Arc<std::sync::atomic::AtomicU64>,
-    started_at: DateTime<Utc>,
-    started_instant: Instant,
-    run_bundle_dir: PathBuf,
+    pub(crate) current_tick: Arc<std::sync::atomic::AtomicU64>,
+    pub(crate) started_at: DateTime<Utc>,
+    pub(crate) started_instant: Instant,
+    pub(crate) run_bundle_dir: PathBuf,
     /// **M1 R2**: pluggable audio backend. M1 default is `NullAudioPlugin`
     /// (no-op + tracing). cf-app or cf-tools-replay-viewer install their own
     /// implementation via `set_audio_plugin` to play real sound.
-    audio_plugin: std::sync::Mutex<Box<dyn cf_audio::AudioPlugin>>,
+    pub(crate) audio_plugin: std::sync::Mutex<Box<dyn cf_audio::AudioPlugin>>,
     /// **M4B § "observe.save.last returns last save metadata"** — shared
     /// snapshot of the last quicksave / quickload / migrate operation.
     /// Updated by the cf-app F5/F9 path + `cfctl save quicksave/quickload`.
@@ -762,16 +762,16 @@ pub struct M0Engine {
 }
 
 pub(crate) struct EngineMutable {
-    clock: SimClock,
+    pub(crate) clock: SimClock,
     pub(crate) rng: Rng,
     pub(crate) settings: Settings,
-    pending_runbundle: bool,
-    shutdown_requested: bool,
-    tick_durations_us: Vec<u64>,
+    pub(crate) pending_runbundle: bool,
+    pub(crate) shutdown_requested: bool,
+    pub(crate) tick_durations_us: Vec<u64>,
     /// M1: pending player intent for the next tick. The dispatch handlers update fields
     /// here; `drive_tick` consumes the intent, applies it, then clears the edge-triggered
     /// fields. Continuous fields (`move_x`, `aim`) persist tick-to-tick.
-    pending_intent: ControlIntent,
+    pub(crate) pending_intent: ControlIntent,
     /// M1: actor world + rifles + projectiles. `None` for M0 scenarios.
     pub(crate) actor_state: Option<ActorSimState>,
     /// Cached player actor id from the actor world for fast access.
@@ -781,63 +781,63 @@ pub(crate) struct EngineMutable {
     /// (`cf-app::ingest_player_input`) watch this to know when their cached
     /// "last sent" trackers are stale and must redispatch held keys, even if
     /// the keyboard state itself has not changed.
-    intent_epoch: u64,
+    pub(crate) intent_epoch: u64,
     /// M1.5: breach world (soft-breach strips). `None` when scenario has no breaches.
-    breach_world: Option<cf_terrain::BreachWorld>,
+    pub(crate) breach_world: Option<cf_terrain::BreachWorld>,
     /// M1.5: pending dig request consumed at the start of the next tick.
     /// `Some` only when an `act.player.dig` arrived since the last tick.
-    pending_dig: Option<PendingDig>,
+    pub(crate) pending_dig: Option<PendingDig>,
     /// M1.5: per-actor reactive-guard controllers, keyed by actor id.
-    reactive_guards: BTreeMap<ActorId, cf_ai::ReactiveGuard>,
+    pub(crate) reactive_guards: BTreeMap<ActorId, cf_ai::ReactiveGuard>,
     /// M1.5: mission state machine. `None` when the scenario is sandbox-only.
-    mission: Option<cf_mission::MissionState>,
+    pub(crate) mission: Option<cf_mission::MissionState>,
     /// M1.5: monotonic id counter for guard projectiles. We share the actor
     /// projectile pool but allocate ids from a separate range so guard shots
     /// don't alias the player's projectile_id space across resets.
-    next_guard_projectile_id: u64,
+    pub(crate) next_guard_projectile_id: u64,
     /// M2: chunked pixel terrain. `None` for scenarios that have not opted
     /// into chunked terrain. Coexists with `breach_world`.
     pub(crate) chunked_terrain: Option<cf_terrain::ChunkedTerrain>,
     /// M2.5: reactor world (damageable static actors). `None` when no reactor
     /// is declared.
-    reactor_world: Option<cf_mission::ReactorWorld>,
+    pub(crate) reactor_world: Option<cf_mission::ReactorWorld>,
     /// M4A: HUD banner queue. Latest entries are pushed to the back; FIFO
     /// drain caps the queue at `M4A_BANNER_BUFFER`. The HUD draws the highest
     /// `severity` (critical > warning > info) entries first per priority +
     /// raised_at_tick FIFO. Replay events are NOT re-derived from the queue;
     /// they live in `events.jsonl`.
-    hud_banners: VecDeque<crate::state::HudBannerView>,
+    pub(crate) hud_banners: VecDeque<crate::state::HudBannerView>,
     /// **M4B § "Delta baseline cadence is enforced"** — last snapshot we
     /// captured (used as the diff base for the next delta).
-    m4b_previous_snapshot: Option<serde_json::Value>,
+    pub(crate) m4b_previous_snapshot: Option<serde_json::Value>,
     /// **M4B**: event_id of the most recent `snapshot.baseline_emitted`.
     /// Stamped onto each subsequent `snapshot.delta_emitted` so the
     /// reconstructor can chain them back.
-    m4b_last_baseline_event_id: Option<String>,
+    pub(crate) m4b_last_baseline_event_id: Option<String>,
     /// **M4B**: tick at which the most recent baseline was emitted.
-    m4b_last_baseline_tick: Option<u64>,
+    pub(crate) m4b_last_baseline_tick: Option<u64>,
     /// M4A: captions queue (audio-bound events surfaced as text). Drains FIFO
     /// at `M4A_CAPTION_BUFFER`. The HUD draws the most recent N entries when
     /// `Settings.captions == true`.
-    hud_captions: VecDeque<crate::state::CaptionView>,
+    pub(crate) hud_captions: VecDeque<crate::state::CaptionView>,
     /// M4A: tool-validity tracker (last carve / last refusal). Updated per
     /// tick by the dig pipeline.
-    hud_tool_validity: crate::state::ToolValidityView,
+    pub(crate) hud_tool_validity: crate::state::ToolValidityView,
     /// M4A: previous tick's per-actor status, used to detect state changes
     /// that should raise a banner without scanning the full event log.
-    hud_last_status: BTreeMap<ActorId, cf_actor::Status>,
+    pub(crate) hud_last_status: BTreeMap<ActorId, cf_actor::Status>,
     /// M4A: previous tick's mission result, used to detect mission_resolved
     /// transitions for banner emission.
-    hud_last_mission_result: Option<String>,
+    pub(crate) hud_last_mission_result: Option<String>,
     /// **M1 / Gap D**: controls-captured state. `Some(capturer)` while an
     /// overlay holds input; the CONTROLS CAPTURED HUD zone renders and all
     /// `act.player.*` dispatches reject with reason `controls_captured`.
-    controls_captured_by: Option<String>,
+    pub(crate) controls_captured_by: Option<String>,
     /// **M14 audit pass 2 (GAP-M4-02 HIGH fix)**: latched true when
     /// `act.player.abort` succeeds. `record_run_finished` reads this to
     /// emit `system.run_finished.outcome="abort"` per M4 § Expected
     /// outcome + system events (previously hardcoded clean/panic only).
-    run_aborted: bool,
+    pub(crate) run_aborted: bool,
     /// **M1 / Gap C2**: projectile_id -> spawn_event_id map persisted across
     /// ticks so when a projectile hits N ticks after spawn, the
     /// `combat.projectile_hit` event can parent to its originating
@@ -845,7 +845,7 @@ pub(crate) struct EngineMutable {
     /// `equipment.weapon_fired` -> `input.intent_received`). Entries are
     /// pruned when the projectile reaches `combat.projectile_hit` or
     /// `combat.projectile_expired` to keep the map bounded.
-    projectile_spawn_event_ids: BTreeMap<u64, String>,
+    pub(crate) projectile_spawn_event_ids: BTreeMap<u64, String>,
     /// **M14C** § per-projectile round-kind discriminator. Populated at
     /// `combat.projectile_spawned` time (from
     /// `cf_actor::sim::SpawnedProjectile::round_kind`) and read by the
@@ -854,182 +854,182 @@ pub(crate) struct EngineMutable {
     /// `apfsds_impact_producer`) rather than the M14 baseline traversal.
     /// Pruned alongside `projectile_spawn_event_ids` after the projectile
     /// is resolved.
-    projectile_round_kinds: BTreeMap<u64, cf_equipment::RoundKind>,
+    pub(crate) projectile_round_kinds: BTreeMap<u64, cf_equipment::RoundKind>,
     /// **M1.5 forward-hook (Seam S1)**: latched by damage events so the
     /// next ReactiveGuard tick treats the damaged actor as a perception
     /// trigger. No consumer at M1; M1.5 ai layer reads it.
     #[allow(dead_code)]
-    force_ai_update_this_tick: bool,
+    pub(crate) force_ai_update_this_tick: bool,
     /// **M1.5 G2 (hearing)**: alarms collected during the previous tick's
     /// actor step. The current tick's AI loop consumes these so guard
     /// hearing reacts ≤1 tick after the player's `equipment.alarm_registered`
     /// fires. Cleared after each AI loop.
-    pending_alarms: Vec<cf_ai::AlarmInput>,
+    pub(crate) pending_alarms: Vec<cf_ai::AlarmInput>,
     /// **M1.5 G2 (hearing) staging**: alarms produced by THIS tick's actor
     /// step; promoted to `pending_alarms` at end-of-tick so they're
     /// available to the next tick's AI loop. Two-stage so AI never reads
     /// half-collected alarms mid-tick.
-    pending_alarms_staging: Vec<cf_ai::AlarmInput>,
+    pub(crate) pending_alarms_staging: Vec<cf_ai::AlarmInput>,
     /// M4A: HUD focus state (DR-012 ACC-A-04). The cf-app keyboard layer +
     /// cfctl `act.input.focus` advance/retreat focus through the canonical
     /// `HUD_FOCUSABLE_NODES` list; observe.accessibility surfaces it.
-    hud_focus_index: Option<usize>,
-    hud_focus_cycle: u64,
+    pub(crate) hud_focus_index: Option<usize>,
+    pub(crate) hud_focus_cycle: u64,
     /// **M9**: timer-warning thresholds already emitted this mission run
     /// (de-duplicated; each threshold fires exactly once per
     /// `TIMER_WARNING_THRESHOLDS_S`). Cleared on scenario reset.
-    m9_timer_warnings_emitted: BTreeMap<u32, bool>,
+    pub(crate) m9_timer_warnings_emitted: BTreeMap<u32, bool>,
     /// **M9**: per-actor concussion dose accumulator (0..=100) for the
     /// concussion band machine. Applied by combat hits + explosions.
     /// Decay/recovery happens via `m9_tick_concussion_recovery`.
-    m9_concussion_dose: BTreeMap<ActorId, f32>,
+    pub(crate) m9_concussion_dose: BTreeMap<ActorId, f32>,
     /// **M9**: per-actor last-seen concussion band so band crossings emit
     /// exactly once per transition.
-    m9_concussion_band: BTreeMap<ActorId, &'static str>,
+    pub(crate) m9_concussion_band: BTreeMap<ActorId, &'static str>,
     /// **M9**: per-actor concussion recovery countdown (ticks). Reset on
     /// every dose application; ticks down to zero before recovery starts.
-    m9_concussion_recovery_lockout_ticks: BTreeMap<ActorId, u32>,
+    pub(crate) m9_concussion_recovery_lockout_ticks: BTreeMap<ActorId, u32>,
     /// **M5**: previous tick's chassis stage on the player actor (used to
     /// raise stage-change banners without scanning the event log).
-    hud_last_chassis_stage: Option<cf_chassis::ChassisStage>,
+    pub(crate) hud_last_chassis_stage: Option<cf_chassis::ChassisStage>,
     /// **M5**: previous tick's pilot state.
-    hud_last_pilot_state: Option<cf_chassis::PilotState>,
+    pub(crate) hud_last_pilot_state: Option<cf_chassis::PilotState>,
     /// **M1.5**: latest `input.intent_received` event_id from the player.
     /// Used as the `show_me_why_event_id` anchor on
     /// `mission.mission_resolved` when result=lost (DR-023 onboarding
     /// handoff — M3B viewer rewinds to this tick).
-    last_player_input_event_id: Option<String>,
+    pub(crate) last_player_input_event_id: Option<String>,
     /// **M2 re-audit pass 4 (2026-05-13)**: most-recent
     /// `actor.actor_status_changed` event id for the player actor. Used as
     /// `parent_event_id` on `mission.mission_resolved` when the loss path
     /// is `PlayerDead` so M10's cause-chain walker can hop
     /// `mission_resolved → actor_status_changed(player DYING) → projectile_hit → ...`.
     /// None until the first player status_changed fires.
-    last_player_status_event_id: Option<String>,
+    pub(crate) last_player_status_event_id: Option<String>,
     /// **M2**: current material-overlay mode for the HUD legend + render
     /// layer. One of "off" | "integrity" | "pathability" | "mobility" |
     /// "hazard" | "build_repair". Default "off".
-    material_overlay_mode: String,
+    pub(crate) material_overlay_mode: String,
     /// **M2**: total debris pixels spawned (cumulative across the run).
     /// Surfaced via `observe.terrain.total_debris_spawned`.
-    total_debris_spawned: u64,
+    pub(crate) total_debris_spawned: u64,
     /// **M2**: total carve events emitted (cumulative). Distinct from
     /// `chunked_terrain.carve_count` (which counts terrain-state carves —
     /// `total_carve_events` counts every emitted carve event including
     /// strip + chunked).
-    total_carve_events: u64,
+    pub(crate) total_carve_events: u64,
     /// **M2**: last hazard contact tick per actor — used to debounce the
     /// per-tick hazard damage event to one per actor.
-    hazard_last_contact_tick: BTreeMap<ActorId, u64>,
+    pub(crate) hazard_last_contact_tick: BTreeMap<ActorId, u64>,
     /// **M2 re-audit (2026-05-13)**: id of the latest `mission.mission_started`
     /// event, used as parent for the first batch of `mission.objective_started`
     /// emissions per spec line 558 ("every event carries parent_event_id").
-    mission_started_event_id: Option<String>,
+    pub(crate) mission_started_event_id: Option<String>,
     /// **M2 re-audit (2026-05-13)**: per-objective `mission.objective_started`
     /// event id keyed by objective id. Used as parent for
     /// `mission.objective_updated`, `mission.objective_completed`,
     /// `mission.objective_failed` so the cause chain walks back to the
     /// origination event.
-    mission_objective_started_event_ids: BTreeMap<String, String>,
+    pub(crate) mission_objective_started_event_ids: BTreeMap<String, String>,
     /// **M4 § Parent-event-id cause chains**: most-recent `mission.*` event
     /// id, used as `parent_event_id` for snapshot re-emits at objective
     /// transitions (per spec literal "every event in {... snapshot_*} has
     /// parent_event_id"). Updated whenever any mission.* event fires.
-    last_mission_event_id: Option<String>,
+    pub(crate) last_mission_event_id: Option<String>,
     /// **M4 § ai cause chains**: per-actor most-recent `ai.state_changed`
     /// event id. Used as parent for `ai.tactic_chosen` events emitted when
     /// no fresh perception_signal fired this tick.
-    last_ai_state_changed_by_actor: BTreeMap<ActorId, String>,
+    pub(crate) last_ai_state_changed_by_actor: BTreeMap<ActorId, String>,
     /// **M4 § system events**: most-recent `system.run_started` event id.
     /// Used as a fallback root parent when no other cause exists (per spec
     /// "the cause chain ... walks back to an `input.intent_received` or
     /// `system.run_started` root").
-    run_started_event_id: Option<String>,
+    pub(crate) run_started_event_id: Option<String>,
     /// **M4 § system.critical_drop**: last reported gameplay drop count so
     /// the engine only emits a `system.critical_drop` event for the delta
     /// (not the full cumulative total) each tick.
-    last_reported_dropped_gameplay: u64,
+    pub(crate) last_reported_dropped_gameplay: u64,
     /// **M1 re-audit pass 4 (2026-05-13)**: per-actor `equipment.weapon_reload_started`
     /// event id, used as `parent_event_id` on the subsequent
     /// `equipment.weapon_reload_completed` so M10 viewers can walk the
     /// reload chain cleanly. Entry is inserted on reload_started and removed
     /// on reload_completed (so a cancelled reload doesn't strand a stale id).
-    reload_started_event_id_by_actor: BTreeMap<ActorId, String>,
+    pub(crate) reload_started_event_id_by_actor: BTreeMap<ActorId, String>,
     /// **M3 re-open (2026-05-13)**: per-tick coalesced dirty-region accumulator.
     /// Carve events push their dirty rects + source event ids here; the engine
     /// flushes ONE `terrain.terrain_dirty_region_batch` per tick at end of
     /// `drive_tick` with the merged rect list + all contributing source ids.
     /// See `specs/active/M3.md` § Re-opened gaps.
-    pending_dirty_rects: Vec<PendingDirtyRect>,
+    pub(crate) pending_dirty_rects: Vec<PendingDirtyRect>,
     /// **M3 re-open**: rolling counter of ticks where `unupdated_areas > 0`,
     /// used to trigger `terrain.forced_refresh_requested` after sustained
     /// load. Reset on any tick with `unupdated_areas == 0`.
-    sustained_unupdated_ticks: u32,
+    pub(crate) sustained_unupdated_ticks: u32,
     /// **M3 audit pass 7 (2026-05-13)**: monotonic path-invalidation version
     /// counter. Bumped every time `flush_pending_dirty_batch` produces a
     /// non-empty `out_rects[]`. Carried on `terrain.path_invalidated`
     /// events so M22+ pathfinder consumers can detect cache invalidation.
-    path_invalidation_version: u64,
+    pub(crate) path_invalidation_version: u64,
     /// **M3 re-open**: cumulative coalesce cost samples (ticks where a batch
     /// was emitted). Surfaced via `summary.json.perf.terrain` at run close.
-    perf_coalesce_samples: Vec<u32>,
-    perf_coalesce_rects_in_total: u64,
-    perf_coalesce_rects_out_total: u64,
+    pub(crate) perf_coalesce_samples: Vec<u32>,
+    pub(crate) perf_coalesce_rects_in_total: u64,
+    pub(crate) perf_coalesce_rects_out_total: u64,
     /// **M6**: squad-of-two state surfaced by `observe.squad`. Empty by
     /// default — populated by scenarios that declare a friendly bot. See
     /// `cf_squad::Squad` for the canonical shape.
-    squad: cf_squad::Squad,
+    pub(crate) squad: cf_squad::Squad,
     /// **M6**: per-actor in-flight weapon swap state. A swap starts on
     /// `act.player.weapon_swap` and ticks here until completion, when the
     /// engine emits `equipment.weapon_swap_completed` and removes the entry.
-    weapon_swap_state: BTreeMap<ActorId, cf_equipment::WeaponSwap>,
+    pub(crate) weapon_swap_state: BTreeMap<ActorId, cf_equipment::WeaponSwap>,
     /// **M6**: last-emitted stamina value per actor for change-detection
     /// throttling. Stamina is only re-emitted when the value moves by more
     /// than `M6_STAMINA_EMIT_DELTA` to keep replay volume bounded.
-    m6_last_stamina_emit: BTreeMap<ActorId, f32>,
+    pub(crate) m6_last_stamina_emit: BTreeMap<ActorId, f32>,
     /// **M6**: last-emitted stealth-meter value per actor. Stealth meter is
     /// only re-emitted when the band (Hidden / Risky / Spotted) changes.
-    m6_last_stealth_band: BTreeMap<ActorId, u8>,
+    pub(crate) m6_last_stealth_band: BTreeMap<ActorId, u8>,
     /// **M6**: last-emitted weight-bucket per actor (0 = under threshold,
     /// 1 = above). Toggling emits an `inventory.weight_changed` event.
-    m6_last_weight_bucket: BTreeMap<ActorId, bool>,
+    pub(crate) m6_last_weight_bucket: BTreeMap<ActorId, bool>,
     /// **M6B**: last-emitted discrete encumbrance band per actor
     /// (`None` / `Light` / `Moderate` / `Heavy`). Transitions emit
     /// `inventory.encumbrance_threshold_crossed`.
-    m6b_last_encumbrance_band: BTreeMap<ActorId, cf_equipment::EncumbranceBand>,
+    pub(crate) m6b_last_encumbrance_band: BTreeMap<ActorId, cf_equipment::EncumbranceBand>,
     /// **M6**: per-actor footstep cadence accumulator (ticks since last
     /// emitted `perception.footstep_emitted`). Prevents replay spam.
-    m6_footstep_cooldown: BTreeMap<ActorId, u32>,
+    pub(crate) m6_footstep_cooldown: BTreeMap<ActorId, u32>,
     /// **M6**: in-flight grenade projectiles thrown via
     /// `act.player.throw_grenade`. The tick scheduler advances each one
     /// under gravity + collision and emits
     /// `equipment.grenade_detonated` at fuse=0.
-    grenade_projectiles: Vec<GrenadeProjectile>,
+    pub(crate) grenade_projectiles: Vec<GrenadeProjectile>,
     /// **M6**: in-flight knife projectiles thrown via
     /// `act.player.knife_throw`. The tick scheduler advances each one
     /// under physics and emits `combat.knife_throw_landed` on collision.
-    knife_projectiles: Vec<cf_equipment::KnifeProjectile>,
+    pub(crate) knife_projectiles: Vec<cf_equipment::KnifeProjectile>,
     /// **M6**: latched-per-actor previous `FacingDirection`, used by the
     /// engine to emit `actor.facing_changed` only on flips (not every tick).
-    m6_last_facing: BTreeMap<ActorId, cf_actor::FacingDirection>,
+    pub(crate) m6_last_facing: BTreeMap<ActorId, cf_actor::FacingDirection>,
     /// **M6**: persistent map markers dropped via the Beacon tool. Each
     /// entry is (owner_id, position). Surfaced via observe.squad for the
     /// HUD; consumed by future M7 mission director when waypoints route
     /// AI.
-    m6_beacons: Vec<(ActorId, cf_actor::Vec2)>,
+    pub(crate) m6_beacons: Vec<(ActorId, cf_actor::Vec2)>,
     /// **M6**: physically-dropped items in the world. Created by
     /// `act.player.drop_item`, consumed by `act.player.pickup`. Each item
     /// carries the actor that dropped it, the item id (rifle preset or
     /// material id), the position, and the slot the dropping inventory
     /// originally held it in.
-    m6_dropped_items: Vec<DroppedItem>,
+    pub(crate) m6_dropped_items: Vec<DroppedItem>,
     /// **M6**: monotonic id counter for dropped items.
-    m6_next_dropped_item_id: u64,
+    pub(crate) m6_next_dropped_item_id: u64,
     /// **M6**: per-actor latch consumed by `emit_actor_events` so a Charge-mode
     /// release whose `charge_fraction < SNIPER_MISFIRE_BELOW` annotates the
     /// `equipment.weapon_fired` event with `misfire=true`. Drained each tick
     /// after the recorder reads it.
-    m6_charge_misfires: BTreeMap<ActorId, ChargeFireInfo>,
+    pub(crate) m6_charge_misfires: BTreeMap<ActorId, ChargeFireInfo>,
     /// **M7-A**: smart commandable AI surface — per-actor BotState
     /// (Archetype + 5-layer ThinkingStack + auto-triage/auto-repair
     /// missions), faction registry, 4-phase mission director, reinforcement
@@ -1606,12 +1606,10 @@ struct MeleeHitEmit {
     knockdown_triggered: bool,
 }
 
-/// Pending dig request set by `act.player.dig` and consumed at the start of the
-/// next tick.
 #[derive(Debug, Clone)]
-struct PendingDig {
-    target: Option<String>,
-    source: IntentSource,
+pub(crate) struct PendingDig {
+    pub(crate) target: Option<String>,
+    pub(crate) source: IntentSource,
 }
 
 /// **M3 re-open (2026-05-13)**: a single dirty-region entry pushed by a carve
@@ -2183,291 +2181,6 @@ impl M0Engine {
             engine.recorder.enable_chain_mode(engine.config.seed);
         }
         engine
-    }
-
-    /// **M1 R2**: install a custom audio backend. Default is
-    /// `NullAudioPlugin`; cf-app installs a native backend, cf-e2e installs
-    /// `RecordingAudioPlugin` so tests can assert on cue stream.
-    pub fn set_audio_plugin(&self, plugin: Box<dyn cf_audio::AudioPlugin>) {
-        if let Ok(mut p) = self.audio_plugin.lock() {
-            *p = plugin;
-        }
-    }
-
-    /// Internal helper that fires a cue through the installed plugin AND
-    /// pushes the cue's caption into the HUD's caption queue. Both happen
-    /// on the engine thread so HUD captions stay tick-deterministic for
-    /// replay.
-    fn emit_audio_cue(&self, cue: cf_audio::AudioCue, tick: cf_sim_core::Tick) {
-        if let Ok(plugin) = self.audio_plugin.lock() {
-            plugin.play(&cue);
-        }
-        if let Ok(mut s) = self.state.write() {
-            push_caption(
-                &mut s.hud_captions,
-                crate::state::CaptionView {
-                    id: format!("audio.{}.{}", cue.stub_tag(), tick.0),
-                    label: cue.caption().to_string(),
-                    raised_at_tick: tick.0,
-                    accessibility_id: format!("hud.caption.audio.{}", cue.stub_tag()),
-                },
-            );
-        }
-    }
-
-    /// **M12B** § Wrapper around [`emit_audio_cue`] that ALSO fires the
-    /// 4 cosmetic spatial-resolve events for an actor-attached cue. Used
-    /// at audio-emit sites where the source actor is known (weapon fire,
-    /// reload, body hit, status change, item drop / settle). The source
-    /// position + velocity are looked up via the actor world.
-    ///
-    /// Per spec § Acceptance, every positional SFX must produce the 4
-    /// cosmetic spatial-resolve events so the replay verifier sees the
-    /// full envelope per cue.
-    fn emit_audio_cue_for_actor(
-        &self,
-        cue: cf_audio::AudioCue,
-        tick: cf_sim_core::Tick,
-        sim_time_ms: f64,
-        actor: cf_actor::ActorId,
-    ) {
-        let cue_tag = cue.stub_tag().to_string();
-        self.emit_audio_cue(cue, tick);
-        let (position, velocity) = self
-            .state
-            .read()
-            .ok()
-            .and_then(|s| {
-                s.actor_state
-                    .as_ref()
-                    .and_then(|sim| sim.world.actors.get(&actor))
-                    .map(|a| ([a.position.x, a.position.y], [a.velocity.x, a.velocity.y]))
-            })
-            .unwrap_or(([0.0, 0.0], [0.0, 0.0]));
-        let cue_name = format!("{cue_tag}.{}", actor.0);
-        self.emit_m12b_spatial_resolve(
-            tick,
-            sim_time_ms,
-            &cue_name,
-            position,
-            velocity,
-            cf_audio::Medium::Air,
-            &[],
-            cf_audio::ReverbProfile::open_outdoor(),
-            None,
-        );
-    }
-
-    /// **M12B** § Per-tick spatial resolve pass.
-    ///
-    /// Per spec § Crates / modules touched:
-    /// `cf-control::engine` MODIFY: "Per-tick: drain audio events →
-    /// `resolve_spatial` → emit `audio.spatial_resolved` cosmetic event."
-    ///
-    /// Given a `(source_position, source_velocity, cue_name)` tuple, compute
-    /// the `SpatialEnvelope` using the current player actor as the
-    /// listener + `Medium::Air` + open-outdoor reverb (M12B baseline; the
-    /// M19 room kernel injects the actual reverb profile when the kernel
-    /// exposes per-tile room ids). Emits 4 cosmetic events:
-    /// `audio.spatial_resolved`, `audio.reverb_applied`,
-    /// `audio.occluded`, `audio.doppler_shifted`.
-    ///
-    /// `walls` is the ordered list of [`cf_audio::WallAcoustics`] between
-    /// source and listener — typically empty for the M12B integration
-    /// baseline.
-    ///
-    /// All four events are cosmetic per
-    /// `cf-audio::deterministic_replay::is_cosmetic_audio_event_for`, so
-    /// they do NOT enter the determinism checksum but MUST fire in
-    /// deterministic per-tick order so the replay verifier sees the same
-    /// event stream across two engines with identical seed.
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn emit_m12b_spatial_resolve(
-        &self,
-        tick: cf_sim_core::Tick,
-        sim_time_ms: f64,
-        cue_name: &str,
-        source_position: [f32; 2],
-        source_velocity: [f32; 2],
-        medium: cf_audio::Medium,
-        walls: &[cf_audio::WallAcoustics],
-        reverb_profile: cf_audio::ReverbProfile,
-        room_id: Option<u64>,
-    ) {
-        let (listener_position, listener_velocity, listener_facing) = self.m12b_listener_state();
-        let source = cf_audio::SourceContext {
-            position: source_position,
-            velocity: source_velocity,
-            base_gain: 1.0,
-            propagation_range_m: 100.0,
-            room_id,
-        };
-        let listener = cf_audio::ListenerContext {
-            position: listener_position,
-            velocity: listener_velocity,
-            facing_rad: listener_facing,
-            room_id,
-        };
-        let env = cf_audio::resolve_spatial(source, listener, medium, walls, reverb_profile);
-
-        // 1. audio.spatial_resolved
-        self.recorder.record_cosmetic(
-            tick,
-            sim_time_ms,
-            "audio",
-            "spatial_resolved",
-            json!({
-                "canonical_name": cue_name,
-                "azimuth_rad": env.azimuth_rad,
-                "elevation_rad": env.elevation_rad,
-                "distance_m": env.distance_m,
-                "hrir_index": {
-                    "azimuth_bucket": env.hrir_index.azimuth_bucket as u32,
-                    "elevation_bucket": env.hrir_index.elevation_bucket as u32,
-                },
-                "direction": env.direction.label(),
-                "gain": env.gain,
-                "source_position": [source_position[0], source_position[1]],
-                "listener_position": [listener_position[0], listener_position[1]],
-                "listener_facing_rad": listener_facing,
-            }),
-            None,
-        );
-
-        // 2. audio.reverb_applied
-        self.recorder.record_cosmetic(
-            tick,
-            sim_time_ms,
-            "audio",
-            "reverb_applied",
-            json!({
-                "canonical_name": cue_name,
-                "room_id": room_id,
-                "tail_seconds": reverb_profile.tail_seconds,
-                "decay_coefficient": reverb_profile.decay_coefficient,
-                "decay_band": reverb_profile.decay_band.as_str(),
-                "wet_dry_mix": reverb_profile.wet_dry_mix,
-                "early_reflection_delay_ms": reverb_profile.early_reflection_delay_ms,
-                "aperture_attenuation_db": reverb_profile.aperture_attenuation_db,
-                "reverb_send_db": env.reverb_send_db,
-            }),
-            None,
-        );
-
-        // 3. audio.occluded
-        // Spec § "occlusion_db <= 0"; emit even at 0 dB so replay can
-        // observe a clean "no walls" line.
-        self.recorder.record_cosmetic(
-            tick,
-            sim_time_ms,
-            "audio",
-            "occluded",
-            json!({
-                "canonical_name": cue_name,
-                "occlusion_db": env.occlusion.occlusion_db,
-                "low_pass_cutoff_hz": env.occlusion.low_pass_cutoff_hz,
-                "wall_count": env.occlusion.wall_count,
-                "clipped": env.occlusion.clipped,
-                "source_position": [source_position[0], source_position[1]],
-                "listener_position": [listener_position[0], listener_position[1]],
-            }),
-            None,
-        );
-
-        // 4. audio.doppler_shifted
-        self.recorder.record_cosmetic(
-            tick,
-            sim_time_ms,
-            "audio",
-            "doppler_shifted",
-            json!({
-                "canonical_name": cue_name,
-                "doppler_factor": env.doppler.factor,
-                "clamped": env.doppler.clamped,
-                "speed_of_sound_m_per_s": env.doppler.speed_of_sound_m_per_s,
-                "medium": env.medium_filter.medium.as_str(),
-                "source_velocity": [source_velocity[0], source_velocity[1]],
-                "listener_velocity": [listener_velocity[0], listener_velocity[1]],
-            }),
-            None,
-        );
-    }
-
-    /// **M12B** § Per-tick projectile audio emission. For every live
-    /// projectile in `sim.projectiles`, emits the 4 cosmetic spatial-
-    /// resolve events (`audio.spatial_resolved`, `audio.reverb_applied`,
-    /// `audio.occluded`, `audio.doppler_shifted`) so the supersonic
-    /// projectile flyby acceptance scenario fires once per tick.
-    ///
-    /// Per spec § Acceptance "Doppler shift on supersonic projectile
-    /// flyby":
-    ///
-    /// > audio.doppler_shifted fires per tick with the resolved
-    /// > doppler_factor And as the projectile approaches:
-    /// > doppler_factor ≈ (343 + 0) / (343 - 800) — clipped to a safe
-    /// > positive minimum And as the projectile recedes:
-    /// > doppler_factor ≈ (343 + 0) / (343 + 800) ≈ 0.30 (lower pitch)
-    ///
-    /// All emitted events are cosmetic per
-    /// `cf_audio::is_cosmetic_audio_event_for`, so the determinism
-    /// checksum doesn't include them.
-    fn emit_m12b_per_tick_projectile_audio(&self, tick: cf_sim_core::Tick, sim_time_ms: f64) {
-        let projectile_snapshot: Vec<(u64, [f32; 2], [f32; 2])> = match self.state.read() {
-            Ok(s) => match s.actor_state.as_ref() {
-                Some(sim) => sim
-                    .projectiles
-                    .iter()
-                    .map(|p| (p.id, [p.position.x, p.position.y], [p.velocity.x, p.velocity.y]))
-                    .collect(),
-                None => Vec::new(),
-            },
-            Err(_) => Vec::new(),
-        };
-        if projectile_snapshot.is_empty() {
-            return;
-        }
-        for (id, position, velocity) in projectile_snapshot {
-            let cue_name = format!("projectile_fly.{id}");
-            self.emit_m12b_spatial_resolve(
-                tick,
-                sim_time_ms,
-                &cue_name,
-                position,
-                velocity,
-                // Default to air medium; M19F will inject the
-                // per-position medium via `cf_atmos::medium_at(pos)`.
-                cf_audio::Medium::Air,
-                &[],
-                cf_audio::ReverbProfile::open_outdoor(),
-                None,
-            );
-        }
-    }
-
-    /// **M12B** § Resolve the listener's `(position, velocity, facing_rad)`
-    /// triple from the current world. Returns `([0,0], [0,0], 0.0)` when
-    /// there's no player actor.
-    fn m12b_listener_state(&self) -> ([f32; 2], [f32; 2], f32) {
-        let s = match self.state.read() {
-            Ok(s) => s,
-            Err(_) => return ([0.0, 0.0], [0.0, 0.0], 0.0),
-        };
-        let Some(pid) = s.player_actor else {
-            return ([0.0, 0.0], [0.0, 0.0], 0.0);
-        };
-        let Some(actor_state) = s.actor_state.as_ref() else {
-            return ([0.0, 0.0], [0.0, 0.0], 0.0);
-        };
-        let Some(actor) = actor_state.world.actors.get(&pid) else {
-            return ([0.0, 0.0], [0.0, 0.0], 0.0);
-        };
-        // Listener facing is derived from the aim vector: atan2(aim.y, aim.x).
-        let facing = (actor.aim.y).atan2(actor.aim.x);
-        (
-            [actor.position.x, actor.position.y],
-            [actor.velocity.x, actor.velocity.y],
-            facing,
-        )
     }
 
     pub fn run_id(&self) -> &str {
@@ -20825,26 +20538,21 @@ fn resolve_hud_node_at(x: f32, y: f32) -> Option<String> {
     }
 }
 
-/// M4A: push a banner to the HUD queue, capping at `M4A_BANNER_BUFFER`.
-fn push_banner(queue: &mut VecDeque<crate::state::HudBannerView>, banner: crate::state::HudBannerView) {
+pub(crate) fn push_banner(queue: &mut VecDeque<crate::state::HudBannerView>, banner: crate::state::HudBannerView) {
     queue.push_back(banner);
     while queue.len() > M4A_BANNER_BUFFER {
         queue.pop_front();
     }
 }
 
-/// M4A: push a banner only if no banner with the same `id` is already in the
-/// queue. Used for "sticky" banners (e.g., AMMO OUT) that should not flicker
-/// when conditions persist tick-to-tick.
-fn push_banner_dedup(queue: &mut VecDeque<crate::state::HudBannerView>, banner: crate::state::HudBannerView) {
+pub(crate) fn push_banner_dedup(queue: &mut VecDeque<crate::state::HudBannerView>, banner: crate::state::HudBannerView) {
     if queue.iter().any(|b| b.id == banner.id) {
         return;
     }
     push_banner(queue, banner);
 }
 
-/// M4A: push a caption to the HUD queue, capping at `M4A_CAPTION_BUFFER`.
-fn push_caption(queue: &mut VecDeque<crate::state::CaptionView>, caption: crate::state::CaptionView) {
+pub(crate) fn push_caption(queue: &mut VecDeque<crate::state::CaptionView>, caption: crate::state::CaptionView) {
     queue.push_back(caption);
     while queue.len() > M4A_CAPTION_BUFFER {
         queue.pop_front();

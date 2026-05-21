@@ -51,6 +51,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod alchemy;
 pub mod kernel;
+pub(crate) mod kernel_parallel;
 pub mod loader;
 pub mod phase;
 pub mod precipitation;
