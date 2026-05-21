@@ -1527,6 +1527,35 @@ pub(crate) struct EngineMutable {
     /// **M14J § zipline rider slide speed** — per-rider current speed
     /// along the cable (m/s, positive = toward low end).
     pub(crate) m14j_zipline_speed_by_rider: BTreeMap<u64, f32>,
+    /// **M15 § active material kernel** — per-tick orchestrator for
+    /// the M15+M15B chemistry. When `chunked_terrain` is present, the
+    /// engine calls `cf_material::kernel_step` each tick to drive
+    /// per-pixel reactions, phase transitions, and CA movement. State
+    /// lives here so the Margolus stepper parity persists across ticks.
+    pub(crate) material_kernel: cf_material::MaterialKernel,
+    /// **M15 § reaction registry**. Loaded from
+    /// `content/materials/reaction_registry.json` at engine init, or
+    /// falls back to the hardcoded `default_reaction_registry` when
+    /// the file isn't present.
+    pub(crate) reaction_registry: cf_material::ReactionRegistry,
+    /// **M15 § phase-transition registry**. Loaded from
+    /// `content/materials/phase_registry.json` at engine init.
+    pub(crate) phase_registry: cf_material::PhaseRegistry,
+    /// **M15 § per-cell heat field**. Stub-initialized at ambient
+    /// (293.15 K Earth baseline) until M19 atmospherics wires per-cell
+    /// thermal sources. The kernel uses this for reaction temperature
+    /// gating + phase-transition threshold crossing.
+    pub(crate) heat_field: cf_terrain::HeatField,
+    /// **M15 § previous-tick heat snapshot**. Used to detect threshold
+    /// crossings for phase transitions. `None` on the first tick.
+    pub(crate) prev_heat_field: Option<cf_terrain::HeatField>,
+    /// **M15B § precipitation cycle**. Tracks per-cell cloud
+    /// saturation, fires nucleation + precipitation events as steam
+    /// pixels climb above the altitude/temperature gates.
+    pub(crate) precipitation_cycle: cf_material::PrecipitationCycle,
+    /// **M15B § precipitation tuning config**. Loaded from
+    /// `content/materials/precipitation_config.json` at engine init.
+    pub(crate) precipitation_config: cf_material::PrecipitationConfig,
 }
 
 /// **M14F** § Per-chunk lateral-wall runtime state. Lives on
@@ -2303,6 +2332,19 @@ impl M0Engine {
                 m14j_next_rope_id: 1,
                 m14j_zipline_ropes: std::collections::BTreeSet::new(),
                 m14j_zipline_speed_by_rider: BTreeMap::new(),
+                // **M15 § Active material kernel** wiring. Loaders fall
+                // back to hardcoded defaults when the content JSON
+                // files aren't present (e.g., headless replay-verifier
+                // without content/ on the path).
+                material_kernel: cf_material::MaterialKernel::new(),
+                reaction_registry: cf_material::ReactionRegistry::load_default_or_hardcoded(),
+                phase_registry: cf_material::PhaseRegistry::load_default_or_hardcoded(),
+                heat_field: cf_terrain::HeatField::default(),
+                prev_heat_field: None,
+                precipitation_cycle: cf_material::PrecipitationCycle::new(
+                    cf_material::AmbientWorld::Earth,
+                ),
+                precipitation_config: cf_material::PrecipitationConfig::load_default_or_baseline(),
             }),
             recorder,
             current_tick,
@@ -4928,6 +4970,197 @@ impl M0Engine {
                     }
                 }
             }
+            // **M15 § Active material kernel** — per-tick orchestrator.
+            // Runs after the dig + projectile + mission passes so the
+            // chemistry sees the current pixel state. Fires when
+            // chunked_terrain is loaded (M1.5/M2+ scenarios). Per
+            // DR-052 the kernel mutates terrain deterministically + the
+            // resulting state participates in the next checksum.
+            if state.chunked_terrain.is_some() {
+                let sim_time_ms = state.clock.sim_time_ms();
+                let prev_heat_snapshot = state.prev_heat_field.clone();
+                let report = {
+                    let EngineMutable {
+                        chunked_terrain,
+                        material_kernel,
+                        reaction_registry,
+                        phase_registry,
+                        heat_field,
+                        ..
+                    } = &mut *state;
+                    let terrain = chunked_terrain.as_mut().expect("chunked_terrain present");
+                    cf_material::kernel_step(
+                        terrain,
+                        material_kernel,
+                        reaction_registry,
+                        phase_registry,
+                        heat_field,
+                        prev_heat_snapshot.as_ref(),
+                    )
+                };
+                // Snapshot heat field for next-tick threshold detection.
+                state.prev_heat_field = Some(state.heat_field.clone());
+                // Route reaction events to the recorder.
+                for ev in &report.reactions {
+                    let mut emission_positions_json: Vec<serde_json::Value> = Vec::new();
+                    for p in &ev.emission_positions {
+                        emission_positions_json.push(json!([p[0], p[1]]));
+                    }
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "material",
+                        "reaction_triggered",
+                        json!({
+                            "reaction_id": ev.reaction_id,
+                            "material_a": ev.material_a,
+                            "material_b": ev.material_b,
+                            "output": ev.output,
+                            "byproduct": ev.byproduct,
+                            "emissions": ev.emissions,
+                            "emission_positions": emission_positions_json,
+                            "pos": ev.pos,
+                            "energy_release_j": ev.energy_release_j,
+                            "auto_ignite": ev.auto_ignite,
+                        }),
+                        None,
+                    );
+                }
+                // Route phase-transition events to the recorder.
+                for ev in &report.phase_transitions {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "material",
+                        "phase_transition",
+                        json!({
+                            "material": ev.material,
+                            "product_material": ev.product_material,
+                            "from_state": ev.from_state.as_str(),
+                            "to_state": ev.to_state.as_str(),
+                            "pos": ev.pos,
+                            "temperature_k": ev.temperature_k,
+                            "latent_heat_j_per_kg": ev.latent_heat_j_per_kg,
+                            "direction": ev.direction,
+                        }),
+                        None,
+                    );
+                }
+                // Route cellular_step summary event when CA actually
+                // moved pixels (per M15 spec event vocabulary).
+                if report.ca.pixels_moved > 0 || !report.ca.dirty_chunks.is_empty() {
+                    let dirty_chunks_json: Vec<serde_json::Value> = report
+                        .ca
+                        .dirty_chunks
+                        .iter()
+                        .map(|(cx, cy)| json!([cx, cy]))
+                        .collect();
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "material",
+                        "cellular_step",
+                        json!({
+                            "tick": report.ca.tick,
+                            "parity": report.ca.parity,
+                            "pixels_moved": report.ca.pixels_moved,
+                            "dirty_chunks": dirty_chunks_json,
+                        }),
+                        None,
+                    );
+                }
+
+                // **M15B § Precipitation cycle** — scan steam pixels +
+                // feed them to the cycle. Per-tick PrecipitationCycle
+                // tracks cloud-saturation; fires nucleation +
+                // precipitation events when gates cross. Inputs come
+                // from the per-cell heat field + the loaded
+                // PrecipitationConfig tuning.
+                let precip_evts = {
+                    let EngineMutable {
+                        chunked_terrain,
+                        heat_field,
+                        precipitation_cycle,
+                        precipitation_config,
+                        ..
+                    } = &mut *state;
+                    let terrain = chunked_terrain.as_mut().expect("chunked_terrain present");
+                    let width = terrain.width_px as i64;
+                    let height = terrain.height_px as i64;
+                    // Scan for steam pixels (id=50). For each, query the
+                    // heat field + altitude (world_y → altitude_px =
+                    // world height - world_y so y=0 is the world top).
+                    let mut observed = 0u32;
+                    // **Perf gate**: cap per-tick steam observations at
+                    // 4096 so a steam-cloud-heavy scenario doesn't
+                    // blow the per-tick budget.
+                    const STEAM_OBS_CAP: u32 = 4096;
+                    'scan: for y in 0..height {
+                        for x in 0..width {
+                            if observed >= STEAM_OBS_CAP {
+                                break 'scan;
+                            }
+                            if terrain.material_at(x, y) != 50 {
+                                continue;
+                            }
+                            let altitude_px = (height - y) as f32;
+                            let temp_k = heat_field.temperature_at_world(x as f32, y as f32);
+                            precipitation_cycle.observe_steam_pixel(cf_material::PrecipitationInputs {
+                                material: 50,
+                                world_x: x as i32,
+                                world_y: y as i32,
+                                altitude_px,
+                                ambient_temp_k: temp_k,
+                                ambient_pressure_kpa: precipitation_config.reference_pressure_kpa,
+                                ambient_world: precipitation_cycle.world,
+                                pollutant_fraction_local: 0.0,
+                                tick: tick.0,
+                            });
+                            observed = observed.saturating_add(1);
+                        }
+                    }
+                    // Apply the cycle's pixel side-effects to terrain.
+                    let _ = precipitation_cycle.apply_to_terrain(terrain, tick.0);
+                    // Drain events for recorder routing below.
+                    precipitation_cycle.drain_events()
+                };
+                let (nucleated, precipitations) = precip_evts;
+                for ev in &nucleated {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "material",
+                        "phase_nucleated",
+                        json!({
+                            "from_material": ev.from_material,
+                            "to_material": ev.to_material,
+                            "from": ev.from,
+                            "to": ev.to,
+                            "pos": ev.pos,
+                            "altitude_px": ev.altitude_px,
+                            "temperature_k": ev.temperature_k,
+                        }),
+                        None,
+                    );
+                }
+                for ev in &precipitations {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "material",
+                        "precipitation_started",
+                        json!({
+                            "material": ev.material,
+                            "pos": ev.pos,
+                            "saturation": ev.saturation,
+                            "pollutant_fraction": ev.pollutant_fraction,
+                            "ambient": ev.ambient,
+                        }),
+                        None,
+                    );
+                }
+            }
+
             let cadence = self.config.checksum_cadence_ticks;
             if cadence > 0 && tick.0 % cadence == 0 {
                 let actor_bytes = build_checksum_bytes(&state);

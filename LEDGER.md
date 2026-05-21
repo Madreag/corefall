@@ -1,7 +1,7 @@
 # Corefall — Refactor Ledger
 
 **Purpose**: persistent cross-session memory. Read this FIRST when resuming work.
-Last updated: 5/20/2026 11:30 PM MST
+Last updated: 5/20/2026 11:55 PM MST
 
 ---
 
@@ -53,6 +53,22 @@ Last updated: 5/20/2026 11:30 PM MST
 - Made precipitation tuning loadable from JSON (`content/materials/precipitation_config.json`)
 - Tank rounds (HEAT, APFSDS) now carry bullet_mass + sharpness in their RON files
 - Added 10 content-driven registry tests
+- Committed as 165a79f7
+
+### Session 5 (5/20/2026): M15 kernel engine wiring
+- User: "commit and continue working on all, maintain a ledger md files"
+- Created LEDGER.md (this file)
+- Wired M15 kernel_step into cf-control engine's drive_tick
+- Added MaterialKernel, ReactionRegistry, PhaseRegistry, HeatField, prev_heat_field,
+  PrecipitationCycle, PrecipitationConfig fields to EngineMutable
+- Initialized them in EngineMutable construction (loaders fall back to hardcoded defaults)
+- Per-tick kernel_step call after dig/projectile/mission, before checksum
+- Routes reaction_triggered + phase_transition + cellular_step events to recorder
+- Wired precipitation cycle: scans steam pixels per tick (cap 4096), observes them,
+  applies cloud + rain pixel writes to terrain, drains nucleation + precipitation events
+- Routes phase_nucleated + precipitation_started events to recorder
+- 4 new engine-integration tests (VAL-M15-ENGINE-001..004)
+- 4285 tests passing (was 4281 + 4 new)
 
 ---
 
@@ -80,18 +96,7 @@ Last updated: 5/20/2026 11:30 PM MST
 
 ### HIGH PRIORITY — true blockers to proper simulation
 
-1. **M15 kernel_step not wired into cf-control engine drive_tick**
-   - The kernel orchestrator + precipitation cycle + liquid_flow exist but are NEVER CALLED by the engine
-   - Material reactions don't actually fire in gameplay scenarios
-   - Required work:
-     - Add `MaterialKernel`, `ReactionRegistry`, `PhaseRegistry`, `HeatField`, `PrecipitationCycle` fields to `EngineMutable` in cf-control/src/engine.rs
-     - Initialize them in EngineMutable construction (~line 2150)
-     - Call `kernel_step` in `drive_tick` (after dig/blast, before snapshot)
-     - Route reaction/phase/cellular_step events to recorder
-     - Wire heat field updates from M19 atmospherics (or stub at ambient)
-     - Add cf-material + cf-material-gpu deps to cf-control Cargo.toml
-   - Risk: engine.rs is 29000+ lines. Adding per-tick subsystem can break determinism for 4281 tests.
-   - Estimated scope: 200-400 lines + careful integration testing
+1. ~~**M15 kernel_step not wired into cf-control engine drive_tick**~~ ✅ DONE in Session 5
 
 2. **No actual parallelism in sim hot path**
    - rayon added to workspace, chunk_summary parallelized (small win)
@@ -122,6 +127,20 @@ Last updated: 5/20/2026 11:30 PM MST
 7. **No projectile pair pass parallelism**
    - cf-physics run_projectile_pair_pass iterates candidates serially
    - Narrowphase resolution per candidate could be parallel within projectile-disjoint groups
+
+8. **Steam pixel scan in precipitation is O(width × height) per tick**
+   - Each engine tick scans every pixel looking for steam (id=50)
+   - For 1024x1024 world = 1M pixel lookups per tick
+   - Should track steam pixels in a dedicated set maintained on writes (cf-terrain side)
+
+9. **HeatField is stub-initialized at ambient and never updated**
+   - The engine clones heat_field each tick for prev_heat_field but heat never changes
+   - M19 atmospherics needs to drive per-cell heat updates
+   - Phase transitions can't actually fire because temperature never changes
+
+10. **PrecipitationCycle::world is hardcoded to AmbientWorld::Earth**
+    - Scenarios should set this from their config (Vulcan ambient triggers acid rain)
+    - Engine doesn't expose a way to set this currently
 
 ### LOW PRIORITY — designated future milestones (intentionally deferred)
 

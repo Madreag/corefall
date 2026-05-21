@@ -72,9 +72,10 @@ pub use phase::{
 pub use precipitation::{
     evaluate_steam_nucleation, material_id_to_name, pressure_rate_multiplier, saturation_rate_per_tick,
     saturation_rate_per_tick_with_pressure, update_cloud_cell, update_cloud_cell_with_pressure, AmbientWorld,
-    CloudCell, PhaseNucleatedEvent, PrecipitationCycle, PrecipitationInputs, PrecipitationStartedEvent,
-    ACID_RAIN_POLLUTANT_FRACTION_MIN, NUCLEATION_ALTITUDE_PX, NUCLEATION_PRESSURE_MIN_KPA, NUCLEATION_TEMP_K_MAX,
-    PRECIPITATION_SATURATION_THRESHOLD, PRECIPITATION_TICK_GATE, PRESSURE_MULTIPLIER_RANGE, REFERENCE_PRESSURE_KPA,
+    CloudCell, PhaseNucleatedEvent, PrecipitationConfig, PrecipitationConfigLoadError, PrecipitationCycle,
+    PrecipitationInputs, PrecipitationStartedEvent, ACID_RAIN_POLLUTANT_FRACTION_MIN, NUCLEATION_ALTITUDE_PX,
+    NUCLEATION_PRESSURE_MIN_KPA, NUCLEATION_TEMP_K_MAX, PRECIPITATION_SATURATION_THRESHOLD, PRECIPITATION_TICK_GATE,
+    PRESSURE_MULTIPLIER_RANGE, REFERENCE_PRESSURE_KPA,
 };
 pub use reactions::{
     classify_reaction, default_reaction_registry, evaluate_reaction_pair, reaction_event,
