@@ -1017,20 +1017,20 @@ pub fn default_reaction_registry() -> ReactionRegistry {
         // C8H18 + 12.5 O2 → 8 CO2 + 9 H2O.
         MaterialReaction {
             id: "rxn.combustion.oil_o2".to_string(),
-            input_a: 19, // oil
-            input_b: 51, // oxygen
-            output: 53,  // co2
-            byproduct: Some(50), // steam
-            emissions: vec![],
+            input_a: 19,
+            input_b: 51,
+            output: 53,
+            byproduct: Some(50),
+            emissions: vec![62, 65],
             energy_release_j: 5_470_000.0,
-            rate_per_s: 0.8,
-            auto_ignite: false,
+            rate_per_s: 30.0,
+            auto_ignite: true,
             min_temperature_k: Some(633.0),
-            propagates: false,
-            activation_k: 0.0,
-            pressure_order: 0.0,
-            violent: false,
-            flash_color_hex: None,
+            propagates: true,
+            activation_k: 5000.0,
+            pressure_order: 0.5,
+            violent: true,
+            flash_color_hex: Some("FF8800".to_string()),
         },
         // 25. Combustion: charcoal (input_a) + O2 (input_b) → ash (output) + CO2 (byproduct).
         MaterialReaction {
@@ -1116,20 +1116,20 @@ pub fn default_reaction_registry() -> ReactionRegistry {
         // Toxic cloud.
         MaterialReaction {
             id: "rxn.chem.chlorine_ammonia".to_string(),
-            input_a: 60, // chlorine
-            input_b: 61, // ammonia
-            output: 62,  // smoke
-            byproduct: Some(62), // smoke
-            emissions: vec![],
+            input_a: 60,
+            input_b: 61,
+            output: 62,
+            byproduct: Some(62),
+            emissions: vec![62, 62],
             energy_release_j: 460_000.0,
-            rate_per_s: 0.3,
+            rate_per_s: 10.0,
             auto_ignite: false,
             min_temperature_k: Some(293.0),
             propagates: false,
             activation_k: 0.0,
             pressure_order: 0.0,
-            violent: false,
-            flash_color_hex: None,
+            violent: true,
+            flash_color_hex: Some("AAEE88".to_string()),
         },
         // 30. Ignition: gunpowder (input_a) + lava (input_b) → smoke (output)
         // explosive byproduct. Lava ignites gunpowder directly.
@@ -1173,20 +1173,20 @@ pub fn default_reaction_registry() -> ReactionRegistry {
         // arc stays. Models conductive pool electrification per spec.
         MaterialReaction {
             id: "rxn.electric.water_arc".to_string(),
-            input_a: 13, // water
-            input_b: 63, // electric_arc
-            output: 66,  // polluted_water (conductive pool proxy)
+            input_a: 13,
+            input_b: 63,
+            output: 66,
             byproduct: None,
-            emissions: vec![],
+            emissions: vec![50, 64],
             energy_release_j: 50_000.0,
-            rate_per_s: 1.0,
+            rate_per_s: 30.0,
             auto_ignite: false,
             min_temperature_k: None,
             propagates: false,
             activation_k: 0.0,
             pressure_order: 0.0,
-            violent: false,
-            flash_color_hex: None,
+            violent: true,
+            flash_color_hex: Some("88DDFF".to_string()),
         },
         // **M15B** § 33a. Extinguish (water-gas shift): rain (input_a) +
         // fire (input_b) → steam (output) + hydrogen (byproduct) at
