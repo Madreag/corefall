@@ -141,7 +141,25 @@ impl MaterialAffordance {
     }
 }
 
-const MATERIAL_TABLE: [MaterialAffordance; 9] = [
+/// **M15** § Material affordances for the full active-material set.
+/// Originally a launch-9 table (air, dirt, concrete, metal_nohook,
+/// hazard, loose_fill, repair_fill, anchor, support_beam) for the M2
+/// terrain milestone. M15 grew the active material registry to 89 ids
+/// (water, oil, acid, lava, iron, wood, ore, gases, etc.).
+///
+/// **This table is the RENDER + PHYSICS source of truth** — the
+/// JSON-driven `cf_material::MaterialRegistry` provides id/name/color
+/// for chemistry, but display + physics fields (hardness, friction,
+/// density, blastable, etc.) live HERE. Adding a new material to the
+/// JSON registry alone makes it kernel-reactive but INVISIBLE to the
+/// renderer + treated as air by physics; you must also add an entry
+/// to this table.
+///
+/// Adding new materials: pick a unique `id` not already in this table,
+/// add a `pub const MATERIAL_X: MaterialId = N;` constant above, then
+/// add the affordance entry below. Bump the table size in the array
+/// declaration.
+const MATERIAL_TABLE: [MaterialAffordance; 21] = [
     MaterialAffordance {
         id: MATERIAL_AIR,
         name: "air",
@@ -393,6 +411,298 @@ const MATERIAL_TABLE: [MaterialAffordance; 9] = [
         spawn_material: Some(MATERIAL_LOOSE_FILL),
         path_cost: 1.0,
         overlay_rgba: [110, 70, 30, 0xFF],
+        refusal_reason: None,
+    },
+    // ===== M15 ACTIVE MATERIAL AFFORDANCES =====
+    // The following 12 entries cover the M15B precipitation chain +
+    // the most-emitted reaction products so they render visibly +
+    // physics-interact instead of being silently treated as air.
+    MaterialAffordance {
+        id: 13, // water
+        name: "water",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: false,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.05,
+        restitution: 0.0,
+        friction: 0.10,
+        density: 1.0,
+        spawn_material: None,
+        path_cost: 2.0,
+        overlay_rgba: [40, 100, 220, 200],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 16, // oil
+        name: "oil",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: false,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.10,
+        restitution: 0.0,
+        friction: 0.20,
+        density: 0.88,
+        spawn_material: None,
+        path_cost: 2.0,
+        overlay_rgba: [26, 20, 16, 220],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 21, // acid
+        name: "acid",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 2.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.05,
+        restitution: 0.0,
+        friction: 0.10,
+        density: 1.2,
+        spawn_material: None,
+        path_cost: 3.0,
+        overlay_rgba: [180, 240, 80, 200],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 26, // lava
+        name: "lava",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 12.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.15,
+        restitution: 0.0,
+        friction: 0.30,
+        density: 2.8,
+        spawn_material: None,
+        path_cost: 8.0,
+        overlay_rgba: [220, 80, 20, 0xFF],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 29, // iron
+        name: "iron",
+        solid: true,
+        diggable: true,
+        hardness: 80.0,
+        anchorable: true,
+        hazard: false,
+        damage_per_tick: 0.0,
+        drillable: true,
+        blastable: true,
+        beam_cuttable: true,
+        projectile_passable: false,
+        actor_passable: false,
+        blocks_line_of_sight: true,
+        stickiness: 0.0,
+        restitution: 0.30,
+        friction: 0.50,
+        density: 7.87,
+        spawn_material: Some(MATERIAL_LOOSE_FILL),
+        path_cost: 1.0,
+        overlay_rgba: [120, 120, 130, 0xFF],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 43, // co2
+        name: "co2",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: false,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 0.18,
+        spawn_material: None,
+        path_cost: 1.0,
+        overlay_rgba: [200, 200, 210, 60],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 50, // steam
+        name: "steam",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: false,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 0.06,
+        spawn_material: None,
+        path_cost: 1.0,
+        overlay_rgba: [220, 220, 240, 100],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 62, // smoke
+        name: "smoke",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: false,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: true,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 0.12,
+        spawn_material: None,
+        path_cost: 1.0,
+        overlay_rgba: [50, 50, 55, 160],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 65, // fire_intense
+        name: "fire_intense",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 8.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 0.20,
+        spawn_material: None,
+        path_cost: 6.0,
+        overlay_rgba: [240, 120, 20, 220],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 71, // cloud
+        name: "cloud",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: false,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 0.08,
+        spawn_material: None,
+        path_cost: 1.0,
+        overlay_rgba: [240, 240, 250, 140],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 87, // rain
+        name: "rain",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: false,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.10,
+        density: 1.0,
+        spawn_material: None,
+        path_cost: 2.0,
+        overlay_rgba: [60, 120, 220, 200],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 88, // acid_droplet
+        name: "acid_droplet",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 2.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.05,
+        restitution: 0.0,
+        friction: 0.10,
+        density: 1.2,
+        spawn_material: None,
+        path_cost: 4.0,
+        overlay_rgba: [180, 240, 100, 200],
         refusal_reason: None,
     },
 ];
@@ -2125,6 +2435,47 @@ mod tests {
         assert!(before.is_some());
         assert!(after.is_some());
         assert_ne!(before, after);
+    }
+
+    #[test]
+    fn val_m15b_material_affordances_cover_active_set() {
+        // M15B added 12 active-material affordances (water, oil, acid,
+        // lava, iron, co2, steam, smoke, fire_intense, cloud, rain,
+        // acid_droplet). Without these, the renderer treats them as
+        // transparent black + physics treats them as air.
+        for (id, expected_name) in [
+            (13u8, "water"),
+            (16, "oil"),
+            (21, "acid"),
+            (26, "lava"),
+            (29, "iron"),
+            (43, "co2"),
+            (50, "steam"),
+            (62, "smoke"),
+            (65, "fire_intense"),
+            (71, "cloud"),
+            (87, "rain"),
+            (88, "acid_droplet"),
+        ] {
+            let aff = material_affordance(id)
+                .unwrap_or_else(|| panic!("M15 material id={id} ({expected_name}) missing affordance"));
+            assert_eq!(aff.name, expected_name, "id={id}");
+        }
+    }
+
+    #[test]
+    fn val_m15b_hazardous_materials_damage_actors() {
+        // Per M15 chem doc: acid, lava, fire_intense, acid_droplet all
+        // emit per-tick damage to actors in contact.
+        for (id, min_dpt) in [(21u8, 1.0_f32), (26, 5.0), (65, 5.0), (88, 1.0)] {
+            let aff = material_affordance(id).unwrap();
+            assert!(aff.hazard, "id={id} should be hazard");
+            assert!(
+                aff.damage_per_tick >= min_dpt,
+                "id={id} damage_per_tick {} < {min_dpt}",
+                aff.damage_per_tick
+            );
+        }
     }
 
     #[test]
