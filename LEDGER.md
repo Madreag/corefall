@@ -90,38 +90,37 @@ Last updated: 5/21/2026 2:15 AM MST
 - Committed as fd39e529
 
 ### Session 11 (5/21/2026): Big refactor pass — user mandated "no more deferrals"
-- AGENTS.md: added comment-brevity, <2000 LOC file split, content-driven config rules
-- Parallel CA stepper via snapshot-then-apply (rayon par_iter):
-  - bench m15-ca-burst p50 22ms → 5.2ms, p99 55ms → 5.5ms (10x speedup)
-  - apply_chunk_ca_to_buffer respects world bounds (not just chunk bounds)
-  - parallel_matches_serial_byte_identical test proves determinism
-  - CaStepperState.parallel + MaterialKernel::with_parallel propagate flag
-- Chemistry rate modulation:
-  - Added activation_k (Arrhenius), pressure_order, violent, flash_color_hex
-    to MaterialReaction
-  - effective_rate_per_tick(temp, pressure) computes rate gates
-  - fires_at(tick, x, y, temp, pressure) deterministic firing gate
-  - Marked 4 reactions violent with realistic flash colors:
-    gunpowder+fire (FFCC00), gunpowder+lava (FFAA00), H2+O2 (00CCFF),
-    acid+alkali (F0F0F0)
-- Visual effects:
-  - violent_burst event emitted alongside reaction_triggered when violent=true
-  - material_violent_burst.json schema registered in cf-replay
-- ThermalSourceTable created in cf-material loaded from
-  content/materials/thermal_sources.json (replaces hardcoded constants
-  in engine.rs)
-- MaterialId u8 → u16 refactor:
-  - 256-material cap lifted to 65535
-  - ReactionLookup table flat 256*256 → HashMap<(u16,u16), Vec<u32>>
-    (65536*65536 dense was impossible)
-  - primary_reactive_bitmap [bool;256] → Vec<bool>
-  - checksum_bytes bumped to v2 (LE byte order)
-  - Touched 25 .rs files; type-driven by compiler
-- engine.rs split start: extracted engine_m15.rs (107 LOC) with M15 glue
-  - engine.rs: 29602 → 29488 LOC
+
+**M15 perf totals: p50 22ms → 0.9ms (24x), p99 55ms → 1.07ms (51x).
+p99 now well under the 4ms HARD GATE budget.**
+
+- AGENTS.md: added comment-brevity, <2000 LOC file split, content-driven rules
+- Parallel CA stepper (snapshot-then-apply): 22→5.2ms p50
+- Parallel reaction dispatch (4-color chunk pattern): 5.2→1.0ms p50
+- Parallel phase transitions (no cross-chunk effects): 1.0→0.9ms p50
+- Chemistry rate modulation: activation_k (Arrhenius), pressure_order,
+  violent, flash_color_hex on MaterialReaction; effective_rate_per_tick +
+  fires_at(tick, x, y, temp, pressure) deterministic gates
+- 8 violent reactions with flash colors: gunpowder+fire (FFCC00),
+  gunpowder+lava (FFAA00), H2+O2 (00CCFF), acid+alkali (F0F0F0),
+  oil_o2 (FF8800), chlorine+ammonia (AAEE88), water+arc (88DDFF)
+- violent_burst event + material_violent_burst.json schema
+- ThermalSourceTable: content-driven heat sources from
+  content/materials/thermal_sources.json
+- MaterialId u8 → u16: 256→65535 cap lifted; ReactionLookup HashMap
+  replaces dense 65536² table; primary_reactive_bitmap Vec<bool>
+- 8 new phase transitions: ice→water, copper, glass, granite, basalt,
+  alkali, acid vapor, coal→ash (22 total in registry)
+- MATERIAL_TABLE id fixes: oil=19 (was 16), iron=68 (was 29)
+- engine.rs splits: engine_m15.rs (107) + engine_build.rs (173)
+  - engine.rs: 29602 → 29300 LOC
 - try_penetrate_batch4 SIMD-friendly batched penetration
-- 4294 tests passing
-- Commits: 05fdc125 (agents), a3f01c41 (parallel CA), more...
+- 4 paired-determinism tests verify parallel==serial byte-identical:
+  parallel_matches_serial_byte_identical (CA, 40 ticks mixed materials)
+  val_parallel_reactions_match_serial (reactions, 15 ticks scene)
+  val_parallel_phase_match_serial (phase, 10 ticks)
+  try_penetrate_batch4_matches_scalar (SIMD)
+- 4296 tests passing (was 4271 entering session)
 
 ### Session 10 (5/21/2026): Modder warnings + radiative heat cooling
 - ReactionRegistry / PhaseRegistry / PrecipitationConfig loaders now emit

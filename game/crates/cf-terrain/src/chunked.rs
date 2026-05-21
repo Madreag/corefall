@@ -141,24 +141,10 @@ impl MaterialAffordance {
     }
 }
 
-/// **M15** § Material affordances for the full active-material set.
-/// Originally a launch-9 table (air, dirt, concrete, metal_nohook,
-/// hazard, loose_fill, repair_fill, anchor, support_beam) for the M2
-/// terrain milestone. M15 grew the active material registry to 89 ids
-/// (water, oil, acid, lava, iron, wood, ore, gases, etc.).
-///
-/// **This table is the RENDER + PHYSICS source of truth** — the
-/// JSON-driven `cf_material::MaterialRegistry` provides id/name/color
-/// for chemistry, but display + physics fields (hardness, friction,
-/// density, blastable, etc.) live HERE. Adding a new material to the
-/// JSON registry alone makes it kernel-reactive but INVISIBLE to the
-/// renderer + treated as air by physics; you must also add an entry
-/// to this table.
-///
-/// Adding new materials: pick a unique `id` not already in this table,
-/// add a `pub const MATERIAL_X: MaterialId = N;` constant above, then
-/// add the affordance entry below. Bump the table size in the array
-/// declaration.
+/// Render + physics affordance table. Lookup by id via
+/// `material_affordance(id)`. Add entries here when introducing new
+/// kernel-reactive materials; absence yields transparent render +
+/// air-like physics.
 const MATERIAL_TABLE: [MaterialAffordance; 21] = [
     MaterialAffordance {
         id: MATERIAL_AIR,
@@ -749,10 +735,10 @@ pub fn material_id_from_name(name: &str) -> Option<MaterialId> {
         "acid_droplet" => Some(88),
         // **M15** § active material set — names from
         // `content/materials/material_registry.json`.
-        "oil" => Some(16),
+        "oil" => Some(19),
         "acid" => Some(21),
         "lava" => Some(26),
-        "iron" => Some(29),
+        "iron" => Some(68),
         "co2" => Some(43),
         "smoke" => Some(62),
         "fire_intense" => Some(65),
