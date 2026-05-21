@@ -89,3 +89,163 @@ pub(crate) fn validate_fortification(path: &Path, report: &mut ValidationReport)
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::report::ValidationReport;
+    use crate::test_helpers::write_tmp;
+    use std::path::PathBuf;
+
+    fn write_named(name: &str, contents: &str) -> PathBuf {
+        write_tmp(name, contents)
+    }
+
+    /// VAL-M9C-005: every authored `content/fortifications/*.ron`
+    /// file loads cleanly through `validate_fortification`. The fast
+    /// way to assert this is to walk the manifest dir + validate each.
+    #[test]
+    fn fortifications_load_all() {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("content")
+            .join("fortifications");
+        let entries = fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("read_dir {}: {e}", dir.display()));
+        let mut report = ValidationReport::default();
+        let mut count = 0usize;
+        for entry in entries {
+            let entry = entry.expect("readdir entry");
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("ron") {
+                continue;
+            }
+            count += 1;
+            validate_fortification(&path, &mut report);
+        }
+        assert!(
+            count >= 23,
+            "expected ≥23 fortification RONs on disk; found {count}"
+        );
+        assert_eq!(
+            report.fail(),
+            0,
+            "expected zero FAIL entries; report: {:?}",
+            report.entries
+        );
+        assert!(
+            report.pass() >= 23,
+            "expected ≥23 PASS entries; report: {:?}",
+            report.entries
+        );
+    }
+
+    #[test]
+    fn fortifications_reject_malformed_enum() {
+        let bad = r#"(
+            kind: definitely_not_a_kind,
+            hp: 100,
+            footprint_tiles: (1, 1),
+            build_time_seconds: 1,
+            material_cost: {},
+        )"#;
+        let path = write_named("definitely_not_a_kind.ron", bad);
+        let mut report = ValidationReport::default();
+        validate_fortification(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "report: {:?}", report.entries);
+    }
+
+    #[test]
+    fn fortifications_reject_malformed_wire_kind_enum() {
+        let bad = r#"(
+            kind: barbed_wire,
+            hp: 200,
+            footprint_tiles: (3, 1),
+            build_time_seconds: 4,
+            material_cost: {"iron": 4, "wire": 1},
+            wire_kind: Some(not_a_wire_kind),
+        )"#;
+        let path = write_named("barbed_wire.ron", bad);
+        let mut report = ValidationReport::default();
+        validate_fortification(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "report: {:?}", report.entries);
+    }
+
+    #[test]
+    fn fortifications_reject_malformed_mine_kind_enum() {
+        let bad = r#"(
+            kind: barbed_wire,
+            hp: 200,
+            footprint_tiles: (3, 1),
+            build_time_seconds: 4,
+            material_cost: {"iron": 4, "wire": 1},
+            mine_kind: Some(not_a_mine_kind),
+        )"#;
+        let path = write_named("barbed_wire.ron", bad);
+        let mut report = ValidationReport::default();
+        validate_fortification(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "report: {:?}", report.entries);
+    }
+
+    #[test]
+    fn fortifications_missing_dependency_warning() {
+        let body = r#"(
+            kind: camo_netting,
+            hp: 100,
+            footprint_tiles: (4, 4),
+            build_time_seconds: 12,
+            material_cost: {"burlap": 4, "twine": 2},
+            depends_on: ["m99_future_milestone_thing"],
+        )"#;
+        let path = write_named("camo_netting.ron", body);
+        let mut report = ValidationReport::default();
+        validate_fortification(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(
+            report.fail(),
+            0,
+            "missing dependency must NOT fail; report: {:?}",
+            report.entries
+        );
+        assert!(
+            report.warn() >= 1,
+            "expected ≥1 WARN entry; report: {:?}",
+            report.entries
+        );
+        assert!(
+            report.entries.iter().any(|e| {
+                e.message.contains(FORTIFICATION_MISSING_DEPENDENCY_WARNING)
+                    && e.message.contains("m99_future_milestone_thing")
+            }),
+            "WARN entry must mention the missing dependency: {:?}",
+            report.entries
+        );
+    }
+
+    #[test]
+    fn fortifications_reject_filename_kind_mismatch() {
+        let body = r#"(
+            kind: sandbag_high,
+            hp: 600,
+            footprint_tiles: (3, 1),
+            build_time_seconds: 12,
+            material_cost: {"sandbag": 12},
+            cover_state: Some((standing: Full, crouched: Full, prone: Full)),
+            sandbag_tier: Some(high),
+        )"#;
+        let path = write_named("sandbag_low.ron", body);
+        let mut report = ValidationReport::default();
+        validate_fortification(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "report: {:?}", report.entries);
+        assert!(
+            report.entries[0].message.contains("mismatches filename"),
+            "expected mismatch message; got: {}",
+            report.entries[0].message
+        );
+    }
+}

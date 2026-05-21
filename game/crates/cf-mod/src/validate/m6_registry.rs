@@ -217,3 +217,135 @@ pub(crate) fn validate_tool_registry(path: &Path, report: &mut ValidationReport)
         report.add_error(path.to_path_buf(), messages.join("; "));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::report::ValidationReport;
+    use crate::test_helpers::write_tmp;
+
+    #[test]
+    fn weapon_registry_accepts_minimal_valid_input() {
+        let body = r#"(
+  schema_version: 1,
+  weapons: [
+    (id: "rifle_m1_default", class: "rifle"),
+    (id: "smg_m6_default", class: "smg"),
+  ],
+)"#;
+        let path = write_tmp("weapon_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_weapon_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn weapon_registry_rejects_empty_id() {
+        let body = r#"(
+  schema_version: 1,
+  weapons: [
+    (id: "", class: "rifle"),
+  ],
+)"#;
+        let path = write_tmp("weapon_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_weapon_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+    }
+
+    #[test]
+    fn grenade_registry_accepts_minimal_valid_input() {
+        let body = r#"(
+  schema_version: 1,
+  grenades: [
+    (id: "grenade_frag_m6", kind: "frag"),
+  ],
+)"#;
+        let path = write_tmp("grenade_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_grenade_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn grenade_registry_rejects_empty_registry() {
+        let body = r#"(
+  schema_version: 1,
+  grenades: [],
+)"#;
+        let path = write_tmp("grenade_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_grenade_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("at least 1 entry"));
+    }
+
+    #[test]
+    fn melee_registry_accepts_minimal_valid_input() {
+        let body = r#"(
+  schema_version: 1,
+  melees: [
+    (id: "melee_knife_m6", kind: "knife"),
+  ],
+)"#;
+        let path = write_tmp("melee_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_melee_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn melee_registry_rejects_bad_schema_version() {
+        let body = r#"(
+  schema_version: 2,
+  melees: [
+    (id: "melee_knife_m6", kind: "knife"),
+  ],
+)"#;
+        let path = write_tmp("melee_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_melee_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("schema_version"));
+    }
+
+    #[test]
+    fn tool_registry_accepts_minimal_valid_input() {
+        let body = r#"(
+  schema_version: 1,
+  tools: [
+    (id: "tool_repair_m6", kind: "repair"),
+  ],
+)"#;
+        let path = write_tmp("tool_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_tool_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn tool_registry_rejects_empty_kind() {
+        let body = r#"(
+  schema_version: 1,
+  tools: [
+    (id: "tool_repair_m6", kind: ""),
+  ],
+)"#;
+        let path = write_tmp("tool_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_tool_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+    }
+}

@@ -240,3 +240,199 @@ pub(crate) fn validate_difficulty_m7_shape(presets: &[serde_json::Value], messag
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::report::ValidationReport;
+    use crate::test_helpers::write_tmp;
+    use std::fs;
+
+    #[test]
+    fn difficulty_json_accepts_three_required_presets() {
+        let body = serde_json::json!({
+            "schema": 1,
+            "presets": [
+                {"id": "cakewalk", "display_name": "Cakewalk", "hp": 60, "aim_settle_ticks": 24, "miss_chance": 0.3, "sight_range": 240, "sight_fov_degrees": 90, "hearing_radius": 320, "memory_decay_ticks": 180, "reload_ms": 2400, "retreat_hp_pct": 0.5},
+                {"id": "tough_crowd", "display_name": "Tough Crowd", "hp": 80, "aim_settle_ticks": 12, "miss_chance": 0.1, "sight_range": 320, "sight_fov_degrees": 120, "hearing_radius": 480, "memory_decay_ticks": 300, "reload_ms": 1800, "retreat_hp_pct": 0.3},
+                {"id": "veteran", "display_name": "Veteran", "hp": 120, "aim_settle_ticks": 6, "miss_chance": 0.05, "sight_range": 480, "sight_fov_degrees": 140, "hearing_radius": 600, "memory_decay_ticks": 600, "reload_ms": 1200, "retreat_hp_pct": 0.2}
+            ]
+        });
+        let path = write_tmp("difficulty_pass.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected one PASS entry");
+        assert_eq!(report.fail(), 0, "expected zero FAIL entries");
+    }
+
+    #[test]
+    fn difficulty_json_rejects_missing_preset() {
+        let body = serde_json::json!({
+            "schema": 1,
+            "presets": [
+                {"id": "cakewalk", "display_name": "Cakewalk", "hp": 60, "aim_settle_ticks": 24, "miss_chance": 0.3, "sight_range": 240, "sight_fov_degrees": 90, "hearing_radius": 320, "memory_decay_ticks": 180, "reload_ms": 2400, "retreat_hp_pct": 0.5}
+            ]
+        });
+        let path = write_tmp("difficulty_missing.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "expected one FAIL entry");
+        assert!(report.entries[0].message.contains("tough_crowd"));
+        assert!(report.entries[0].message.contains("veteran"));
+    }
+
+    #[test]
+    fn difficulty_json_rejects_missing_field() {
+        let body = serde_json::json!({
+            "schema": 1,
+            "presets": [
+                {"id": "cakewalk", "display_name": "Cakewalk", "hp": 60, "aim_settle_ticks": 24, "miss_chance": 0.3, "sight_range": 240, "sight_fov_degrees": 90, "hearing_radius": 320, "memory_decay_ticks": 180, "retreat_hp_pct": 0.5},
+                {"id": "tough_crowd", "display_name": "Tough Crowd", "hp": 80, "aim_settle_ticks": 12, "miss_chance": 0.1, "sight_range": 320, "sight_fov_degrees": 120, "hearing_radius": 480, "memory_decay_ticks": 300, "reload_ms": 1800, "retreat_hp_pct": 0.3},
+                {"id": "veteran", "display_name": "Veteran", "hp": 120, "aim_settle_ticks": 6, "miss_chance": 0.05, "sight_range": 480, "sight_fov_degrees": 140, "hearing_radius": 600, "memory_decay_ticks": 600, "reload_ms": 1200, "retreat_hp_pct": 0.2}
+            ]
+        });
+        let path = write_tmp("difficulty_field_missing.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "expected one FAIL entry");
+        assert!(report.entries[0].message.contains("reload_ms"));
+    }
+
+    fn m7_difficulty_entry(arch: &str, diff: &str, retreat: f64, cover: f64, squad_delay: i64) -> serde_json::Value {
+        serde_json::json!({
+            "id": format!("{arch}_{diff}"),
+            "archetype_id": arch,
+            "difficulty_id": diff,
+            "name": format!("{arch} - {diff}"),
+            "display_name": format!("{arch} - {diff}"),
+            "hp": 80.0,
+            "hp_multiplier": 1.0,
+            "damage_multiplier": 1.0,
+            "aim_settle_ticks": 12,
+            "reaction_time_ticks": 12,
+            "miss_chance": 0.1,
+            "sight_range": 320.0,
+            "sight_fov_degrees": 180.0,
+            "fov_degrees": 180.0,
+            "hearing_radius": 480.0,
+            "hearing_range": 480.0,
+            "memory_decay_ticks": 300,
+            "reload_ms": 1800,
+            "retreat_hp_pct": retreat,
+            "retreat_hp_threshold": retreat,
+            "cover_seek_radius": cover,
+            "squad_comm_delay_ticks": squad_delay,
+        })
+    }
+
+    fn m7_full_registry() -> serde_json::Value {
+        let archetypes = ["rifleman", "sniper", "assault", "engineer", "medic"];
+        let difficulties = ["cakewalk", "tough_crowd", "veteran"];
+        let mut presets = Vec::new();
+        for a in &archetypes {
+            for d in &difficulties {
+                presets.push(m7_difficulty_entry(a, d, 0.30, 48.0, 30));
+            }
+        }
+        serde_json::json!({ "schema": 1, "presets": presets })
+    }
+
+    #[test]
+    fn m7_difficulty_json_accepts_15_archetype_difficulty_entries() {
+        let body = m7_full_registry();
+        let path = write_tmp("m7_difficulty_pass.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected PASS, got entries: {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+        assert!(report.entries[0].message.contains("M7 extension shape"));
+        assert!(report.entries[0].message.contains("15 presets"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_short_registry() {
+        let mut body = m7_full_registry();
+        let presets = body["presets"].as_array_mut().unwrap();
+        presets.truncate(14);
+        let path = write_tmp("m7_difficulty_short.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("exactly 15"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_unknown_archetype() {
+        let mut body = m7_full_registry();
+        body["presets"][0]["archetype_id"] = serde_json::json!("paladin");
+        let path = write_tmp("m7_difficulty_bad_archetype.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("paladin"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_retreat_hp_threshold_out_of_range() {
+        let mut body = m7_full_registry();
+        body["presets"][0]["retreat_hp_threshold"] = serde_json::json!(0.95);
+        let path = write_tmp("m7_difficulty_bad_retreat.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("retreat_hp_threshold"));
+        assert!(report.entries[0].message.contains("0.15..=0.50"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_missing_cover_seek_radius() {
+        let mut body = m7_full_registry();
+        body["presets"][0].as_object_mut().unwrap().remove("cover_seek_radius");
+        let path = write_tmp("m7_difficulty_missing_cover.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("cover_seek_radius missing"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_duplicate_pair() {
+        let mut body = m7_full_registry();
+        let arch = body["presets"][1]["archetype_id"].clone();
+        let diff = body["presets"][1]["difficulty_id"].clone();
+        body["presets"][0]["archetype_id"] = arch;
+        body["presets"][0]["difficulty_id"] = diff;
+        let path = write_tmp("m7_difficulty_dup_pair.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("duplicate"));
+    }
+
+    #[test]
+    fn difficulty_json_rejects_wrong_schema() {
+        let body = serde_json::json!({
+            "schema": 2,
+            "presets": [
+                {"id": "cakewalk", "display_name": "C", "hp": 60, "aim_settle_ticks": 24, "miss_chance": 0.3, "sight_range": 240, "sight_fov_degrees": 90, "hearing_radius": 320, "memory_decay_ticks": 180, "reload_ms": 2400, "retreat_hp_pct": 0.5},
+                {"id": "tough_crowd", "display_name": "T", "hp": 80, "aim_settle_ticks": 12, "miss_chance": 0.1, "sight_range": 320, "sight_fov_degrees": 120, "hearing_radius": 480, "memory_decay_ticks": 300, "reload_ms": 1800, "retreat_hp_pct": 0.3},
+                {"id": "veteran", "display_name": "V", "hp": 120, "aim_settle_ticks": 6, "miss_chance": 0.05, "sight_range": 480, "sight_fov_degrees": 140, "hearing_radius": 600, "memory_decay_ticks": 600, "reload_ms": 1200, "retreat_hp_pct": 0.2}
+            ]
+        });
+        let path = write_tmp("difficulty_schema.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "expected one FAIL entry");
+        assert!(report.entries[0].message.contains("schema must be 1"));
+    }
+}

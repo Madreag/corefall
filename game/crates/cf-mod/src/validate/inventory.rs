@@ -177,3 +177,211 @@ pub(crate) fn validate_item_spec_ron(path: &Path, report: &mut ValidationReport)
         report.add_error(path.to_path_buf(), messages.join("; "));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::report::ValidationReport;
+    use crate::test_helpers::write_tmp;
+
+    #[test]
+    fn item_manifest_accepts_minimal_synced_manifest() {
+        let registry_ids = cf_equipment::item_registered_ids();
+        let mut items = String::new();
+        for id in &registry_ids {
+            let spec = cf_equipment::spec_for_id(id).unwrap();
+            items.push_str(&format!("(id: \"{}\", category: \"{}\"),\n", id, spec.category.as_str()));
+        }
+        let body = format!("(schema_version: 1, items: [{items}])");
+        let path = write_tmp("manifest.ron", &body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "report: {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn item_manifest_rejects_unknown_id() {
+        let body = r#"(
+  schema_version: 1,
+  items: [
+    (id: "rifle_m1", category: "weapon"),
+    (id: "this_id_does_not_exist", category: "weapon"),
+  ],
+)"#;
+        let path = write_tmp("manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("not registered"));
+    }
+
+    #[test]
+    fn item_manifest_rejects_category_drift() {
+        let body = r#"(
+  schema_version: 1,
+  items: [
+    (id: "rifle_m1", category: "consumable"),
+  ],
+)"#;
+        let path = write_tmp("manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("category mismatch"));
+    }
+
+    #[test]
+    fn item_manifest_rejects_missing_registered_id() {
+        let body = r#"(
+  schema_version: 1,
+  items: [
+    (id: "rifle_m1", category: "weapon"),
+  ],
+)"#;
+        let path = write_tmp("manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("mirror drift"));
+    }
+
+    #[test]
+    fn item_manifest_rejects_bad_schema_version() {
+        let body = r#"(
+  schema_version: 2,
+  items: [
+    (id: "rifle_m1", category: "weapon"),
+  ],
+)"#;
+        let path = write_tmp("manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+    }
+
+    #[test]
+    fn item_spec_ron_accepts_registered_id() {
+        let body = r#"(
+  id: "rifle_m1",
+  display_name: "Rifle (M1)",
+  mass_kg: 3.5,
+  dimensions: (w: 2, h: 4),
+  bulk_volume_l: 3.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: Some(1000),
+  repair_recipe: Some("repair.rifle_m1"),
+  material_weight_breakdown: {},
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)"#;
+        let path = write_tmp("rifle_m1.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_spec_ron(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "report: {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn item_spec_ron_rejects_unknown_id() {
+        let body = r#"(
+  id: "made_up_item",
+  display_name: "Made Up",
+  mass_kg: 1.0,
+  dimensions: (w: 1, h: 1),
+  bulk_volume_l: 1.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: false,
+  durability_max: None,
+  repair_recipe: None,
+  material_weight_breakdown: {},
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)"#;
+        let path = write_tmp("made_up_item.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_spec_ron(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("not registered"));
+    }
+
+    #[test]
+    fn item_spec_ron_rejects_filename_mismatch() {
+        let body = r#"(
+  id: "rifle_m1",
+  display_name: "Rifle (M1)",
+  mass_kg: 3.5,
+  dimensions: (w: 2, h: 4),
+  bulk_volume_l: 3.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: Some(1000),
+  repair_recipe: None,
+  material_weight_breakdown: {},
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)"#;
+        let path = write_tmp("wrong_filename.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_spec_ron(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("mismatches filename"));
+    }
+
+    #[test]
+    fn item_spec_ron_rejects_zero_dimensions() {
+        let body = r#"(
+  id: "rifle_m1",
+  display_name: "Rifle (M1)",
+  mass_kg: 3.5,
+  dimensions: (w: 0, h: 4),
+  bulk_volume_l: 3.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: None,
+  repair_recipe: None,
+  material_weight_breakdown: {},
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)"#;
+        let path = write_tmp("rifle_m1.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_spec_ron(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("dimensions"));
+    }
+}

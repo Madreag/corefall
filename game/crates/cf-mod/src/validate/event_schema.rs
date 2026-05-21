@@ -248,3 +248,266 @@ pub(crate) fn validate_envelope_schema_file(path: &Path, report: &mut Validation
     let title = value.get("title").and_then(|v| v.as_str()).unwrap_or("(no title)");
     report.add_pass(path.to_path_buf(), format!("envelope schema: {title}"));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::report::ValidationReport;
+    use crate::test_helpers::next_seq;
+    use std::path::PathBuf;
+
+    /// **M5**: an M5 envelope-shaped schema passes validation when every const
+    /// + required field is in place.
+    #[test]
+    fn m5_event_schema_valid_envelope_passes() {
+        let body = serde_json::json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "armor.layer_destroyed",
+            "type": "object",
+            "properties": {
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
+                "category": { "const": "armor" },
+                "event_type": { "const": "layer_destroyed" },
+                "actor_id": { "type": "integer" },
+                "tick": { "type": "integer" },
+                "payload": {
+                    "type": "object",
+                    "properties": {
+                        "item_id": { "type": "integer" },
+                        "zone": { "type": "string" },
+                        "layer": { "type": "string" },
+                        "breach_kind": { "type": "string" }
+                    },
+                    "required": ["item_id", "zone", "layer", "breach_kind"]
+                }
+            },
+            "required": ["schema_version", "category", "event_type", "tick", "payload"]
+        });
+        let dir = std::env::temp_dir().join(format!(
+            "cf-mod-m5-{}-{}",
+            std::process::id(),
+            next_seq()
+        ));
+        fs::create_dir_all(dir.join("event")).unwrap();
+        let path = dir.join("event").join("armor_layer_destroyed.json");
+        fs::write(&path, body.to_string()).unwrap();
+        let path_in_schemas = dir.join("schemas").join("event").join("armor_layer_destroyed.json");
+        fs::create_dir_all(path_in_schemas.parent().unwrap()).unwrap();
+        fs::write(&path_in_schemas, body.to_string()).unwrap();
+        let mut report = ValidationReport::default();
+        validate_event_schema_file(&path_in_schemas, &mut report);
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(report.pass(), 1, "expected PASS, got {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn m5_event_schema_rejects_wrong_schema_version() {
+        let body = serde_json::json!({
+            "title": "armor.layer_destroyed",
+            "type": "object",
+            "properties": {
+                "schema_version": { "const": "0.2" },
+                "category": { "const": "armor" },
+                "event_type": { "const": "layer_destroyed" },
+                "tick": { "type": "integer" },
+                "payload": { "type": "object" }
+            },
+            "required": ["schema_version", "category", "event_type", "tick", "payload"]
+        });
+        let path = PathBuf::from("/tmp/schemas/event/armor_layer_destroyed.json");
+        let messages = validate_event_schema_value(&path, &body);
+        assert!(
+            messages
+                .iter()
+                .any(|m| m.contains("schema_version") && m.contains("prototype-recorder-event.v0.1")),
+            "messages: {messages:?}"
+        );
+    }
+
+    #[test]
+    fn m5_event_schema_rejects_legacy_short_literal() {
+        let body = serde_json::json!({
+            "title": "armor.layer_destroyed",
+            "type": "object",
+            "properties": {
+                "schema_version": { "const": "0.1" },
+                "category": { "const": "armor" },
+                "event_type": { "const": "layer_destroyed" },
+                "tick": { "type": "integer" },
+                "payload": { "type": "object" }
+            },
+            "required": ["schema_version", "category", "event_type", "tick", "payload"]
+        });
+        let path = PathBuf::from("/tmp/schemas/event/armor_layer_destroyed.json");
+        let messages = validate_event_schema_value(&path, &body);
+        assert!(
+            messages.iter().any(|m| m.contains("schema_version")),
+            "messages: {messages:?}"
+        );
+    }
+
+    #[test]
+    fn m5_event_schema_rejects_filename_drift() {
+        let body = serde_json::json!({
+            "title": "armor.layer_destroyed",
+            "type": "object",
+            "properties": {
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
+                "category": { "const": "internal" },
+                "event_type": { "const": "layer_destroyed" },
+                "tick": { "type": "integer" },
+                "payload": { "type": "object" }
+            },
+            "required": ["schema_version", "category", "event_type", "tick", "payload"]
+        });
+        let path = PathBuf::from("/tmp/schemas/event/armor_layer_destroyed.json");
+        let messages = validate_event_schema_value(&path, &body);
+        assert!(
+            messages.iter().any(|m| m.contains("filename")),
+            "messages: {messages:?}"
+        );
+    }
+
+    #[test]
+    fn m5_event_schema_rejects_missing_payload() {
+        let body = serde_json::json!({
+            "title": "armor.layer_destroyed",
+            "type": "object",
+            "properties": {
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
+                "category": { "const": "armor" },
+                "event_type": { "const": "layer_destroyed" },
+                "tick": { "type": "integer" }
+            },
+            "required": ["schema_version", "category", "event_type", "tick", "payload"]
+        });
+        let path = PathBuf::from("/tmp/schemas/event/armor_layer_destroyed.json");
+        let messages = validate_event_schema_value(&path, &body);
+        assert!(
+            messages.iter().any(|m| m.contains("payload") && m.contains("defined")),
+            "messages: {messages:?}"
+        );
+    }
+
+    #[test]
+    fn m5_event_schema_rejects_missing_required_envelope_fields() {
+        let body = serde_json::json!({
+            "title": "armor.layer_destroyed",
+            "type": "object",
+            "properties": {
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
+                "category": { "const": "armor" },
+                "event_type": { "const": "layer_destroyed" },
+                "tick": { "type": "integer" },
+                "payload": { "type": "object" }
+            },
+            "required": ["schema_version", "category", "event_type", "payload"]
+        });
+        let path = PathBuf::from("/tmp/schemas/event/armor_layer_destroyed.json");
+        let messages = validate_event_schema_value(&path, &body);
+        assert!(messages.iter().any(|m| m.contains("tick")), "messages: {messages:?}");
+    }
+
+    #[test]
+    fn m5_legacy_payload_only_schema_passes() {
+        let body = serde_json::json!({
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "snapshot_actor payload",
+            "type": "object",
+            "required": ["actor"],
+            "properties": {
+                "actor": { "type": "integer" }
+            }
+        });
+        let path = PathBuf::from("/tmp/schemas/event/snapshot_actor.json");
+        let messages = validate_event_schema_value(&path, &body);
+        assert!(messages.is_empty(), "expected pass, got {messages:?}");
+    }
+
+    /// **M5**: every shipped M5 schema under cf-replay/schemas/event/ passes
+    /// the validator end-to-end. This is the spec scenario:
+    /// "cf-mod validate game/crates/cf-replay/schemas/ exits 0".
+    #[test]
+    fn m5_all_shipped_schemas_validate() {
+        use crate::report::EntryResult;
+        use crate::validate::walk;
+        let candidates = [
+            PathBuf::from("../cf-replay/schemas"),
+            PathBuf::from("../../cf-replay/schemas"),
+            PathBuf::from("game/crates/cf-replay/schemas"),
+            PathBuf::from("crates/cf-replay/schemas"),
+        ];
+        let Some(schemas_root) = candidates.iter().find(|p| p.exists()).cloned() else {
+            eprintln!("cf-replay/schemas not found relative to test CWD; skipping");
+            return;
+        };
+        let mut report = ValidationReport::default();
+        walk(&schemas_root, &mut report);
+        assert_eq!(
+            report.fail(),
+            0,
+            "every cf-replay/schemas/* schema must validate; failures: {:?}",
+            report
+                .entries
+                .iter()
+                .filter(|e| matches!(e.result, EntryResult::Fail))
+                .map(|e| format!("{}: {}", e.path.display(), e.message))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            report.pass() > 50,
+            "expected at least 50 schemas (got {})",
+            report.pass()
+        );
+    }
+
+    #[test]
+    fn m5_event_schema_rejects_payload_additional_properties_false() {
+        let body = serde_json::json!({
+            "title": "armor.layer_destroyed",
+            "type": "object",
+            "properties": {
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
+                "category": { "const": "armor" },
+                "event_type": { "const": "layer_destroyed" },
+                "tick": { "type": "integer" },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": { "item_id": { "type": "integer" } },
+                    "required": ["item_id"]
+                }
+            },
+            "required": ["schema_version", "category", "event_type", "tick", "payload"]
+        });
+        let path = PathBuf::from("/tmp/schemas/event/armor_layer_destroyed.json");
+        let messages = validate_event_schema_value(&path, &body);
+        assert!(
+            messages
+                .iter()
+                .any(|m| m.contains("additionalProperties") && m.contains("DR-002")),
+            "messages: {messages:?}"
+        );
+    }
+
+    #[test]
+    fn m5_envelope_version_dir_regex_accepts_canonical_forms() {
+        assert!(is_envelope_version_dir("v0_1"));
+        assert!(is_envelope_version_dir("v1"));
+        assert!(is_envelope_version_dir("v0_2"));
+        assert!(is_envelope_version_dir("v2_5"));
+        assert!(is_envelope_version_dir("v10_42"));
+    }
+
+    #[test]
+    fn m5_envelope_version_dir_regex_rejects_bad_forms() {
+        assert!(!is_envelope_version_dir("v"));
+        assert!(!is_envelope_version_dir("v_1"));
+        assert!(!is_envelope_version_dir("v1_"));
+        assert!(!is_envelope_version_dir("v1_2_3"));
+        assert!(!is_envelope_version_dir("event"));
+        assert!(!is_envelope_version_dir("v0.1"));
+        assert!(!is_envelope_version_dir("alpha"));
+    }
+}

@@ -320,3 +320,121 @@ pub(crate) fn validate_regen_manifest(path: &Path, report: &mut ValidationReport
         report.add_error(path.to_path_buf(), messages.join("; "));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::report::ValidationReport;
+    use crate::test_helpers::write_tmp;
+
+    #[test]
+    fn validate_regen_manifest_accepts_well_formed() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "M9A_svg_v1",
+                    owner_milestone: "M9A",
+                    regen_command: "cf-tools-svg-gen --asset-id $ASSET_ID",
+                    model_version: "llm:gpt-4o-mini@2026-05",
+                    deterministic: true,
+                    freeze_path_suffix: ".frozen",
+                    notes: "ok",
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected PASS, got {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn validate_regen_manifest_accepts_missing_optional_fields() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "minimal_v1",
+                    regen_command: "cf-tools-minimal",
+                    model_version: "v1",
+                    deterministic: false,
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected PASS, got {:?}", report.entries);
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_wrong_schema_version() {
+        let body = r#"(
+            schema_version: "2.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "x",
+                    regen_command: "y",
+                    model_version: "z",
+                    deterministic: true,
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("schema_version"));
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_empty_pipelines() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("pipelines"));
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_empty_pipeline_id() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "",
+                    regen_command: "y",
+                    model_version: "z",
+                    deterministic: true,
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("pipeline_id"));
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_malformed_ron() {
+        let body = "this is not valid ron";
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("regen_manifest parse"));
+    }
+}

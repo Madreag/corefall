@@ -190,3 +190,213 @@ pub(crate) fn validate_trench_template(path: &Path, report: &mut ValidationRepor
         ),
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::report::ValidationReport;
+    use crate::test_helpers::write_tmp;
+
+    fn write_named(name: &str, contents: &str) -> std::path::PathBuf {
+        write_tmp(name, contents)
+    }
+
+    /// VAL-M9B-MOD-SEGMENT-001 — a hand-crafted segment RON with a
+    /// malformed enum value (`cover_state.standing: "ultra_full"`)
+    /// fails validation with a typed error and no panic occurs.
+    #[test]
+    fn trench_segment_unknown_variant_rejected() {
+        let bad = r#"(
+            variant: ultra_deep,
+            depth: 16,
+            width: 16,
+            raised_step_height: None,
+            embedded_modules: [],
+            cover_state: (standing: Partial, crouched: Full, prone: Full),
+        )"#;
+        let path = write_named("ultra_deep.ron", bad);
+        let mut report = ValidationReport::default();
+        validate_trench_segment(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "expected one FAIL entry; got {:?}", report.entries);
+        let msg = &report.entries[0].message;
+        assert!(
+            msg.contains("ultra_deep") || msg.to_lowercase().contains("unknown") || msg.to_lowercase().contains("variant"),
+            "expected unknown-variant message; got: {msg}"
+        );
+    }
+
+    #[test]
+    fn trench_segment_malformed_rejected() {
+        let bad = r#"(
+            variant: standard,
+            depth: 16,
+            width: 16,
+            raised_step_height: None,
+            embedded_modules: [],
+            cover_state: (standing: Bananas, crouched: Full, prone: Full),
+        )"#;
+        let path = write_named("standard.ron", bad);
+        let mut report = ValidationReport::default();
+        validate_trench_segment(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+    }
+
+    #[test]
+    fn trench_segment_negative_depth_rejected() {
+        let bad = r#"(
+            variant: standard,
+            depth: -3,
+            width: 16,
+            raised_step_height: None,
+            embedded_modules: [],
+            cover_state: (standing: Partial, crouched: Full, prone: Full),
+        )"#;
+        let path = write_named("standard.ron", bad);
+        let mut report = ValidationReport::default();
+        validate_trench_segment(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "report: {:?}", report.entries);
+        let msg = &report.entries[0].message;
+        assert!(
+            msg.to_lowercase().contains("expected") || msg.to_lowercase().contains("negative") || msg.contains("ron"),
+            "expected parse-error containing field hint; got: {msg}"
+        );
+    }
+
+    #[test]
+    fn trench_segment_well_formed_passes() {
+        let good = r#"(
+            variant: standard,
+            depth: 16,
+            width: 16,
+            raised_step_height: None,
+            embedded_modules: [duckboard],
+            cover_state: (standing: Partial, crouched: Full, prone: Full),
+        )"#;
+        let path = write_named("standard.ron", good);
+        let mut report = ValidationReport::default();
+        validate_trench_segment(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "report: {:?}", report.entries);
+    }
+
+    #[test]
+    fn trench_module_malformed_rejected() {
+        let bad = r#"(
+            module: not_a_real_module,
+            material_cost: {"wood": 2},
+            build_time_seconds: 4,
+        )"#;
+        let path = write_named("not_a_real_module.ron", bad);
+        let mut report = ValidationReport::default();
+        validate_trench_module(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+    }
+
+    #[test]
+    fn trench_template_unknown_variant_rejected() {
+        let bad = r#"(
+            id: "bad_template",
+            display_name: "Bad",
+            faction: None,
+            doctrine_hint: None,
+            recommended_garrison: None,
+            footprint: (min_x: 0, min_y: 0, max_x: 10, max_y: 10),
+            path_polyline: [(0,0), (5,0)],
+            segment_overrides: [],
+            default_variant: ultra_deep,
+            fortification_placeholders: [],
+            zones: [],
+        )"#;
+        let path = write_named("bad_template.trench.ron", bad);
+        let mut report = ValidationReport::default();
+        validate_trench_template(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "report: {:?}", report.entries);
+        let msg = &report.entries[0].message;
+        assert!(
+            msg.contains("unknown_segment_variant")
+                || msg.to_lowercase().contains("unknown variant"),
+            "expected unknown_segment_variant in message: {msg}"
+        );
+    }
+
+    #[test]
+    fn trench_template_unknown_fortification_rejected() {
+        let bad = r#"(
+            id: "ub",
+            display_name: "Unknown bunker",
+            faction: None,
+            doctrine_hint: None,
+            recommended_garrison: None,
+            footprint: (min_x: 0, min_y: 0, max_x: 10, max_y: 10),
+            path_polyline: [(0,0), (5,0)],
+            segment_overrides: [],
+            default_variant: standard,
+            fortification_placeholders: [
+                (fortification_id: "wat_is_this", offset: (0,0), optional: true),
+            ],
+            zones: [],
+        )"#;
+        let path = write_named("ub.trench.ron", bad);
+        let mut report = ValidationReport::default();
+        validate_trench_template(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "report: {:?}", report.entries);
+    }
+
+    #[test]
+    fn trench_template_missing_fortification_warning() {
+        let body = r#"(
+            id: "outpost_demo",
+            display_name: "Demo",
+            faction: None,
+            doctrine_hint: None,
+            recommended_garrison: None,
+            footprint: (min_x: 0, min_y: 0, max_x: 10, max_y: 10),
+            path_polyline: [(0,0), (5,0)],
+            segment_overrides: [],
+            default_variant: standard,
+            fortification_placeholders: [
+                (fortification_id: "mg_nest_static", offset: (1,1), optional: true),
+            ],
+            zones: [],
+        )"#;
+        let path = write_named("outpost_demo.trench.ron", body);
+        let mut report = ValidationReport::default();
+        validate_trench_template(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 0, "report: {:?}", report.entries);
+        assert!(report.warn() >= 1, "expected ≥1 WARN entry; report: {:?}", report.entries);
+        assert!(report.entries.iter().any(|e| {
+            e.message.contains("trench_template_missing_fortification")
+                || e.message.contains("mg_nest_static")
+        }));
+    }
+
+    #[test]
+    fn trench_template_id_filename_mismatch_rejected() {
+        let body = r#"(
+            id: "abc",
+            display_name: "ABC",
+            faction: None,
+            doctrine_hint: None,
+            recommended_garrison: None,
+            footprint: (min_x: 0, min_y: 0, max_x: 10, max_y: 10),
+            path_polyline: [(0,0), (5,0)],
+            segment_overrides: [],
+            default_variant: standard,
+            fortification_placeholders: [],
+            zones: [],
+        )"#;
+        let path = write_named("xyz.trench.ron", body);
+        let mut report = ValidationReport::default();
+        validate_trench_template(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("mismatches filename"));
+    }
+}
