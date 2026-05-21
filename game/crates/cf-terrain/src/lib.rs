@@ -76,7 +76,7 @@ pub mod parallel;
 pub mod structural_integrity;
 pub mod wall_collapse;
 pub use air::{AirField, AIR_GRID_CELLS, AIR_GRID_SIZE, AMBIENT_PRESSURE_KPA};
-pub use ca::{ca_movement_class, step_ca, CaMovementClass, CaStepReport, CaStepperState};
+pub use ca::{ca_movement_class, step_ca, step_ca_filtered, CaMovementClass, CaStepReport, CaStepperState};
 pub use heat::{ambient_temperature_k, HeatField, HEAT_GRID_CELLS, HEAT_GRID_SIZE};
 pub use m14a_overlay::{material_thermal_contact, material_walk_modulator, ThermalContact, WalkModulator};
 

@@ -73,9 +73,20 @@ pub fn classify_reaction(material_name: &str, zone: ZoneId, intensity: f32) -> O
 /// }
 /// ```
 ///
+/// ## Pixel-transformation convention (M15 kernel)
+///
+/// When the per-tick reaction evaluator fires this rule for an adjacent
+/// pixel pair (pa, pb):
+/// - the pixel matching `input_a` is rewritten to `output`,
+/// - the pixel matching `input_b` is rewritten to `byproduct` when
+///   `byproduct.is_some()`, otherwise the pixel keeps its `input_b`
+///   material (catalyst semantics for cascades like
+///   `oil + fire → fire`).
+///
 /// The optional `byproduct` field is M15's hook for two-output reactions
-/// (e.g. `oil + fire → larger_fire + smoke`). It is `serde(default)` so
-/// legacy single-output JSON entries round-trip.
+/// (e.g. `acid + iron → rust + hydrogen` — iron→rust via output, acid→H2
+/// via byproduct). It is `serde(default)` so legacy single-output JSON
+/// entries round-trip.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MaterialReaction {
     /// Stable id (e.g. `"rxn.corrosion.acid_iron"`).
@@ -151,6 +162,17 @@ impl ReactionRegistry {
     pub fn is_empty(&self) -> bool {
         self.reactions.is_empty()
     }
+
+    /// Build the set of materials that appear as `input_a` in any
+    /// reaction in this registry. The CA kernel uses this to skip
+    /// pixels that have no chance of being the "primary transforming"
+    /// material — a critical bench optimization since most pixels in
+    /// the world are inert (air, dirt, concrete) and never need a
+    /// per-neighbor reaction check.
+    #[must_use]
+    pub fn primary_reactive_set(&self) -> std::collections::BTreeSet<MaterialId> {
+        self.reactions.iter().flat_map(|r| [r.input_a, r.input_b]).collect()
+    }
 }
 
 /// Convenience: lookup a reaction in the default registry by name pair.
@@ -182,77 +204,85 @@ pub fn evaluate_reaction_pair(
 #[must_use]
 pub fn default_reaction_registry() -> ReactionRegistry {
     let raw: &[MaterialReaction] = &[
-        // 1. Corrosion: acid + iron → rust (slow propagation)
+        // 1. Corrosion: iron (input_a) + acid (input_b) → rust (output) + H2 (byproduct)
+        // iron pixel transforms to rust per spec gherkin "the iron pixel transforms".
         MaterialReaction {
             id: "rxn.corrosion.acid_iron".to_string(),
-            input_a: 21,
-            input_b: 68,
-            output: 38,
-            byproduct: Some(55),
+            input_a: 68, // iron
+            input_b: 21, // acid
+            output: 38,  // rust
+            byproduct: Some(55), // hydrogen
             energy_release_j: 89_000.0,
             rate_per_s: 0.5,
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: true,
         },
-        // 2. Phase: water + lava → steam + obsidian (instant, exothermic)
+        // 2. Phase: water + lava → steam + obsidian (instant; exothermic).
+        // Water pixel → steam (gas; rises), lava pixel → obsidian (cooled solid).
         MaterialReaction {
             id: "rxn.phase.water_lava".to_string(),
-            input_a: 13,
-            input_b: 26,
-            output: 50,
-            byproduct: Some(70),
+            input_a: 13, // water
+            input_b: 26, // lava
+            output: 50,  // steam
+            byproduct: Some(70), // obsidian
             energy_release_j: 2_260_000.0,
             rate_per_s: 1000.0,
             auto_ignite: false,
             min_temperature_k: Some(1373.0),
             propagates: false,
         },
-        // 3. Extinguish: water + fire → steam (and fire disappears)
+        // 3. Extinguish: water (input_a) + fire (input_b) → steam (output) + air (byproduct).
+        // Per spec gherkin "fire extinguished; steam spawns (rises)".
         MaterialReaction {
             id: "rxn.extinguish.water_fire".to_string(),
-            input_a: 13,
-            input_b: 65,
-            output: 50,
-            byproduct: None,
+            input_a: 13, // water
+            input_b: 65, // fire_intense
+            output: 50,  // steam
+            byproduct: Some(0), // air (extinguishes fire)
             energy_release_j: -2_260_000.0,
             rate_per_s: 5.0,
             auto_ignite: false,
             min_temperature_k: None,
             propagates: false,
         },
-        // 4. Cascade: oil + fire → larger fire + smoke
+        // 4. Cascade: oil (input_a) + fire (input_b) → fire (output) + (fire stays).
+        // Oil pixel becomes fire; fire pixel stays as fire so cascade continues
+        // through adjacent oil. byproduct=None means input_b stays unchanged.
         MaterialReaction {
             id: "rxn.ignition.oil_fire".to_string(),
-            input_a: 19,
-            input_b: 65,
-            output: 65,
-            byproduct: Some(62),
+            input_a: 19, // oil
+            input_b: 65, // fire
+            output: 65,  // fire (cascade)
+            byproduct: None,
             energy_release_j: 200_000.0,
             rate_per_s: 0.8,
             auto_ignite: true,
             min_temperature_k: Some(533.0),
             propagates: true,
         },
-        // 5. Cascade: wood + fire → fire + charcoal
+        // 5. Wood (input_a) + fire → charcoal (output) + (fire stays).
+        // Spec literal: "wood + fire → charcoal + ash (rate 0.6; burns away)".
+        // The pixel transforms to charcoal; the cascade through wood is gated
+        // by adjacent fire (no infinite cascade through wood).
         MaterialReaction {
             id: "rxn.ignition.wood_fire".to_string(),
-            input_a: 8,
-            input_b: 65,
-            output: 41,
-            byproduct: Some(40),
+            input_a: 8,  // wood
+            input_b: 65, // fire
+            output: 41,  // charcoal
+            byproduct: None,
             energy_release_j: 180_000.0,
             rate_per_s: 0.6,
             auto_ignite: true,
             min_temperature_k: Some(573.0),
             propagates: true,
         },
-        // 6. Cascade: paper + fire → ash
+        // 6. Paper (input_a) + fire → ash. Fire stays.
         MaterialReaction {
             id: "rxn.ignition.paper_fire".to_string(),
-            input_a: 47,
-            input_b: 65,
-            output: 40,
+            input_a: 47, // paper
+            input_b: 65, // fire
+            output: 40,  // ash
             byproduct: None,
             energy_release_j: 120_000.0,
             rate_per_s: 0.95,
@@ -260,12 +290,12 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             min_temperature_k: Some(506.0),
             propagates: true,
         },
-        // 7. Cascade: fabric + fire → ash
+        // 7. Fabric (input_a) + fire → ash. Fire stays.
         MaterialReaction {
             id: "rxn.ignition.fabric_fire".to_string(),
-            input_a: 49,
-            input_b: 65,
-            output: 40,
+            input_a: 49, // fabric
+            input_b: 65, // fire
+            output: 40,  // ash
             byproduct: None,
             energy_release_j: 150_000.0,
             rate_per_s: 0.85,
@@ -273,103 +303,110 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             min_temperature_k: Some(510.0),
             propagates: true,
         },
-        // 8. Cascade: fuel + fire → larger fire + smoke
+        // 8. Cascade: fuel (input_a) + fire → fire (output) + (fire stays).
         MaterialReaction {
             id: "rxn.ignition.fuel_fire".to_string(),
-            input_a: 20,
-            input_b: 65,
-            output: 65,
-            byproduct: Some(62),
+            input_a: 20, // fuel
+            input_b: 65, // fire
+            output: 65,  // fire (cascade)
+            byproduct: None,
             energy_release_j: 250_000.0,
             rate_per_s: 0.85,
             auto_ignite: true,
             min_temperature_k: Some(483.0),
             propagates: true,
         },
-        // 9. Cascade: alcohol + fire → fire + steam
+        // 9. Alcohol (input_a) + fire → steam (output) + (fire stays).
+        // Ethanol combusts cleanly to water (steam) + CO2.
         MaterialReaction {
             id: "rxn.ignition.alcohol_fire".to_string(),
-            input_a: 24,
-            input_b: 65,
-            output: 65,
-            byproduct: Some(50),
+            input_a: 24, // alcohol
+            input_b: 65, // fire
+            output: 50,  // steam
+            byproduct: None,
             energy_release_j: 137_000.0,
             rate_per_s: 0.9,
             auto_ignite: true,
             min_temperature_k: Some(638.0),
             propagates: true,
         },
-        // 10. Explosion: gunpowder + fire → fire + smoke (boom)
+        // 10. Explosion: gunpowder (input_a) + fire → smoke (output) + (fire stays).
+        // Energy release is the explosive impulse; the engine layer routes
+        // energy_release_j into a blast event.
         MaterialReaction {
             id: "rxn.explosion.gunpowder_fire".to_string(),
-            input_a: 48,
-            input_b: 65,
-            output: 65,
-            byproduct: Some(62),
+            input_a: 48, // gunpowder
+            input_b: 65, // fire
+            output: 62,  // smoke
+            byproduct: None,
             energy_release_j: 1_850_000.0,
             rate_per_s: 5.0,
             auto_ignite: true,
             min_temperature_k: Some(573.0),
             propagates: true,
         },
-        // 11. Combustion: methane + oxygen → CO2 (need fire/heat)
+        // 11. Combustion: methane (input_a) + oxygen (input_b) → CO2 (output) + steam (byproduct).
+        // CH4 + 2 O2 → CO2 + 2 H2O.
         MaterialReaction {
             id: "rxn.combustion.methane_o2".to_string(),
-            input_a: 54,
-            input_b: 51,
-            output: 53,
-            byproduct: Some(50),
+            input_a: 54, // methane
+            input_b: 51, // oxygen
+            output: 53,  // co2
+            byproduct: Some(50), // steam
             energy_release_j: 890_400.0,
             rate_per_s: 0.9,
             auto_ignite: false,
             min_temperature_k: Some(573.0),
             propagates: false,
         },
-        // 12. Combustion: hydrogen + oxygen → steam (huge ΔH)
+        // 12. Combustion: H2 (input_a) + O2 (input_b) → steam (output) + air (byproduct).
+        // 2 H2 + O2 → 2 H2O. Both pixels consumed.
         MaterialReaction {
             id: "rxn.combustion.h2_o2".to_string(),
-            input_a: 55,
-            input_b: 51,
-            output: 50,
-            byproduct: None,
+            input_a: 55, // hydrogen
+            input_b: 51, // oxygen
+            output: 50,  // steam
+            byproduct: Some(0), // air (O2 consumed; only steam remains nearby)
             energy_release_j: 483_600.0,
             rate_per_s: 1.0,
             auto_ignite: false,
             min_temperature_k: Some(773.0),
             propagates: false,
         },
-        // 13. Combustion: coal + oxygen → CO2 (slow)
+        // 13. Combustion: coal (input_a) + O2 (input_b) → ash (output) + CO2 (byproduct).
+        // Coal solid pixel → ash residue; O2 pixel → CO2.
         MaterialReaction {
             id: "rxn.combustion.coal_o2".to_string(),
-            input_a: 33,
-            input_b: 51,
-            output: 53,
-            byproduct: Some(40),
+            input_a: 33, // coal
+            input_b: 51, // oxygen
+            output: 40,  // ash
+            byproduct: Some(53), // co2
             energy_release_j: 393_500.0,
             rate_per_s: 0.5,
             auto_ignite: false,
             min_temperature_k: Some(973.0),
             propagates: false,
         },
-        // 14. Neutralization: acid + alkali → brine
+        // 14. Neutralization: acid (input_a) + alkali (input_b) → brine (output) + brine (byproduct).
+        // Both pixels neutralize to brine.
         MaterialReaction {
             id: "rxn.neutralization.acid_alkali".to_string(),
-            input_a: 21,
-            input_b: 22,
-            output: 67,
-            byproduct: None,
+            input_a: 21, // acid
+            input_b: 22, // alkali
+            output: 67,  // neutralized_brine
+            byproduct: Some(67), // neutralized_brine
             energy_release_j: 57_000.0,
             rate_per_s: 5.0,
             auto_ignite: false,
             min_temperature_k: Some(253.0),
             propagates: false,
         },
-        // 15. Smelting: ore_iron + heat → iron (forward-compat for M25)
+        // 15. Smelting: ore_iron (input_a) + fire (input_b) → iron (output); fire stays.
         MaterialReaction {
             id: "rxn.phase.iron_smelt".to_string(),
-            input_a: 34,
-            input_b: 65,
-            output: 68,
+            input_a: 34, // ore_iron
+            input_b: 65, // fire
+            output: 68,  // iron
             byproduct: None,
             energy_release_j: -247_000.0,
             rate_per_s: 0.2,
@@ -377,12 +414,12 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             min_temperature_k: Some(1811.0),
             propagates: false,
         },
-        // 16. Smelting: ore_gold + heat → (gold uses iron id slot for now since gold not in registry)
+        // 16. Smelting: ore_gold (input_a) + fire (input_b) → gold (output); fire stays.
         MaterialReaction {
             id: "rxn.phase.gold_smelt".to_string(),
-            input_a: 35,
-            input_b: 65,
-            output: 68,
+            input_a: 35, // ore_gold
+            input_b: 65, // fire
+            output: 73,  // gold
             byproduct: None,
             energy_release_j: -63_000.0,
             rate_per_s: 0.25,
@@ -390,200 +427,223 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             min_temperature_k: Some(1337.0),
             propagates: false,
         },
-        // 17. Dissolution: salt + water → brine (mass conservation)
+        // 17. Dissolution: salt (input_a) + water (input_b) → brine (output) + brine (byproduct).
+        // Both pixels become brine (mass-conservation tracking via energy budget).
         MaterialReaction {
             id: "rxn.dissolution.salt_water".to_string(),
-            input_a: 42,
-            input_b: 13,
-            output: 67,
-            byproduct: None,
+            input_a: 42, // salt
+            input_b: 13, // water
+            output: 67,  // neutralized_brine
+            byproduct: Some(67),
             energy_release_j: 4_000.0,
             rate_per_s: 0.5,
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
         },
-        // 18. Dissolution: sugar + water → polluted_water (syrup analog)
+        // 18. Dissolution: sugar (input_a) + water (input_b) → polluted_water (output) + polluted_water (byproduct).
         MaterialReaction {
             id: "rxn.dissolution.sugar_water".to_string(),
-            input_a: 43,
-            input_b: 13,
-            output: 66,
-            byproduct: None,
+            input_a: 43, // sugar
+            input_b: 13, // water
+            output: 66,  // polluted_water (syrup proxy)
+            byproduct: Some(66),
             energy_release_j: 12_000.0,
             rate_per_s: 0.4,
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
         },
-        // 19. Phase: ice + heat(>273) → water (handled by phase machine; reaction form for symmetry)
+        // 19. Ignition: coal (input_a) + fire (input_b) → fire (output) cascade.
+        // Coal needs higher temp than wood (973K vs 573K).
         MaterialReaction {
-            id: "rxn.thermal.ice_melt".to_string(),
-            input_a: 15,
-            input_b: 65,
-            output: 13,
+            id: "rxn.ignition.coal_fire".to_string(),
+            input_a: 33, // coal
+            input_b: 65, // fire
+            output: 65,  // fire (cascade)
             byproduct: None,
-            energy_release_j: -334_000.0,
-            rate_per_s: 0.3,
+            energy_release_j: 393_500.0,
+            rate_per_s: 0.5,
+            auto_ignite: true,
+            min_temperature_k: Some(973.0),
+            propagates: true,
+        },
+        // 20. Combustion: fabric (input_a) + O2 (input_b) → ash (output) + CO2 (byproduct).
+        MaterialReaction {
+            id: "rxn.combustion.fabric_o2".to_string(),
+            input_a: 49, // fabric
+            input_b: 51, // oxygen
+            output: 40,  // ash
+            byproduct: Some(53), // co2
+            energy_release_j: 150_000.0,
+            rate_per_s: 0.6,
             auto_ignite: false,
-            min_temperature_k: Some(273.0),
+            min_temperature_k: Some(510.0),
             propagates: false,
         },
-        // 20. Phase: steam + cold air → water (condensation; uses air id 0)
+        // 21. Combustion: wood (input_a) + O2 (input_b) → charcoal (output) + CO2 (byproduct).
         MaterialReaction {
-            id: "rxn.thermal.steam_condense".to_string(),
-            input_a: 50,
-            input_b: 0,
-            output: 13,
-            byproduct: None,
-            energy_release_j: -2_260_000.0,
-            rate_per_s: 0.2,
+            id: "rxn.combustion.wood_o2".to_string(),
+            input_a: 8,  // wood
+            input_b: 51, // oxygen
+            output: 41,  // charcoal
+            byproduct: Some(53), // co2
+            energy_release_j: 280_000.0,
+            rate_per_s: 0.55,
             auto_ignite: false,
-            min_temperature_k: None,
+            min_temperature_k: Some(573.0),
             propagates: false,
         },
-        // 21. Biology: blood + air → frozen_blood (M15 uses frozen_blood as cold-coagulated form)
-        MaterialReaction {
-            id: "rxn.bio.blood_coagulate".to_string(),
-            input_a: 23,
-            input_b: 0,
-            output: 72,
-            byproduct: None,
-            energy_release_j: -2_000.0,
-            rate_per_s: 0.05,
-            auto_ignite: false,
-            min_temperature_k: Some(253.0),
-            propagates: false,
-        },
-        // 22. Corrosion: acid + iron rust cascade — same reaction by id, alt form for adjacent rust pixels (skip)
-        // 23. Corrosion: acid + concrete → loose_fill + steam (concrete dissolves)
+        // 22. Corrosion: concrete (input_a) + acid (input_b) → loose_fill (output) + steam (byproduct).
+        // Acid dissolves concrete to rubble + steam vent.
         MaterialReaction {
             id: "rxn.corrosion.acid_concrete".to_string(),
-            input_a: 21,
-            input_b: 2,
-            output: 5,
-            byproduct: Some(50),
+            input_a: 2,  // concrete
+            input_b: 21, // acid
+            output: 5,   // loose_fill
+            byproduct: Some(50), // steam
             energy_release_j: 30_000.0,
             rate_per_s: 0.2,
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
         },
-        // 24. Lava cascade: lava + ice → water + obsidian
+        // 23. Phase: lava (input_a) + ice (input_b) → obsidian (output) + water (byproduct).
+        // Lava cools to obsidian crust; ice melts to water.
         MaterialReaction {
             id: "rxn.phase.lava_ice".to_string(),
-            input_a: 26,
-            input_b: 15,
-            output: 13,
-            byproduct: Some(70),
+            input_a: 26, // lava
+            input_b: 15, // ice
+            output: 70,  // obsidian
+            byproduct: Some(13), // water
             energy_release_j: -334_000.0,
             rate_per_s: 1.0,
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
         },
-        // 25. Combustion: oil + oxygen → CO2 + steam (no fire required if hot)
+        // 24. Combustion: oil (input_a) + O2 (input_b) → CO2 (output) + steam (byproduct).
+        // C8H18 + 12.5 O2 → 8 CO2 + 9 H2O.
         MaterialReaction {
             id: "rxn.combustion.oil_o2".to_string(),
-            input_a: 19,
-            input_b: 51,
-            output: 53,
-            byproduct: Some(50),
+            input_a: 19, // oil
+            input_b: 51, // oxygen
+            output: 53,  // co2
+            byproduct: Some(50), // steam
             energy_release_j: 5_470_000.0,
             rate_per_s: 0.8,
             auto_ignite: false,
             min_temperature_k: Some(633.0),
             propagates: false,
         },
-        // 26. Ignition: charcoal + oxygen → CO2 (slow burn)
+        // 25. Combustion: charcoal (input_a) + O2 (input_b) → ash (output) + CO2 (byproduct).
         MaterialReaction {
             id: "rxn.combustion.charcoal_o2".to_string(),
-            input_a: 41,
-            input_b: 51,
-            output: 53,
-            byproduct: Some(40),
+            input_a: 41, // charcoal
+            input_b: 51, // oxygen
+            output: 40,  // ash
+            byproduct: Some(53), // co2
             energy_release_j: 393_500.0,
             rate_per_s: 0.4,
             auto_ignite: false,
             min_temperature_k: Some(600.0),
             propagates: false,
         },
-        // 27. Lava + wood → fire + ash
+        // 26. Ignition: wood (input_a) + lava (input_b) → fire (output); lava stays.
+        // Same as wood+fire but with lava as the ignition catalyst.
         MaterialReaction {
             id: "rxn.ignition.lava_wood".to_string(),
-            input_a: 26,
-            input_b: 8,
-            output: 65,
-            byproduct: Some(40),
+            input_a: 8,  // wood
+            input_b: 26, // lava
+            output: 65,  // fire
+            byproduct: None,
             energy_release_j: 180_000.0,
             rate_per_s: 0.8,
             auto_ignite: true,
             min_temperature_k: Some(573.0),
             propagates: true,
         },
-        // 28. Lava + oil → larger fire + smoke
+        // 27. Ignition: oil (input_a) + lava (input_b) → fire (output); lava stays.
         MaterialReaction {
             id: "rxn.ignition.lava_oil".to_string(),
-            input_a: 26,
-            input_b: 19,
-            output: 65,
-            byproduct: Some(62),
+            input_a: 19, // oil
+            input_b: 26, // lava
+            output: 65,  // fire
+            byproduct: None,
             energy_release_j: 250_000.0,
             rate_per_s: 1.0,
             auto_ignite: true,
             min_temperature_k: Some(533.0),
             propagates: true,
         },
-        // 29. Corrosion: acid + ore_copper → polluted_water + ammonia (toxic byproduct stand-in)
+        // 28. Corrosion: ore_copper (input_a) + acid (input_b) → polluted_water (output) + ammonia (byproduct).
+        // CuSO4 dissolution + SO2 toxic byproduct.
         MaterialReaction {
             id: "rxn.corrosion.acid_copper".to_string(),
-            input_a: 21,
-            input_b: 36,
-            output: 66,
-            byproduct: Some(61),
+            input_a: 36, // ore_copper
+            input_b: 21, // acid
+            output: 66,  // polluted_water
+            byproduct: Some(61), // ammonia
             energy_release_j: 130_000.0,
             rate_per_s: 0.4,
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: true,
         },
-        // 30. Chlorine + ammonia → smoke (toxic cloud)
+        // 29. Chemical: chlorine (input_a) + ammonia (input_b) → smoke (output) + smoke (byproduct).
+        // Toxic cloud.
         MaterialReaction {
             id: "rxn.chem.chlorine_ammonia".to_string(),
-            input_a: 60,
-            input_b: 61,
-            output: 62,
-            byproduct: None,
+            input_a: 60, // chlorine
+            input_b: 61, // ammonia
+            output: 62,  // smoke
+            byproduct: Some(62), // smoke
             energy_release_j: 460_000.0,
             rate_per_s: 0.3,
             auto_ignite: false,
             min_temperature_k: Some(293.0),
             propagates: false,
         },
-        // 31. Lava cools to obsidian when in contact with cold air
+        // 30. Ignition: gunpowder (input_a) + lava (input_b) → smoke (output)
+        // explosive byproduct. Lava ignites gunpowder directly.
         MaterialReaction {
-            id: "rxn.phase.lava_cools".to_string(),
-            input_a: 26,
-            input_b: 0,
-            output: 70,
+            id: "rxn.explosion.gunpowder_lava".to_string(),
+            input_a: 48, // gunpowder
+            input_b: 26, // lava
+            output: 62,  // smoke
             byproduct: None,
-            energy_release_j: -41_000.0,
-            rate_per_s: 0.05,
-            auto_ignite: false,
-            min_temperature_k: None,
-            propagates: false,
+            energy_release_j: 1_850_000.0,
+            rate_per_s: 5.0,
+            auto_ignite: true,
+            min_temperature_k: Some(573.0),
+            propagates: true,
         },
-        // 32. Acid rain reaction: pollutant_x (smoke as proxy) + steam → polluted_water
+        // 31. Precipitation: smoke (input_a; pollutant proxy) + steam (input_b) →
+        // polluted_water (output) + polluted_water (byproduct).
         MaterialReaction {
             id: "rxn.precipitation.acid_rain".to_string(),
-            input_a: 62,
-            input_b: 50,
-            output: 66,
-            byproduct: None,
+            input_a: 62, // smoke / pollutant_x
+            input_b: 50, // steam
+            output: 66,  // polluted_water
+            byproduct: Some(66),
             energy_release_j: -22_000.0,
             rate_per_s: 0.05,
             auto_ignite: false,
             min_temperature_k: Some(273.0),
+            propagates: false,
+        },
+        // 32. Electric arc: water (input_a) + electric_arc (input_b) → polluted_water (output);
+        // arc stays. Models conductive pool electrification per spec.
+        MaterialReaction {
+            id: "rxn.electric.water_arc".to_string(),
+            input_a: 13, // water
+            input_b: 63, // electric_arc
+            output: 66,  // polluted_water (conductive pool proxy)
+            byproduct: None,
+            energy_release_j: 50_000.0,
+            rate_per_s: 1.0,
+            auto_ignite: false,
+            min_temperature_k: None,
             propagates: false,
         },
     ];
@@ -656,17 +716,18 @@ mod tests {
         );
     }
 
-    /// VAL-M15-002: acid + iron → rust reaction is present + matches the
-    /// spec rate (0.5/s).
+    /// VAL-M15-002: acid + iron → rust reaction. Per the M15 spec gherkin
+    /// "the iron pixel transforms", iron is `input_a` (transforms to
+    /// `output=rust`); acid is `input_b` (becomes `byproduct=H2`).
     #[test]
     fn acid_iron_rust_reaction_matches_spec() {
         let r = default_reaction_registry();
         let rxn = r.by_id("rxn.corrosion.acid_iron").expect("present");
-        assert_eq!(rxn.input_a, 21, "acid id");
-        assert_eq!(rxn.input_b, 68, "iron id");
-        assert_eq!(rxn.output, 38, "rust id");
+        assert_eq!(rxn.input_a, 68, "input_a must be iron — iron pixel transforms");
+        assert_eq!(rxn.input_b, 21, "input_b is acid (catalyst-companion)");
+        assert_eq!(rxn.output, 38, "output is rust");
+        assert_eq!(rxn.byproduct, Some(55), "byproduct is hydrogen (acid → H2)");
         assert!((rxn.rate_per_s - 0.5).abs() < 1e-6);
-        // Per spec § "Acid + iron → rust + acid_residue (rate 0.5; corrosion gameplay)".
     }
 
     /// VAL-M15-003: water + fire extinguish reaction is symmetric (a/b

@@ -11,8 +11,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+cf-terrain = { path = "../cf-terrain" }
 cf-wound = { path = "../cf-wound" }
 
 [dev-dependencies]
 cf-flask = { path = "../cf-flask" }
-cf-terrain = { path = "../cf-terrain" }
+blake3 = { workspace = true }
+hex = { workspace = true }

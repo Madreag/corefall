@@ -1623,10 +1623,13 @@ dependencies = [
  "blake3",
  "cf-actor",
  "cf-equipment",
+ "cf-material",
  "cf-physics",
  "cf-sim-core",
+ "cf-terrain",
  "clap",
  "criterion",
+ "hex",
  "serde",
  "serde_json",
  "tracing",
@@ -1807,6 +1810,7 @@ name = "cf-flask"
 version = "0.0.1"
 dependencies = [
  "cf-material",
+ "cf-terrain",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1879,9 +1883,11 @@ dependencies = [
 name = "cf-material"
 version = "0.0.1"
 dependencies = [
+ "blake3",
  "cf-flask",
  "cf-terrain",
  "cf-wound",
+ "hex",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

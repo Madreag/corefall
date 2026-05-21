@@ -5,10 +5,11 @@
 //! never reach into private internals — so a future refactor that
 //! keeps the API stable continues to satisfy the spec.
 
-use cf_flask::{drink_flask, throw_flask, Flask, FlaskKind};
+use cf_flask::{drink_flask, paint_splash, throw_flask, Flask, FlaskKind};
 use cf_material::alchemy::{
     default_alchemy_registry, step_station, try_invoke_recipe, AlchemyInput, AlchemyStation,
 };
+use cf_material::kernel::{kernel_step, kernel_step_no_movement, MaterialKernel};
 use cf_material::phase::{default_phase_registry, PhaseDirection, PhaseState};
 use cf_material::reactions::{default_reaction_registry, reaction_event};
 
@@ -62,6 +63,7 @@ fn scenario_acid_iron_to_rust_reaction() {
         .evaluate(21, 68, 293.0)
         .expect("acid+iron at room temperature must match");
     assert_eq!(rxn.id, "rxn.corrosion.acid_iron");
+    assert_eq!(rxn.input_a, 68, "iron is input_a — iron pixel transforms");
     assert_eq!(rxn.output, 38, "output must be rust");
     let evt = reaction_event(rxn, [10, 20], 60);
     assert_eq!(evt.output, 38);
@@ -301,4 +303,255 @@ fn val_m15_cross_lava_water_steam_obsidian() {
     assert_eq!(rxn.input_b, 26, "lava");
     assert_eq!(rxn.output, 50, "steam");
     assert_eq!(rxn.byproduct, Some(70), "obsidian crust");
+}
+
+// =============================================================
+// End-to-end pixel-transform acceptance tests through the M15
+// orchestrator (cf-material::kernel). These exercise the full
+// active-material kernel orchestration loop (phase → reactions →
+// movement → wake/sleep) and verify the pixel transformations the
+// Gherkin acceptance scenarios mandate.
+// =============================================================
+
+use cf_terrain::ca::{step_ca, CaStepperState};
+use cf_terrain::chunked::{ChunkedTerrain, MATERIAL_AIR};
+use cf_terrain::heat::HeatField;
+
+/// VAL-M15-e2e-001: Acid + iron → rust through the kernel
+/// orchestrator. Per spec gherkin "And the iron pixel transforms".
+#[test]
+fn e2e_acid_iron_pixel_transforms_to_rust() {
+    let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
+    terrain.set_material_pixel(4, 4, 68, 0); // iron
+    terrain.set_material_pixel(5, 4, 21, 0); // acid
+    let reactions = default_reaction_registry();
+    let phase = default_phase_registry();
+    let heat = HeatField::default();
+    let mut kernel = MaterialKernel::new();
+    let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+    assert!(!report.reactions.is_empty(), "reaction must fire");
+    assert!(report
+        .reactions
+        .iter()
+        .any(|e| e.reaction_id == "rxn.corrosion.acid_iron"));
+    assert_eq!(terrain.material_at(4, 4), 38, "iron pixel → rust");
+    assert_eq!(terrain.material_at(5, 4), 55, "acid pixel → hydrogen byproduct");
+}
+
+/// VAL-M15-e2e-002: Water + fire → steam + extinguish. Spec gherkin
+/// "reaction fires; fire extinguished; steam spawns (rises)".
+#[test]
+fn e2e_water_fire_extinguishes_and_makes_steam() {
+    let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
+    terrain.set_material_pixel(3, 3, 13, 0); // water
+    terrain.set_material_pixel(4, 3, 65, 0); // fire
+    let reactions = default_reaction_registry();
+    let phase = default_phase_registry();
+    let heat = HeatField::default();
+    let mut kernel = MaterialKernel::new();
+    let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+    assert!(report
+        .reactions
+        .iter()
+        .any(|e| e.reaction_id == "rxn.extinguish.water_fire"));
+    assert_eq!(terrain.material_at(3, 3), 50, "water → steam");
+    assert_eq!(terrain.material_at(4, 3), 0, "fire → air (extinguished)");
+}
+
+/// VAL-M15-e2e-003: Water → steam phase transition at 100°C (373.15 K).
+/// Per spec gherkin "material.phase_transition fires And water tile
+/// transforms to steam (gas; rises)".
+#[test]
+fn e2e_water_tile_transforms_to_steam_at_boil() {
+    let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
+    terrain.set_material_pixel(3, 3, 13, 0); // water
+    let reactions = default_reaction_registry();
+    let phase = default_phase_registry();
+    let mut prev = HeatField::default();
+    let mut curr = HeatField::default();
+    for cy in 0..cf_terrain::air::AIR_GRID_SIZE {
+        for cx in 0..cf_terrain::air::AIR_GRID_SIZE {
+            prev.set_temperature(cx, cy, 360.0);
+            curr.set_temperature(cx, cy, 380.0);
+        }
+    }
+    let mut kernel = MaterialKernel::new();
+    let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &curr, Some(&prev));
+    assert!(
+        !report.phase_transitions.is_empty(),
+        "phase transition must fire"
+    );
+    assert_eq!(terrain.material_at(3, 3), 50, "water pixel → steam");
+}
+
+/// VAL-M15-e2e-004: Steam → water on cooling. Per spec gherkin
+/// "phase_transition reverse fires And water droplet forms (condensation)".
+#[test]
+fn e2e_steam_condenses_back_to_water_on_cooling() {
+    let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
+    terrain.set_material_pixel(3, 3, 50, 0); // steam
+    let reactions = default_reaction_registry();
+    let phase = default_phase_registry();
+    let mut prev = HeatField::default();
+    let mut curr = HeatField::default();
+    for cy in 0..cf_terrain::air::AIR_GRID_SIZE {
+        for cx in 0..cf_terrain::air::AIR_GRID_SIZE {
+            prev.set_temperature(cx, cy, 380.0);
+            curr.set_temperature(cx, cy, 360.0);
+        }
+    }
+    let mut kernel = MaterialKernel::new();
+    let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &curr, Some(&prev));
+    assert!(!report.phase_transitions.is_empty(), "reverse phase fires");
+    assert_eq!(terrain.material_at(3, 3), 13, "steam → water");
+}
+
+/// VAL-M15-e2e-005: Flask throw paints terrain. Per spec gherkin
+/// "water tile spreads in splash radius And the flask is destroyed".
+#[test]
+fn e2e_flask_throw_paints_water_pixels() {
+    let mut terrain = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+    let mut flask = Flask::new(7, FlaskKind::Water);
+    let outcome = throw_flask(&mut flask, 1, [30.0, 30.0], 10).expect("throw");
+    let painted = paint_splash(&mut terrain, &outcome, 10);
+    assert!(painted > 0, "splash painted pixels");
+    assert_eq!(terrain.material_at(30, 30), 13, "center painted with water");
+    assert!(flask.is_empty(), "flask destroyed");
+}
+
+/// VAL-M15-e2e-006: Flask of acid thrown at iron → acid splashes, then
+/// reactions cascade through the kernel orchestrator. Verifies the
+/// end-to-end flask-glue → terrain → reaction-dispatch chain.
+#[test]
+fn e2e_acid_flask_thrown_at_iron_rusts() {
+    let mut terrain = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+    // Wall of iron at column x=30.
+    for y in 28..34 {
+        terrain.set_material_pixel(30, y, 68, 0); // iron
+    }
+    // Throw acid flask near the iron wall.
+    let mut flask = Flask::new(11, FlaskKind::Acid);
+    let outcome = throw_flask(&mut flask, 1, [29.0, 31.0], 10).expect("throw");
+    paint_splash(&mut terrain, &outcome, 10);
+    // After paint, run the kernel to dispatch reactions.
+    let reactions = default_reaction_registry();
+    let phase = default_phase_registry();
+    let heat = HeatField::default();
+    let mut kernel = MaterialKernel::new();
+    let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+    let rusted = report
+        .reactions
+        .iter()
+        .filter(|e| e.reaction_id == "rxn.corrosion.acid_iron")
+        .count();
+    assert!(rusted > 0, "at least one iron pixel rusted");
+    // At least one iron pixel transformed (those touched by acid splash).
+    let mut rust_count = 0;
+    for y in 28..34 {
+        if terrain.material_at(30, y) == 38 {
+            rust_count += 1;
+        }
+    }
+    assert!(rust_count > 0, "iron pixels transformed to rust");
+}
+
+/// VAL-M15-e2e-007: Active-region preservation rule 4 — chunks that
+/// see movement transition to `active_region = true`.
+#[test]
+fn e2e_active_region_set_on_falling_materials() {
+    let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
+    terrain.set_material_pixel(4, 2, 14, 0); // sand
+    assert!(!terrain.chunk_active_region(0, 0));
+    let mut stepper = CaStepperState::default();
+    step_ca(&mut terrain, &mut stepper);
+    assert!(
+        terrain.chunk_active_region(0, 0),
+        "chunk with falling sand must transition to active_region=true"
+    );
+}
+
+/// VAL-M15-e2e-008: Heat field temperature affects phase decision —
+/// hot cell → steam; cold cell → no transition.
+#[test]
+fn e2e_heat_field_drives_phase_transitions() {
+    let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
+    terrain.set_material_pixel(3, 3, 13, 0); // water
+    let reactions = default_reaction_registry();
+    let phase = default_phase_registry();
+    let mut prev = HeatField::default();
+    let mut curr = HeatField::default();
+    // Hot cell at (0,0) — covers pixel (3,3) since cell_size=16.
+    prev.set_temperature(0, 0, 280.0);
+    curr.set_temperature(0, 0, 350.0);
+    let mut kernel = MaterialKernel::new();
+    let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &curr, Some(&prev));
+    // 350K is below boil; phase does not fire (water → steam crosses at 373K).
+    assert!(report.phase_transitions.is_empty(), "no transition below boil");
+    assert_eq!(terrain.material_at(3, 3), 13, "water unchanged");
+
+    // Now ramp to 400K — should fire.
+    let mut prev2 = HeatField::default();
+    let mut curr2 = HeatField::default();
+    prev2.set_temperature(0, 0, 350.0);
+    curr2.set_temperature(0, 0, 400.0);
+    let report2 = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &curr2, Some(&prev2));
+    assert!(!report2.phase_transitions.is_empty(), "transition fires past boil");
+    assert_eq!(terrain.material_at(3, 3), 50, "water → steam");
+}
+
+/// VAL-M15-e2e-009: Acceptance scenario "Air pressure field per cell"
+/// with explosion + breach + diffusion.
+#[test]
+fn e2e_air_pressure_explosion_then_breach() {
+    use cf_terrain::air::AirField;
+    let mut field = AirField::default();
+    // Sealed room with explosion: spike pressure.
+    field.add_pressure_radial(256.0, 256.0, 64.0, 200.0);
+    let peak_pressure = field.pressure_at_world(256.0, 256.0);
+    assert!(peak_pressure > field.ambient_kpa + 50.0);
+    // Breach opens to vacuum — repeated equalization drops the peak.
+    for _ in 0..100 {
+        field.equalize(0.10);
+    }
+    let after = field.pressure_at_world(256.0, 256.0);
+    assert!(after < peak_pressure, "diffusion lowers peak");
+}
+
+/// VAL-M15-e2e-010: Determinism contract — kernel produces byte-
+/// identical output across multiple runs of the same seed.
+#[test]
+fn e2e_kernel_byte_identical_across_runs() {
+    fn run() -> String {
+        let mut terrain = ChunkedTerrain::new(32, 32, MATERIAL_AIR);
+        // Floor.
+        for x in 0..32 {
+            terrain.set_material_pixel(x, 31, 1, 0); // dirt
+        }
+        // Mixed scenario: sand column, iron/acid pair, water/fire pair.
+        for y in 0..16 {
+            terrain.set_material_pixel(10, y, 14, 0); // sand column
+        }
+        terrain.set_material_pixel(15, 20, 68, 0); // iron
+        terrain.set_material_pixel(16, 20, 21, 0); // acid
+        terrain.set_material_pixel(20, 20, 13, 0); // water
+        terrain.set_material_pixel(21, 20, 65, 0); // fire
+        let reactions = default_reaction_registry();
+        let phase = default_phase_registry();
+        let heat = HeatField::default();
+        let mut kernel = MaterialKernel::new();
+        for _ in 0..60 {
+            kernel_step(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        }
+        // Hash the final terrain state.
+        let mut hasher = blake3::Hasher::new();
+        for (cx, cy, hex) in terrain.chunk_summary_entries() {
+            hasher.update(&cx.to_le_bytes());
+            hasher.update(&cy.to_le_bytes());
+            hasher.update(hex.as_bytes());
+        }
+        hex::encode(hasher.finalize().as_bytes())
+    }
+    let a = run();
+    let b = run();
+    assert_eq!(a, b, "kernel determinism: same seed → same hash");
 }

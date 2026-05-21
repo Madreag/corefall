@@ -193,6 +193,23 @@ impl PhaseRegistry {
     pub fn is_empty(&self) -> bool {
         self.transitions.is_empty()
     }
+
+    /// Build the set of materials that appear as either source
+    /// (`material`) or product (`product_material`) in any transition.
+    /// The CA kernel uses this to skip pixels that can't possibly
+    /// undergo a phase transition (inert solids like concrete, dirt,
+    /// metal). Per-tick scans drop from O(pixels) to O(phase_pixels).
+    #[must_use]
+    pub fn phase_material_set(&self) -> std::collections::BTreeSet<MaterialId> {
+        let mut set = std::collections::BTreeSet::new();
+        for t in &self.transitions {
+            set.insert(t.material);
+            if let Some(p) = t.product_material {
+                set.insert(p);
+            }
+        }
+        set
+    }
 }
 
 /// **M15** § the canonical launch phase-transition registry. Material

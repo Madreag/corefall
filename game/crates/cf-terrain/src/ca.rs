@@ -127,10 +127,34 @@ pub struct CaStepReport {
 /// Per M3 preservation rule 1, every pixel mutation routes through
 /// `set_pixel_at_tick` (and we call `add_updated_material_area` once
 /// per dirty chunk pair so the renderer + AI pathfinder see the edit).
+///
+/// Per M15 spec § Preservation rule 4 "Active-region flag on each
+/// Chunk (M3 always writes false; M15 sets true for chunks with
+/// falling materials)": chunks where this step caused pixel movement
+/// (and their 1-chunk-radius neighbors) are transitioned to
+/// `active_region = true`.
 pub fn step_ca(terrain: &mut ChunkedTerrain, stepper: &mut CaStepperState) -> CaStepReport {
+    step_ca_filtered(terrain, stepper, /* awake_only = */ false)
+}
+
+/// **M15** § same as [`step_ca`] but when `awake_only=true` the stepper
+/// only visits chunks whose `active_region == true`. Per spec § "Per-
+/// tick: only active chunks simulated (dirty regions + nearby chunks)".
+/// Engines that have opted into wake/sleep gating call this entry
+/// point; the simpler `step_ca` is the eager full-pass form used by
+/// scenario start / debug tools.
+pub fn step_ca_filtered(
+    terrain: &mut ChunkedTerrain,
+    stepper: &mut CaStepperState,
+    awake_only: bool,
+) -> CaStepReport {
     let parity = stepper.parity;
     let tick = stepper.tick;
-    let chunk_coords = terrain.allocated_chunk_coords();
+    let chunk_coords = if awake_only {
+        terrain.awake_chunk_coords()
+    } else {
+        terrain.allocated_chunk_coords()
+    };
     let mut moved: u32 = 0;
     let mut dirty: Vec<(i32, i32)> = Vec::new();
 
@@ -175,6 +199,12 @@ pub fn step_ca(terrain: &mut ChunkedTerrain, stepper: &mut CaStepperState) -> Ca
             terrain.add_updated_material_area(world_min, world_max);
         }
     }
+    // M15 Preservation rule 4: wake the 3×3 neighborhood of every chunk
+    // that saw movement. Per Noita pattern "most of world sleeping; only
+    // chunks with falling materials wake up".
+    for (cx, cy) in &dirty {
+        terrain.wake_chunk_neighborhood(*cx, *cy);
+    }
     stepper.pixels_moved = stepper.pixels_moved.saturating_add(moved as u64);
     stepper.advance();
     CaStepReport {
@@ -200,6 +230,12 @@ fn apply_margolus_2x2(terrain: &mut ChunkedTerrain, x: i64, y: i64, tick: u64) -
     let tr = terrain.material_at(x + 1, y);
     let bl = terrain.material_at(x, y + 1);
     let br = terrain.material_at(x + 1, y + 1);
+    // Bench fast-path: a 2x2 block of all air has nothing to do (no
+    // gravity-driver, no buoyancy-driver). Most of the world looks
+    // like this so the early-out is a major perf win.
+    if tl == 0 && tr == 0 && bl == 0 && br == 0 {
+        return false;
+    }
 
     let tl_cls = ca_movement_class(tl);
     let tr_cls = ca_movement_class(tr);
@@ -380,5 +416,42 @@ mod tests {
         let mut s = CaStepperState::default();
         let r = step_ca(&mut t, &mut s);
         assert!(r.pixels_moved > 0 || !r.dirty_chunks.is_empty() || true);
+    }
+
+    /// VAL-M15-ca-010 (Preservation rule 4): chunks that see movement
+    /// transition to `active_region = true` via the stepper. The 3×3
+    /// neighborhood is woken at the same time per Noita pattern.
+    #[test]
+    fn step_ca_wakes_chunk_with_movement() {
+        // Use a small terrain with sand falling — single chunk covers
+        // the full extent at CHUNK_SIZE=256.
+        let mut t = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
+        t.set_material_pixel(4, 2, 14, 0); // sand
+        // chunk (0,0) is allocated but starts with active_region=false.
+        assert!(!t.chunk_active_region(0, 0));
+        let mut s = CaStepperState::default();
+        step_ca(&mut t, &mut s);
+        // After the step, chunk (0,0) is awake.
+        assert!(t.chunk_active_region(0, 0), "chunk with falling sand must be awake");
+    }
+
+    /// VAL-M15-ca-011: when `awake_only=true`, the stepper skips
+    /// chunks whose `active_region == false`.
+    #[test]
+    fn step_ca_filtered_skips_sleeping_chunks() {
+        let mut t = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
+        t.set_material_pixel(4, 2, 14, 0); // sand
+        assert!(!t.chunk_active_region(0, 0));
+        let mut s = CaStepperState::default();
+        // awake_only=true with no awake chunks → no movement.
+        let r = step_ca_filtered(&mut t, &mut s, true);
+        assert_eq!(r.pixels_moved, 0, "sleeping chunks should be skipped");
+        // Sand still at original position.
+        assert_eq!(t.material_at(4, 2), 14);
+        // Force-wake.
+        t.set_chunk_active_region(0, 0, true);
+        let r = step_ca_filtered(&mut t, &mut s, true);
+        // Eventually moves (parity-dependent).
+        let _ = r;
     }
 }

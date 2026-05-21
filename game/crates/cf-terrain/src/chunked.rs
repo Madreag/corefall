@@ -1297,6 +1297,86 @@ impl ChunkedTerrain {
         self.chunks.keys().map(|c| (c.cx, c.cy)).collect()
     }
 
+    /// **M15** § enumerate awake chunks only (`active_region == true`)
+    /// in `(cx, cy)` ascending order. Per the M15 spec § "Per-pixel
+    /// cellular automata (Noita chunking)" rule: "Per-tick: only active
+    /// chunks simulated (dirty regions + nearby chunks)". The CA stepper
+    /// uses this when wake/sleep gating is active.
+    pub fn awake_chunk_coords(&self) -> Vec<(i32, i32)> {
+        self.chunks
+            .iter()
+            .filter(|(_, c)| c.active_region)
+            .map(|(coord, _)| (coord.cx, coord.cy))
+            .collect()
+    }
+
+    /// **M15** § set the `active_region` flag on a single allocated
+    /// chunk. Per M15 spec § Preservation rule 4: "M3 always writes
+    /// false; M15 sets true for chunks with falling materials". Returns
+    /// true if the chunk existed; false if no chunk is allocated at
+    /// `(cx, cy)` (the caller can pre-allocate via a `set_material_pixel`
+    /// call first if needed).
+    pub fn set_chunk_active_region(&mut self, cx: i32, cy: i32, value: bool) -> bool {
+        let coord = ChunkCoord::new(cx, cy);
+        match self.chunks.get_mut(&coord) {
+            Some(chunk) => {
+                chunk.active_region = value;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// **M15** § read the `active_region` flag on a chunk. Returns
+    /// `false` for unallocated chunks (they are implicitly sleeping).
+    #[must_use]
+    pub fn chunk_active_region(&self, cx: i32, cy: i32) -> bool {
+        self.chunks
+            .get(&ChunkCoord::new(cx, cy))
+            .map(|c| c.active_region)
+            .unwrap_or(false)
+    }
+
+    /// **M15** § wake the chunk at `(cx, cy)` plus its 1-chunk-radius
+    /// neighborhood (3×3 = 9 chunks total) to `active_region = true`.
+    /// Per M15 spec § "active-chunk wake/sleep gating" + M8A's
+    /// `wake_chunk_and_neighbors` semantics. Only updates already-
+    /// allocated chunks; missing chunks are left as-is. Returns the
+    /// number of chunks transitioned.
+    pub fn wake_chunk_neighborhood(&mut self, cx: i32, cy: i32) -> u32 {
+        let mut transitioned = 0;
+        for dy in -1..=1 {
+            for dx in -1..=1 {
+                let coord = ChunkCoord::new(cx + dx, cy + dy);
+                if let Some(chunk) = self.chunks.get_mut(&coord) {
+                    if !chunk.active_region {
+                        chunk.active_region = true;
+                        transitioned += 1;
+                    }
+                }
+            }
+        }
+        transitioned
+    }
+
+    /// **M15** § transition chunks that have been idle for at least
+    /// `idle_threshold_ticks` to `active_region = false`. Per the M15
+    /// spec § "Per Noita pattern: most of world sleeping; only chunks
+    /// with falling materials wake up". Returns the chunks that just
+    /// went to sleep.
+    pub fn sleep_idle_chunks(&mut self, current_tick: u64, idle_threshold_ticks: u64) -> Vec<(i32, i32)> {
+        let mut transitioned = Vec::new();
+        for (coord, chunk) in &mut self.chunks {
+            if chunk.active_region
+                && current_tick.saturating_sub(chunk.last_modified_tick) >= idle_threshold_ticks
+            {
+                chunk.active_region = false;
+                transitioned.push((coord.cx, coord.cy));
+            }
+        }
+        transitioned
+    }
+
     /// **M15** § set the material at world-space pixel `(px, py)` with
     /// an explicit tick stamp. Routes through the canonical
     /// `set_pixel_at_tick` path so the per-chunk `last_modified_tick`,

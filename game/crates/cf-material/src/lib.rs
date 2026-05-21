@@ -39,7 +39,10 @@
     clippy::redundant_closure_for_method_calls,
     clippy::format_in_format_args,
     clippy::useless_format,
-    clippy::too_many_lines
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::similar_names,
+    clippy::new_without_default
 )]
 
 use std::{collections::BTreeMap, path::Path};
@@ -47,6 +50,7 @@ use std::{collections::BTreeMap, path::Path};
 use serde::{Deserialize, Serialize};
 
 pub mod alchemy;
+pub mod kernel;
 pub mod loader;
 pub mod phase;
 pub mod reactions;
@@ -55,6 +59,9 @@ pub mod registry;
 pub use alchemy::{
     default_alchemy_registry, step_station, try_invoke_recipe, AlchemyInput, AlchemyRecipe, AlchemyRegistry,
     AlchemyStation, QueuedInvocation, RecipeCompletion, RecipeInvocation, RecipeInvokeError,
+};
+pub use kernel::{
+    kernel_step, kernel_step_no_movement, KernelStepReport, MaterialKernel, SLEEP_IDLE_THRESHOLD_TICKS,
 };
 pub use loader::{load_registry_from_file, validate_registry_json, RegistryValidationError, RegistryValidationReport};
 pub use phase::{

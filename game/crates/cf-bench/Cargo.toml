@@ -18,10 +18,13 @@ tracing-subscriber = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
+hex = { workspace = true }
 cf-actor = { path = "../cf-actor" }
 cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
 cf-sim-core = { path = "../cf-sim-core" }
+cf-material = { path = "../cf-material" }
+cf-terrain = { path = "../cf-terrain" }
 
 [dev-dependencies]
 criterion = "0.5"

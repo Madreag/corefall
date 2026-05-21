@@ -41,6 +41,7 @@
 use serde::{Deserialize, Serialize};
 
 use cf_material::MaterialId;
+use cf_terrain::chunked::ChunkedTerrain;
 
 /// Locked launch flask kinds. Per spec § "Flask kinds: water flask, oil
 /// flask, acid flask, fuel flask, heal_potion flask, poison flask,
@@ -280,6 +281,75 @@ pub fn throw_flask(
     })
 }
 
+/// **M15** § Paint a flask's splash on the chunked terrain. Called by
+/// the engine immediately after [`throw_flask`] to realize the splash
+/// pixels per the M15 spec § "flask glue" ownership for cf-material.
+///
+/// Replaces every non-static pixel within `splash_radius_px` of the
+/// impact position with the flask's `contents_material`. Static
+/// materials (concrete, metal, anchor) are preserved; only passable
+/// pixels (air, liquids, gases) are overwritten.
+///
+/// Returns the number of pixels painted. The chunked terrain's dirty-
+/// region contract is preserved: every write routes through
+/// `set_material_pixel` (which marks the chunk dirty), and we call
+/// `add_updated_material_area` once at the end for the renderer
+/// upload pass.
+pub fn paint_splash(terrain: &mut ChunkedTerrain, outcome: &ThrowOutcome, tick: u64) -> u32 {
+    let radius = outcome.splash_radius_px.max(1.0);
+    let r2 = radius * radius;
+    let cx = outcome.event.impact_pos[0];
+    let cy = outcome.event.impact_pos[1];
+    let min = [cx - radius, cy - radius];
+    let max = [cx + radius, cy + radius];
+    let x0 = (min[0].floor() as i64).max(0);
+    let y0 = (min[1].floor() as i64).max(0);
+    let x1 = (max[0].ceil() as i64)
+        .max(0)
+        .min(terrain.width_px as i64);
+    let y1 = (max[1].ceil() as i64)
+        .max(0)
+        .min(terrain.height_px as i64);
+    let contents = outcome.event.contents_material;
+    let mut painted: u32 = 0;
+    let mut budget = outcome.pixel_budget;
+    for py in y0..y1 {
+        for px in x0..x1 {
+            if budget == 0 {
+                break;
+            }
+            let dx = (px as f32 + 0.5) - cx;
+            let dy = (py as f32 + 0.5) - cy;
+            if dx * dx + dy * dy > r2 {
+                continue;
+            }
+            let existing = terrain.material_at(px, py);
+            if !is_paintable(existing) {
+                continue;
+            }
+            if terrain.set_material_pixel(px, py, contents, tick) {
+                painted += 1;
+                budget = budget.saturating_sub(1);
+            }
+        }
+    }
+    if painted > 0 {
+        terrain.add_updated_material_area(min, max);
+    }
+    painted
+}
+
+/// Materials that the flask splash CAN overwrite. Solids that are
+/// integral to the structure (concrete, metal, anchor, dirt, etc.)
+/// stay; only passable / mobile materials are repainted.
+fn is_paintable(id: MaterialId) -> bool {
+    use cf_terrain::ca::{ca_movement_class, CaMovementClass};
+    matches!(
+        ca_movement_class(id),
+        CaMovementClass::Air | CaMovementClass::Liquid | CaMovementClass::Gas | CaMovementClass::Powder
+    )
+}
+
 /// Drink a flask. Consumes its volume and produces a [`DrinkOutcome`].
 /// The engine wires `effect.health_delta` into the drinker's HP.
 pub fn drink_flask(flask: &mut Flask, drinker_id: u64, tick: u64) -> Result<DrinkOutcome, FlaskActionError> {
@@ -415,5 +485,45 @@ mod tests {
         let mut flask = Flask::with_volume(1, FlaskKind::HealPotion, 50.0);
         let outcome = drink_flask(&mut flask, 1, 1).expect("ok");
         assert!((outcome.effect.health_delta - 25.0).abs() < 1e-3);
+    }
+
+    /// VAL-M15-flask-011: splash painter overwrites air pixels with the
+    /// contents material within the radius.
+    #[test]
+    fn paint_splash_paints_air_pixels_within_radius() {
+        use cf_terrain::chunked::{ChunkedTerrain, MATERIAL_AIR};
+        let mut terrain = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        let mut flask = Flask::new(1, FlaskKind::Water);
+        let outcome = throw_flask(&mut flask, 1, [32.0, 32.0], 100).expect("ok");
+        let painted = paint_splash(&mut terrain, &outcome, 100);
+        assert!(painted > 0, "splash painted at least one pixel");
+        // The impact center pixel must be water.
+        assert_eq!(terrain.material_at(32, 32), 13, "center pixel is water");
+    }
+
+    /// VAL-M15-flask-012: splash painter does NOT overwrite static
+    /// solids (concrete, dirt, metal).
+    #[test]
+    fn paint_splash_preserves_static_solids() {
+        use cf_terrain::chunked::{ChunkedTerrain, MATERIAL_AIR, MATERIAL_CONCRETE};
+        let mut terrain = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        terrain.set_material_pixel(32, 32, MATERIAL_CONCRETE, 0);
+        let mut flask = Flask::new(1, FlaskKind::Acid);
+        let outcome = throw_flask(&mut flask, 1, [32.0, 32.0], 100).expect("ok");
+        let _painted = paint_splash(&mut terrain, &outcome, 100);
+        assert_eq!(terrain.material_at(32, 32), MATERIAL_CONCRETE, "concrete preserved");
+    }
+
+    /// VAL-M15-flask-013: splash painter marks chunks dirty (M3
+    /// preservation rule 1).
+    #[test]
+    fn paint_splash_marks_chunks_dirty() {
+        use cf_terrain::chunked::{ChunkedTerrain, MATERIAL_AIR};
+        let mut terrain = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        terrain.clear_dirty();
+        let mut flask = Flask::new(1, FlaskKind::Water);
+        let outcome = throw_flask(&mut flask, 1, [32.0, 32.0], 100).expect("ok");
+        let _ = paint_splash(&mut terrain, &outcome, 100);
+        assert!(terrain.dirty_chunk_count() > 0, "splash dirties chunks");
     }
 }
