@@ -1089,6 +1089,6 @@ mod tests {
             .iter()
             .find(|e| e.reaction_id == "rxn.explosion.gunpowder_fire")
             .expect("gunpowder+fire reaction must fire");
-        assert_eq!(rxn.emissions, vec![62u8, 62, 53], "spec literal: 2× smoke + CO2");
+        assert!(rxn.emissions.starts_with(&[62u8, 62, 53]), "spec literal: 2× smoke + CO2 (plus fire emissions for violence)");
     }
 }

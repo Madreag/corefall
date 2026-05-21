@@ -107,24 +107,15 @@ pub fn classify_reaction(material_name: &str, zone: ZoneId, intensity: f32) -> O
 /// output JSON entries round-trip cleanly with an empty Vec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MaterialReaction {
-    /// Stable id (e.g. `"rxn.corrosion.acid_iron"`).
     pub id: String,
     pub input_a: MaterialId,
     pub input_b: MaterialId,
     pub output: MaterialId,
     #[serde(default)]
     pub byproduct: Option<MaterialId>,
-    /// **M15B** § Tertiary-and-beyond emissions. Each material id in
-    /// this list spawns one pixel into an adjacent air cell when the
-    /// reaction fires. Used by cascade reactions where `input_b`
-    /// stays as fire/lava (so the cascade propagates) but the
-    /// physical reaction ALSO releases gas products that the 2-slot
-    /// (output + byproduct) model can't express alone.
     #[serde(default)]
     pub emissions: Vec<MaterialId>,
     pub energy_release_j: f32,
-    /// Per-second rate. The CA evaluator gates per-tick triggers on a
-    /// deterministic threshold derived from this rate × dt_s.
     pub rate_per_s: f32,
     #[serde(default)]
     pub auto_ignite: bool,
@@ -132,19 +123,70 @@ pub struct MaterialReaction {
     pub min_temperature_k: Option<f32>,
     #[serde(default)]
     pub propagates: bool,
+    /// Arrhenius-style temperature accel: effective_rate = rate_per_s
+    /// * exp(activation_k * (1/min_T - 1/T)). 0.0 disables.
+    #[serde(default)]
+    pub activation_k: f32,
+    /// Reactions involving gases get a pressure multiplier:
+    /// effective_rate *= (P / ref_kpa)^pressure_order. 0.0 disables.
+    #[serde(default)]
+    pub pressure_order: f32,
+    /// True for fast-exothermic reactions that should emit a violence
+    /// burst event (sparks, color flash, sound cue) when they fire.
+    #[serde(default)]
+    pub violent: bool,
+    /// Hex color flash (e.g. "FFAA00") for the violence burst. Default
+    /// renderer fallback uses output material's color.
+    #[serde(default)]
+    pub flash_color_hex: Option<String>,
 }
 
 impl MaterialReaction {
-    /// True when this reaction can fire given the local temperature and
-    /// the unordered material pair `{a, b}`. Returns `false` when either
-    /// the pair doesn't match or the temperature gate is unmet.
-    #[must_use]
     pub fn matches(&self, a: MaterialId, b: MaterialId, temperature_k: f32) -> bool {
         let pair_ok = (self.input_a == a && self.input_b == b) || (self.input_a == b && self.input_b == a);
         if !pair_ok {
             return false;
         }
         !matches!(self.min_temperature_k, Some(min) if temperature_k < min)
+    }
+
+    /// Per-tick effective rate after temperature + pressure modulation.
+    /// Returns events/tick assuming 60 Hz; callers divide by tick rate
+    /// if different.
+    pub fn effective_rate_per_tick(&self, temperature_k: f32, pressure_kpa: f32) -> f32 {
+        let mut rate = self.rate_per_s / 60.0;
+        if self.activation_k > 0.0 {
+            if let Some(min_t) = self.min_temperature_k {
+                if min_t > 0.0 && temperature_k > 0.0 {
+                    let inv = (1.0 / min_t) - (1.0 / temperature_k);
+                    rate *= (self.activation_k * inv).exp();
+                }
+            }
+        }
+        if self.pressure_order > 0.0 && pressure_kpa > 0.0 {
+            rate *= (pressure_kpa / 101.325).powf(self.pressure_order);
+        }
+        rate.max(0.0).min(1.0)
+    }
+
+    /// Deterministic firing decision: hash(reaction_id, tick, x, y) < threshold.
+    pub fn fires_at(&self, tick: u64, x: i64, y: i64, temperature_k: f32, pressure_kpa: f32) -> bool {
+        let threshold = self.effective_rate_per_tick(temperature_k, pressure_kpa);
+        if threshold >= 1.0 {
+            return true;
+        }
+        if threshold <= 0.0 {
+            return false;
+        }
+        let mut h: u64 = 0xCBF29CE484222325;
+        for b in self.id.as_bytes() {
+            h = h.wrapping_mul(0x100000001B3).wrapping_add(*b as u64);
+        }
+        h = h.wrapping_mul(0x100000001B3).wrapping_add(tick);
+        h = h.wrapping_mul(0x100000001B3).wrapping_add(x as u64);
+        h = h.wrapping_mul(0x100000001B3).wrapping_add(y as u64);
+        let frac = ((h % 1_000_000) as f32) / 1_000_000.0;
+        frac < threshold
     }
 }
 
@@ -474,6 +516,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 2. Phase: water + lava → steam + obsidian (instant; exothermic).
         // Water pixel → steam (gas; rises), lava pixel → obsidian (cooled solid).
@@ -489,6 +535,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(1373.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 3a. Extinguish (water-gas shift): water (input_a) + fire (input_b) →
         // steam (output) + hydrogen (byproduct) at high temperature. Per real
@@ -510,6 +560,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(973.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 3b. Extinguish (standard): water (input_a) + fire (input_b) →
         // steam (output) + smoke (byproduct). Per real chemistry: the fire
@@ -529,6 +583,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: None,
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 4. Cascade: oil (input_a) + fire (input_b) → fire (output) +
         // (fire stays) + [smoke, smoke, CO2] emissions.
@@ -550,6 +608,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: true,
             min_temperature_k: Some(533.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 5. Wood (input_a) + fire → charcoal (output) + (fire stays) +
         // [smoke, CO2] emissions.
@@ -570,6 +632,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: true,
             min_temperature_k: Some(573.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 6. Paper (input_a) + fire → ash (output) + (fire stays) +
         // [smoke, CO2] emissions.
@@ -590,6 +656,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: true,
             min_temperature_k: Some(506.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 7. Fabric (input_a) + fire → ash (output) + (fire stays) +
         // [smoke, CO2] emissions. Same chemistry profile as paper
@@ -606,6 +676,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: true,
             min_temperature_k: Some(510.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 8. Cascade: fuel (input_a) + fire (input_b) → fire (output) +
         // (fire stays) + [smoke, CO2] emissions.
@@ -625,6 +699,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: true,
             min_temperature_k: Some(483.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 9. Alcohol (input_a) + fire → steam (output) + co2 (byproduct).
         // Per real chemistry: C2H6O + 3O2 → 2CO2 + 3H2O. Ethanol
@@ -643,6 +721,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: true,
             min_temperature_k: Some(638.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 10. Explosion: gunpowder (input_a) + fire → smoke (output) +
         // (fire stays) + [smoke, smoke, CO2] emissions.
@@ -655,16 +737,20 @@ pub fn default_reaction_registry() -> ReactionRegistry {
         // plume that lingers after the detonation.
         MaterialReaction {
             id: "rxn.explosion.gunpowder_fire".to_string(),
-            input_a: 48, // gunpowder
-            input_b: 65, // fire
-            output: 62,  // smoke
+            input_a: 48,
+            input_b: 65,
+            output: 62,
             byproduct: None,
-            emissions: vec![62, 62, 53], // dense smoke cloud + co2
+            emissions: vec![62, 62, 53, 65, 65],
             energy_release_j: 1_850_000.0,
-            rate_per_s: 5.0,
+            rate_per_s: 60.0,
             auto_ignite: true,
             min_temperature_k: Some(573.0),
             propagates: true,
+            activation_k: 8000.0,
+            pressure_order: 0.0,
+            violent: true,
+            flash_color_hex: Some("FFCC00".to_string()),
         },
         // 11. Combustion: methane (input_a) + oxygen (input_b) → CO2 (output) + steam (byproduct).
         // CH4 + 2 O2 → CO2 + 2 H2O.
@@ -680,6 +766,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(573.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 12. Combustion: H2 (input_a) + O2 (input_b) → steam (output) +
         // steam (byproduct). Per real chemistry: 2 H2 + O2 → 2 H2O. Both
@@ -689,16 +779,20 @@ pub fn default_reaction_registry() -> ReactionRegistry {
         // no smoke).
         MaterialReaction {
             id: "rxn.combustion.h2_o2".to_string(),
-            input_a: 55, // hydrogen
-            input_b: 51, // oxygen
-            output: 50,  // steam
-            byproduct: Some(50), // steam (O2 also → H2O via 2H2+O2 stoich)
-            emissions: vec![],
+            input_a: 55,
+            input_b: 51,
+            output: 50,
+            byproduct: Some(50),
+            emissions: vec![65],
             energy_release_j: 483_600.0,
-            rate_per_s: 1.0,
+            rate_per_s: 60.0,
             auto_ignite: false,
             min_temperature_k: Some(773.0),
-            propagates: false,
+            propagates: true,
+            activation_k: 7000.0,
+            pressure_order: 1.5,
+            violent: true,
+            flash_color_hex: Some("00CCFF".to_string()),
         },
         // 13. Combustion: coal (input_a) + O2 (input_b) → ash (output) +
         // CO2 (byproduct) + [smoke] emission.
@@ -720,6 +814,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(973.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 14. Neutralization: acid (input_a) + alkali (input_b) →
         // brine (output) + brine (byproduct) + [steam] emission.
@@ -730,16 +828,20 @@ pub fn default_reaction_registry() -> ReactionRegistry {
         // the water → steam plume above the reaction site.
         MaterialReaction {
             id: "rxn.neutralization.acid_alkali".to_string(),
-            input_a: 21, // acid
-            input_b: 22, // alkali
-            output: 67,  // neutralized_brine
-            byproduct: Some(67), // neutralized_brine
-            emissions: vec![50], // steam (exothermic; boils local water)
+            input_a: 21,
+            input_b: 22,
+            output: 67,
+            byproduct: Some(67),
+            emissions: vec![50, 50],
             energy_release_j: 57_000.0,
-            rate_per_s: 5.0,
+            rate_per_s: 30.0,
             auto_ignite: false,
             min_temperature_k: Some(253.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: true,
+            flash_color_hex: Some("F0F0F0".to_string()),
         },
         // 15. Smelting: ore_iron (input_a) + fire (input_b) → iron (output); fire stays.
         MaterialReaction {
@@ -754,6 +856,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(1811.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 16. Smelting: ore_gold (input_a) + fire (input_b) → gold (output); fire stays.
         MaterialReaction {
@@ -768,6 +874,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(1337.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 17. Dissolution: salt (input_a) + water (input_b) → brine (output) + brine (byproduct).
         // Both pixels become brine (mass-conservation tracking via energy budget).
@@ -783,6 +893,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 18. Dissolution: sugar (input_a) + water (input_b) → polluted_water (output) + polluted_water (byproduct).
         MaterialReaction {
@@ -797,6 +911,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 19. Ignition: coal (input_a) + fire (input_b) → fire (output)
         // cascade + [smoke, smoke, CO2] emissions.
@@ -818,6 +936,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: true,
             min_temperature_k: Some(973.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 20. Combustion: fabric (input_a) + O2 (input_b) → ash (output) + CO2 (byproduct).
         MaterialReaction {
@@ -832,6 +954,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(510.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 21. Combustion: wood (input_a) + O2 (input_b) → charcoal (output) + CO2 (byproduct).
         MaterialReaction {
@@ -846,6 +972,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(573.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 22. Corrosion: concrete (input_a) + acid (input_b) → loose_fill (output) + co2 (byproduct).
         // Acid dissolves concrete (calcium carbonate) per real chemistry:
@@ -863,6 +993,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 23. Phase: lava (input_a) + ice (input_b) → obsidian (output) + water (byproduct).
         // Lava cools to obsidian crust; ice melts to water.
@@ -878,6 +1012,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 24. Combustion: oil (input_a) + O2 (input_b) → CO2 (output) + steam (byproduct).
         // C8H18 + 12.5 O2 → 8 CO2 + 9 H2O.
@@ -893,6 +1031,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(633.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 25. Combustion: charcoal (input_a) + O2 (input_b) → ash (output) + CO2 (byproduct).
         MaterialReaction {
@@ -907,6 +1049,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(600.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 26. Ignition: wood (input_a) + lava (input_b) → fire (output); lava stays.
         // Same as wood+fire but with lava as the ignition catalyst.
@@ -922,6 +1068,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: true,
             min_temperature_k: Some(573.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 27. Ignition: oil (input_a) + lava (input_b) → fire (output); lava stays.
         MaterialReaction {
@@ -936,6 +1086,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: true,
             min_temperature_k: Some(533.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 28. Corrosion: ore_copper (input_a) + acid (input_b) →
         // polluted_water (output) + hydrogen (byproduct).
@@ -957,6 +1111,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 29. Chemical: chlorine (input_a) + ammonia (input_b) → smoke (output) + smoke (byproduct).
         // Toxic cloud.
@@ -972,21 +1130,29 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(293.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 30. Ignition: gunpowder (input_a) + lava (input_b) → smoke (output)
         // explosive byproduct. Lava ignites gunpowder directly.
         MaterialReaction {
             id: "rxn.explosion.gunpowder_lava".to_string(),
-            input_a: 48, // gunpowder
-            input_b: 26, // lava
-            output: 62,  // smoke
+            input_a: 48,
+            input_b: 26,
+            output: 62,
             byproduct: None,
-            emissions: vec![],
+            emissions: vec![62, 62, 65],
             energy_release_j: 1_850_000.0,
-            rate_per_s: 5.0,
+            rate_per_s: 60.0,
             auto_ignite: true,
             min_temperature_k: Some(573.0),
             propagates: true,
+            activation_k: 6000.0,
+            pressure_order: 0.0,
+            violent: true,
+            flash_color_hex: Some("FFAA00".to_string()),
         },
         // 31. Precipitation: smoke (input_a; pollutant proxy) + steam (input_b) →
         // polluted_water (output) + polluted_water (byproduct).
@@ -1002,6 +1168,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // 32. Electric arc: water (input_a) + electric_arc (input_b) → polluted_water (output);
         // arc stays. Models conductive pool electrification per spec.
@@ -1017,6 +1187,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: None,
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // **M15B** § 33a. Extinguish (water-gas shift): rain (input_a) +
         // fire (input_b) → steam (output) + hydrogen (byproduct) at
@@ -1035,6 +1209,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(973.0),
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // **M15B** § 33b. Extinguish (standard): rain (input_a) + fire
         // (input_b) → steam (output) + smoke (byproduct). Per real
@@ -1053,6 +1231,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: None,
             propagates: false,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // **M15B** § 34. Corrosion: metal_nohook (input_a) + acid_droplet (input_b) →
         // rust (output) + hydrogen (byproduct). Per spec § acceptance scenario 5:
@@ -1070,6 +1252,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
         // **M15B** § 35. Corrosion: iron (input_a) + acid_droplet → rust
         // (output) + hydrogen (byproduct). Same as acid+iron via
@@ -1086,6 +1272,10 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: true,
+            activation_k: 0.0,
+            pressure_order: 0.0,
+            violent: false,
+            flash_color_hex: None,
         },
     ];
     ReactionRegistry::new(raw.to_vec())

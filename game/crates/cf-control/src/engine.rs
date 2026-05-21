@@ -439,15 +439,7 @@ fn build_atmos_cell(c: &cf_mission::ScenarioAtmosCell) -> cf_atmos::AtmosCell {
 }
 
 /// **M15B § AmbientWorld inference** — derive the precipitation cycle's
-/// AmbientWorld from a scenario id. Per spec § "Vulcan ambient
-/// triggers acid rain" — scenarios opt into Vulcan / Mimas / Mars
-/// ambient by id prefix. Default fallback is Earth.
-///
-/// Naming conventions:
-/// - `*_vulcan*` → AmbientWorld::Vulcan (high humidity, pollutant > 5%, always-rain)
-/// - `*_mimas*` → AmbientWorld::Mimas (vacuum, never rain)
-/// - `*_mars*` → AmbientWorld::Mars (thin atm, rare rain)
-/// - anything else → AmbientWorld::Earth
+/// Map scenario id substring → AmbientWorld (vulcan/mimas/mars/earth).
 fn infer_ambient_world_from_scenario_id(scenario_id: &str) -> cf_material::AmbientWorld {
     let id = scenario_id.to_ascii_lowercase();
     if id.contains("vulcan") {
@@ -461,35 +453,13 @@ fn infer_ambient_world_from_scenario_id(scenario_id: &str) -> cf_material::Ambie
     }
 }
 
-/// **M15B § Heat-source injection + diffusion** — per-tick maintenance
-/// of the heat field. Walks awake chunks looking for hot materials
-/// (fire_intense=65, lava=26, lightning=64, electric_arc=63) and
-/// stamps their canonical surface temperature into the heat field
-/// cell that covers their world position. Then applies one diffusion
-/// pass to spread heat to neighbors (so a fire pixel doesn't ONLY
-/// affect its own cell — surrounding cells warm up via 4-neighbor
-/// mixing).
-///
-/// Cell temperatures use max(existing, source) so multiple fire
-/// pixels in the same cell don't double-stack, and cold materials
-/// don't accidentally cool a fire-heated cell. Cooling (return to
-/// ambient) happens naturally through the diffusion mixing toward
-/// ambient-bordered cells.
-///
-/// Without this helper the heat field stays static after scenario
-/// init, so phase transitions (water → steam at 373 K, etc.) can ONLY
-/// fire if the scenario manually pre-heated the cell — i.e. they
-/// could never fire DYNAMICALLY mid-game when fire spreads. This is
-/// the missing piece that makes M15's chemistry actually reactive.
+/// Stamp hot-material source temps into heat field, then diffuse + cool.
+/// Source temps live in `content/materials/thermal_sources.json`.
 fn inject_thermal_sources_and_diffuse(state: &mut EngineMutable) {
     use cf_terrain::chunked::CHUNK_SIZE;
-    // Per-material source temperatures (Kelvin) — see canonical
-    // material_registry.json for material classes.
-    const FIRE_INTENSE_TEMP_K: f32 = 1200.0; // ~natural gas flame
-    const LAVA_TEMP_K: f32 = 1473.0; // ~liquid basalt
-    const LIGHTNING_TEMP_K: f32 = 30000.0; // plasma stroke peak
-    const ELECTRIC_ARC_TEMP_K: f32 = 6000.0; // welding arc
-    const DIFFUSE_MIX: f32 = 0.05; // per spec § thermal exchange tuned for 60 Hz
+    let sources = cf_material::ThermalSourceTable::load_default_or_baseline();
+    let diffuse_mix = sources.diffuse_mix;
+    let cool_mix = sources.cool_mix;
 
     let chunked = match state.chunked_terrain.as_ref() {
         Some(t) => t,
@@ -519,12 +489,9 @@ fn inject_thermal_sources_and_diffuse(state: &mut EngineMutable) {
                     continue;
                 }
                 let mat = chunked.material_at(x, y);
-                let source_temp = match mat {
-                    65 => FIRE_INTENSE_TEMP_K,
-                    26 => LAVA_TEMP_K,
-                    64 => LIGHTNING_TEMP_K,
-                    63 => ELECTRIC_ARC_TEMP_K,
-                    _ => continue,
+                let source_temp = match sources.lookup(mat) {
+                    Some(t) => t,
+                    None => continue,
                 };
                 if let Some((heat_cx, heat_cy)) = state.heat_field.world_to_cell(x as f32, y as f32) {
                     let current = state.heat_field.temperature_at_cell(heat_cx, heat_cy);
@@ -535,17 +502,8 @@ fn inject_thermal_sources_and_diffuse(state: &mut EngineMutable) {
             }
         }
     }
-    // Spread heat to neighbors so phase transitions fire in the
-    // SURROUNDING cells, not just the source pixel's cell.
-    state.heat_field.diffuse(DIFFUSE_MIX);
-    // **M15B** § Radiative cooling toward ambient. Without this, heat
-    // injected into the field never returns to ambient (the diffuse
-    // pass conserves total heat — it only spreads). A cell that
-    // briefly held fire stays at 1200K forever, slowly dissipating
-    // into neighbors. With cooling, isolated hot cells return to
-    // ambient over ~100 ticks.
-    const COOL_MIX: f32 = 0.01; // 1% per tick toward ambient
-    state.heat_field.cool_toward_ambient(COOL_MIX);
+    state.heat_field.diffuse(diffuse_mix);
+    state.heat_field.cool_toward_ambient(cool_mix);
 }
 
 /// **M15 § HeatField initialization** — populate the per-cell heat

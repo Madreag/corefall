@@ -12,7 +12,11 @@
       "rate_per_s": 0.5,
       "auto_ignite": false,
       "min_temperature_k": 273.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.phase.water_lava",
@@ -25,7 +29,11 @@
       "rate_per_s": 1000.0,
       "auto_ignite": false,
       "min_temperature_k": 1373.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.extinguish.water_fire_water_gas_shift",
@@ -38,7 +46,11 @@
       "rate_per_s": 5.0,
       "auto_ignite": false,
       "min_temperature_k": 973.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.extinguish.water_fire",
@@ -51,7 +63,11 @@
       "rate_per_s": 5.0,
       "auto_ignite": false,
       "min_temperature_k": null,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.ignition.oil_fire",
@@ -68,7 +84,11 @@
       "rate_per_s": 0.8,
       "auto_ignite": true,
       "min_temperature_k": 533.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.ignition.wood_fire",
@@ -84,7 +104,11 @@
       "rate_per_s": 0.6,
       "auto_ignite": true,
       "min_temperature_k": 573.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.ignition.paper_fire",
@@ -100,7 +124,11 @@
       "rate_per_s": 0.95,
       "auto_ignite": true,
       "min_temperature_k": 506.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.ignition.fabric_fire",
@@ -116,7 +144,11 @@
       "rate_per_s": 0.85,
       "auto_ignite": true,
       "min_temperature_k": 510.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.ignition.fuel_fire",
@@ -132,7 +164,11 @@
       "rate_per_s": 0.85,
       "auto_ignite": true,
       "min_temperature_k": 483.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.ignition.alcohol_fire",
@@ -145,7 +181,11 @@
       "rate_per_s": 0.9,
       "auto_ignite": true,
       "min_temperature_k": 638.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.explosion.gunpowder_fire",
@@ -156,13 +196,19 @@
       "emissions": [
         62,
         62,
-        53
+        53,
+        65,
+        65
       ],
       "energy_release_j": 1850000.0,
-      "rate_per_s": 5.0,
+      "rate_per_s": 60.0,
       "auto_ignite": true,
       "min_temperature_k": 573.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 8000.0,
+      "pressure_order": 0.0,
+      "violent": true,
+      "flash_color_hex": "FFCC00"
     },
     {
       "id": "rxn.combustion.methane_o2",
@@ -175,7 +221,11 @@
       "rate_per_s": 0.9,
       "auto_ignite": false,
       "min_temperature_k": 573.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.combustion.h2_o2",
@@ -183,12 +233,18 @@
       "input_b": 51,
       "output": 50,
       "byproduct": 50,
-      "emissions": [],
+      "emissions": [
+        65
+      ],
       "energy_release_j": 483600.0,
-      "rate_per_s": 1.0,
+      "rate_per_s": 60.0,
       "auto_ignite": false,
       "min_temperature_k": 773.0,
-      "propagates": false
+      "propagates": true,
+      "activation_k": 7000.0,
+      "pressure_order": 1.5,
+      "violent": true,
+      "flash_color_hex": "00CCFF"
     },
     {
       "id": "rxn.combustion.coal_o2",
@@ -203,7 +259,11 @@
       "rate_per_s": 0.5,
       "auto_ignite": false,
       "min_temperature_k": 973.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.neutralization.acid_alkali",
@@ -212,13 +272,18 @@
       "output": 67,
       "byproduct": 67,
       "emissions": [
+        50,
         50
       ],
       "energy_release_j": 57000.0,
-      "rate_per_s": 5.0,
+      "rate_per_s": 30.0,
       "auto_ignite": false,
       "min_temperature_k": 253.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": true,
+      "flash_color_hex": "F0F0F0"
     },
     {
       "id": "rxn.phase.iron_smelt",
@@ -231,7 +296,11 @@
       "rate_per_s": 0.2,
       "auto_ignite": false,
       "min_temperature_k": 1811.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.phase.gold_smelt",
@@ -244,7 +313,11 @@
       "rate_per_s": 0.25,
       "auto_ignite": false,
       "min_temperature_k": 1337.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.dissolution.salt_water",
@@ -257,7 +330,11 @@
       "rate_per_s": 0.5,
       "auto_ignite": false,
       "min_temperature_k": 273.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.dissolution.sugar_water",
@@ -270,7 +347,11 @@
       "rate_per_s": 0.4,
       "auto_ignite": false,
       "min_temperature_k": 273.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.ignition.coal_fire",
@@ -287,7 +368,11 @@
       "rate_per_s": 0.5,
       "auto_ignite": true,
       "min_temperature_k": 973.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.combustion.fabric_o2",
@@ -300,7 +385,11 @@
       "rate_per_s": 0.6,
       "auto_ignite": false,
       "min_temperature_k": 510.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.combustion.wood_o2",
@@ -313,7 +402,11 @@
       "rate_per_s": 0.55,
       "auto_ignite": false,
       "min_temperature_k": 573.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.corrosion.acid_concrete",
@@ -326,7 +419,11 @@
       "rate_per_s": 0.2,
       "auto_ignite": false,
       "min_temperature_k": 273.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.phase.lava_ice",
@@ -339,7 +436,11 @@
       "rate_per_s": 1.0,
       "auto_ignite": false,
       "min_temperature_k": 273.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.combustion.oil_o2",
@@ -352,7 +453,11 @@
       "rate_per_s": 0.8,
       "auto_ignite": false,
       "min_temperature_k": 633.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.combustion.charcoal_o2",
@@ -365,7 +470,11 @@
       "rate_per_s": 0.4,
       "auto_ignite": false,
       "min_temperature_k": 600.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.ignition.lava_wood",
@@ -378,7 +487,11 @@
       "rate_per_s": 0.8,
       "auto_ignite": true,
       "min_temperature_k": 573.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.ignition.lava_oil",
@@ -391,7 +504,11 @@
       "rate_per_s": 1.0,
       "auto_ignite": true,
       "min_temperature_k": 533.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.corrosion.acid_copper",
@@ -404,7 +521,11 @@
       "rate_per_s": 0.4,
       "auto_ignite": false,
       "min_temperature_k": 273.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.chem.chlorine_ammonia",
@@ -417,7 +538,11 @@
       "rate_per_s": 0.3,
       "auto_ignite": false,
       "min_temperature_k": 293.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.explosion.gunpowder_lava",
@@ -425,12 +550,20 @@
       "input_b": 26,
       "output": 62,
       "byproduct": null,
-      "emissions": [],
+      "emissions": [
+        62,
+        62,
+        65
+      ],
       "energy_release_j": 1850000.0,
-      "rate_per_s": 5.0,
+      "rate_per_s": 60.0,
       "auto_ignite": true,
       "min_temperature_k": 573.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 6000.0,
+      "pressure_order": 0.0,
+      "violent": true,
+      "flash_color_hex": "FFAA00"
     },
     {
       "id": "rxn.precipitation.acid_rain",
@@ -443,7 +576,11 @@
       "rate_per_s": 0.05,
       "auto_ignite": false,
       "min_temperature_k": 273.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.electric.water_arc",
@@ -456,7 +593,11 @@
       "rate_per_s": 1.0,
       "auto_ignite": false,
       "min_temperature_k": null,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.extinguish.rain_fire_water_gas_shift",
@@ -469,7 +610,11 @@
       "rate_per_s": 5.0,
       "auto_ignite": false,
       "min_temperature_k": 973.0,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.extinguish.rain_fire",
@@ -482,7 +627,11 @@
       "rate_per_s": 5.0,
       "auto_ignite": false,
       "min_temperature_k": null,
-      "propagates": false
+      "propagates": false,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.corrosion.acid_droplet_metal_nohook",
@@ -495,7 +644,11 @@
       "rate_per_s": 0.4,
       "auto_ignite": false,
       "min_temperature_k": 273.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     },
     {
       "id": "rxn.corrosion.acid_droplet_iron",
@@ -508,7 +661,11 @@
       "rate_per_s": 0.5,
       "auto_ignite": false,
       "min_temperature_k": 273.0,
-      "propagates": true
+      "propagates": true,
+      "activation_k": 0.0,
+      "pressure_order": 0.0,
+      "violent": false,
+      "flash_color_hex": null
     }
   ]
 }

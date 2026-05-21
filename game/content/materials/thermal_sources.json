@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "diffuse_mix": 0.05,
+  "cool_mix": 0.01,
+  "sources": [
+    { "material_id": 65, "material_name": "fire_intense", "source_temp_k": 1200.0 },
+    { "material_id": 26, "material_name": "lava", "source_temp_k": 1473.0 },
+    { "material_id": 64, "material_name": "lightning", "source_temp_k": 30000.0 },
+    { "material_id": 63, "material_name": "electric_arc", "source_temp_k": 6000.0 }
+  ]
+}

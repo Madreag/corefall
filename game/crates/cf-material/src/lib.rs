@@ -56,6 +56,9 @@ pub mod phase;
 pub mod precipitation;
 pub mod reactions;
 pub mod registry;
+pub mod thermal_sources;
+
+pub use thermal_sources::{ThermalSource, ThermalSourceLoadError, ThermalSourceTable};
 
 pub use alchemy::{
     default_alchemy_registry, step_station, try_invoke_recipe, AlchemyInput, AlchemyRecipe, AlchemyRegistry,
