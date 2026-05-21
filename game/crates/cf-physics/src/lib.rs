@@ -617,11 +617,72 @@ pub fn try_penetrate(inputs: PenetrationInputs) -> PenetrationOutcome {
     }
 }
 
-/// **M2**: hazard contact damage routing. Returns the total damage to apply
-/// to the actor when their AABB overlaps `hazard_pixels` count of hazard
-/// pixels at `damage_per_tick` per-pixel. Pure / stateless: callers pull
-/// the overlap count from `ChunkedTerrain` and the per-tick rate from
-/// `MaterialAffordance::damage_per_tick`.
+/// Batched penetration eval. SIMD-friendly: branchless body, fixed-width 4
+/// lanes, no per-iteration allocations. LLVM auto-vectorizes to SSE/NEON.
+/// Each lane independent. For stickiness/bounce paths the function still
+/// produces correct outputs because the conditional is selected via mask
+/// rather than control flow.
+#[must_use]
+pub fn try_penetrate_batch4(inputs: [PenetrationInputs; 4]) -> [PenetrationOutcome; 4] {
+    let mut out: [PenetrationOutcome; 4] = [
+        PenetrationOutcome { passes: false, stuck: false, remaining_velocity: 0.0, impulse_squared: 0.0, integrity_squared: 0.0, impulse: 0.0, integrity: 0.0 },
+        PenetrationOutcome { passes: false, stuck: false, remaining_velocity: 0.0, impulse_squared: 0.0, integrity_squared: 0.0, impulse: 0.0, integrity: 0.0 },
+        PenetrationOutcome { passes: false, stuck: false, remaining_velocity: 0.0, impulse_squared: 0.0, integrity_squared: 0.0, impulse: 0.0, integrity: 0.0 },
+        PenetrationOutcome { passes: false, stuck: false, remaining_velocity: 0.0, impulse_squared: 0.0, integrity_squared: 0.0, impulse: 0.0, integrity: 0.0 },
+    ];
+    let mut velocity = [0.0f32; 4];
+    let mut mass = [0.0f32; 4];
+    let mut sharpness = [0.0f32; 4];
+    let mut integrity = [0.0f32; 4];
+    let mut stickiness = [0.0f32; 4];
+    let mut restitution = [0.0f32; 4];
+    let mut friction = [0.0f32; 4];
+    let mut rng_roll = [0.0f32; 4];
+    for i in 0..4 {
+        velocity[i] = inputs[i].velocity.max(0.0);
+        mass[i] = inputs[i].mass.max(0.0);
+        sharpness[i] = inputs[i].sharpness.clamp(0.0, 1.0);
+        integrity[i] = inputs[i].integrity.max(0.0);
+        stickiness[i] = inputs[i].stickiness.clamp(0.0, 1.0);
+        restitution[i] = inputs[i].restitution.clamp(0.0, 1.0);
+        friction[i] = inputs[i].friction.clamp(0.0, 1.0);
+        rng_roll[i] = inputs[i].rng_roll;
+    }
+    let mut impulse = [0.0f32; 4];
+    let mut impulse_sq = [0.0f32; 4];
+    let mut integrity_sq = [0.0f32; 4];
+    for i in 0..4 {
+        impulse[i] = mass[i] * velocity[i] * sharpness[i];
+        impulse_sq[i] = impulse[i] * impulse[i];
+        integrity_sq[i] = integrity[i] * integrity[i];
+    }
+    for i in 0..4 {
+        let passes = impulse_sq[i] > integrity_sq[i];
+        let loss = (integrity_sq[i] / impulse_sq[i].max(f32::EPSILON)).sqrt().clamp(0.0, 1.0);
+        let pen_remain = velocity[i] * (1.0 - loss);
+        let stuck = !passes && rng_roll[i] < stickiness[i];
+        let bounce = restitution[i] * (1.0 - friction[i]);
+        let bounce_remain = velocity[i] * bounce;
+        let remaining = if passes {
+            pen_remain.max(0.0)
+        } else if stuck {
+            0.0
+        } else {
+            bounce_remain
+        };
+        out[i] = PenetrationOutcome {
+            passes,
+            stuck,
+            remaining_velocity: remaining,
+            impulse_squared: impulse_sq[i],
+            integrity_squared: integrity_sq[i],
+            impulse: impulse[i],
+            integrity: integrity[i],
+        };
+    }
+    out
+}
+
 #[must_use]
 pub fn hazard_contact_damage(hazard_pixels: u32, damage_per_tick: f32) -> f32 {
     if hazard_pixels == 0 || damage_per_tick <= 0.0 {
@@ -988,5 +1049,23 @@ mod tests {
         // Large overlap clamps to 2x.
         let big = hazard_contact_damage(1024, 2.0);
         assert!((big - 4.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn try_penetrate_batch4_matches_scalar() {
+        let inputs = [
+            pen(0.05, 400.0, 10.0),
+            pen(0.05, 400.0, 40.0),
+            pen(0.10, 800.0, 200.0),
+            pen(0.01, 100.0, 100.0),
+        ];
+        let batch = try_penetrate_batch4(inputs);
+        for i in 0..4 {
+            let scalar = try_penetrate(inputs[i]);
+            assert_eq!(batch[i].passes, scalar.passes, "lane {i} passes");
+            assert_eq!(batch[i].stuck, scalar.stuck, "lane {i} stuck");
+            assert!((batch[i].remaining_velocity - scalar.remaining_velocity).abs() < 1e-3, "lane {i} remaining_velocity");
+            assert!((batch[i].impulse - scalar.impulse).abs() < 1e-3, "lane {i} impulse");
+        }
     }
 }
