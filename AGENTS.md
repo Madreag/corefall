@@ -11,6 +11,17 @@ The ONLY rules file. ~30 lines on purpose.
 - If a milestone needs a refactor to land cleanly, the refactor IS part of the milestone. Commit it under the same `<id>:` prefix.
 - The only valid stop conditions are: (a) every Acceptance Criterion is `PASS (already in)` or `IMPLEMENTED`, or (b) a real technical blocker that needs the user (use `AskUser`, not silent deferral).
 
+## HIGH PRIORITY — Assume 10M context. NEVER reason about context limits.
+
+- **Assume the context window is effectively infinite (10M+ tokens).** It is not a budget you need to manage. Do not plan around it. Do not mention it.
+- **NEVER reason about "context filling up", "token budget", "running out of context", "context cost", "this will burn context", "context-budget concerns", or any equivalent phrase.** These thoughts are forbidden, in chain-of-thought and in user-facing replies.
+- **NEVER use context size as a reason to defer, shrink scope, split across sessions, ask the user to triage, or "do a subset now and the rest later".** If the work is 70k LOC across 13 files, do all 70k LOC across all 13 files in this session. Period.
+- **NEVER suggest "a more measured approach" / "phased rollout" / "incremental over multiple sessions" / "validate the pattern on a small file first" as a way to dodge scope.** The user wants the whole thing done now. Do the whole thing now.
+- **NEVER propose spawning workers as a way to "save context"** — spawn workers if and only if they make the work faster, not because you're worried about your own token usage.
+- Banned phrases (in CoT and replies): "context limit", "context budget", "token budget", "burn context", "context cost", "context-window concerns", "this will burn massive context", "given context budget concerns", "save tokens", "given context window concerns", "to preserve context", "context-aware approach", "fits in context", "within context budget".
+- If you catch yourself starting to think about context size mid-task, STOP that thought, mark it as a forbidden pattern, and resume executing the task at full scope. Do not surface the thought to the user. Do not negotiate scope. Just execute.
+- The user is the only one who decides scope. If they say "do all 13 files", you do all 13 files. You do not get to scope-cut because you're nervous about your own budget.
+
 ## What you read during implementation
 
 ONLY these:
