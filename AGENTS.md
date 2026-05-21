@@ -24,6 +24,9 @@ Do NOT read `docs/plan/`, `docs/MISSING_FEATURES.md`, `docs/FUTURE_FEATURES.md`,
 - No `thread_rng()` in sim crates (`cf-sim-core`, `cf-physics`, `cf-material`, `cf-ai`, `cf-terrain`, `cf-atmos`).
 - No `unsafe` blocks.
 - Tick rate is configurable. Never hardcode `60` as a sim architectural assumption.
+- **Comments stay short.** Default to none. One line max for non-obvious WHY. NO multi-line narratives. NO restating what the code does. NO milestone/spec references in code bodies. Doc-comments document API contracts only. If a comment needs more than one line, the code probably needs a better name.
+- **Files stay under 2000 LOC.** If a file grows past 1000 LOC look for natural module boundaries. Past 2000 LOC: split unless there's a perf or safety reason to keep it monolithic. Document the reason in the file header if you must.
+- **All tuning constants live in `content/` JSON/RON.** Code reads them via loaders with hardcoded fallback only for boot. Add a JSON file before adding a `const X: f32 = ...` in source.
 
 ## Workflow
 
