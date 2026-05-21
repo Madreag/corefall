@@ -126,6 +126,78 @@
       "threshold_k": 273.15,
       "latent_heat_j_per_kg": -334000.0,
       "reversible": true
+    },
+    {
+      "material": 15,
+      "from_state": "solid",
+      "to_state": "liquid",
+      "product_material": 13,
+      "threshold_k": 273.15,
+      "latent_heat_j_per_kg": 334000.0,
+      "reversible": true
+    },
+    {
+      "material": 21,
+      "from_state": "liquid",
+      "to_state": "gas",
+      "product_material": 60,
+      "threshold_k": 357.0,
+      "latent_heat_j_per_kg": 444000.0,
+      "reversible": true
+    },
+    {
+      "material": 22,
+      "from_state": "solid",
+      "to_state": "liquid",
+      "product_material": null,
+      "threshold_k": 591.0,
+      "latent_heat_j_per_kg": 158000.0,
+      "reversible": true
+    },
+    {
+      "material": 69,
+      "from_state": "solid",
+      "to_state": "liquid",
+      "product_material": null,
+      "threshold_k": 1358.0,
+      "latent_heat_j_per_kg": 207000.0,
+      "reversible": true
+    },
+    {
+      "material": 33,
+      "from_state": "solid",
+      "to_state": "powder",
+      "product_material": 40,
+      "threshold_k": 873.0,
+      "latent_heat_j_per_kg": -32800000.0,
+      "reversible": false
+    },
+    {
+      "material": 10,
+      "from_state": "solid",
+      "to_state": "liquid",
+      "product_material": null,
+      "threshold_k": 1573.0,
+      "latent_heat_j_per_kg": 320000.0,
+      "reversible": true
+    },
+    {
+      "material": 32,
+      "from_state": "solid",
+      "to_state": "liquid",
+      "product_material": 26,
+      "threshold_k": 1535.0,
+      "latent_heat_j_per_kg": 400000.0,
+      "reversible": true
+    },
+    {
+      "material": 28,
+      "from_state": "solid",
+      "to_state": "liquid",
+      "product_material": 26,
+      "threshold_k": 1473.0,
+      "latent_heat_j_per_kg": 400000.0,
+      "reversible": true
     }
   ]
 }

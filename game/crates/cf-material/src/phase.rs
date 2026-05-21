@@ -474,6 +474,86 @@ pub fn default_phase_registry() -> PhaseRegistry {
             latent_heat_j_per_kg: -334_000.0,
             reversible: true,
         },
+        // Ice (15) → water (13) at 273.15K
+        PhaseTransition {
+            material: 15,
+            from_state: PhaseState::Solid,
+            to_state: PhaseState::Liquid,
+            product_material: Some(13),
+            threshold_k: 273.15,
+            latent_heat_j_per_kg: 334_000.0,
+            reversible: true,
+        },
+        // Acid (21) → vapor at 357K (HCl boiling)
+        PhaseTransition {
+            material: 21,
+            from_state: PhaseState::Liquid,
+            to_state: PhaseState::Gas,
+            product_material: Some(60), // chlorine vapor proxy
+            threshold_k: 357.0,
+            latent_heat_j_per_kg: 444_000.0,
+            reversible: true,
+        },
+        // Alkali (22) sodium hydroxide melts ~591K — solid→liquid
+        PhaseTransition {
+            material: 22,
+            from_state: PhaseState::Solid,
+            to_state: PhaseState::Liquid,
+            product_material: None,
+            threshold_k: 591.0,
+            latent_heat_j_per_kg: 158_000.0,
+            reversible: true,
+        },
+        // Copper (69) solid→liquid at 1358K
+        PhaseTransition {
+            material: 69,
+            from_state: PhaseState::Solid,
+            to_state: PhaseState::Liquid,
+            product_material: None,
+            threshold_k: 1358.0,
+            latent_heat_j_per_kg: 207_000.0,
+            reversible: true,
+        },
+        // Coal (33) → ash (40) above 873K (combustion)
+        PhaseTransition {
+            material: 33,
+            from_state: PhaseState::Solid,
+            to_state: PhaseState::Powder,
+            product_material: Some(40),
+            threshold_k: 873.0,
+            latent_heat_j_per_kg: -32_800_000.0,
+            reversible: false,
+        },
+        // Glass (10) melt at 1573K
+        PhaseTransition {
+            material: 10,
+            from_state: PhaseState::Solid,
+            to_state: PhaseState::Liquid,
+            product_material: None,
+            threshold_k: 1573.0,
+            latent_heat_j_per_kg: 320_000.0,
+            reversible: true,
+        },
+        // Granite (32) → lava (26) at 1535K
+        PhaseTransition {
+            material: 32,
+            from_state: PhaseState::Solid,
+            to_state: PhaseState::Liquid,
+            product_material: Some(26),
+            threshold_k: 1535.0,
+            latent_heat_j_per_kg: 400_000.0,
+            reversible: true,
+        },
+        // Basalt (28) → lava (26) at 1473K
+        PhaseTransition {
+            material: 28,
+            from_state: PhaseState::Solid,
+            to_state: PhaseState::Liquid,
+            product_material: Some(26),
+            threshold_k: 1473.0,
+            latent_heat_j_per_kg: 400_000.0,
+            reversible: true,
+        },
     ];
     PhaseRegistry::new(raw.to_vec())
 }

@@ -442,7 +442,7 @@ const MATERIAL_TABLE: [MaterialAffordance; 21] = [
         refusal_reason: None,
     },
     MaterialAffordance {
-        id: 16, // oil
+        id: 19,
         name: "oil",
         solid: false,
         diggable: false,
@@ -514,7 +514,7 @@ const MATERIAL_TABLE: [MaterialAffordance; 21] = [
         refusal_reason: None,
     },
     MaterialAffordance {
-        id: 29, // iron
+        id: 68,
         name: "iron",
         solid: true,
         diggable: true,
@@ -2492,14 +2492,14 @@ mod tests {
         // transparent black + physics treats them as air.
         for (id, expected_name) in [
             (13u16, "water"),
-            (16, "oil"),
+            (19, "oil"),
             (21, "acid"),
             (26, "lava"),
-            (29, "iron"),
             (43, "co2"),
             (50, "steam"),
             (62, "smoke"),
             (65, "fire_intense"),
+            (68, "iron"),
             (71, "cloud"),
             (87, "rain"),
             (88, "acid_droplet"),
