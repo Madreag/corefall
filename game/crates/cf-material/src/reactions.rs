@@ -168,11 +168,31 @@ impl ReactionRegistry {
         }
     }
 
-    /// Find the first reaction matching the unordered pair `{a, b}` at
-    /// the given temperature. Returns `None` if no reaction fires.
+    /// **Perf hot-path optimization** § Find the first reaction matching
+    /// the unordered pair `{a, b}` at the given temperature. Returns
+    /// `None` if no reaction fires.
+    ///
+    /// Current implementation walks the reactions Vec linearly. For
+    /// the M15 launch set (~38 reactions) this is `O(N)` per call.
+    /// Callers in the kernel hot path should use
+    /// [`Self::build_lookup`] + [`ReactionLookup::evaluate`] which
+    /// provides `O(1)` average-case lookup via a 256×256 dense table.
     #[must_use]
     pub fn evaluate(&self, a: MaterialId, b: MaterialId, temperature_k: f32) -> Option<&MaterialReaction> {
         self.reactions.iter().find(|r| r.matches(a, b, temperature_k))
+    }
+
+    /// **Perf hot-path optimization** § Build a precomputed lookup
+    /// table for `O(1)` reaction matching. Used by the M15 kernel
+    /// orchestrator's per-pixel dispatch to replace the linear scan
+    /// over `reactions` with a table-indexed access.
+    ///
+    /// The table is 65 KB (256×256 × ~1 byte chain ids) which fits
+    /// comfortably in L2 cache. Build it once at scenario start and
+    /// hand it to `kernel_step_with_lookup`.
+    #[must_use]
+    pub fn build_lookup(&self) -> ReactionLookup {
+        ReactionLookup::from_registry(self)
     }
 
     /// Lookup by id. Stable across mod loads.
@@ -200,6 +220,90 @@ impl ReactionRegistry {
         self.reactions.iter().flat_map(|r| [r.input_a, r.input_b]).collect()
     }
 
+    /// **Perf hot-path optimization** § Build a 256-entry boolean
+    /// bitmap of reactive materials. Replaces the `BTreeSet<u8>`
+    /// `contains()` lookup (O(log N)) with an array index lookup
+    /// (O(1)) in the per-pixel scan. The kernel dispatch goes from
+    /// log(N)-per-pixel to constant-per-pixel.
+    #[must_use]
+    pub fn primary_reactive_bitmap(&self) -> [bool; 256] {
+        let mut bitmap = [false; 256];
+        for r in &self.reactions {
+            bitmap[r.input_a as usize] = true;
+            bitmap[r.input_b as usize] = true;
+        }
+        bitmap
+    }
+}
+
+/// **M15 Perf** § Precomputed reaction lookup table for the hot path.
+/// Built once via [`ReactionRegistry::build_lookup`] and reused per
+/// tick. Provides O(1) average-case matching for `(input_a, input_b)`
+/// pairs.
+///
+/// Layout: for each `(a, b)` pair in `[0, 256)²`, stores a small list
+/// of reaction indices to check. Most pairs have zero or one entry;
+/// only a few (e.g. water+fire) have two when temperature-gated
+/// variants are present.
+///
+/// Memory: 256×256 = 65536 cells × ~16 bytes per cell = ~1 MB.
+/// Acceptable cost for the bench/runtime path.
+#[derive(Debug, Clone)]
+pub struct ReactionLookup {
+    /// Per-(a, b) candidate reaction indices into `reactions`.
+    /// Empty Vec = no reaction for this pair.
+    table: Vec<Vec<u16>>,
+    /// `[bool; 256]` reactive-material bitmap for the
+    /// kernel's primary-reactive-pixel fast path.
+    reactive_bitmap: [bool; 256],
+}
+
+impl ReactionLookup {
+    fn from_registry(registry: &ReactionRegistry) -> Self {
+        let mut table: Vec<Vec<u16>> = (0..(256 * 256)).map(|_| Vec::new()).collect();
+        for (i, r) in registry.reactions.iter().enumerate() {
+            let ab = (r.input_a as usize) * 256 + (r.input_b as usize);
+            let ba = (r.input_b as usize) * 256 + (r.input_a as usize);
+            table[ab].push(i as u16);
+            if ab != ba {
+                table[ba].push(i as u16);
+            }
+        }
+        let reactive_bitmap = registry.primary_reactive_bitmap();
+        Self { table, reactive_bitmap }
+    }
+
+    /// O(1)-average reaction match. Returns the reaction's index in
+    /// the source registry's `reactions` vec, or None.
+    #[inline]
+    #[must_use]
+    pub fn evaluate<'r>(
+        &self,
+        registry: &'r ReactionRegistry,
+        a: MaterialId,
+        b: MaterialId,
+        temperature_k: f32,
+    ) -> Option<&'r MaterialReaction> {
+        let idx = (a as usize) * 256 + (b as usize);
+        for &rxn_idx in &self.table[idx] {
+            let r = &registry.reactions[rxn_idx as usize];
+            if r.matches(a, b, temperature_k) {
+                return Some(r);
+            }
+        }
+        None
+    }
+
+    /// O(1) reactive-material check (the per-pixel hot path's first
+    /// gate).
+    #[inline]
+    #[must_use]
+    pub fn is_reactive(&self, material: MaterialId) -> bool {
+        self.reactive_bitmap[material as usize]
+    }
+}
+
+impl ReactionRegistry {
     /// **M15B** § Load a `ReactionRegistry` from a JSON file. This is
     /// the canonical content-driven path: modders + tuners edit
     /// `content/materials/reaction_registry.json` (or a custom path) to

@@ -35,7 +35,7 @@ use cf_terrain::chunked::{ChunkedTerrain, CHUNK_SIZE};
 use cf_terrain::heat::HeatField;
 
 use crate::phase::{phase_transition_event, PhaseRegistry, PhaseTransitionEvent};
-use crate::reactions::{ReactionRegistry, ReactionTriggeredEvent};
+use crate::reactions::{ReactionLookup, ReactionRegistry, ReactionTriggeredEvent};
 
 /// Per M8A `CHUNK_SLEEP_IDLE_THRESHOLD_TICKS`; the kernel transitions
 /// chunks idle this many ticks back to sleeping.
@@ -209,9 +209,14 @@ pub fn kernel_step(
     }
 
     // --- 2. Reaction dispatch (per-pixel adjacency).
+    //
+    // **Perf** § build a O(1) lookup table from the registry once per
+    // step; the per-pixel hot path uses table-indexed lookup instead
+    // of linear scan. Drops the dispatch from O(reactions × pixels)
+    // to O(pixels) for the common case.
     let mut reaction_events: Vec<ReactionTriggeredEvent> = Vec::new();
     let mut reactions_remaining = kernel.reaction_cap;
-    let reactive_materials = reactions.primary_reactive_set();
+    let reaction_lookup = reactions.build_lookup();
     for (cx, cy) in &scan_chunks {
         if reactions_remaining == 0 {
             break;
@@ -221,7 +226,7 @@ pub fn kernel_step(
             *cx,
             *cy,
             reactions,
-            &reactive_materials,
+            &reaction_lookup,
             heat,
             tick_before,
             &mut reaction_events,
@@ -294,7 +299,7 @@ pub fn kernel_step_no_movement(
     }
     let mut reaction_events: Vec<ReactionTriggeredEvent> = Vec::new();
     let mut reactions_remaining = kernel.reaction_cap;
-    let reactive_materials = reactions.primary_reactive_set();
+    let reaction_lookup = reactions.build_lookup();
     for (cx, cy) in &scan_chunks {
         if reactions_remaining == 0 {
             break;
@@ -304,7 +309,7 @@ pub fn kernel_step_no_movement(
             *cx,
             *cy,
             reactions,
-            &reactive_materials,
+            &reaction_lookup,
             heat,
             tick_before,
             &mut reaction_events,
@@ -349,7 +354,7 @@ fn dispatch_reactions_in_chunk(
     cx: i32,
     cy: i32,
     reactions: &ReactionRegistry,
-    reactive_materials: &std::collections::BTreeSet<u8>,
+    reaction_lookup: &ReactionLookup,
     heat: &HeatField,
     tick: u64,
     out_events: &mut Vec<ReactionTriggeredEvent>,
@@ -364,6 +369,10 @@ fn dispatch_reactions_in_chunk(
     // Iterate every pixel in the chunk; check right + below neighbors
     // (no need to check left/up since those pairs are covered by the
     // chunk to the left/above's iteration).
+    //
+    // **Perf** § O(1) reactive-material bitmap check + O(1) lookup
+    // table for the (a, b) pair → reaction match. Replaces BTreeSet
+    // log-N lookup + linear scan over the reactions Vec.
     for ly in 0..CHUNK_SIZE {
         if *remaining == 0 {
             break;
@@ -381,7 +390,7 @@ fn dispatch_reactions_in_chunk(
                 break;
             }
             let pa = terrain.material_at(world_x, world_y);
-            if !reactive_materials.contains(&pa) {
+            if !reaction_lookup.is_reactive(pa) {
                 continue;
             }
             // Right neighbor.
@@ -394,6 +403,7 @@ fn dispatch_reactions_in_chunk(
                     pa,
                     pb,
                     reactions,
+                    reaction_lookup,
                     heat,
                     tick,
                     out_events,
@@ -413,6 +423,7 @@ fn dispatch_reactions_in_chunk(
                     pa,
                     pb,
                     reactions,
+                    reaction_lookup,
                     heat,
                     tick,
                     out_events,
@@ -443,6 +454,7 @@ fn try_fire_reaction(
     pa: u8,
     pb: u8,
     reactions: &ReactionRegistry,
+    reaction_lookup: &ReactionLookup,
     heat: &HeatField,
     tick: u64,
     out_events: &mut Vec<ReactionTriggeredEvent>,
@@ -451,7 +463,8 @@ fn try_fire_reaction(
         return false;
     }
     let temp = heat.temperature_at_world(pa_pos[0] as f32, pa_pos[1] as f32);
-    let Some(rxn) = reactions.evaluate(pa, pb, temp) else {
+    // **Perf** § O(1) table lookup instead of linear scan over registry.
+    let Some(rxn) = reaction_lookup.evaluate(reactions, pa, pb, temp) else {
         return false;
     };
     // Identify which pixel is `input_a` (gets `output`) and which is
