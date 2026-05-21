@@ -374,12 +374,28 @@ impl ReactionRegistry {
     /// when the file isn't present. The default path-then-fallback
     /// pattern lets `cargo test` work without content/ on the path
     /// while runtime + modders edit the JSON.
+    ///
+    /// **Modder feedback**: when the JSON file IS present but fails to
+    /// parse, this emits a `tracing::warn!` with the error before
+    /// falling back to the hardcoded set. Without this, modders making
+    /// a JSON typo would silently get hardcoded behavior with no
+    /// indication their file was rejected.
     #[must_use]
     pub fn load_default_or_hardcoded() -> Self {
-        match Self::locate_default().and_then(|p| Self::load_from_file(&p).ok()) {
-            Some(r) => r,
-            None => default_reaction_registry(),
+        if let Some(path) = Self::locate_default() {
+            match Self::load_from_file(&path) {
+                Ok(r) => return r,
+                Err(err) => {
+                    tracing::warn!(
+                        target: "cf_material::reactions",
+                        path = %path.display(),
+                        error = ?err,
+                        "reaction_registry.json present but failed to load — falling back to hardcoded defaults"
+                    );
+                }
+            }
         }
+        default_reaction_registry()
     }
 }
 

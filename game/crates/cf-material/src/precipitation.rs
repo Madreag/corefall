@@ -212,12 +212,26 @@ impl PrecipitationConfig {
 
     /// **M15B** § Load from the default path or fall back to spec-
     /// baked constants when the JSON file isn't present.
+    ///
+    /// **Modder feedback**: emits a `tracing::warn!` when the JSON
+    /// file IS present but fails to parse so a typo isn't silently
+    /// swallowed.
     #[must_use]
     pub fn load_default_or_baseline() -> Self {
-        match Self::locate_default().and_then(|p| Self::load_from_file(&p).ok()) {
-            Some(c) => c,
-            None => Self::default(),
+        if let Some(path) = Self::locate_default() {
+            match Self::load_from_file(&path) {
+                Ok(c) => return c,
+                Err(err) => {
+                    tracing::warn!(
+                        target: "cf_material::precipitation",
+                        path = %path.display(),
+                        error = ?err,
+                        "precipitation_config.json present but failed to load — falling back to baseline defaults"
+                    );
+                }
+            }
         }
+        Self::default()
     }
 
     /// **M15B** § Pressure-rate multiplier using THIS config's pressure

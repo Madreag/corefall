@@ -747,6 +747,15 @@ pub fn material_id_from_name(name: &str) -> Option<MaterialId> {
         "cloud" => Some(71),
         "rain" => Some(87),
         "acid_droplet" => Some(88),
+        // **M15** § active material set — names from
+        // `content/materials/material_registry.json`.
+        "oil" => Some(16),
+        "acid" => Some(21),
+        "lava" => Some(26),
+        "iron" => Some(29),
+        "co2" => Some(43),
+        "smoke" => Some(62),
+        "fire_intense" => Some(65),
         _ => None,
     }
 }

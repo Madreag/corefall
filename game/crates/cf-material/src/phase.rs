@@ -217,12 +217,26 @@ impl PhaseRegistry {
     /// **M15B** § Load the canonical registry from the default JSON
     /// path, or fall back to the hardcoded `default_phase_registry`
     /// when the file isn't present.
+    ///
+    /// **Modder feedback**: emits a `tracing::warn!` when the JSON
+    /// file IS present but fails to parse, so a typo isn't silently
+    /// swallowed.
     #[must_use]
     pub fn load_default_or_hardcoded() -> Self {
-        match Self::locate_default().and_then(|p| Self::load_from_file(&p).ok()) {
-            Some(r) => r,
-            None => default_phase_registry(),
+        if let Some(path) = Self::locate_default() {
+            match Self::load_from_file(&path) {
+                Ok(r) => return r,
+                Err(err) => {
+                    tracing::warn!(
+                        target: "cf_material::phase",
+                        path = %path.display(),
+                        error = ?err,
+                        "phase_registry.json present but failed to load — falling back to hardcoded defaults"
+                    );
+                }
+            }
         }
+        default_phase_registry()
     }
 
     /// Find the first transition that fires for `(material, prev_t, t)`.

@@ -89,6 +89,22 @@ Last updated: 5/20/2026 11:55 PM MST
 - 4285 tests passing
 - Committed as fd39e529
 
+### Session 9 (5/20/2026): M15 material affordances + render visibility
+- Extended cf-terrain MATERIAL_TABLE from launch-9 → 21 entries
+- Added 12 M15 affordances: water(13), oil(16), acid(21), lava(26), iron(29),
+  co2(43), steam(50), smoke(62), fire_intense(65), cloud(71), rain(87),
+  acid_droplet(88)
+- Includes physics-relevant fields: hardness, hazard+damage_per_tick,
+  density, friction, stickiness, overlay_rgba (visible colors)
+- Smoke blocks LOS=true (combat-relevant), others false
+- Hazardous materials (acid 2 dpt, lava 12 dpt, fire_intense 8 dpt,
+  acid_droplet 2 dpt) emit per-tick actor damage
+- 2 new tests: val_m15b_material_affordances_cover_active_set + val_m15b_hazardous_materials_damage_actors
+- Result: players now SEE fire spreading, steam rising, rain falling, etc.
+  instead of invisible chemistry behind transparent pixels
+- 4288 tests passing (was 4286, +2 new)
+- Committed as 4a2243a2
+
 ### Session 8 (5/20/2026): Steam scan opt + dynamic heat field
 - Steam pixel scan now iterates ONLY awake chunks (was O(W*H) full world scan)
   - For typical scene: 4 awake chunks × 4096 = 16K lookups (vs 1M)
