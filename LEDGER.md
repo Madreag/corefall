@@ -1,7 +1,7 @@
 # Corefall — Refactor Ledger
 
 **Purpose**: persistent cross-session memory. Read this FIRST when resuming work.
-Last updated: 5/20/2026 11:55 PM MST
+Last updated: 5/21/2026 12:30 AM MST
 
 ---
 
@@ -89,6 +89,21 @@ Last updated: 5/20/2026 11:55 PM MST
 - 4285 tests passing
 - Committed as fd39e529
 
+### Session 10 (5/21/2026): Modder warnings + radiative heat cooling
+- ReactionRegistry / PhaseRegistry / PrecipitationConfig loaders now emit
+  tracing::warn! when JSON file is present but fails to parse (instead
+  of silently falling back). Modders editing JSON with a typo now see
+  the error.
+- material_id_from_name extended with missing M15 names: oil(16),
+  acid(21), lava(26), iron(29), co2(43), smoke(62), fire_intense(65)
+- HeatField gained cool_toward_ambient(mix): lerps each cell toward
+  ambient by mix per call. Engine calls it after diffuse with mix=0.01
+  so isolated hot cells return to ambient over ~100 ticks (radiative
+  loss simulation).
+- 2 new heat tests (cool_toward_ambient + zero-mix noop)
+- 4290 tests passing (was 4288, +2 new)
+- Committed as 8911cf53 + 2d14d2ba
+
 ### Session 9 (5/20/2026): M15 material affordances + render visibility
 - Extended cf-terrain MATERIAL_TABLE from launch-9 → 21 entries
 - Added 12 M15 affordances: water(13), oil(16), acid(21), lava(26), iron(29),
@@ -147,50 +162,45 @@ Last updated: 5/20/2026 11:55 PM MST
 ### HIGH PRIORITY — true blockers to proper simulation
 
 1. ~~**M15 kernel_step not wired into cf-control engine drive_tick**~~ ✅ DONE in Session 5
+2. ~~**HeatField is stub-initialized at ambient and never updated**~~ ✅ DONE in Session 8 (dynamic heat injection + diffusion)
+3. ~~**PrecipitationCycle::world hardcoded to AmbientWorld::Earth**~~ ✅ DONE in Session 6 (inferred from scenario id)
+4. ~~**Steam pixel scan O(W*H) per tick**~~ ✅ DONE in Session 8 (awake-chunk-only scan)
+5. ~~**M15 active materials invisible to renderer**~~ ✅ DONE in Session 9 (12 affordances added to MATERIAL_TABLE)
+6. ~~**HeatField doesn't cool toward ambient**~~ ✅ DONE in Session 10 (cool_toward_ambient at 1%/tick)
 
-2. **No actual parallelism in sim hot path**
+7. **No actual parallelism in sim hot path** (DEFERRED - high risk to determinism)
    - rayon added to workspace, chunk_summary parallelized (small win)
-   - M15 kernel single-threaded — bench shows 56ms p99 at 100K pixels (14× over 4ms budget)
-   - Add 4-color phase parallel mode to dispatch_reactions_in_chunk + dispatch_phase_in_chunk
-   - Requires careful determinism handling (collect-then-apply pattern; within-chunk cascade via local override map)
-   - `MaterialKernel::with_parallel(bool)` opt-in API exists; needs implementation
+   - M15 kernel single-threaded — bench shows ~55ms p99 at 100K pixels (14× over 4ms budget)
+   - The BTreeMap<(i32, i32), Chunk> storage prevents safe concurrent disjoint-chunk mutation
+   - Needs storage refactor: snapshot-then-apply pattern OR Chunk-keyed lock approach
+   - Risk of breaking determinism is high; needs careful test suite for byte-identical output
+   - Estimated 1-2 days of dedicated refactor work
 
-3. **CA stepper single-threaded**
-   - cf-terrain/src/ca.rs step_ca_filtered iterates chunks sequentially
-   - Margolus 2x2 pattern is data-parallel within parity but cross-chunk writes serialize it
-   - Same parallelization approach as #2
+8. **CA stepper single-threaded** (DEFERRED - same root cause as #7)
+   - Same parallelization approach + same risk profile
 
 ### MEDIUM PRIORITY — performance / config / scale
 
-4. **Material loader doesn't load FROM content registry JSON in production**
-   - Engine doesn't call MaterialRegistry::load_from_file at scenario start
-   - Hardcoded fallback only
+9. ~~**Loaders silently fail on JSON parse errors**~~ ✅ DONE in Session 10 (tracing::warn! on fallback)
+10. ~~**material_id_from_name missing M15 entries**~~ ✅ DONE in Session 9
 
-5. **No SIMD in penetration math**
-   - cf-physics::try_penetrate is per-projectile sequential
-   - Could batch with SIMD (f32x4) for the impulse formula
+11. **Material loader doesn't load FROM content registry JSON in production**
+    - Engine has narrow load paths (inspect_material, registry_color_hex_for)
+    - But MaterialRegistry isn't held in memory persistently
+    - Each lookup re-parses the JSON file — wasteful but functionally correct
+    - Real fix: load once at engine init, cache in M0Engine
 
-6. **MaterialId = u8 caps at 256 materials**
-   - Design tradeoff (1 byte per pixel) but modders will hit this
-   - Currently 89/256 used
+12. **No SIMD in penetration math**
+    - cf-physics::try_penetrate is per-projectile sequential
+    - Could batch with SIMD (f32x4) for the impulse formula
 
-7. **No projectile pair pass parallelism**
-   - cf-physics run_projectile_pair_pass iterates candidates serially
-   - Narrowphase resolution per candidate could be parallel within projectile-disjoint groups
+13. **MaterialId = u8 caps at 256 materials**
+    - Design tradeoff (1 byte per pixel) but modders will hit this
+    - Currently 89/256 used; bumping to u16 doubles terrain RAM
 
-8. **Steam pixel scan in precipitation is O(width × height) per tick**
-   - Each engine tick scans every pixel looking for steam (id=50)
-   - For 1024x1024 world = 1M pixel lookups per tick
-   - Should track steam pixels in a dedicated set maintained on writes (cf-terrain side)
-
-9. **HeatField is stub-initialized at ambient and never updated**
-   - The engine clones heat_field each tick for prev_heat_field but heat never changes
-   - M19 atmospherics needs to drive per-cell heat updates
-   - Phase transitions can't actually fire because temperature never changes
-
-10. **PrecipitationCycle::world is hardcoded to AmbientWorld::Earth**
-    - Scenarios should set this from their config (Vulcan ambient triggers acid rain)
-    - Engine doesn't expose a way to set this currently
+14. **No projectile pair pass parallelism**
+    - cf-physics run_projectile_pair_pass iterates candidates serially
+    - Narrowphase resolution per candidate could be parallel within projectile-disjoint groups
 
 ### LOW PRIORITY — designated future milestones (intentionally deferred)
 
