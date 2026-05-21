@@ -1309,6 +1309,10 @@ pub struct ReactionTriggeredEvent {
     pub energy_release_j: f32,
     pub auto_ignite: bool,
     pub tick: u64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub violent: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flash_color_hex: Option<String>,
 }
 
 /// **M15** § build a [`ReactionTriggeredEvent`] from a matched reaction.
@@ -1330,19 +1334,11 @@ pub fn reaction_event(reaction: &MaterialReaction, pos: [i32; 2], tick: u64) -> 
         energy_release_j: reaction.energy_release_j,
         auto_ignite: reaction.auto_ignite,
         tick,
+        violent: reaction.violent,
+        flash_color_hex: reaction.flash_color_hex.clone(),
     }
 }
 
-/// **M15B** § Build a [`ReactionTriggeredEvent`] WITH the actual
-/// emission positions filled in. The kernel orchestrator calls this
-/// after placing emission pixels in adjacent air cells so the recorder
-/// event carries the full spatial record of every output from the
-/// reaction.
-///
-/// `emission_positions` must be the same length as
-/// `reaction.emissions`. Entries that couldn't be placed (no adjacent
-/// air cell) MUST use the sentinel `[i32::MIN, i32::MIN]` so consumers
-/// can filter them out.
 #[must_use]
 pub fn reaction_event_with_emissions(
     reaction: &MaterialReaction,
@@ -1362,6 +1358,8 @@ pub fn reaction_event_with_emissions(
         energy_release_j: reaction.energy_release_j,
         auto_ignite: reaction.auto_ignite,
         tick,
+        violent: reaction.violent,
+        flash_color_hex: reaction.flash_color_hex.clone(),
     }
 }
 

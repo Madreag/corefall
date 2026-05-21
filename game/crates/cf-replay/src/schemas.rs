@@ -587,6 +587,8 @@ const SCHEMA_MATERIAL_PRECIPITATION_STARTED: &str =
     include_str!("../schemas/event/material_precipitation_started.json");
 const SCHEMA_MATERIAL_GPU_CPU_DIVERGENCE_DETECTED: &str =
     include_str!("../schemas/event/material_gpu_cpu_divergence_detected.json");
+const SCHEMA_MATERIAL_VIOLENT_BURST: &str =
+    include_str!("../schemas/event/material_violent_burst.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -1061,6 +1063,7 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("material", "phase_nucleated") => Some(SCHEMA_MATERIAL_PHASE_NUCLEATED),
         ("material", "precipitation_started") => Some(SCHEMA_MATERIAL_PRECIPITATION_STARTED),
         ("material", "gpu_cpu_divergence_detected") => Some(SCHEMA_MATERIAL_GPU_CPU_DIVERGENCE_DETECTED),
+        ("material", "violent_burst") => Some(SCHEMA_MATERIAL_VIOLENT_BURST),
         _ => None,
     }
 }

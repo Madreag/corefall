@@ -5124,31 +5124,45 @@ impl M0Engine {
                 };
                 // Snapshot heat field for next-tick threshold detection.
                 state.prev_heat_field = Some(state.heat_field.clone());
-                // Route reaction events to the recorder.
                 for ev in &report.reactions {
                     let mut emission_positions_json: Vec<serde_json::Value> = Vec::new();
                     for p in &ev.emission_positions {
                         emission_positions_json.push(json!([p[0], p[1]]));
                     }
-                    self.recorder.record(
-                        tick,
-                        sim_time_ms,
-                        "material",
-                        "reaction_triggered",
-                        json!({
-                            "reaction_id": ev.reaction_id,
-                            "material_a": ev.material_a,
-                            "material_b": ev.material_b,
-                            "output": ev.output,
-                            "byproduct": ev.byproduct,
-                            "emissions": ev.emissions,
-                            "emission_positions": emission_positions_json,
-                            "pos": ev.pos,
-                            "energy_release_j": ev.energy_release_j,
-                            "auto_ignite": ev.auto_ignite,
-                        }),
-                        None,
-                    );
+                    let mut payload = json!({
+                        "reaction_id": ev.reaction_id,
+                        "material_a": ev.material_a,
+                        "material_b": ev.material_b,
+                        "output": ev.output,
+                        "byproduct": ev.byproduct,
+                        "emissions": ev.emissions,
+                        "emission_positions": emission_positions_json,
+                        "pos": ev.pos,
+                        "energy_release_j": ev.energy_release_j,
+                        "auto_ignite": ev.auto_ignite,
+                    });
+                    if ev.violent {
+                        payload["violent"] = serde_json::Value::Bool(true);
+                        if let Some(c) = &ev.flash_color_hex {
+                            payload["flash_color_hex"] = serde_json::Value::String(c.clone());
+                        }
+                    }
+                    self.recorder.record(tick, sim_time_ms, "material", "reaction_triggered", payload.clone(), None);
+                    if ev.violent {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "material",
+                            "violent_burst",
+                            json!({
+                                "reaction_id": ev.reaction_id,
+                                "pos": ev.pos,
+                                "energy_release_j": ev.energy_release_j,
+                                "flash_color_hex": ev.flash_color_hex,
+                            }),
+                            None,
+                        );
+                    }
                 }
                 // Route phase-transition events to the recorder.
                 for ev in &report.phase_transitions {
