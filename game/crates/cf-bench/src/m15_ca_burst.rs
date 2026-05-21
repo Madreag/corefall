@@ -69,7 +69,7 @@ fn drive_ca_burst(args: &BenchArgs) -> PerfReport {
     // pre-seeds awake chunks where active pixels live so the first
     // tick has work to do without a warm-up tick.
     seed_awake_chunks(&mut terrain);
-    let mut kernel = MaterialKernel::new().with_wake_sleep_gating(true);
+    let mut kernel = MaterialKernel::new().with_wake_sleep_gating(true).with_parallel(true);
 
     let mut terrain_samples = Vec::with_capacity(args.ticks as usize);
     for _ in 0..args.ticks {

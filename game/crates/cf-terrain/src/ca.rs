@@ -79,14 +79,14 @@ pub fn ca_movement_class(id: MaterialId) -> CaMovementClass {
     }
 }
 
-/// **M15** § stepper state. Held in the engine and bumped one parity
-/// per CA tick.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaStepperState {
     pub tick: u64,
     pub parity: u8,
     pub pixels_moved: u64,
     pub reactions_evaluated: u64,
+    #[serde(default)]
+    pub parallel: bool,
 }
 
 impl Default for CaStepperState {
@@ -96,6 +96,7 @@ impl Default for CaStepperState {
             parity: 0,
             pixels_moved: 0,
             reactions_evaluated: 0,
+            parallel: false,
         }
     }
 }
@@ -148,6 +149,9 @@ pub fn step_ca_filtered(
     stepper: &mut CaStepperState,
     awake_only: bool,
 ) -> CaStepReport {
+    if stepper.parallel {
+        return step_ca_filtered_parallel(terrain, stepper, awake_only);
+    }
     let parity = stepper.parity;
     let tick = stepper.tick;
     let chunk_coords = if awake_only {
@@ -310,6 +314,199 @@ fn apply_margolus_2x2(terrain: &mut ChunkedTerrain, x: i64, y: i64, tick: u64) -
     moved
 }
 
+/// Parallel CA stepper. Per-chunk processing runs concurrently against
+/// independent pixel buffers; final write-back to terrain is sequential
+/// to preserve M3 dirty-rect contract + deterministic event ordering.
+fn step_ca_filtered_parallel(
+    terrain: &mut ChunkedTerrain,
+    stepper: &mut CaStepperState,
+    awake_only: bool,
+) -> CaStepReport {
+    use rayon::prelude::*;
+
+    let parity = stepper.parity;
+    let tick = stepper.tick;
+    let chunk_coords = if awake_only {
+        terrain.awake_chunk_coords()
+    } else {
+        terrain.allocated_chunk_coords()
+    };
+
+    let width = terrain.width_px as i64;
+    let height = terrain.height_px as i64;
+    let chunk_size_i = CHUNK_SIZE as i64;
+
+    let snapshots: Vec<(i32, i32, Vec<MaterialId>)> = chunk_coords
+        .iter()
+        .filter_map(|(cx, cy)| terrain.chunk_pixels_clone(*cx, *cy).map(|p| (*cx, *cy, p)))
+        .collect();
+
+    let processed: Vec<(i32, i32, Vec<MaterialId>, u32, bool)> = snapshots
+        .into_par_iter()
+        .map(|(cx, cy, mut pixels)| {
+            let mut moved = 0u32;
+            let mut chunk_dirty = false;
+            let chunk_origin_x = (cx as i64) * chunk_size_i;
+            let chunk_origin_y = (cy as i64) * chunk_size_i;
+            apply_chunk_ca_to_buffer(
+                &mut pixels,
+                parity,
+                chunk_origin_x,
+                chunk_origin_y,
+                width,
+                height,
+                &mut moved,
+                &mut chunk_dirty,
+            );
+            (cx, cy, pixels, moved, chunk_dirty)
+        })
+        .collect();
+
+    let mut total_moved: u32 = 0;
+    let mut dirty: Vec<(i32, i32)> = Vec::new();
+    let chunk_size_i = CHUNK_SIZE as i64;
+    for (cx, cy, new_pixels, moved, chunk_dirty) in processed {
+        if !chunk_dirty {
+            continue;
+        }
+        if terrain.replace_chunk_pixels_at_tick(cx, cy, new_pixels, tick) {
+            total_moved = total_moved.saturating_add(moved);
+            dirty.push((cx, cy));
+            let world_min = [(cx as i64 * chunk_size_i) as f32, (cy as i64 * chunk_size_i) as f32];
+            let world_max = [
+                ((cx as i64 + 1) * chunk_size_i) as f32,
+                ((cy as i64 + 1) * chunk_size_i) as f32,
+            ];
+            terrain.add_updated_material_area(world_min, world_max);
+        }
+    }
+
+    for (cx, cy) in &dirty {
+        terrain.wake_chunk_neighborhood(*cx, *cy);
+    }
+    stepper.pixels_moved = stepper.pixels_moved.saturating_add(total_moved as u64);
+    stepper.advance();
+    CaStepReport {
+        tick,
+        parity,
+        pixels_moved: total_moved,
+        dirty_chunks: dirty,
+    }
+}
+
+/// Margolus 2×2 sweep over a local chunk pixel buffer. Same logic as
+/// `apply_margolus_2x2` but operates on `&mut Vec<MaterialId>` with
+/// chunk-local coordinates so it parallelizes safely.
+fn apply_chunk_ca_to_buffer(
+    pixels: &mut Vec<MaterialId>,
+    parity: u8,
+    chunk_origin_x: i64,
+    chunk_origin_y: i64,
+    world_width: i64,
+    world_height: i64,
+    moved: &mut u32,
+    chunk_dirty: &mut bool,
+) {
+    let mut ly = u32::from(parity != 0);
+    while ly + 1 < CHUNK_SIZE {
+        let world_y = chunk_origin_y + (ly as i64);
+        if world_y + 1 >= world_height {
+            ly = ly.saturating_add(2);
+            continue;
+        }
+        let mut lx = u32::from(parity != 0);
+        while lx + 1 < CHUNK_SIZE {
+            let world_x = chunk_origin_x + (lx as i64);
+            if world_x + 1 >= world_width {
+                break;
+            }
+            if apply_margolus_2x2_local(pixels, lx, ly) {
+                *moved = moved.saturating_add(1);
+                *chunk_dirty = true;
+            }
+            lx = lx.saturating_add(2);
+        }
+        ly = ly.saturating_add(2);
+    }
+}
+
+#[inline]
+fn local_idx(lx: u32, ly: u32) -> usize {
+    (ly as usize) * (CHUNK_SIZE as usize) + (lx as usize)
+}
+
+fn apply_margolus_2x2_local(pixels: &mut [MaterialId], lx: u32, ly: u32) -> bool {
+    let tl = pixels[local_idx(lx, ly)];
+    let tr = pixels[local_idx(lx + 1, ly)];
+    let bl = pixels[local_idx(lx, ly + 1)];
+    let br = pixels[local_idx(lx + 1, ly + 1)];
+    if tl == 0 && tr == 0 && bl == 0 && br == 0 {
+        return false;
+    }
+    let tl_cls = ca_movement_class(tl);
+    let tr_cls = ca_movement_class(tr);
+    let air: MaterialId = 0;
+    let mut moved = false;
+
+    if matches!(tl_cls, CaMovementClass::Powder | CaMovementClass::Liquid) && bl == air {
+        pixels[local_idx(lx, ly)] = air;
+        pixels[local_idx(lx, ly + 1)] = tl;
+        moved = true;
+    } else if matches!(tl_cls, CaMovementClass::Powder | CaMovementClass::Liquid) && br == air {
+        pixels[local_idx(lx, ly)] = air;
+        pixels[local_idx(lx + 1, ly + 1)] = tl;
+        moved = true;
+    }
+    if matches!(tr_cls, CaMovementClass::Powder | CaMovementClass::Liquid) && br == air {
+        pixels[local_idx(lx + 1, ly)] = air;
+        pixels[local_idx(lx + 1, ly + 1)] = tr;
+        moved = true;
+    } else if matches!(tr_cls, CaMovementClass::Powder | CaMovementClass::Liquid) && bl == air {
+        pixels[local_idx(lx + 1, ly)] = air;
+        pixels[local_idx(lx, ly + 1)] = tr;
+        moved = true;
+    }
+
+    let bl_now = pixels[local_idx(lx, ly + 1)];
+    let tl_now = pixels[local_idx(lx, ly)];
+    let tr_now = pixels[local_idx(lx + 1, ly)];
+    if ca_movement_class(bl_now) == CaMovementClass::Gas && tl_now == air {
+        pixels[local_idx(lx, ly + 1)] = air;
+        pixels[local_idx(lx, ly)] = bl_now;
+        moved = true;
+    } else if ca_movement_class(bl_now) == CaMovementClass::Gas && tr_now == air {
+        pixels[local_idx(lx, ly + 1)] = air;
+        pixels[local_idx(lx + 1, ly)] = bl_now;
+        moved = true;
+    }
+    let br_now = pixels[local_idx(lx + 1, ly + 1)];
+    let tr_now = pixels[local_idx(lx + 1, ly)];
+    let tl_now = pixels[local_idx(lx, ly)];
+    if ca_movement_class(br_now) == CaMovementClass::Gas && tr_now == air {
+        pixels[local_idx(lx + 1, ly + 1)] = air;
+        pixels[local_idx(lx + 1, ly)] = br_now;
+        moved = true;
+    } else if ca_movement_class(br_now) == CaMovementClass::Gas && tl_now == air {
+        pixels[local_idx(lx + 1, ly + 1)] = air;
+        pixels[local_idx(lx, ly)] = br_now;
+        moved = true;
+    }
+
+    let bl_now = pixels[local_idx(lx, ly + 1)];
+    let br_now = pixels[local_idx(lx + 1, ly + 1)];
+    if ca_movement_class(bl_now) == CaMovementClass::Liquid && br_now == air {
+        pixels[local_idx(lx, ly + 1)] = air;
+        pixels[local_idx(lx + 1, ly + 1)] = bl_now;
+        moved = true;
+    } else if ca_movement_class(br_now) == CaMovementClass::Liquid && bl_now == air {
+        pixels[local_idx(lx + 1, ly + 1)] = air;
+        pixels[local_idx(lx, ly + 1)] = br_now;
+        moved = true;
+    }
+
+    moved
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -433,6 +630,50 @@ mod tests {
         step_ca(&mut t, &mut s);
         // After the step, chunk (0,0) is awake.
         assert!(t.chunk_active_region(0, 0), "chunk with falling sand must be awake");
+    }
+
+    /// Determinism: parallel + serial paths produce identical terrain
+    /// state across many ticks with mixed materials.
+    #[test]
+    fn parallel_matches_serial_byte_identical() {
+        let seed = |t: &mut ChunkedTerrain| {
+            for x in 0..32 {
+                for y in 0..16 {
+                    if (x + y) % 3 == 0 {
+                        t.set_material_pixel(x as i64, y as i64, 14, 0);
+                    } else if (x + y) % 5 == 1 {
+                        t.set_material_pixel(x as i64, y as i64, 13, 0);
+                    } else if (x + y) % 7 == 2 {
+                        t.set_material_pixel(x as i64, y as i64, 50, 0);
+                    }
+                }
+            }
+        };
+
+        let mut a = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        let mut b = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        seed(&mut a);
+        seed(&mut b);
+
+        let mut sa = CaStepperState::default();
+        let mut sb = CaStepperState { parallel: true, ..CaStepperState::default() };
+        for tick in 0..40 {
+            let ra = step_ca_filtered(&mut a, &mut sa, false);
+            let rb = step_ca_filtered(&mut b, &mut sb, false);
+            for y in 0..64i64 {
+                for x in 0..64i64 {
+                    let ma = a.material_at(x, y);
+                    let mb = b.material_at(x, y);
+                    if ma != mb {
+                        panic!(
+                            "pixel divergence at tick {tick} ({x},{y}): serial={ma} parallel={mb}, ra.moved={} rb.moved={}",
+                            ra.pixels_moved, rb.pixels_moved
+                        );
+                    }
+                }
+            }
+            assert_eq!(ra.pixels_moved, rb.pixels_moved, "moved count mismatch tick {tick}");
+        }
     }
 
     /// VAL-M15-ca-011: when `awake_only=true`, the stepper skips

@@ -2,6 +2,15 @@
 
 The ONLY rules file. ~30 lines on purpose.
 
+## HIGH PRIORITY — Never defer refactors
+
+- **Never defer a refactor because it's "high-risk", "big", or "out of scope".** Risk is not a reason to skip work. Do it.
+- **Never shy away from a refactor.** If the cleaner shape unlocks features, performance, multithreading, or GPU paths, refactor now — don't tack on a workaround.
+- **Goal:** the most feature-rich, max-performance build possible — multithreading, GPU, SIMD, parallelism wherever it pays off.
+- **Milestones are followed, not deferred.** Not for context filling up, not for token budget, not for "we'll do it next session", not for ANY reason. Finish the spec.
+- If a milestone needs a refactor to land cleanly, the refactor IS part of the milestone. Commit it under the same `<id>:` prefix.
+- The only valid stop conditions are: (a) every Acceptance Criterion is `PASS (already in)` or `IMPLEMENTED`, or (b) a real technical blocker that needs the user (use `AskUser`, not silent deferral).
+
 ## What you read during implementation
 
 ONLY these:

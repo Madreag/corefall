@@ -1627,6 +1627,41 @@ impl ChunkedTerrain {
         self.chunks.keys().map(|c| (c.cx, c.cy)).collect()
     }
 
+    /// Clone a chunk's pixel buffer for parallel snapshot-then-apply.
+    pub fn chunk_pixels_clone(&self, cx: i32, cy: i32) -> Option<Vec<MaterialId>> {
+        self.chunks.get(&ChunkCoord::new(cx, cy)).map(|c| c.pixels.clone())
+    }
+
+    /// Replace a chunk's pixel buffer atomically; updates dirty_rect to whole-chunk
+    /// and bumps last_modified_tick. Used by the parallel CA stepper after off-chunk
+    /// processing. Returns true if the chunk existed.
+    pub fn replace_chunk_pixels_at_tick(
+        &mut self,
+        cx: i32,
+        cy: i32,
+        new_pixels: Vec<MaterialId>,
+        tick: u64,
+    ) -> bool {
+        let coord = ChunkCoord::new(cx, cy);
+        let chunk = match self.chunks.get_mut(&coord) {
+            Some(c) => c,
+            None => return false,
+        };
+        if new_pixels.len() != chunk.pixels.len() {
+            return false;
+        }
+        if chunk.pixels == new_pixels {
+            return false;
+        }
+        chunk.pixels = new_pixels;
+        chunk.last_modified_tick = tick;
+        chunk.dirty_rect = Some(DirtyRect {
+            min: [0, 0],
+            max: [CHUNK_SIZE - 1, CHUNK_SIZE - 1],
+        });
+        true
+    }
+
     /// **M15** § enumerate awake chunks only (`active_region == true`)
     /// in `(cx, cy)` ascending order. Per the M15 spec § "Per-pixel
     /// cellular automata (Noita chunking)" rule: "Per-tick: only active

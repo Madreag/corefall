@@ -119,7 +119,14 @@ impl MaterialKernel {
     #[must_use]
     pub fn with_parallel(mut self, on: bool) -> Self {
         self.parallel = on;
+        self.stepper.parallel = on;
         self
+    }
+
+    /// Toggle parallel dispatch on an existing kernel.
+    pub fn set_parallel(&mut self, on: bool) {
+        self.parallel = on;
+        self.stepper.parallel = on;
     }
 
     /// Current sim tick.

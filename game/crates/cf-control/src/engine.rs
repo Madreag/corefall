@@ -2495,7 +2495,7 @@ impl M0Engine {
                 // back to hardcoded defaults when the content JSON
                 // files aren't present (e.g., headless replay-verifier
                 // without content/ on the path).
-                material_kernel: cf_material::MaterialKernel::new(),
+                material_kernel: cf_material::MaterialKernel::new().with_parallel(true),
                 reaction_registry: cf_material::ReactionRegistry::load_default_or_hardcoded(),
                 phase_registry: cf_material::PhaseRegistry::load_default_or_hardcoded(),
                 heat_field: m15_initial_heat,
