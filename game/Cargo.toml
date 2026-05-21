@@ -6,6 +6,7 @@ members = [
   "crates/cf-terrain",
   "crates/cf-physics",
   "crates/cf-material",
+  "crates/cf-material-gpu",
   "crates/cf-atmos",
   "crates/cf-environment",
   "crates/cf-actor",
@@ -94,6 +95,7 @@ crossbeam-channel = "0.5"
 fs2 = "0.4"
 bincode = { version = "2", features = ["serde"] }
 dirs-next = "2.0"
+rayon = "1.10"
 
 [profile.dev]
 opt-level = 1

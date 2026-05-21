@@ -24,6 +24,7 @@ cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
 cf-sim-core = { path = "../cf-sim-core" }
 cf-material = { path = "../cf-material" }
+cf-material-gpu = { path = "../cf-material-gpu" }
 cf-terrain = { path = "../cf-terrain" }
 
 [dev-dependencies]

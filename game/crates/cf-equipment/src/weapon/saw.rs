@@ -29,7 +29,9 @@ pub fn squad_automatic_saw() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.005,
+        bullet_sharpness: 0.85,
+};
     let mut p = WeaponPreset::new(
         SQUAD_AUTOMATIC_SAW_ID,
         "Squad Automatic Weapon",

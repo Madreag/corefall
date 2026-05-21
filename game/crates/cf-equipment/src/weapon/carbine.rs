@@ -29,7 +29,9 @@ pub fn carbine_compact() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.004,
+        bullet_sharpness: 0.85,
+};
     WeaponPreset::new(
         CARBINE_COMPACT_ID,
         "Compact Carbine",

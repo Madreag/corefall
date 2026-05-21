@@ -29,7 +29,9 @@ pub fn shotgun_pump() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Pellet,
-    };
+        bullet_mass_kg: 0.028,
+        bullet_sharpness: 0.5,
+};
     WeaponPreset::new(
         SHOTGUN_PUMP_ID,
         "Pump Shotgun",

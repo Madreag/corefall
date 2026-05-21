@@ -29,7 +29,9 @@ pub fn smg_m6_default() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.008,
+        bullet_sharpness: 0.75,
+};
     WeaponPreset::new(
         SMG_M6_DEFAULT_ID,
         "Submachine Gun",

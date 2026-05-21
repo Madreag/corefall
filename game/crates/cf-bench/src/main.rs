@@ -26,6 +26,7 @@ use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
 mod m15_ca_burst;
+mod m15b_gpu_vs_cpu;
 mod m22_pathfinder_load;
 mod m9_firehose;
 mod mp_8player_lan;
@@ -44,6 +45,10 @@ enum Cmd {
     M9Firehose(BenchArgs),
     /// M15 CA burst: 100K synthetic active pixels (placeholder for M15).
     M15CaBurst(BenchArgs),
+    /// M15B GPU vs CPU: 10000 active pixels in a 256x256 scene; records
+    /// CPU p99 + (with `--features gpu`) GPU p99.
+    #[command(name = "m15b-gpu-vs-cpu")]
+    M15bGpuVsCpu(BenchArgs),
     /// M22 pathfinder load: placeholder scaffold for M22's A* harness.
     M22PathfinderLoad(BenchArgs),
     /// 8-client deterministic lockstep replay.
@@ -120,6 +125,7 @@ fn main() -> Result<()> {
     match cli.command {
         Cmd::M9Firehose(args) => m9_firehose::run(args),
         Cmd::M15CaBurst(args) => m15_ca_burst::run(args),
+        Cmd::M15bGpuVsCpu(args) => m15b_gpu_vs_cpu::run(args),
         Cmd::M22PathfinderLoad(args) => m22_pathfinder_load::run(args),
         Cmd::Mp8PlayerLan(args) => mp_8player_lan::run(args),
         Cmd::BaselinePerfSnapshot { ticks, output } => {

@@ -29,7 +29,9 @@ pub fn battle_rifle_762() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.0098,
+        bullet_sharpness: 0.85,
+};
     WeaponPreset::new(
         BATTLE_RIFLE_762_ID,
         "7.62 Battle Rifle",

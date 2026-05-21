@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/material.precipitation_started.v0.1",
+  "title": "material.precipitation_started",
+  "description": "M15B § Precipitation cycle — cloud → rain transition event. Fires when a cloud cell crosses the saturation gate (>= 0.80) AND the 60-tick precipitation gate has elapsed since the saturation crossing. Material is rain (id=87) on Earth-baseline ambient or acid_droplet (id=88) when local or world pollutant fraction >= 0.05 (acid rain trigger; Vulcan ambient is the canonical case). Producer: cf-material::precipitation::update_cloud_cell. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "material" },
+    "event_type": { "const": "precipitation_started" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "material": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "pos": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "saturation": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "pollutant_fraction": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "ambient": { "type": "string", "enum": ["earth", "vulcan", "mimas", "mars"] }
+      },
+      "required": ["material", "pos", "saturation", "pollutant_fraction", "ambient"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

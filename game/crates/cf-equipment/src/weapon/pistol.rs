@@ -29,7 +29,9 @@ pub fn pistol_m6_default() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.0082,
+        bullet_sharpness: 0.75,
+};
     WeaponPreset::new(
         PISTOL_M6_DEFAULT_ID,
         "Service Pistol",

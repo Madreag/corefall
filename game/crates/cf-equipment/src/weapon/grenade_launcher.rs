@@ -29,7 +29,9 @@ pub fn grenade_launcher_m6_default() -> WeaponPreset {
         ai_blast_radius: 60.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::HighExplosive,
-    };
+        bullet_mass_kg: 0.23,
+        bullet_sharpness: 0.4,
+};
     WeaponPreset::new(
         GRENADE_LAUNCHER_M6_DEFAULT_ID,
         "Grenade Launcher",

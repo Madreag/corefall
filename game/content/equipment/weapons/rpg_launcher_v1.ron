@@ -14,4 +14,8 @@
   fire_interval_seconds: 1.0,
   projectile_speed: 320.0,
   damage_per_hit: 0.0,
+  // M15B+ § Real HEAT chemistry: ~10 kg warhead + shaped-charge jet
+  // (sharpness 0.7). Penetration impulse = mass × velocity × sharpness.
+  bullet_mass_kg: 10.0,
+  bullet_sharpness: 0.7,
 )

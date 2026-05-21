@@ -1,0 +1,12 @@
+{
+  "_doc": "M15B § Precipitation tuning parameters. Edit these values to tweak how easily clouds form, when precipitation triggers, how acid rain detects pollutant, etc. The engine loads this file at scenario start via PrecipitationConfig::load_default_or_baseline(). Missing fields fall back to the spec-locked baseline values via serde defaults.",
+  "nucleation_altitude_px": 80.0,
+  "nucleation_temp_k_max": 353.15,
+  "precipitation_saturation_threshold": 0.80,
+  "precipitation_tick_gate": 60,
+  "acid_rain_pollutant_fraction_min": 0.05,
+  "reference_pressure_kpa": 101.325,
+  "nucleation_pressure_min_kpa": 1.0,
+  "pressure_multiplier_lo": 0.5,
+  "pressure_multiplier_hi": 2.0
+}

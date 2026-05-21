@@ -73,20 +73,38 @@ pub fn classify_reaction(material_name: &str, zone: ZoneId, intensity: f32) -> O
 /// }
 /// ```
 ///
-/// ## Pixel-transformation convention (M15 kernel)
+/// ## Pixel-transformation convention (M15 kernel + M15B emissions)
 ///
 /// When the per-tick reaction evaluator fires this rule for an adjacent
 /// pixel pair (pa, pb):
-/// - the pixel matching `input_a` is rewritten to `output`,
-/// - the pixel matching `input_b` is rewritten to `byproduct` when
-///   `byproduct.is_some()`, otherwise the pixel keeps its `input_b`
-///   material (catalyst semantics for cascades like
-///   `oil + fire → fire`).
 ///
-/// The optional `byproduct` field is M15's hook for two-output reactions
-/// (e.g. `acid + iron → rust + hydrogen` — iron→rust via output, acid→H2
-/// via byproduct). It is `serde(default)` so legacy single-output JSON
-/// entries round-trip.
+/// 1. The pixel matching `input_a` is rewritten to `output`.
+/// 2. The pixel matching `input_b` is rewritten to `byproduct` when
+///    `byproduct.is_some()`, otherwise the pixel keeps its `input_b`
+///    material (catalyst semantics for cascades like
+///    `oil + fire → fire`).
+/// 3. **M15B** § For every material id in `emissions`, the kernel
+///    spawns one new pixel in an adjacent **air** cell (NESW search
+///    order starting from `input_a`'s neighbors then `input_b`'s
+///    neighbors). Empty `emissions` slot is dropped silently — the
+///    reaction still fires, just without tertiary spawns.
+///
+/// `byproduct` is the two-output hook for reactions whose `input_b`
+/// pixel TRANSFORMS in place (`acid + iron → rust + hydrogen` —
+/// iron→rust via output, acid→H2 via byproduct). `emissions` is the
+/// **N+ output** hook for reactions whose `input_b` STAYS unchanged
+/// (cascade reactions) but that physically release additional gas
+/// products into the surrounding air — e.g., `wood + fire → charcoal
+/// (output) + (fire stays) + smoke (emission)`. This unlocks accurate
+/// real-world chemistry — incomplete combustion, dissolution effervescence,
+/// metal-fire hydrogen release — without breaking cascade propagation.
+///
+/// Determinism: the adjacent-cell search walks NESW in fixed order
+/// (north, east, south, west) so per-tick output is byte-identical
+/// across runs.
+///
+/// Backward compat: `emissions` is `serde(default)` so legacy two-
+/// output JSON entries round-trip cleanly with an empty Vec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MaterialReaction {
     /// Stable id (e.g. `"rxn.corrosion.acid_iron"`).
@@ -96,6 +114,14 @@ pub struct MaterialReaction {
     pub output: MaterialId,
     #[serde(default)]
     pub byproduct: Option<MaterialId>,
+    /// **M15B** § Tertiary-and-beyond emissions. Each material id in
+    /// this list spawns one pixel into an adjacent air cell when the
+    /// reaction fires. Used by cascade reactions where `input_b`
+    /// stays as fire/lava (so the cascade propagates) but the
+    /// physical reaction ALSO releases gas products that the 2-slot
+    /// (output + byproduct) model can't express alone.
+    #[serde(default)]
+    pub emissions: Vec<MaterialId>,
     pub energy_release_j: f32,
     /// Per-second rate. The CA evaluator gates per-tick triggers on a
     /// deterministic threshold derived from this rate × dt_s.
@@ -173,6 +199,116 @@ impl ReactionRegistry {
     pub fn primary_reactive_set(&self) -> std::collections::BTreeSet<MaterialId> {
         self.reactions.iter().flat_map(|r| [r.input_a, r.input_b]).collect()
     }
+
+    /// **M15B** § Load a `ReactionRegistry` from a JSON file. This is
+    /// the canonical content-driven path: modders + tuners edit
+    /// `content/materials/reaction_registry.json` (or a custom path) to
+    /// add new reactions, tweak rates, change emissions — without
+    /// touching the engine source.
+    ///
+    /// The file shape matches the [`ReactionRegistry`] struct exactly
+    /// (schema_version + reactions array). All [`MaterialReaction`]
+    /// fields use `#[serde(default)]` for back-compat (emissions,
+    /// byproduct, auto_ignite, min_temperature_k, propagates).
+    pub fn load_from_file(
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, ReactionRegistryLoadError> {
+        let path_ref = path.as_ref();
+        let raw = std::fs::read_to_string(path_ref).map_err(|source| {
+            ReactionRegistryLoadError::Io {
+                path: path_ref.to_path_buf(),
+                source,
+            }
+        })?;
+        let registry: ReactionRegistry = serde_json::from_str(&raw).map_err(|source| {
+            ReactionRegistryLoadError::Parse {
+                path: path_ref.to_path_buf(),
+                source,
+            }
+        })?;
+        if registry.schema_version != Self::SCHEMA_VERSION {
+            return Err(ReactionRegistryLoadError::SchemaVersionMismatch {
+                path: path_ref.to_path_buf(),
+                expected: Self::SCHEMA_VERSION,
+                actual: registry.schema_version,
+            });
+        }
+        // Validate: no duplicate ids.
+        let mut seen = std::collections::BTreeSet::new();
+        for r in &registry.reactions {
+            if !seen.insert(r.id.clone()) {
+                return Err(ReactionRegistryLoadError::DuplicateReactionId {
+                    path: path_ref.to_path_buf(),
+                    id: r.id.clone(),
+                });
+            }
+        }
+        Ok(registry)
+    }
+
+    /// **M15B** § Resolve the canonical reaction registry path. The
+    /// engine + cf-mod tools call this to find
+    /// `content/materials/reaction_registry.json` regardless of cwd.
+    /// Returns `None` if the file isn't present (caller falls back to
+    /// [`default_reaction_registry`]).
+    #[must_use]
+    pub fn locate_default() -> Option<std::path::PathBuf> {
+        for candidate in [
+            std::path::PathBuf::from("content/materials/reaction_registry.json"),
+            std::path::PathBuf::from("../content/materials/reaction_registry.json"),
+            std::path::PathBuf::from("game/content/materials/reaction_registry.json"),
+        ] {
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+        None
+    }
+
+    /// **M15B** § Load the canonical registry from the default JSON
+    /// path, or fall back to the hardcoded `default_reaction_registry`
+    /// when the file isn't present. The default path-then-fallback
+    /// pattern lets `cargo test` work without content/ on the path
+    /// while runtime + modders edit the JSON.
+    #[must_use]
+    pub fn load_default_or_hardcoded() -> Self {
+        match Self::locate_default().and_then(|p| Self::load_from_file(&p).ok()) {
+            Some(r) => r,
+            None => default_reaction_registry(),
+        }
+    }
+}
+
+/// **M15B** § Errors from [`ReactionRegistry::load_from_file`].
+#[derive(Debug, thiserror::Error)]
+pub enum ReactionRegistryLoadError {
+    #[error("failed to read reaction registry at {}: {source}", path.display())]
+    Io {
+        path: std::path::PathBuf,
+        source: std::io::Error,
+    },
+    #[error("failed to parse reaction registry at {}: {source}", path.display())]
+    Parse {
+        path: std::path::PathBuf,
+        source: serde_json::Error,
+    },
+    #[error(
+        "schema_version mismatch in {}: expected {expected}, got {actual}",
+        path.display()
+    )]
+    SchemaVersionMismatch {
+        path: std::path::PathBuf,
+        expected: u32,
+        actual: u32,
+    },
+    #[error(
+        "duplicate reaction id {id} in {}: every reaction must have a unique stable id",
+        path.display()
+    )]
+    DuplicateReactionId {
+        path: std::path::PathBuf,
+        id: String,
+    },
 }
 
 /// Convenience: lookup a reaction in the default registry by name pair.
@@ -212,6 +348,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 21, // acid
             output: 38,  // rust
             byproduct: Some(55), // hydrogen
+            emissions: vec![],
             energy_release_j: 89_000.0,
             rate_per_s: 0.5,
             auto_ignite: false,
@@ -226,119 +363,183 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 26, // lava
             output: 50,  // steam
             byproduct: Some(70), // obsidian
+            emissions: vec![],
             energy_release_j: 2_260_000.0,
             rate_per_s: 1000.0,
             auto_ignite: false,
             min_temperature_k: Some(1373.0),
             propagates: false,
         },
-        // 3. Extinguish: water (input_a) + fire (input_b) → steam (output) + air (byproduct).
-        // Per spec gherkin "fire extinguished; steam spawns (rises)".
+        // 3a. Extinguish (water-gas shift): water (input_a) + fire (input_b) →
+        // steam (output) + hydrogen (byproduct) at high temperature. Per real
+        // chemistry: above ~973 K (carbon-burn temps), water on hot carbon
+        // fuel runs the water-gas shift `C + H2O → CO + H2`, releasing
+        // hydrogen alongside steam. This is WHY water on metal/magnesium
+        // fires is dangerous — the released H2 is explosive. The high-temp
+        // variant is listed FIRST so the registry's `find_map` returns it
+        // when the temperature gate is met; falls through to 3b otherwise.
+        MaterialReaction {
+            id: "rxn.extinguish.water_fire_water_gas_shift".to_string(),
+            input_a: 13, // water
+            input_b: 65, // fire_intense
+            output: 50,  // steam
+            byproduct: Some(55), // hydrogen (water-gas shift release)
+            emissions: vec![],
+            energy_release_j: -1_900_000.0,
+            rate_per_s: 5.0,
+            auto_ignite: false,
+            min_temperature_k: Some(973.0),
+            propagates: false,
+        },
+        // 3b. Extinguish (standard): water (input_a) + fire (input_b) →
+        // steam (output) + smoke (byproduct). Per real chemistry: the fire
+        // dies cooled below ignition temp, leaving steam from the water +
+        // smoke from the incomplete-combustion residue + ash particulates.
+        // The byproduct is smoke (id=62), NOT air — fire never goes
+        // straight to "clean air" in reality.
         MaterialReaction {
             id: "rxn.extinguish.water_fire".to_string(),
             input_a: 13, // water
             input_b: 65, // fire_intense
             output: 50,  // steam
-            byproduct: Some(0), // air (extinguishes fire)
+            byproduct: Some(62), // smoke (incomplete-combustion residue)
+            emissions: vec![],
             energy_release_j: -2_260_000.0,
             rate_per_s: 5.0,
             auto_ignite: false,
             min_temperature_k: None,
             propagates: false,
         },
-        // 4. Cascade: oil (input_a) + fire (input_b) → fire (output) + (fire stays).
-        // Oil pixel becomes fire; fire pixel stays as fire so cascade continues
-        // through adjacent oil. byproduct=None means input_b stays unchanged.
+        // 4. Cascade: oil (input_a) + fire (input_b) → fire (output) +
+        // (fire stays) + [smoke, smoke, CO2] emissions.
+        //
+        // Per real chemistry: hydrocarbon combustion (C8H18 + 12.5 O2 →
+        // 8 CO2 + 9 H2O) produces CO2 + water vapor + heavy black soot.
+        // Oil's incomplete combustion is sootier than fuel's — hence
+        // the dual smoke emission. The cascade is preserved (input_b
+        // stays as fire) so adjacent oil pixels also ignite.
         MaterialReaction {
             id: "rxn.ignition.oil_fire".to_string(),
             input_a: 19, // oil
             input_b: 65, // fire
             output: 65,  // fire (cascade)
             byproduct: None,
+            emissions: vec![62, 62, 53], // smoke + smoke + co2 (heavy black soot)
             energy_release_j: 200_000.0,
             rate_per_s: 0.8,
             auto_ignite: true,
             min_temperature_k: Some(533.0),
             propagates: true,
         },
-        // 5. Wood (input_a) + fire → charcoal (output) + (fire stays).
-        // Spec literal: "wood + fire → charcoal + ash (rate 0.6; burns away)".
-        // The pixel transforms to charcoal; the cascade through wood is gated
-        // by adjacent fire (no infinite cascade through wood).
+        // 5. Wood (input_a) + fire → charcoal (output) + (fire stays) +
+        // [smoke, CO2] emissions.
+        //
+        // Per real chemistry: cellulose combustion (C6H10O5 + 6 O2 →
+        // 6 CO2 + 5 H2O) produces CO2 + steam + smoke residue. The
+        // wood pixel becomes charcoal (the solid residue); the fire
+        // stays as fire (cascade); smoke + CO2 spawn in adjacent air.
         MaterialReaction {
             id: "rxn.ignition.wood_fire".to_string(),
             input_a: 8,  // wood
             input_b: 65, // fire
             output: 41,  // charcoal
             byproduct: None,
+            emissions: vec![62, 53], // smoke + co2
             energy_release_j: 180_000.0,
             rate_per_s: 0.6,
             auto_ignite: true,
             min_temperature_k: Some(573.0),
             propagates: true,
         },
-        // 6. Paper (input_a) + fire → ash. Fire stays.
+        // 6. Paper (input_a) + fire → ash (output) + (fire stays) +
+        // [smoke, CO2] emissions.
+        //
+        // Per real chemistry: cellulose combustion produces CO2 + H2O +
+        // soot in addition to the ash residue. Paper-fire smoke is
+        // notable — paper has lower density than wood so the soot
+        // fraction is higher.
         MaterialReaction {
             id: "rxn.ignition.paper_fire".to_string(),
             input_a: 47, // paper
             input_b: 65, // fire
             output: 40,  // ash
             byproduct: None,
+            emissions: vec![62, 53], // smoke + co2
             energy_release_j: 120_000.0,
             rate_per_s: 0.95,
             auto_ignite: true,
             min_temperature_k: Some(506.0),
             propagates: true,
         },
-        // 7. Fabric (input_a) + fire → ash. Fire stays.
+        // 7. Fabric (input_a) + fire → ash (output) + (fire stays) +
+        // [smoke, CO2] emissions. Same chemistry profile as paper
+        // (organic polymer → CO2 + H2O + soot).
         MaterialReaction {
             id: "rxn.ignition.fabric_fire".to_string(),
             input_a: 49, // fabric
             input_b: 65, // fire
             output: 40,  // ash
             byproduct: None,
+            emissions: vec![62, 53], // smoke + co2
             energy_release_j: 150_000.0,
             rate_per_s: 0.85,
             auto_ignite: true,
             min_temperature_k: Some(510.0),
             propagates: true,
         },
-        // 8. Cascade: fuel (input_a) + fire → fire (output) + (fire stays).
+        // 8. Cascade: fuel (input_a) + fire (input_b) → fire (output) +
+        // (fire stays) + [smoke, CO2] emissions.
+        //
+        // Per real chemistry: fuel combustion is more complete than oil
+        // (refined; less soot). Hence the single smoke emission vs
+        // oil's double-smoke.
         MaterialReaction {
             id: "rxn.ignition.fuel_fire".to_string(),
             input_a: 20, // fuel
             input_b: 65, // fire
             output: 65,  // fire (cascade)
             byproduct: None,
+            emissions: vec![62, 53], // smoke + co2
             energy_release_j: 250_000.0,
             rate_per_s: 0.85,
             auto_ignite: true,
             min_temperature_k: Some(483.0),
             propagates: true,
         },
-        // 9. Alcohol (input_a) + fire → steam (output) + (fire stays).
-        // Ethanol combusts cleanly to water (steam) + CO2.
+        // 9. Alcohol (input_a) + fire → steam (output) + co2 (byproduct).
+        // Per real chemistry: C2H6O + 3O2 → 2CO2 + 3H2O. Ethanol
+        // combusts to CO2 + water. The alcohol pixel becomes steam
+        // (the water product); the fire pixel becomes CO2 (the
+        // carbon-dioxide product). Both gases rise.
         MaterialReaction {
             id: "rxn.ignition.alcohol_fire".to_string(),
             input_a: 24, // alcohol
             input_b: 65, // fire
             output: 50,  // steam
-            byproduct: None,
+            byproduct: Some(53), // co2 (combustion product)
+            emissions: vec![],
             energy_release_j: 137_000.0,
             rate_per_s: 0.9,
             auto_ignite: true,
             min_temperature_k: Some(638.0),
             propagates: true,
         },
-        // 10. Explosion: gunpowder (input_a) + fire → smoke (output) + (fire stays).
-        // Energy release is the explosive impulse; the engine layer routes
-        // energy_release_j into a blast event.
+        // 10. Explosion: gunpowder (input_a) + fire → smoke (output) +
+        // (fire stays) + [smoke, smoke, CO2] emissions.
+        //
+        // Per real chemistry: black powder detonation (2 KNO3 + 3 C + S
+        // → K2S + N2 + 3 CO2) releases massive volumes of gas — CO2 +
+        // N2 + smoke + sulfur compounds. Energy release is the
+        // explosive impulse; the engine layer routes energy_release_j
+        // into a blast event. The emissions feed the visual smoke
+        // plume that lingers after the detonation.
         MaterialReaction {
             id: "rxn.explosion.gunpowder_fire".to_string(),
             input_a: 48, // gunpowder
             input_b: 65, // fire
             output: 62,  // smoke
             byproduct: None,
+            emissions: vec![62, 62, 53], // dense smoke cloud + co2
             energy_release_j: 1_850_000.0,
             rate_per_s: 5.0,
             auto_ignite: true,
@@ -353,48 +554,67 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 51, // oxygen
             output: 53,  // co2
             byproduct: Some(50), // steam
+            emissions: vec![],
             energy_release_j: 890_400.0,
             rate_per_s: 0.9,
             auto_ignite: false,
             min_temperature_k: Some(573.0),
             propagates: false,
         },
-        // 12. Combustion: H2 (input_a) + O2 (input_b) → steam (output) + air (byproduct).
-        // 2 H2 + O2 → 2 H2O. Both pixels consumed.
+        // 12. Combustion: H2 (input_a) + O2 (input_b) → steam (output) +
+        // steam (byproduct). Per real chemistry: 2 H2 + O2 → 2 H2O. Both
+        // reactants are fully consumed into water. The H2 pixel and the
+        // O2 pixel BOTH become steam (water vapor) — the carbon-free
+        // combustion has no other byproducts at all (no CO2, no soot,
+        // no smoke).
         MaterialReaction {
             id: "rxn.combustion.h2_o2".to_string(),
             input_a: 55, // hydrogen
             input_b: 51, // oxygen
             output: 50,  // steam
-            byproduct: Some(0), // air (O2 consumed; only steam remains nearby)
+            byproduct: Some(50), // steam (O2 also → H2O via 2H2+O2 stoich)
+            emissions: vec![],
             energy_release_j: 483_600.0,
             rate_per_s: 1.0,
             auto_ignite: false,
             min_temperature_k: Some(773.0),
             propagates: false,
         },
-        // 13. Combustion: coal (input_a) + O2 (input_b) → ash (output) + CO2 (byproduct).
-        // Coal solid pixel → ash residue; O2 pixel → CO2.
+        // 13. Combustion: coal (input_a) + O2 (input_b) → ash (output) +
+        // CO2 (byproduct) + [smoke] emission.
+        //
+        // Per real chemistry: incomplete combustion of coal releases
+        // smoke (soot + tar) in addition to the CO2. Even oxygen-fed
+        // coal combustion has visible black smoke unless the burn is
+        // perfectly stoichiometric — which it almost never is on a
+        // pixel-CA timescale.
         MaterialReaction {
             id: "rxn.combustion.coal_o2".to_string(),
             input_a: 33, // coal
             input_b: 51, // oxygen
             output: 40,  // ash
             byproduct: Some(53), // co2
+            emissions: vec![62], // smoke (incomplete combustion soot)
             energy_release_j: 393_500.0,
             rate_per_s: 0.5,
             auto_ignite: false,
             min_temperature_k: Some(973.0),
             propagates: false,
         },
-        // 14. Neutralization: acid (input_a) + alkali (input_b) → brine (output) + brine (byproduct).
-        // Both pixels neutralize to brine.
+        // 14. Neutralization: acid (input_a) + alkali (input_b) →
+        // brine (output) + brine (byproduct) + [steam] emission.
+        //
+        // Per real chemistry: strong-acid + strong-base neutralization
+        // (HCl + NaOH → NaCl + H2O) is highly exothermic (ΔH ≈ -57 kJ
+        // /mol). At reactor concentrations the heat boils off some of
+        // the water → steam plume above the reaction site.
         MaterialReaction {
             id: "rxn.neutralization.acid_alkali".to_string(),
             input_a: 21, // acid
             input_b: 22, // alkali
             output: 67,  // neutralized_brine
             byproduct: Some(67), // neutralized_brine
+            emissions: vec![50], // steam (exothermic; boils local water)
             energy_release_j: 57_000.0,
             rate_per_s: 5.0,
             auto_ignite: false,
@@ -408,6 +628,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 65, // fire
             output: 68,  // iron
             byproduct: None,
+            emissions: vec![],
             energy_release_j: -247_000.0,
             rate_per_s: 0.2,
             auto_ignite: false,
@@ -421,6 +642,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 65, // fire
             output: 73,  // gold
             byproduct: None,
+            emissions: vec![],
             energy_release_j: -63_000.0,
             rate_per_s: 0.25,
             auto_ignite: false,
@@ -435,6 +657,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 13, // water
             output: 67,  // neutralized_brine
             byproduct: Some(67),
+            emissions: vec![],
             energy_release_j: 4_000.0,
             rate_per_s: 0.5,
             auto_ignite: false,
@@ -448,20 +671,28 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 13, // water
             output: 66,  // polluted_water (syrup proxy)
             byproduct: Some(66),
+            emissions: vec![],
             energy_release_j: 12_000.0,
             rate_per_s: 0.4,
             auto_ignite: false,
             min_temperature_k: Some(273.0),
             propagates: false,
         },
-        // 19. Ignition: coal (input_a) + fire (input_b) → fire (output) cascade.
-        // Coal needs higher temp than wood (973K vs 573K).
+        // 19. Ignition: coal (input_a) + fire (input_b) → fire (output)
+        // cascade + [smoke, smoke, CO2] emissions.
+        //
+        // Per real chemistry: coal combustion (C + O2 → CO2) plus the
+        // characteristic "coal smoke" from incomplete burning of
+        // bituminous coal (releases SO2 + soot + tar). Coal needs
+        // higher ignition temp than wood (973 K vs 573 K) per the
+        // existing M15 gate.
         MaterialReaction {
             id: "rxn.ignition.coal_fire".to_string(),
             input_a: 33, // coal
             input_b: 65, // fire
             output: 65,  // fire (cascade)
             byproduct: None,
+            emissions: vec![62, 62, 53], // dense coal smoke + co2
             energy_release_j: 393_500.0,
             rate_per_s: 0.5,
             auto_ignite: true,
@@ -475,6 +706,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 51, // oxygen
             output: 40,  // ash
             byproduct: Some(53), // co2
+            emissions: vec![],
             energy_release_j: 150_000.0,
             rate_per_s: 0.6,
             auto_ignite: false,
@@ -488,20 +720,24 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 51, // oxygen
             output: 41,  // charcoal
             byproduct: Some(53), // co2
+            emissions: vec![],
             energy_release_j: 280_000.0,
             rate_per_s: 0.55,
             auto_ignite: false,
             min_temperature_k: Some(573.0),
             propagates: false,
         },
-        // 22. Corrosion: concrete (input_a) + acid (input_b) → loose_fill (output) + steam (byproduct).
-        // Acid dissolves concrete to rubble + steam vent.
+        // 22. Corrosion: concrete (input_a) + acid (input_b) → loose_fill (output) + co2 (byproduct).
+        // Acid dissolves concrete (calcium carbonate) per real chemistry:
+        // CaCO3 + 2HCl → CaCl2 + H2O + CO2. The visible "fizzing" when
+        // acid hits concrete is CO2 effervescence, NOT steam.
         MaterialReaction {
             id: "rxn.corrosion.acid_concrete".to_string(),
             input_a: 2,  // concrete
             input_b: 21, // acid
             output: 5,   // loose_fill
-            byproduct: Some(50), // steam
+            byproduct: Some(53), // co2 (carbonate dissolution)
+            emissions: vec![],
             energy_release_j: 30_000.0,
             rate_per_s: 0.2,
             auto_ignite: false,
@@ -516,6 +752,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 15, // ice
             output: 70,  // obsidian
             byproduct: Some(13), // water
+            emissions: vec![],
             energy_release_j: -334_000.0,
             rate_per_s: 1.0,
             auto_ignite: false,
@@ -530,6 +767,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 51, // oxygen
             output: 53,  // co2
             byproduct: Some(50), // steam
+            emissions: vec![],
             energy_release_j: 5_470_000.0,
             rate_per_s: 0.8,
             auto_ignite: false,
@@ -543,6 +781,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 51, // oxygen
             output: 40,  // ash
             byproduct: Some(53), // co2
+            emissions: vec![],
             energy_release_j: 393_500.0,
             rate_per_s: 0.4,
             auto_ignite: false,
@@ -557,6 +796,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 26, // lava
             output: 65,  // fire
             byproduct: None,
+            emissions: vec![],
             energy_release_j: 180_000.0,
             rate_per_s: 0.8,
             auto_ignite: true,
@@ -570,20 +810,28 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 26, // lava
             output: 65,  // fire
             byproduct: None,
+            emissions: vec![],
             energy_release_j: 250_000.0,
             rate_per_s: 1.0,
             auto_ignite: true,
             min_temperature_k: Some(533.0),
             propagates: true,
         },
-        // 28. Corrosion: ore_copper (input_a) + acid (input_b) → polluted_water (output) + ammonia (byproduct).
-        // CuSO4 dissolution + SO2 toxic byproduct.
+        // 28. Corrosion: ore_copper (input_a) + acid (input_b) →
+        // polluted_water (output) + hydrogen (byproduct).
+        // Per real chemistry: Cu + H2SO4 → CuSO4 + H2 (sulfuric on
+        // copper), or Cu + 2HCl → CuCl2 + H2 (hydrochloric on copper).
+        // The dissolved metal salt becomes the conductive "polluted
+        // water" pool; the byproduct is hydrogen (H2), NOT ammonia.
+        // Ammonia (NH3) requires nitrogen, which is absent from this
+        // reaction.
         MaterialReaction {
             id: "rxn.corrosion.acid_copper".to_string(),
             input_a: 36, // ore_copper
             input_b: 21, // acid
-            output: 66,  // polluted_water
-            byproduct: Some(61), // ammonia
+            output: 66,  // polluted_water (dissolved copper salt)
+            byproduct: Some(55), // hydrogen (NOT ammonia per real chemistry)
+            emissions: vec![],
             energy_release_j: 130_000.0,
             rate_per_s: 0.4,
             auto_ignite: false,
@@ -598,6 +846,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 61, // ammonia
             output: 62,  // smoke
             byproduct: Some(62), // smoke
+            emissions: vec![],
             energy_release_j: 460_000.0,
             rate_per_s: 0.3,
             auto_ignite: false,
@@ -612,6 +861,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 26, // lava
             output: 62,  // smoke
             byproduct: None,
+            emissions: vec![],
             energy_release_j: 1_850_000.0,
             rate_per_s: 5.0,
             auto_ignite: true,
@@ -626,6 +876,7 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 50, // steam
             output: 66,  // polluted_water
             byproduct: Some(66),
+            emissions: vec![],
             energy_release_j: -22_000.0,
             rate_per_s: 0.05,
             auto_ignite: false,
@@ -640,11 +891,81 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             input_b: 63, // electric_arc
             output: 66,  // polluted_water (conductive pool proxy)
             byproduct: None,
+            emissions: vec![],
             energy_release_j: 50_000.0,
             rate_per_s: 1.0,
             auto_ignite: false,
             min_temperature_k: None,
             propagates: false,
+        },
+        // **M15B** § 33a. Extinguish (water-gas shift): rain (input_a) +
+        // fire (input_b) → steam (output) + hydrogen (byproduct) at
+        // high temperature. Mirrors `rxn.extinguish.water_fire_water_gas_shift`
+        // for the droplet form of water — rain on a metal/magnesium fire
+        // releases the same explosive H2.
+        MaterialReaction {
+            id: "rxn.extinguish.rain_fire_water_gas_shift".to_string(),
+            input_a: 87, // rain
+            input_b: 65, // fire_intense
+            output: 50,  // steam
+            byproduct: Some(55), // hydrogen
+            emissions: vec![],
+            energy_release_j: -1_900_000.0,
+            rate_per_s: 5.0,
+            auto_ignite: false,
+            min_temperature_k: Some(973.0),
+            propagates: false,
+        },
+        // **M15B** § 33b. Extinguish (standard): rain (input_a) + fire
+        // (input_b) → steam (output) + smoke (byproduct). Per real
+        // chemistry: incomplete-combustion residue + ash escapes as
+        // smoke when the fire dies. Per spec § "rain may extinguish
+        // active fires per M15 reactions".
+        MaterialReaction {
+            id: "rxn.extinguish.rain_fire".to_string(),
+            input_a: 87, // rain
+            input_b: 65, // fire_intense
+            output: 50,  // steam
+            byproduct: Some(62), // smoke
+            emissions: vec![],
+            energy_release_j: -2_260_000.0,
+            rate_per_s: 5.0,
+            auto_ignite: false,
+            min_temperature_k: None,
+            propagates: false,
+        },
+        // **M15B** § 34. Corrosion: metal_nohook (input_a) + acid_droplet (input_b) →
+        // rust (output) + hydrogen (byproduct). Per spec § acceptance scenario 5:
+        // "contact with metal_nohook triggers acid+iron→rust reaction per M15".
+        // metal_nohook = id 3; reuses the canonical acid_iron output path.
+        MaterialReaction {
+            id: "rxn.corrosion.acid_droplet_metal_nohook".to_string(),
+            input_a: 3,  // metal_nohook (the spec literal target)
+            input_b: 88, // acid_droplet
+            output: 38,  // rust
+            byproduct: Some(55), // hydrogen
+            emissions: vec![],
+            energy_release_j: 89_000.0,
+            rate_per_s: 0.4,
+            auto_ignite: false,
+            min_temperature_k: Some(273.0),
+            propagates: true,
+        },
+        // **M15B** § 35. Corrosion: iron (input_a) + acid_droplet → rust
+        // (output) + hydrogen (byproduct). Same as acid+iron via
+        // dropletized acid (the acid_droplet variant of rxn.corrosion.acid_iron).
+        MaterialReaction {
+            id: "rxn.corrosion.acid_droplet_iron".to_string(),
+            input_a: 68, // iron
+            input_b: 88, // acid_droplet
+            output: 38,  // rust
+            byproduct: Some(55), // hydrogen
+            emissions: vec![],
+            energy_release_j: 89_000.0,
+            rate_per_s: 0.5,
+            auto_ignite: false,
+            min_temperature_k: Some(273.0),
+            propagates: true,
         },
     ];
     ReactionRegistry::new(raw.to_vec())
@@ -663,6 +984,17 @@ pub struct ReactionTriggeredEvent {
     pub output: MaterialId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub byproduct: Option<MaterialId>,
+    /// **M15B** § Materials spawned into adjacent air cells when the
+    /// reaction fired. Mirrors [`MaterialReaction::emissions`]. Empty
+    /// for reactions with no tertiary outputs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub emissions: Vec<MaterialId>,
+    /// **M15B** § The world-space positions where the emission pixels
+    /// were actually placed. Same length as `emissions`. Empty entries
+    /// (e.g. `[i32::MIN, i32::MIN]`) indicate the emission was
+    /// dropped because no adjacent air cell was available.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub emission_positions: Vec<[i32; 2]>,
     pub pos: [i32; 2],
     pub energy_release_j: f32,
     pub auto_ignite: bool,
@@ -670,6 +1002,10 @@ pub struct ReactionTriggeredEvent {
 }
 
 /// **M15** § build a [`ReactionTriggeredEvent`] from a matched reaction.
+/// Note: this does NOT populate `emission_positions` — the kernel
+/// orchestrator fills that field after it places the emission pixels
+/// in adjacent air cells (since it knows the actual world coords).
+/// Use [`reaction_event_with_emissions`] for the populated form.
 #[must_use]
 pub fn reaction_event(reaction: &MaterialReaction, pos: [i32; 2], tick: u64) -> ReactionTriggeredEvent {
     ReactionTriggeredEvent {
@@ -678,12 +1014,52 @@ pub fn reaction_event(reaction: &MaterialReaction, pos: [i32; 2], tick: u64) -> 
         material_b: reaction.input_b,
         output: reaction.output,
         byproduct: reaction.byproduct,
+        emissions: reaction.emissions.clone(),
+        emission_positions: vec![],
         pos,
         energy_release_j: reaction.energy_release_j,
         auto_ignite: reaction.auto_ignite,
         tick,
     }
 }
+
+/// **M15B** § Build a [`ReactionTriggeredEvent`] WITH the actual
+/// emission positions filled in. The kernel orchestrator calls this
+/// after placing emission pixels in adjacent air cells so the recorder
+/// event carries the full spatial record of every output from the
+/// reaction.
+///
+/// `emission_positions` must be the same length as
+/// `reaction.emissions`. Entries that couldn't be placed (no adjacent
+/// air cell) MUST use the sentinel `[i32::MIN, i32::MIN]` so consumers
+/// can filter them out.
+#[must_use]
+pub fn reaction_event_with_emissions(
+    reaction: &MaterialReaction,
+    pos: [i32; 2],
+    tick: u64,
+    emission_positions: Vec<[i32; 2]>,
+) -> ReactionTriggeredEvent {
+    ReactionTriggeredEvent {
+        reaction_id: reaction.id.clone(),
+        material_a: reaction.input_a,
+        material_b: reaction.input_b,
+        output: reaction.output,
+        byproduct: reaction.byproduct,
+        emissions: reaction.emissions.clone(),
+        emission_positions,
+        pos,
+        energy_release_j: reaction.energy_release_j,
+        auto_ignite: reaction.auto_ignite,
+        tick,
+    }
+}
+
+/// **M15B** § Sentinel position used in `emission_positions` when an
+/// emission's adjacent-air-cell search failed. Consumers filter on
+/// `pos == [EMISSION_DROPPED, EMISSION_DROPPED]` to detect dropped
+/// emissions.
+pub const EMISSION_DROPPED: i32 = i32::MIN;
 
 #[cfg(test)]
 mod tests {

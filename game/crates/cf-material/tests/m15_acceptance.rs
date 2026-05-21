@@ -77,12 +77,22 @@ fn scenario_acid_iron_to_rust_reaction() {
 fn scenario_water_fire_extinguish_to_steam() {
     let reg = default_reaction_registry();
     // water id=13, fire_intense id=65, steam id=50.
-    let rxn = reg.evaluate(13, 65, 1500.0).expect("water+fire match");
-    assert_eq!(rxn.id, "rxn.extinguish.water_fire");
-    assert_eq!(rxn.output, 50, "steam spawns");
+    // At high-temp (1500K > 973K water-gas shift gate), the registry
+    // returns the water-gas shift variant first (per real chemistry:
+    // hot carbon + water → CO + H2). Both variants produce steam.
+    let rxn_hot = reg.evaluate(13, 65, 1500.0).expect("water+fire at high temp");
+    assert_eq!(rxn_hot.id, "rxn.extinguish.water_fire_water_gas_shift");
+    assert_eq!(rxn_hot.output, 50, "steam spawns");
+    assert_eq!(rxn_hot.byproduct, Some(55), "hydrogen byproduct (water-gas shift)");
+    // At low-temp (below 973K gate), the standard extinguish variant
+    // matches — fire becomes smoke (incomplete-combustion residue).
+    let rxn_cold = reg.evaluate(13, 65, 700.0).expect("water+fire at low temp");
+    assert_eq!(rxn_cold.id, "rxn.extinguish.water_fire");
+    assert_eq!(rxn_cold.output, 50, "steam spawns");
+    assert_eq!(rxn_cold.byproduct, Some(62), "smoke byproduct");
     // Steam is a gas — confirm via the CA stepper class.
     assert_eq!(
-        cf_terrain::ca::ca_movement_class(rxn.output),
+        cf_terrain::ca::ca_movement_class(rxn_hot.output),
         cf_terrain::ca::CaMovementClass::Gas,
         "steam must be a gas class (rises in CA)"
     );
@@ -339,7 +349,9 @@ fn e2e_acid_iron_pixel_transforms_to_rust() {
 }
 
 /// VAL-M15-e2e-002: Water + fire → steam + extinguish. Spec gherkin
-/// "reaction fires; fire extinguished; steam spawns (rises)".
+/// "reaction fires; fire extinguished; steam spawns (rises)". Per real
+/// chemistry: the extinguished fire pixel becomes smoke (incomplete-
+/// combustion residue), NOT clean air.
 #[test]
 fn e2e_water_fire_extinguishes_and_makes_steam() {
     let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
@@ -355,7 +367,11 @@ fn e2e_water_fire_extinguishes_and_makes_steam() {
         .iter()
         .any(|e| e.reaction_id == "rxn.extinguish.water_fire"));
     assert_eq!(terrain.material_at(3, 3), 50, "water → steam");
-    assert_eq!(terrain.material_at(4, 3), 0, "fire → air (extinguished)");
+    assert_eq!(
+        terrain.material_at(4, 3),
+        62,
+        "fire → smoke (incomplete-combustion residue)"
+    );
 }
 
 /// VAL-M15-e2e-003: Water → steam phase transition at 100°C (373.15 K).

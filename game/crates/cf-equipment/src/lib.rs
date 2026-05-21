@@ -323,6 +323,26 @@ pub struct RifleSpec {
     /// required by VAL-M14C-007/008/009/010/011/012/019/020/023/026.
     #[serde(default = "default_primary_round")]
     pub primary_round: RoundKind,
+
+    /// **Per-projectile mass** (kg). Drives the
+    /// `cf-physics::try_penetrate` impulse formula
+    /// `impulse² = (mass × velocity × sharpness)²` (CCCP
+    /// `SceneMan::TryPenetrate:571`). Default 0.05 kg = 50 g rifle bullet
+    /// baseline so legacy presets behave identically to the pre-spec-
+    /// extension hardcoded value. Tank-grade rounds override (APFSDS
+    /// long-rod ~7-9 kg; HEAT shaped-charge ~10-15 kg; 5.56 NATO ~4 g
+    /// = 0.004 kg).
+    #[serde(default = "default_bullet_mass_kg")]
+    pub bullet_mass_kg: f32,
+
+    /// **Per-projectile sharpness** in [0, 1] — the penetration-formula
+    /// multiplier capturing aerodynamic shape + hardened tip. Default
+    /// 0.8 = ogive-tipped rifle round baseline (preserves the legacy
+    /// hardcoded value). APFSDS long-rod ≈ 0.98 (depleted-uranium dart);
+    /// HEAT ≈ 0.7 (shaped-charge jet); blunt slug ≈ 0.4; rubber bullet
+    /// ≈ 0.2.
+    #[serde(default = "default_bullet_sharpness")]
+    pub bullet_sharpness: f32,
 }
 
 fn default_recoil_decay_rate() -> f32 {
@@ -343,6 +363,20 @@ fn default_particle_count() -> u32 {
 
 fn default_primary_round() -> RoundKind {
     RoundKind::Regular
+}
+
+/// **No-compromise default**: 50 g rifle bullet baseline (= 0.05 kg).
+/// Preserves byte-identical behavior with pre-extension RifleSpec presets
+/// per the per-projectile penetration formula.
+fn default_bullet_mass_kg() -> f32 {
+    0.05
+}
+
+/// **No-compromise default**: 0.8 sharpness for an ogive-tipped rifle
+/// round. Preserves byte-identical behavior with the pre-extension
+/// engine.rs hardcoded constant.
+fn default_bullet_sharpness() -> f32 {
+    0.8
 }
 
 impl RifleSpec {
@@ -533,6 +567,8 @@ impl RoleRecord {
             projectile_speed: spec.projectile_speed,
             damage_per_hit: spec.damage_per_hit,
             projectile_lifetime_seconds: spec.projectile_lifetime_seconds,
+            bullet_mass_kg: spec.bullet_mass_kg,
+            bullet_sharpness: spec.bullet_sharpness,
         };
         Self {
             id: spec.preset_id.clone(),
@@ -563,6 +599,13 @@ impl RoleRecord {
 
 /// Per-shot firing profile carried by ranged role records. Mirrors [`RifleSpec`]
 /// for backward compat — the rifle preset registry now delegates to this.
+///
+/// **M15B+** extension: `bullet_mass_kg` + `bullet_sharpness` make the
+/// projectile-vs-terrain penetration formula configurable per-RON.
+/// Tank-grade rounds (HEAT shaped-charge, APFSDS long-rod) override
+/// the rifle baseline so heavy weapons punch through walls per the
+/// real CCCP `SceneMan::TryPenetrate:571` formula
+/// `impulse² = (mass × velocity × sharpness)²`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FiringProfile {
     pub fire_interval_seconds: f32,
@@ -574,6 +617,17 @@ pub struct FiringProfile {
     pub projectile_speed: f32,
     pub damage_per_hit: f32,
     pub projectile_lifetime_seconds: f32,
+    /// **Per-projectile mass** (kg). Optional — defaults to 0.05 kg
+    /// (50 g rifle baseline) when omitted. Drives the penetration
+    /// formula. Tank rounds set this to ~8 kg (APFSDS) or ~10 kg
+    /// (HEAT) to override the default.
+    #[serde(default = "default_bullet_mass_kg")]
+    pub bullet_mass_kg: f32,
+    /// **Per-projectile sharpness** in [0, 1]. Optional — defaults to
+    /// 0.8 (ogive-tipped rifle round). APFSDS long-rod ≈ 0.98; HEAT
+    /// ≈ 0.7; blunt slug ≈ 0.4.
+    #[serde(default = "default_bullet_sharpness")]
+    pub bullet_sharpness: f32,
 }
 
 impl FiringProfile {
@@ -601,6 +655,8 @@ impl FiringProfile {
             ai_blast_radius: 0.0,
             fire_mode: default_fire_mode(),
             primary_round: default_primary_round(),
+            bullet_mass_kg: self.bullet_mass_kg,
+            bullet_sharpness: self.bullet_sharpness,
         }
     }
 }
@@ -780,6 +836,8 @@ fn rifle_m1_default() -> RifleSpec {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Regular,
+        bullet_mass_kg: 0.05,
+        bullet_sharpness: 0.8,
     }
 }
 
@@ -810,6 +868,8 @@ fn shotgun_m1_default() -> RifleSpec {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Pellet,
+        bullet_mass_kg: 0.05,
+        bullet_sharpness: 0.8,
     }
 }
 
@@ -851,6 +911,8 @@ fn carbine_m5_powered() -> RifleSpec {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
         primary_round: RoundKind::Regular,
+        bullet_mass_kg: 0.05,
+        bullet_sharpness: 0.8,
     }
 }
 
@@ -880,6 +942,8 @@ fn rifle_m5_mech_heavy() -> RifleSpec {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Regular,
+        bullet_mass_kg: 0.05,
+        bullet_sharpness: 0.8,
     }
 }
 
@@ -922,6 +986,13 @@ fn rpg_launcher_v1_rifle() -> RifleSpec {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Heat,
+        // HEAT shaped-charge warhead: ~10 kg total mass with explosive
+        // filler. Lower sharpness than KE rounds (0.7) because the
+        // penetration mechanism is the molten jet, not raw kinetic
+        // impulse — but the high mass + high muzzle still punches
+        // through walls.
+        bullet_mass_kg: 10.0,
+        bullet_sharpness: 0.7,
     }
 }
 
@@ -953,6 +1024,11 @@ fn tank_autocannon_t3_rifle() -> RifleSpec {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Apfsds,
+        // APFSDS depleted-uranium long-rod penetrator: ~8 kg with a
+        // hardened tip (sharpness 0.98). The KE × sharpness² product
+        // is what gives APFSDS its through-armor capability.
+        bullet_mass_kg: 8.0,
+        bullet_sharpness: 0.98,
     }
 }
 

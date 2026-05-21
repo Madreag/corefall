@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/material.phase_nucleated.v0.1",
+  "title": "material.phase_nucleated",
+  "description": "M15B § Precipitation cycle — steam → cloud nucleation event. Fires when a steam pixel (id=50) crosses both the altitude gate (> 80 px above sea level) AND the ambient-temperature gate (< 353.15 K). Producer: cf-material::precipitation::evaluate_steam_nucleation dispatched by the precipitation cycle. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "material" },
+    "event_type": { "const": "phase_nucleated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "from_material": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "to_material": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "pos": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "altitude_px": { "type": "number" },
+        "temperature_k": { "type": "number" }
+      },
+      "required": ["from_material", "to_material", "pos", "altitude_px", "temperature_k"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

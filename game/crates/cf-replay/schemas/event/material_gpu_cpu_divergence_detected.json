@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/material.gpu_cpu_divergence_detected.v0.1",
+  "title": "material.gpu_cpu_divergence_detected",
+  "description": "M15B § GPU vs CPU divergence detector — fires at the first divergent tick when the GPU material kernel and the CPU truth fallback disagree on the per-tick blake3 sim_checksum. Reason vocabulary: byte_mismatch (same tick, different bytes; canonical case), tick_skew (lockstep broke), length_mismatch (one trace ended early). Producer: cf-physics::determinism::DivergenceDetector pushed by the engine after both kernels emit their per-tick checksum samples. Engine pauses + dumps both states on fire per spec § acceptance scenario 7. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "material" },
+    "event_type": { "const": "gpu_cpu_divergence_detected" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "gpu_backend": { "type": "string" },
+        "cpu_backend": { "type": "string" },
+        "gpu_checksum_hex": { "type": "string" },
+        "cpu_checksum_hex": { "type": "string" },
+        "reason": { "type": "string", "enum": ["byte_mismatch", "tick_skew", "length_mismatch"] }
+      },
+      "required": ["gpu_backend", "cpu_backend", "gpu_checksum_hex", "cpu_checksum_hex", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

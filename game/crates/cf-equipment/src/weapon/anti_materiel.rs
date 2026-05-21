@@ -30,7 +30,9 @@ pub fn anti_materiel_rifle_127() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.85,
+        bullet_sharpness: 0.97,
+};
     WeaponPreset::new(
         ANTI_MATERIEL_RIFLE_127_ID,
         "12.7mm Anti-Materiel Rifle",

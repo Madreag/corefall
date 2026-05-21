@@ -53,6 +53,7 @@ pub mod alchemy;
 pub mod kernel;
 pub mod loader;
 pub mod phase;
+pub mod precipitation;
 pub mod reactions;
 pub mod registry;
 
@@ -68,9 +69,17 @@ pub use phase::{
     default_phase_registry, phase_transition_event, PhaseDirection, PhaseRegistry, PhaseState, PhaseTransition,
     PhaseTransitionEvent,
 };
+pub use precipitation::{
+    evaluate_steam_nucleation, material_id_to_name, pressure_rate_multiplier, saturation_rate_per_tick,
+    saturation_rate_per_tick_with_pressure, update_cloud_cell, update_cloud_cell_with_pressure, AmbientWorld,
+    CloudCell, PhaseNucleatedEvent, PrecipitationCycle, PrecipitationInputs, PrecipitationStartedEvent,
+    ACID_RAIN_POLLUTANT_FRACTION_MIN, NUCLEATION_ALTITUDE_PX, NUCLEATION_PRESSURE_MIN_KPA, NUCLEATION_TEMP_K_MAX,
+    PRECIPITATION_SATURATION_THRESHOLD, PRECIPITATION_TICK_GATE, PRESSURE_MULTIPLIER_RANGE, REFERENCE_PRESSURE_KPA,
+};
 pub use reactions::{
-    classify_reaction, default_reaction_registry, evaluate_reaction_pair, reaction_event, MaterialReaction,
-    ReactionRegistry, ReactionTriggeredEvent, ReactionWoundEmit,
+    classify_reaction, default_reaction_registry, evaluate_reaction_pair, reaction_event,
+    reaction_event_with_emissions, MaterialReaction, ReactionRegistry, ReactionTriggeredEvent, ReactionWoundEmit,
+    EMISSION_DROPPED,
 };
 
 /// Material schema version stamped into every registry JSON file. M2 ships

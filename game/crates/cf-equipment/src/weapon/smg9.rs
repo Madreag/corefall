@@ -29,7 +29,9 @@ pub fn submachine_gun_9mm() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.008,
+        bullet_sharpness: 0.75,
+};
     WeaponPreset::new(
         SUBMACHINE_GUN_9MM_ID,
         "9mm Submachine Gun",

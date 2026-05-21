@@ -29,7 +29,9 @@ pub fn heavy_machine_gun_50cal() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.045,
+        bullet_sharpness: 0.9,
+};
     let mut p = WeaponPreset::new(
         HEAVY_MACHINE_GUN_50CAL_ID,
         ".50 cal Heavy Machine Gun",

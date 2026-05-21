@@ -172,6 +172,59 @@ impl PhaseRegistry {
         }
     }
 
+    /// **M15B** § Load a `PhaseRegistry` from a JSON file. Modders +
+    /// tuners edit `content/materials/phase_registry.json` (or a
+    /// custom path) to add new phase transitions, tweak thresholds,
+    /// or override latent-heat budgets without touching engine source.
+    pub fn load_from_file(
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, PhaseRegistryLoadError> {
+        let path_ref = path.as_ref();
+        let raw = std::fs::read_to_string(path_ref).map_err(|source| PhaseRegistryLoadError::Io {
+            path: path_ref.to_path_buf(),
+            source,
+        })?;
+        let registry: PhaseRegistry =
+            serde_json::from_str(&raw).map_err(|source| PhaseRegistryLoadError::Parse {
+                path: path_ref.to_path_buf(),
+                source,
+            })?;
+        if registry.schema_version != Self::SCHEMA_VERSION {
+            return Err(PhaseRegistryLoadError::SchemaVersionMismatch {
+                path: path_ref.to_path_buf(),
+                expected: Self::SCHEMA_VERSION,
+                actual: registry.schema_version,
+            });
+        }
+        Ok(registry)
+    }
+
+    /// **M15B** § Resolve the canonical phase registry path.
+    #[must_use]
+    pub fn locate_default() -> Option<std::path::PathBuf> {
+        for candidate in [
+            std::path::PathBuf::from("content/materials/phase_registry.json"),
+            std::path::PathBuf::from("../content/materials/phase_registry.json"),
+            std::path::PathBuf::from("game/content/materials/phase_registry.json"),
+        ] {
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+        None
+    }
+
+    /// **M15B** § Load the canonical registry from the default JSON
+    /// path, or fall back to the hardcoded `default_phase_registry`
+    /// when the file isn't present.
+    #[must_use]
+    pub fn load_default_or_hardcoded() -> Self {
+        match Self::locate_default().and_then(|p| Self::load_from_file(&p).ok()) {
+            Some(r) => r,
+            None => default_phase_registry(),
+        }
+    }
+
     /// Find the first transition that fires for `(material, prev_t, t)`.
     /// Direction-aware.
     #[must_use]
@@ -210,6 +263,30 @@ impl PhaseRegistry {
         }
         set
     }
+}
+
+/// **M15B** § Errors from [`PhaseRegistry::load_from_file`].
+#[derive(Debug, thiserror::Error)]
+pub enum PhaseRegistryLoadError {
+    #[error("failed to read phase registry at {}: {source}", path.display())]
+    Io {
+        path: std::path::PathBuf,
+        source: std::io::Error,
+    },
+    #[error("failed to parse phase registry at {}: {source}", path.display())]
+    Parse {
+        path: std::path::PathBuf,
+        source: serde_json::Error,
+    },
+    #[error(
+        "schema_version mismatch in {}: expected {expected}, got {actual}",
+        path.display()
+    )]
+    SchemaVersionMismatch {
+        path: std::path::PathBuf,
+        expected: u32,
+        actual: u32,
+    },
 }
 
 /// **M15** § the canonical launch phase-transition registry. Material
@@ -331,6 +408,57 @@ pub fn default_phase_registry() -> PhaseRegistry {
             threshold_k: 273.15,
             latent_heat_j_per_kg: 334_000.0,
             reversible: false,
+        },
+        // **M15B** § Steam (50) → cloud (71) when temperature drops below
+        // 353.15 K (80°C). Per spec § "steam particles reach altitude >
+        // 80 px with ambient temp < 80°C Then material_phase_nucleated
+        // event fires with from='steam' to='cloud'". Note: the altitude
+        // gate lives in the per-cell precipitation evaluator
+        // (`crate::precipitation::evaluate_steam_nucleation`); this
+        // entry covers the temperature side of the gate so the kernel
+        // can fire the transition via the phase registry path too.
+        PhaseTransition {
+            material: 50, // steam
+            from_state: PhaseState::Gas,
+            to_state: PhaseState::Gas,
+            product_material: Some(71), // cloud
+            threshold_k: 353.15,
+            latent_heat_j_per_kg: -200_000.0,
+            reversible: true,
+        },
+        // **M15B** § Cloud (71) → rain (87) at 273.15K (precipitation
+        // forms when the cloud is cool enough for droplets). Saturation
+        // gating + tick-gate enforcement happens in
+        // `crate::precipitation::update_cloud_cell`; this entry serves
+        // as the temperature backstop so a deeply-cooled cloud cell
+        // condenses out via the kernel path even when the saturation
+        // tracker is bypassed (e.g. when a scenario manually seeds
+        // cloud).
+        PhaseTransition {
+            material: 71, // cloud
+            from_state: PhaseState::Gas,
+            to_state: PhaseState::Liquid,
+            product_material: Some(87), // rain
+            threshold_k: 273.15,
+            latent_heat_j_per_kg: -334_000.0,
+            reversible: false,
+        },
+        // **M15B** § Rain (87) → water (13) on landing — the spec says
+        // "puddles accumulate in low ground via cf-terrain liquid_flow",
+        // so rain reverts to water once it pools. The transition fires
+        // when the local temperature crosses below 273.15K (freeze) OR
+        // when the surface is reached (handled by cf-terrain
+        // liquid_flow). This phase entry is the temperature backstop
+        // for the freezing case (rain → ice → water on melt) so the
+        // chain stays reversible.
+        PhaseTransition {
+            material: 87, // rain
+            from_state: PhaseState::Liquid,
+            to_state: PhaseState::Solid,
+            product_material: Some(15), // ice
+            threshold_k: 273.15,
+            latent_heat_j_per_kg: -334_000.0,
+            reversible: true,
         },
     ];
     PhaseRegistry::new(raw.to_vec())

@@ -29,7 +29,9 @@ pub fn sniper_rifle_t2() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.045,
+        bullet_sharpness: 0.95,
+};
     WeaponPreset::new(
         SNIPER_RIFLE_T2_ID,
         "Sniper Rifle (T2)",

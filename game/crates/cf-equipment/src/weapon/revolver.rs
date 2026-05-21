@@ -29,7 +29,9 @@ pub fn revolver_357() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.014,
+        bullet_sharpness: 0.7,
+};
     WeaponPreset::new(
         REVOLVER_357_ID,
         ".357 Revolver",

@@ -123,6 +123,26 @@ pub struct Projectile {
     pub velocity: Vec2,
     pub damage: f32,
     pub remaining_ticks: u32,
+    /// **Per-projectile mass** (kg). Sourced from `RifleSpec.bullet_mass_kg`
+    /// at spawn; drives the `cf-physics::try_penetrate` impulse formula.
+    /// Default 0.05 kg for byte-identical compat with pre-extension
+    /// projectiles.
+    #[serde(default = "default_projectile_mass_kg")]
+    pub mass_kg: f32,
+    /// **Per-projectile sharpness** in [0, 1]. Sourced from
+    /// `RifleSpec.bullet_sharpness` at spawn; the penetration-formula
+    /// multiplier. Default 0.8 for byte-identical compat with the
+    /// pre-extension hardcoded value.
+    #[serde(default = "default_projectile_sharpness")]
+    pub sharpness: f32,
+}
+
+fn default_projectile_mass_kg() -> f32 {
+    0.05
+}
+
+fn default_projectile_sharpness() -> f32 {
+    0.8
 }
 
 /// **M1 R2 / Gap G1**: a dropped inventory item subject to gravity + ground
@@ -1134,6 +1154,8 @@ fn step_one_actor<R: FnMut() -> u64>(
                 velocity,
                 damage,
                 remaining_ticks: max_flight,
+                mass_kg: spec.bullet_mass_kg,
+                sharpness: spec.bullet_sharpness,
             });
             report.spawned_projectiles.push(SpawnedProjectile {
                 id: projectile_id,
@@ -2364,6 +2386,8 @@ mod tests {
             velocity: Vec2::new(24000.0, 0.0),
             damage: 25.0,
             remaining_ticks: 60,
+            mass_kg: 0.05,
+            sharpness: 0.8,
         });
         let mut intents: BTreeMap<ActorId, ControlIntent> = BTreeMap::new();
         let report = step_no_rng(&mut state, &mut intents, deps());

@@ -29,7 +29,9 @@ pub fn sniper_m6_default() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.0098,
+        bullet_sharpness: 0.92,
+};
     WeaponPreset::new(
         SNIPER_M6_DEFAULT_ID,
         "Long Rifle",

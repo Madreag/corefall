@@ -29,7 +29,9 @@ pub fn assault_rifle_t2() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
         primary_round: RoundKind::Regular,
-    };
+        bullet_mass_kg: 0.0046,
+        bullet_sharpness: 0.85,
+};
     WeaponPreset::new(
         ASSAULT_RIFLE_T2_ID,
         "Assault Rifle (T2)",

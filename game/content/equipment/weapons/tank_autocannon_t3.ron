@@ -16,4 +16,9 @@
   fire_interval_seconds: 0.2,
   projectile_speed: 1600.0,
   damage_per_hit: 40.0,
+  // M15B+ § Real APFSDS chemistry: ~8 kg depleted-uranium long-rod
+  // penetrator + hardened tip (sharpness 0.98). The KE × sharpness²
+  // product is what gives APFSDS its through-armor capability.
+  bullet_mass_kg: 8.0,
+  bullet_sharpness: 0.98,
 )

@@ -71,6 +71,7 @@ pub mod constants;
 pub mod dirty;
 pub mod heat;
 pub mod integrity;
+pub mod liquid_flow;
 pub mod m14a_overlay;
 pub mod parallel;
 pub mod structural_integrity;
@@ -78,6 +79,10 @@ pub mod wall_collapse;
 pub use air::{AirField, AIR_GRID_CELLS, AIR_GRID_SIZE, AMBIENT_PRESSURE_KPA};
 pub use ca::{ca_movement_class, step_ca, step_ca_filtered, CaMovementClass, CaStepReport, CaStepperState};
 pub use heat::{ambient_temperature_k, HeatField, HEAT_GRID_CELLS, HEAT_GRID_SIZE};
+pub use liquid_flow::{
+    is_solid_floor, liquid_flow_step, LiquidFlowReport, FLOWING_LIQUIDS, POST_LANDING_ACID_DROPLET,
+    POST_LANDING_RAIN,
+};
 pub use m14a_overlay::{material_thermal_contact, material_walk_modulator, ThermalContact, WalkModulator};
 
 pub use cave_in::{

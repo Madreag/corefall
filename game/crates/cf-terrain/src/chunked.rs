@@ -414,6 +414,11 @@ pub fn material_name_from_id(id: MaterialId) -> &'static str {
 /// Resolve a material name (case-sensitive) from a scenario manifest. Names
 /// match the DR-007 launch set verbatim. `concrete_soft` is a deprecated M1.5
 /// alias of `concrete` retained for backward compat with `micro_breach.ron`.
+///
+/// **M15B** extension: scenarios can now stamp the precipitation chain
+/// materials directly (`water`, `steam`, `cloud`, `rain`, `acid_droplet`)
+/// so the m15b_water_cycle_demo + m15b_acid_rain_vulcan scenarios load
+/// without engine-side seeding.
 #[must_use]
 pub fn material_id_from_name(name: &str) -> Option<MaterialId> {
     match name {
@@ -426,6 +431,12 @@ pub fn material_id_from_name(name: &str) -> Option<MaterialId> {
         "repair_fill" => Some(MATERIAL_REPAIR_FILL),
         "anchor" => Some(MATERIAL_ANCHOR),
         "support_beam" => Some(MATERIAL_SUPPORT_BEAM),
+        // **M15B** § precipitation chain stampable ids.
+        "water" => Some(13),
+        "steam" => Some(50),
+        "cloud" => Some(71),
+        "rain" => Some(87),
+        "acid_droplet" => Some(88),
         _ => None,
     }
 }
@@ -1399,9 +1410,20 @@ impl ChunkedTerrain {
     /// spec literal "And it appears in the determinism.sim_checksum
     /// payload's chunk-summary field". Returns `(cx, cy, blake3_hex)`
     /// triples ordered by (cx, cy) for deterministic JSON output.
+    ///
+    /// **Performance**: parallelized via rayon's `par_iter` over the chunk
+    /// map's entries. Per-chunk blake3 hashing is CPU-bound + independent
+    /// (no shared writes), so this scales linearly with core count. The
+    /// final collect() preserves BTreeMap iteration order so the output
+    /// is byte-identical to the serial path (determinism per DR-052).
     pub fn chunk_summary_entries(&self) -> Vec<(i32, i32, String)> {
-        self.chunks
-            .iter()
+        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        // Snapshot ordered entries first so par_iter operates on a
+        // canonical-ordered slice; final result preserves (cx, cy)
+        // ascending order without needing a post-sort.
+        let entries: Vec<(&ChunkCoord, &Chunk)> = self.chunks.iter().collect();
+        entries
+            .into_par_iter()
             .map(|(coord, chunk)| {
                 let mut hasher = blake3::Hasher::new();
                 hasher.update(&coord.cx.to_le_bytes());

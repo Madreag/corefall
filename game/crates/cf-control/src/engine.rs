@@ -4007,6 +4007,11 @@ impl M0Engine {
                             velocity: cf_actor::Vec2::new(fire.velocity[0], fire.velocity[1]),
                             damage: fire.damage,
                             remaining_ticks: fire.lifetime_ticks,
+                            // Guard-fired rounds inherit the same baseline
+                            // as a default rifle until the guard spec adds
+                            // per-tower mass + sharpness fields.
+                            mass_kg: 0.05,
+                            sharpness: 0.8,
                         });
                     }
                 }
@@ -4077,17 +4082,20 @@ impl M0Engine {
                         }
                         // Material-aware penetration formula.
                         let aff = terrain.registry.affordance(mat).expect("solid material has affordance");
-                        // Approximate projectile mass/sharpness; M5+ wires
-                        // real per-projectile mass + sharpness from
-                        // `RifleSpec`. M2 uses spec baseline (mass=0.05,
-                        // sharpness=0.8).
+                        // Per-projectile mass + sharpness sourced from
+                        // `RifleSpec.bullet_mass_kg` / `bullet_sharpness`
+                        // at spawn time and carried through the `Projectile`
+                        // struct. Tank-grade rounds (APFSDS long-rod /
+                        // HEAT shaped-charge) override the defaults via
+                        // their spec rows so heavy weapons punch through
+                        // walls per the M14C contract.
                         let velocity = (proj.velocity.x * proj.velocity.x + proj.velocity.y * proj.velocity.y).sqrt();
                         // Seeded RNG roll for stickiness — preserves determinism.
                         let rng_roll = (rng.next_u64() as f64 / u64::MAX as f64) as f32;
                         let outcome = cf_physics::try_penetrate(cf_physics::PenetrationInputs {
-                            mass: 0.05,
+                            mass: proj.mass_kg,
                             velocity,
-                            sharpness: 0.8,
+                            sharpness: proj.sharpness,
                             integrity: aff.hardness,
                             stickiness: aff.stickiness,
                             restitution: aff.restitution,
@@ -15932,6 +15940,8 @@ impl M0Engine {
                         velocity,
                         damage: spec.damage_per_hit,
                         remaining_ticks: max_flight,
+                        mass_kg: spec.bullet_mass_kg,
+                        sharpness: spec.bullet_sharpness,
                     });
                 }
                 let mag_remaining = s

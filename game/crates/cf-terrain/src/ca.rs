@@ -68,8 +68,8 @@ pub fn ca_movement_class(id: MaterialId) -> CaMovementClass {
         // Powders (granular solids): sand, snow, salt, sugar, ash, gunpowder, charcoal
         12 | 14 | 40 | 41 | 42 | 43 | 48 => CaMovementClass::Powder,
         // Liquids: water, oil, fuel, acid, alkali, blood, alcohol, mercury, lava, slime,
-        //          polluted_water, neutralized_brine
-        13 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 66 | 67 => CaMovementClass::Liquid,
+        //          polluted_water, neutralized_brine, rain (M15B), acid_droplet (M15B)
+        13 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 66 | 67 | 87 | 88 => CaMovementClass::Liquid,
         // Gases: steam, oxygen, nitrogen, co2, methane, hydrogen, nitrous_oxide,
         //        helium, ozone, ethanol_vapor, chlorine, ammonia, smoke, fire_intense,
         //        electric_arc, lightning, cloud

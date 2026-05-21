@@ -29,7 +29,9 @@ pub fn shotgun_m6_default() -> WeaponPreset {
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
         primary_round: RoundKind::Pellet,
-    };
+        bullet_mass_kg: 0.028,
+        bullet_sharpness: 0.5,
+};
     WeaponPreset::new(
         SHOTGUN_M6_DEFAULT_ID,
         "Combat Shotgun",

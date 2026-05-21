@@ -19,5 +19,6 @@ cf-sim-core = { path = "../cf-sim-core" }
 cf-save = { path = "../cf-save" }
 
 [dev-dependencies]
+cf-material = { path = "../cf-material" }
 cf-physics = { path = "../cf-physics" }
 cf-terrain = { path = "../cf-terrain" }

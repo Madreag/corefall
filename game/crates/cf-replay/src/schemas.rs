@@ -579,6 +579,14 @@ const SCHEMA_FLASK_CONSUMED: &str = include_str!("../schemas/event/flask_consume
 const SCHEMA_ALCHEMY_RECIPE_INVOKED: &str = include_str!("../schemas/event/alchemy_recipe_invoked.json");
 const SCHEMA_ALCHEMY_RECIPE_COMPLETED: &str =
     include_str!("../schemas/event/alchemy_recipe_completed.json");
+// **M15B § GPU Material Kernel + Precipitation Cycle**: steam → cloud
+// nucleation, cloud → rain precipitation, GPU vs CPU divergence.
+const SCHEMA_MATERIAL_PHASE_NUCLEATED: &str =
+    include_str!("../schemas/event/material_phase_nucleated.json");
+const SCHEMA_MATERIAL_PRECIPITATION_STARTED: &str =
+    include_str!("../schemas/event/material_precipitation_started.json");
+const SCHEMA_MATERIAL_GPU_CPU_DIVERGENCE_DETECTED: &str =
+    include_str!("../schemas/event/material_gpu_cpu_divergence_detected.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -1047,6 +1055,12 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("flask", "consumed") => Some(SCHEMA_FLASK_CONSUMED),
         ("alchemy", "recipe_invoked") => Some(SCHEMA_ALCHEMY_RECIPE_INVOKED),
         ("alchemy", "recipe_completed") => Some(SCHEMA_ALCHEMY_RECIPE_COMPLETED),
+        // **M15B § GPU Material Kernel + Precipitation Cycle**: steam →
+        // cloud nucleation, cloud → rain precipitation, GPU vs CPU
+        // divergence detector.
+        ("material", "phase_nucleated") => Some(SCHEMA_MATERIAL_PHASE_NUCLEATED),
+        ("material", "precipitation_started") => Some(SCHEMA_MATERIAL_PRECIPITATION_STARTED),
+        ("material", "gpu_cpu_divergence_detected") => Some(SCHEMA_MATERIAL_GPU_CPU_DIVERGENCE_DETECTED),
         _ => None,
     }
 }

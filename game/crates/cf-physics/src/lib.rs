@@ -38,6 +38,7 @@
 pub mod atom_group;
 pub mod authority;
 pub mod constants;
+pub mod determinism;
 pub mod facing_routing;
 pub mod gravity_field;
 pub mod hazard;
@@ -59,6 +60,9 @@ pub use atom_group::{
     RICOCHET_ANGLE_THRESHOLD, RICOCHET_ENERGY_LOSS, RICOCHET_HARDNESS_FACTOR,
 };
 pub use authority::{AuthorityKind, AuthorityTransition};
+pub use determinism::{
+    detect_first_divergence, ChecksumSample, DivergenceCheckResult, DivergenceDetector, DivergenceEvent, ForensicsDump,
+};
 pub use facing_routing::{classify_hit_direction, exposed_zones, mirror_local_x, HitDirection};
 pub use gravity_field::{
     advance_damaged_grav_wave_fronts, apply_overrides, GravityOverride, GravityVec, OverrideResult,

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://corefall/event/material.reaction_triggered.v0.1",
+  "$id": "https://corefall/event/material.reaction_triggered.v0.2",
   "title": "material.reaction_triggered",
-  "description": "M15 § Active Material Kernel — per-pixel reaction trigger. Fires when two adjacent pixels match a MaterialReaction entry from the M15D registry (acid+iron, water+lava, oil+fire, etc.). Producer: cf-material::reactions evaluator dispatched by the CA stepper. Additive-only per M4 DR-002.",
+  "description": "M15 § Active Material Kernel — per-pixel reaction trigger. Fires when two adjacent pixels match a MaterialReaction entry from the M15D registry (acid+iron, water+lava, oil+fire, etc.). Producer: cf-material::reactions evaluator dispatched by the CA stepper. M15B extension: `emissions` array carries tertiary gas products spawned into adjacent air cells (e.g. wood+fire emits smoke+CO2 alongside the charcoal residue + fire cascade). Additive-only per M4 DR-002.",
   "type": "object",
   "additionalProperties": true,
   "properties": {
@@ -20,6 +20,21 @@
         "material_b": { "type": "integer", "minimum": 0, "maximum": 255 },
         "output": { "type": "integer", "minimum": 0, "maximum": 255 },
         "byproduct": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 },
+        "emissions": {
+          "type": "array",
+          "description": "M15B § Tertiary materials spawned into adjacent air cells (e.g. wood-fire → [smoke, CO2]). Empty for reactions with no tertiary outputs.",
+          "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+        },
+        "emission_positions": {
+          "type": "array",
+          "description": "M15B § World-space positions of the spawned emission pixels. Same length as `emissions`. Entries [i32::MIN, i32::MIN] indicate the emission was dropped (no adjacent air cell available).",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer" },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
         "pos": {
           "type": "array",
           "items": { "type": "integer" },
