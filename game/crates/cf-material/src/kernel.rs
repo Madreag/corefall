@@ -189,35 +189,50 @@ pub fn kernel_step(
         terrain.allocated_chunk_coords()
     };
 
-    // --- 1. Phase transition dispatch (pixel-identity changes by temp).
-    let mut phase_events: Vec<PhaseTransitionEvent> = Vec::new();
-    let mut phase_remaining = kernel.phase_cap;
     let phase_materials = phase.phase_material_set();
-    if let Some(prev) = prev_heat {
-        for (cx, cy) in &scan_chunks {
-            if phase_remaining == 0 {
-                break;
-            }
-            let n = dispatch_phase_in_chunk(
+    let (phase_events, _phase_remaining) = if let Some(prev) = prev_heat {
+        if kernel.parallel {
+            dispatch_phase_parallel(
                 terrain,
-                *cx,
-                *cy,
+                &scan_chunks,
                 phase,
                 &phase_materials,
                 heat,
                 prev,
                 tick_before,
-                &mut phase_events,
-                &mut phase_remaining,
-            );
-            if n > 0 {
-                terrain.wake_chunk_neighborhood(*cx, *cy);
+                kernel.phase_cap,
+            )
+        } else {
+            let mut events: Vec<PhaseTransitionEvent> = Vec::new();
+            let mut remaining = kernel.phase_cap;
+            for (cx, cy) in &scan_chunks {
+                if remaining == 0 {
+                    break;
+                }
+                let n = dispatch_phase_in_chunk(
+                    terrain,
+                    *cx,
+                    *cy,
+                    phase,
+                    &phase_materials,
+                    heat,
+                    prev,
+                    tick_before,
+                    &mut events,
+                    &mut remaining,
+                );
+                if n > 0 {
+                    terrain.wake_chunk_neighborhood(*cx, *cy);
+                }
             }
+            (events, remaining)
         }
-    }
+    } else {
+        (Vec::new(), kernel.phase_cap)
+    };
 
     let reaction_lookup = reactions.build_lookup();
-    let (mut reaction_events, mut reactions_remaining) =
+    let (reaction_events, reactions_remaining) =
         if kernel.parallel {
             dispatch_reactions_4color_parallel(
                 terrain,
@@ -594,6 +609,126 @@ fn find_adjacent_air_cell(
         }
     }
     None
+}
+
+/// Parallel phase-transition dispatch. Phase writes are WITHIN-CHUNK
+/// only (the pixel changes identity at its own coord), so chunks are
+/// fully independent and parallelize across rayon without per-color
+/// phasing.
+fn dispatch_phase_parallel(
+    terrain: &mut ChunkedTerrain,
+    scan_chunks: &[(i32, i32)],
+    phase: &PhaseRegistry,
+    phase_materials: &std::collections::BTreeSet<MaterialId>,
+    heat: &HeatField,
+    prev_heat: &HeatField,
+    tick: u64,
+    cap: u32,
+) -> (Vec<PhaseTransitionEvent>, u32) {
+    use rayon::prelude::*;
+    let width = terrain.width_px as i64;
+    let height = terrain.height_px as i64;
+
+    let snapshots: Vec<(i32, i32, Vec<MaterialId>)> = scan_chunks
+        .iter()
+        .filter_map(|(cx, cy)| terrain.chunk_pixels_clone(*cx, *cy).map(|p| (*cx, *cy, p)))
+        .collect();
+
+    type PhaseResult = (i32, i32, Vec<MaterialId>, Vec<PhaseTransitionEvent>, u32);
+    let results: Vec<PhaseResult> = snapshots
+        .into_par_iter()
+        .map(|(cx, cy, mut pixels)| {
+            let mut events: Vec<PhaseTransitionEvent> = Vec::new();
+            let mut fired = 0u32;
+            process_chunk_phase_to_snap(
+                &mut pixels,
+                cx,
+                cy,
+                width,
+                height,
+                phase,
+                phase_materials,
+                heat,
+                prev_heat,
+                tick,
+                &mut events,
+                &mut fired,
+            );
+            (cx, cy, pixels, events, fired)
+        })
+        .collect();
+
+    let mut all_events: Vec<PhaseTransitionEvent> = Vec::new();
+    let mut remaining = cap;
+    for (cx, cy, pixels, mut events, _fired) in results {
+        if remaining == 0 {
+            break;
+        }
+        let dirty = terrain.replace_chunk_pixels_at_tick(cx, cy, pixels, tick);
+        if dirty {
+            let chunk_size = CHUNK_SIZE as i64;
+            terrain.add_updated_material_area(
+                [(cx as i64 * chunk_size) as f32, (cy as i64 * chunk_size) as f32],
+                [((cx as i64 + 1) * chunk_size) as f32, ((cy as i64 + 1) * chunk_size) as f32],
+            );
+            terrain.wake_chunk_neighborhood(cx, cy);
+        }
+        let allowed = (remaining as usize).min(events.len());
+        events.truncate(allowed);
+        remaining = remaining.saturating_sub(allowed as u32);
+        all_events.extend(events);
+    }
+    (all_events, remaining)
+}
+
+fn process_chunk_phase_to_snap(
+    snap: &mut Vec<MaterialId>,
+    cx: i32,
+    cy: i32,
+    width: i64,
+    height: i64,
+    phase: &PhaseRegistry,
+    phase_materials: &std::collections::BTreeSet<MaterialId>,
+    heat: &HeatField,
+    prev_heat: &HeatField,
+    tick: u64,
+    events: &mut Vec<PhaseTransitionEvent>,
+    fired: &mut u32,
+) {
+    let chunk_origin_x = (cx as i64) * (CHUNK_SIZE as i64);
+    let chunk_origin_y = (cy as i64) * (CHUNK_SIZE as i64);
+    for ly in 0..CHUNK_SIZE {
+        let world_y = chunk_origin_y + (ly as i64);
+        if world_y >= height {
+            break;
+        }
+        for lx in 0..CHUNK_SIZE {
+            let world_x = chunk_origin_x + (lx as i64);
+            if world_x >= width {
+                break;
+            }
+            let material = snap[(ly as usize) * (CHUNK_SIZE as usize) + (lx as usize)];
+            if material == 0 || !phase_materials.contains(&material) {
+                continue;
+            }
+            let curr_t = heat.temperature_at_world(world_x as f32, world_y as f32);
+            let prev_t = prev_heat.temperature_at_world(world_x as f32, world_y as f32);
+            if let Some((transition, direction)) = phase.evaluate(material, prev_t, curr_t) {
+                let (product, _state) = transition.resolve(direction);
+                if product != material {
+                    snap[(ly as usize) * (CHUNK_SIZE as usize) + (lx as usize)] = product;
+                }
+                events.push(phase_transition_event(
+                    transition,
+                    direction,
+                    [world_x as i32, world_y as i32],
+                    curr_t,
+                    tick,
+                ));
+                *fired += 1;
+            }
+        }
+    }
 }
 
 /// 4-color phase parallel reaction dispatch. Chunks colored by
@@ -1449,6 +1584,61 @@ mod tests {
             t.set_material_pixel(6 + (i * 6), 15, 65, 0);
         }
         t
+    }
+
+    /// VAL: parallel phase dispatch produces byte-identical output to serial.
+    #[test]
+    fn val_parallel_phase_match_serial() {
+        let reactions = default_reaction_registry();
+        let phase = default_phase_registry();
+        let mut heat = HeatField::default();
+        for cy in 0..cf_terrain::air::AIR_GRID_SIZE {
+            for cx in 0..cf_terrain::air::AIR_GRID_SIZE {
+                heat.set_temperature(cx, cy, 400.0);
+            }
+        }
+        let prev = HeatField::default();
+
+        let seed = |t: &mut ChunkedTerrain| {
+            for x in 0..32 {
+                for y in 0..16 {
+                    if (x + y) % 4 == 0 {
+                        t.set_material_pixel(x, y, 13, 0);
+                    } else if (x + y) % 5 == 1 {
+                        t.set_material_pixel(x, y, 15, 0);
+                    } else if (x + y) % 7 == 2 {
+                        t.set_material_pixel(x, y, 19, 0);
+                    }
+                }
+            }
+        };
+
+        let mut a = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        let mut b = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        seed(&mut a);
+        seed(&mut b);
+
+        let mut ka = MaterialKernel::new();
+        let mut kb = MaterialKernel::new().with_parallel(true);
+        for tick in 0..10u64 {
+            let ra = kernel_step_no_movement(&mut a, &mut ka, &reactions, &phase, &heat, Some(&prev));
+            let rb = kernel_step_no_movement(&mut b, &mut kb, &reactions, &phase, &heat, Some(&prev));
+            assert_eq!(
+                ra.phase_transitions.len(),
+                rb.phase_transitions.len(),
+                "phase count tick {tick}"
+            );
+            for (ea, eb) in ra.phase_transitions.iter().zip(rb.phase_transitions.iter()) {
+                assert_eq!(ea.material, eb.material, "material tick {tick}");
+                assert_eq!(ea.pos, eb.pos, "pos tick {tick}");
+                assert_eq!(ea.product_material, eb.product_material, "product tick {tick}");
+            }
+            for y in 0..64i64 {
+                for x in 0..64i64 {
+                    assert_eq!(a.material_at(x, y), b.material_at(x, y), "pixel ({x},{y}) tick {tick}");
+                }
+            }
+        }
     }
 
     /// VAL: parallel reaction dispatch produces byte-identical output to serial.
