@@ -89,6 +89,21 @@ Last updated: 5/20/2026 11:55 PM MST
 - 4285 tests passing
 - Committed as fd39e529
 
+### Session 8 (5/20/2026): Steam scan opt + dynamic heat field
+- Steam pixel scan now iterates ONLY awake chunks (was O(W*H) full world scan)
+  - For typical scene: 4 awake chunks × 4096 = 16K lookups (vs 1M)
+  - Falls back to allocated chunks for tick-0 before wake/sleep gating settles
+  - Committed as 3c6ca1ed
+- HeatField now updates DYNAMICALLY each tick from hot materials
+  - Sources: fire_intense(65)→1200K, lava(26)→1473K, lightning(64)→30000K, electric_arc(63)→6000K
+  - inject_thermal_sources_and_diffuse helper runs BEFORE kernel_step
+  - One diffuse() pass per tick spreads heat to 4 neighbors (mix=0.05)
+  - Without this, phase transitions could only fire at scenarios with
+    pre-heated cells — fire spreading mid-game wouldn't heat anything
+  - VAL-M15-ENGINE-005 proves determinism is preserved (byte-identical
+    reaction payloads across two independent runs)
+  - 4286 tests passing
+
 ---
 
 ## Completed Work (committed)

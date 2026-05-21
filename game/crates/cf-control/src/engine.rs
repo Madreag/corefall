@@ -461,6 +461,85 @@ fn infer_ambient_world_from_scenario_id(scenario_id: &str) -> cf_material::Ambie
     }
 }
 
+/// **M15B § Heat-source injection + diffusion** — per-tick maintenance
+/// of the heat field. Walks awake chunks looking for hot materials
+/// (fire_intense=65, lava=26, lightning=64, electric_arc=63) and
+/// stamps their canonical surface temperature into the heat field
+/// cell that covers their world position. Then applies one diffusion
+/// pass to spread heat to neighbors (so a fire pixel doesn't ONLY
+/// affect its own cell — surrounding cells warm up via 4-neighbor
+/// mixing).
+///
+/// Cell temperatures use max(existing, source) so multiple fire
+/// pixels in the same cell don't double-stack, and cold materials
+/// don't accidentally cool a fire-heated cell. Cooling (return to
+/// ambient) happens naturally through the diffusion mixing toward
+/// ambient-bordered cells.
+///
+/// Without this helper the heat field stays static after scenario
+/// init, so phase transitions (water → steam at 373 K, etc.) can ONLY
+/// fire if the scenario manually pre-heated the cell — i.e. they
+/// could never fire DYNAMICALLY mid-game when fire spreads. This is
+/// the missing piece that makes M15's chemistry actually reactive.
+fn inject_thermal_sources_and_diffuse(state: &mut EngineMutable) {
+    use cf_terrain::chunked::CHUNK_SIZE;
+    // Per-material source temperatures (Kelvin) — see canonical
+    // material_registry.json for material classes.
+    const FIRE_INTENSE_TEMP_K: f32 = 1200.0; // ~natural gas flame
+    const LAVA_TEMP_K: f32 = 1473.0; // ~liquid basalt
+    const LIGHTNING_TEMP_K: f32 = 30000.0; // plasma stroke peak
+    const ELECTRIC_ARC_TEMP_K: f32 = 6000.0; // welding arc
+    const DIFFUSE_MIX: f32 = 0.05; // per spec § thermal exchange tuned for 60 Hz
+
+    let chunked = match state.chunked_terrain.as_ref() {
+        Some(t) => t,
+        None => return,
+    };
+    let width = chunked.width_px as i64;
+    let height = chunked.height_px as i64;
+    let chunk_size = CHUNK_SIZE as i64;
+    let awake = chunked.awake_chunk_coords();
+    let coords: Vec<(i32, i32)> = if awake.is_empty() {
+        chunked.allocated_chunk_coords()
+    } else {
+        awake
+    };
+
+    for (cx, cy) in &coords {
+        let chunk_origin_x = (*cx as i64) * chunk_size;
+        let chunk_origin_y = (*cy as i64) * chunk_size;
+        for ly in 0..chunk_size {
+            let y = chunk_origin_y + ly;
+            if y < 0 || y >= height {
+                continue;
+            }
+            for lx in 0..chunk_size {
+                let x = chunk_origin_x + lx;
+                if x < 0 || x >= width {
+                    continue;
+                }
+                let mat = chunked.material_at(x, y);
+                let source_temp = match mat {
+                    65 => FIRE_INTENSE_TEMP_K,
+                    26 => LAVA_TEMP_K,
+                    64 => LIGHTNING_TEMP_K,
+                    63 => ELECTRIC_ARC_TEMP_K,
+                    _ => continue,
+                };
+                if let Some((heat_cx, heat_cy)) = state.heat_field.world_to_cell(x as f32, y as f32) {
+                    let current = state.heat_field.temperature_at_cell(heat_cx, heat_cy);
+                    if source_temp > current {
+                        state.heat_field.set_temperature(heat_cx, heat_cy, source_temp);
+                    }
+                }
+            }
+        }
+    }
+    // Spread heat to neighbors so phase transitions fire in the
+    // SURROUNDING cells, not just the source pixel's cell.
+    state.heat_field.diffuse(DIFFUSE_MIX);
+}
+
 /// **M15 § HeatField initialization** — populate the per-cell heat
 /// field from a scenario's atmosphere_cells. Each atmosphere cell's
 /// `temp_k` is written to every HeatField cell whose world-space
@@ -5048,6 +5127,15 @@ impl M0Engine {
             // resulting state participates in the next checksum.
             if state.chunked_terrain.is_some() {
                 let sim_time_ms = state.clock.sim_time_ms();
+                // **M15B § Heat field source injection** — before the
+                // kernel reads the heat field for phase transitions,
+                // inject heat from hot materials (fire_intense, lava,
+                // lightning) AND apply one diffusion pass to smooth
+                // gradients. Without this, the heat field stays at
+                // initial scenario state forever; with it, phase
+                // transitions fire DYNAMICALLY in response to fire
+                // spreading + cooling, exactly per spec.
+                inject_thermal_sources_and_diffuse(&mut *state);
                 let prev_heat_snapshot = state.prev_heat_field.clone();
                 let report = {
                     let EngineMutable {
