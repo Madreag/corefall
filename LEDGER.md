@@ -69,6 +69,25 @@ Last updated: 5/20/2026 11:55 PM MST
 - Routes phase_nucleated + precipitation_started events to recorder
 - 4 new engine-integration tests (VAL-M15-ENGINE-001..004)
 - 4285 tests passing (was 4281 + 4 new)
+- Committed as 0ae23952
+
+### Session 6 (5/20/2026): Wire HeatField + AmbientWorld from scenario
+- HeatField now populated from scenario atmosphere_cells (was stub-init at ambient)
+- AmbientWorld inferred from scenario id (*_vulcan*, *_mimas*, *_mars*, else Earth)
+- Phase transitions can now actually fire because temperature changes
+- m15b_acid_rain_vulcan now actually produces acid_droplet pixels
+- Committed as 6c3ed1d5
+
+### Session 7 (5/20/2026): M15 perf - O(1) reaction lookup
+- Added ReactionLookup struct with (a*256+b) → reaction index table
+- Added [bool; 256] reactive_bitmap for O(1) is_reactive check
+- Refactored dispatch_reactions_in_chunk + try_fire_reaction to use lookup
+- Lookup built once per step, reused across all chunks
+- Bench: m15-ca-burst @ 100K pixels still ~55ms p99 (dispatch not bottleneck;
+  Margolus CA stepper + per-chunk material_at/set_material_pixel BTreeMap
+  lookups are the real cost — need parallel + cache optimization)
+- 4285 tests passing
+- Committed as fd39e529
 
 ---
 

@@ -5143,9 +5143,13 @@ impl M0Engine {
                 // **M15B § Precipitation cycle** — scan steam pixels +
                 // feed them to the cycle. Per-tick PrecipitationCycle
                 // tracks cloud-saturation; fires nucleation +
-                // precipitation events when gates cross. Inputs come
-                // from the per-cell heat field + the loaded
-                // PrecipitationConfig tuning.
+                // precipitation events when gates cross.
+                //
+                // **Perf** § iterate only the awake chunk set, not the
+                // whole world. For a typical scene with sleeping
+                // geometry this drops the scan from
+                // O(width × height) ≈ 1M ops to O(awake_chunks × 4096)
+                // which is typically <16K ops.
                 let precip_evts = {
                     let EngineMutable {
                         chunked_terrain,
@@ -5157,36 +5161,58 @@ impl M0Engine {
                     let terrain = chunked_terrain.as_mut().expect("chunked_terrain present");
                     let width = terrain.width_px as i64;
                     let height = terrain.height_px as i64;
-                    // Scan for steam pixels (id=50). For each, query the
-                    // heat field + altitude (world_y → altitude_px =
-                    // world height - world_y so y=0 is the world top).
+                    let chunk_size = cf_terrain::chunked::CHUNK_SIZE as i64;
+                    // Scan only awake chunks (with active_region==true)
+                    // OR dirty chunks (recent edits). Falls back to all
+                    // allocated chunks for the first tick when nothing
+                    // is awake yet.
+                    let awake = terrain.awake_chunk_coords();
+                    let chunk_coords: Vec<(i32, i32)> = if awake.is_empty() {
+                        terrain.allocated_chunk_coords()
+                    } else {
+                        awake
+                    };
                     let mut observed = 0u32;
                     // **Perf gate**: cap per-tick steam observations at
                     // 4096 so a steam-cloud-heavy scenario doesn't
                     // blow the per-tick budget.
                     const STEAM_OBS_CAP: u32 = 4096;
-                    'scan: for y in 0..height {
-                        for x in 0..width {
-                            if observed >= STEAM_OBS_CAP {
-                                break 'scan;
-                            }
-                            if terrain.material_at(x, y) != 50 {
+                    'scan: for (cx, cy) in &chunk_coords {
+                        let chunk_origin_x = (*cx as i64) * chunk_size;
+                        let chunk_origin_y = (*cy as i64) * chunk_size;
+                        for ly in 0..chunk_size {
+                            let y = chunk_origin_y + ly;
+                            if y < 0 || y >= height {
                                 continue;
                             }
-                            let altitude_px = (height - y) as f32;
-                            let temp_k = heat_field.temperature_at_world(x as f32, y as f32);
-                            precipitation_cycle.observe_steam_pixel(cf_material::PrecipitationInputs {
-                                material: 50,
-                                world_x: x as i32,
-                                world_y: y as i32,
-                                altitude_px,
-                                ambient_temp_k: temp_k,
-                                ambient_pressure_kpa: precipitation_config.reference_pressure_kpa,
-                                ambient_world: precipitation_cycle.world,
-                                pollutant_fraction_local: 0.0,
-                                tick: tick.0,
-                            });
-                            observed = observed.saturating_add(1);
+                            for lx in 0..chunk_size {
+                                if observed >= STEAM_OBS_CAP {
+                                    break 'scan;
+                                }
+                                let x = chunk_origin_x + lx;
+                                if x < 0 || x >= width {
+                                    continue;
+                                }
+                                if terrain.material_at(x, y) != 50 {
+                                    continue;
+                                }
+                                let altitude_px = (height - y) as f32;
+                                let temp_k = heat_field.temperature_at_world(x as f32, y as f32);
+                                precipitation_cycle.observe_steam_pixel(
+                                    cf_material::PrecipitationInputs {
+                                        material: 50,
+                                        world_x: x as i32,
+                                        world_y: y as i32,
+                                        altitude_px,
+                                        ambient_temp_k: temp_k,
+                                        ambient_pressure_kpa: precipitation_config.reference_pressure_kpa,
+                                        ambient_world: precipitation_cycle.world,
+                                        pollutant_fraction_local: 0.0,
+                                        tick: tick.0,
+                                    },
+                                );
+                                observed = observed.saturating_add(1);
+                            }
                         }
                     }
                     // Apply the cycle's pixel side-effects to terrain.
