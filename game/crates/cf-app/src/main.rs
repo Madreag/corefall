@@ -1122,12 +1122,12 @@ fn pump_recorder_events_into_render_effects(
                     .payload
                     .get("spawn_material_id")
                     .and_then(|v| v.as_u64())
-                    .and_then(|n| u8::try_from(n).ok())
+                    .and_then(|n| u16::try_from(n).ok())
                     .or_else(|| {
                         ev.payload
                             .get("source_material_id")
                             .and_then(|v| v.as_u64())
-                            .and_then(|n| u8::try_from(n).ok())
+                            .and_then(|n| u16::try_from(n).ok())
                     })
                     .unwrap_or(cf_terrain::MATERIAL_LOOSE_FILL);
                 debris_queue.pending.push_back(DebrisSpawnRequest {

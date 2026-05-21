@@ -614,7 +614,7 @@ pub struct InspectTerrainChunkParams {
 #[serde(deny_unknown_fields)]
 pub struct InspectMaterialParams {
     pub schema_version: u32,
-    pub id: u8,
+    pub id: u16,
 }
 
 /// **M9** (audit round-3 fix gap 3): `observe.terrain.material_at { x, y }`

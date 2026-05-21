@@ -34,7 +34,7 @@ use crate::integrity::{
 /// One pixel's material id. The DR-007 launch set ships 8 ids; the runtime stays
 /// `u8` so future expansion (M5.6 active material kernel) can fit additional ids
 /// without changing the storage layout.
-pub type MaterialId = u8;
+pub type MaterialId = u16;
 
 pub const MATERIAL_AIR: MaterialId = 0;
 pub const MATERIAL_DIRT: MaterialId = 1;
@@ -1493,7 +1493,9 @@ impl ChunkedTerrain {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&cx.to_le_bytes());
         hasher.update(&cy.to_le_bytes());
-        hasher.update(&chunk.pixels);
+        for p in &chunk.pixels {
+            hasher.update(&p.to_le_bytes());
+        }
         Some(hex::encode(hasher.finalize().as_bytes()))
     }
 
@@ -1782,7 +1784,9 @@ impl ChunkedTerrain {
                 let mut hasher = blake3::Hasher::new();
                 hasher.update(&coord.cx.to_le_bytes());
                 hasher.update(&coord.cy.to_le_bytes());
-                hasher.update(&chunk.pixels);
+                for p in &chunk.pixels {
+                    hasher.update(&p.to_le_bytes());
+                }
                 (coord.cx, coord.cy, hex::encode(hasher.finalize().as_bytes()))
             })
             .collect()
@@ -1832,20 +1836,19 @@ impl ChunkedTerrain {
     /// directly.
     pub fn checksum_bytes(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(64 + self.chunks.len() * 32);
-        out.extend_from_slice(b"cf-terrain-chunked-v1");
+        out.extend_from_slice(b"cf-terrain-chunked-v2");
         out.extend_from_slice(&self.width_px.to_le_bytes());
         out.extend_from_slice(&self.height_px.to_le_bytes());
-        out.push(self.default_material);
+        out.extend_from_slice(&self.default_material.to_le_bytes());
         out.extend_from_slice(&self.carve_count.to_le_bytes());
         out.extend_from_slice(&(self.chunks.len() as u32).to_le_bytes());
-        // Hash each chunk's pixel array via blake3 so the output stays bounded
-        // regardless of terrain size. Chunks iterate in BTreeMap order — that's
-        // deterministic.
         let mut chunk_hasher = blake3::Hasher::new();
         for (coord, chunk) in &self.chunks {
             chunk_hasher.update(&coord.cx.to_le_bytes());
             chunk_hasher.update(&coord.cy.to_le_bytes());
-            chunk_hasher.update(&chunk.pixels);
+            for p in &chunk.pixels {
+                chunk_hasher.update(&p.to_le_bytes());
+            }
         }
         out.extend_from_slice(chunk_hasher.finalize().as_bytes());
         out
@@ -2488,7 +2491,7 @@ mod tests {
         // acid_droplet). Without these, the renderer treats them as
         // transparent black + physics treats them as air.
         for (id, expected_name) in [
-            (13u8, "water"),
+            (13u16, "water"),
             (16, "oil"),
             (21, "acid"),
             (26, "lava"),
@@ -2511,7 +2514,7 @@ mod tests {
     fn val_m15b_hazardous_materials_damage_actors() {
         // Per M15 chem doc: acid, lava, fire_intense, acid_droplet all
         // emit per-tick damage to actors in contact.
-        for (id, min_dpt) in [(21u8, 1.0_f32), (26, 5.0), (65, 5.0), (88, 1.0)] {
+        for (id, min_dpt) in [(21u16, 1.0_f32), (26, 5.0), (65, 5.0), (88, 1.0)] {
             let aff = material_affordance(id).unwrap();
             assert!(aff.hazard, "id={id} should be hazard");
             assert!(

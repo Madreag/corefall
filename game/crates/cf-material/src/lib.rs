@@ -93,7 +93,7 @@ pub const MATERIAL_SCHEMA_VERSION: u32 = 1;
 
 /// One pixel's material id. Re-exported via cf-terrain so consumers use the
 /// same type.
-pub type MaterialId = u8;
+pub type MaterialId = u16;
 
 /// Required canonical material ids in the DR-007 launch set. The registry
 /// loader enforces these IDs are present and that no others sneak in past

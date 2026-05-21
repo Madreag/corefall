@@ -1357,7 +1357,7 @@ pub trait EngineHandle: Send + Sync + 'static {
     }
     /// **M2**: return the full MaterialDef for the requested id. Default
     /// returns `None`.
-    async fn inspect_material(&self, _id: u8) -> Option<serde_json::Value> {
+    async fn inspect_material(&self, _id: u16) -> Option<serde_json::Value> {
         None
     }
     /// **M9** (audit round-3 fix gap 3): return the `MaterialInfo` at

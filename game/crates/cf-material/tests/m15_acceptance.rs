@@ -193,7 +193,7 @@ fn scenario_cpu_ca_is_deterministic_across_runs() {
     use cf_terrain::ca::{step_ca, CaStepperState};
     use cf_terrain::chunked::{ChunkedTerrain, MATERIAL_AIR, MATERIAL_DIRT};
 
-    fn run_n_ticks() -> Vec<(i64, i64, u8)> {
+    fn run_n_ticks() -> Vec<(i64, i64, u16)> {
         let mut t = ChunkedTerrain::new(32, 32, MATERIAL_AIR);
         // Seed: a pillar of sand suspended in the middle.
         for y in 0..4 {
@@ -279,10 +279,8 @@ fn val_m15_cross_30_plus_reactions() {
 #[test]
 fn val_m15_cross_phase_registry_covers_spec_pairs() {
     let reg = default_phase_registry();
-    let materials: std::collections::BTreeSet<u8> = reg.transitions.iter().map(|t| t.material).collect();
-    // water (13), obsidian (70), iron ore (34), iron (68), oil (19),
-    // alcohol (24), mercury (25), wood (8), blood (23), snow (12).
-    for required in [13, 70, 34, 68, 19, 24, 25, 8, 23, 12] {
+    let materials: std::collections::BTreeSet<u16> = reg.transitions.iter().map(|t| t.material).collect();
+    for required in [13u16, 70, 34, 68, 19, 24, 25, 8, 23, 12] {
         assert!(
             materials.contains(&required),
             "phase registry missing material {required}"

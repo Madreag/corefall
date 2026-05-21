@@ -268,8 +268,12 @@ impl ReactionRegistry {
     /// (O(1)) in the per-pixel scan. The kernel dispatch goes from
     /// log(N)-per-pixel to constant-per-pixel.
     #[must_use]
-    pub fn primary_reactive_bitmap(&self) -> [bool; 256] {
-        let mut bitmap = [false; 256];
+    pub fn primary_reactive_bitmap(&self) -> Vec<bool> {
+        let mut max_id: usize = 0;
+        for r in &self.reactions {
+            max_id = max_id.max(r.input_a as usize).max(r.input_b as usize);
+        }
+        let mut bitmap = vec![false; max_id + 1];
         for r in &self.reactions {
             bitmap[r.input_a as usize] = true;
             bitmap[r.input_b as usize] = true;
@@ -292,31 +296,24 @@ impl ReactionRegistry {
 /// Acceptable cost for the bench/runtime path.
 #[derive(Debug, Clone)]
 pub struct ReactionLookup {
-    /// Per-(a, b) candidate reaction indices into `reactions`.
-    /// Empty Vec = no reaction for this pair.
-    table: Vec<Vec<u16>>,
-    /// `[bool; 256]` reactive-material bitmap for the
-    /// kernel's primary-reactive-pixel fast path.
-    reactive_bitmap: [bool; 256],
+    table: std::collections::HashMap<(MaterialId, MaterialId), Vec<u32>>,
+    reactive_bitmap: Vec<bool>,
 }
 
 impl ReactionLookup {
     fn from_registry(registry: &ReactionRegistry) -> Self {
-        let mut table: Vec<Vec<u16>> = (0..(256 * 256)).map(|_| Vec::new()).collect();
+        let mut table: std::collections::HashMap<(MaterialId, MaterialId), Vec<u32>> =
+            std::collections::HashMap::with_capacity(registry.reactions.len() * 2);
         for (i, r) in registry.reactions.iter().enumerate() {
-            let ab = (r.input_a as usize) * 256 + (r.input_b as usize);
-            let ba = (r.input_b as usize) * 256 + (r.input_a as usize);
-            table[ab].push(i as u16);
-            if ab != ba {
-                table[ba].push(i as u16);
+            table.entry((r.input_a, r.input_b)).or_default().push(i as u32);
+            if r.input_a != r.input_b {
+                table.entry((r.input_b, r.input_a)).or_default().push(i as u32);
             }
         }
         let reactive_bitmap = registry.primary_reactive_bitmap();
         Self { table, reactive_bitmap }
     }
 
-    /// O(1)-average reaction match. Returns the reaction's index in
-    /// the source registry's `reactions` vec, or None.
     #[inline]
     #[must_use]
     pub fn evaluate<'r>(
@@ -326,8 +323,8 @@ impl ReactionLookup {
         b: MaterialId,
         temperature_k: f32,
     ) -> Option<&'r MaterialReaction> {
-        let idx = (a as usize) * 256 + (b as usize);
-        for &rxn_idx in &self.table[idx] {
+        let bucket = self.table.get(&(a, b))?;
+        for &rxn_idx in bucket {
             let r = &registry.reactions[rxn_idx as usize];
             if r.matches(a, b, temperature_k) {
                 return Some(r);
@@ -336,12 +333,11 @@ impl ReactionLookup {
         None
     }
 
-    /// O(1) reactive-material check (the per-pixel hot path's first
-    /// gate).
     #[inline]
     #[must_use]
     pub fn is_reactive(&self, material: MaterialId) -> bool {
-        self.reactive_bitmap[material as usize]
+        let idx = material as usize;
+        idx < self.reactive_bitmap.len() && self.reactive_bitmap[idx]
     }
 }
 

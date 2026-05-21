@@ -439,7 +439,15 @@ fn build_atmos_cell(c: &cf_mission::ScenarioAtmosCell) -> cf_atmos::AtmosCell {
 }
 
 /// **M15B § AmbientWorld inference** — derive the precipitation cycle's
-/// Map scenario id substring → AmbientWorld (vulcan/mimas/mars/earth).
+/// Deterministic little-endian byte view over a u16 slice for hashing/hex.
+fn u16_slice_to_bytes(pixels: &[u16]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(pixels.len() * 2);
+    for p in pixels {
+        out.extend_from_slice(&p.to_le_bytes());
+    }
+    out
+}
+
 fn infer_ambient_world_from_scenario_id(scenario_id: &str) -> cf_material::AmbientWorld {
     let id = scenario_id.to_ascii_lowercase();
     if id.contains("vulcan") {
@@ -3288,9 +3296,9 @@ impl M0Engine {
                         "default_material": snapshot.default_material,
                         "schema": snapshot.schema,
                         "pixels_len": chunk.pixels.len(),
-                        "pixels_blake3": hex::encode(&blake3::hash(&chunk.pixels).as_bytes()[..16]),
-                        "checksum": hex::encode(blake3::hash(&chunk.pixels).as_bytes()),
-                        "compact_payload": hex::encode(&chunk.pixels),
+                        "pixels_blake3": hex::encode(&blake3::hash(&u16_slice_to_bytes(&chunk.pixels)).as_bytes()[..16]),
+                        "checksum": hex::encode(blake3::hash(&u16_slice_to_bytes(&chunk.pixels)).as_bytes()),
+                        "compact_payload": hex::encode(&u16_slice_to_bytes(&chunk.pixels)),
                     }),
                     parent_event_id.map(|s| s.to_string()),
                 );
@@ -23993,7 +24001,7 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    async fn inspect_material(&self, id: u8) -> Option<serde_json::Value> {
+    async fn inspect_material(&self, id: u16) -> Option<serde_json::Value> {
         let aff = cf_terrain::material_affordance(id)?;
         // Try to load the JSON registry to surface the full MaterialDef
         // (with future-compat fields). If load fails we fall back to the

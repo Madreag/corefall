@@ -64,7 +64,7 @@ fn canonical_display_name(name: &str) -> String {
 #[must_use]
 pub fn legend_entries() -> Vec<MaterialLegendEntry> {
     let mut out = Vec::with_capacity(8);
-    for id in 0_u8..=7 {
+    for id in 0u16..=7 {
         if let Some(aff) = material_affordance(id) {
             out.push(MaterialLegendEntry::from_affordance(aff));
         }

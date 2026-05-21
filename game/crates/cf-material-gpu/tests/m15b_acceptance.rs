@@ -507,12 +507,12 @@ fn val_m15b_x10_kernel_determinism_holds_over_600_ticks() {
         // Seed reactive pixels for a non-trivial scene.
         for y in 0..32 {
             for x in 0..32 {
-                let mat = match (x + y * 7) % 5 {
-                    0 => 14u8, // sand
-                    1 => 13u8, // water
-                    2 => 68u8, // iron
-                    3 => 21u8, // acid
-                    _ => 0u8,  // air
+                let mat: u16 = match (x + y * 7) % 5 {
+                    0 => 14,
+                    1 => 13,
+                    2 => 68,
+                    3 => 21,
+                    _ => 0,
                 };
                 if mat != 0 {
                     terrain.set_material_pixel(x as i64, y as i64, mat, 0);

@@ -323,7 +323,7 @@ mod tests {
     /// identical state across runs.
     #[test]
     fn liquid_flow_is_deterministic_across_runs() {
-        fn run() -> Vec<u8> {
+        fn run() -> Vec<MaterialId> {
             let mut terrain = ChunkedTerrain::new(16, 16, MATERIAL_AIR);
             for x in 0..16 {
                 terrain.set_material_pixel(x, 8, MATERIAL_DIRT, 0);

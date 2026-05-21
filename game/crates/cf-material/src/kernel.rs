@@ -36,6 +36,7 @@ use cf_terrain::heat::HeatField;
 
 use crate::phase::{phase_transition_event, PhaseRegistry, PhaseTransitionEvent};
 use crate::reactions::{ReactionLookup, ReactionRegistry, ReactionTriggeredEvent};
+use crate::MaterialId;
 
 /// Per M8A `CHUNK_SLEEP_IDLE_THRESHOLD_TICKS`; the kernel transitions
 /// chunks idle this many ticks back to sleeping.
@@ -458,8 +459,8 @@ fn try_fire_reaction(
     terrain: &mut ChunkedTerrain,
     pa_pos: [i64; 2],
     pb_pos: [i64; 2],
-    pa: u8,
-    pb: u8,
+    pa: MaterialId,
+    pb: MaterialId,
     reactions: &ReactionRegistry,
     reaction_lookup: &ReactionLookup,
     heat: &HeatField,
@@ -598,7 +599,7 @@ fn dispatch_phase_in_chunk(
     cx: i32,
     cy: i32,
     phase: &PhaseRegistry,
-    phase_materials: &std::collections::BTreeSet<u8>,
+    phase_materials: &std::collections::BTreeSet<MaterialId>,
     heat: &HeatField,
     prev_heat: &HeatField,
     tick: u64,
@@ -897,7 +898,7 @@ mod tests {
     /// VAL-M15-kernel-009: deterministic — same input → same output.
     #[test]
     fn kernel_step_is_deterministic_across_runs() {
-        fn run() -> Vec<u8> {
+        fn run() -> Vec<MaterialId> {
             let mut t = ChunkedTerrain::new(16, 16, MATERIAL_AIR);
             t.set_material_pixel(5, 5, 68, 0); // iron
             t.set_material_pixel(6, 5, 21, 0); // acid
@@ -1089,6 +1090,6 @@ mod tests {
             .iter()
             .find(|e| e.reaction_id == "rxn.explosion.gunpowder_fire")
             .expect("gunpowder+fire reaction must fire");
-        assert!(rxn.emissions.starts_with(&[62u8, 62, 53]), "spec literal: 2× smoke + CO2 (plus fire emissions for violence)");
+        assert!(rxn.emissions.starts_with(&[62u16, 62, 53]), "spec literal: 2× smoke + CO2 (plus fire emissions for violence)");
     }
 }

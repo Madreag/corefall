@@ -291,7 +291,7 @@ pub struct TerrainView {
     /// {id: pixel_count}` keyed by material id (u8). Same data as
     /// `material_counts` but with id keys instead of name keys.
     #[serde(default)]
-    pub material_distribution: std::collections::BTreeMap<u8, u64>,
+    pub material_distribution: std::collections::BTreeMap<u16, u64>,
     /// **M2**: active material-overlay mode ("off" by default). Cycled via
     /// `act.player.toggle_material_overlay`. One of `off`, `integrity`,
     /// `pathability`, `mobility`, `hazard`, `build_repair`.

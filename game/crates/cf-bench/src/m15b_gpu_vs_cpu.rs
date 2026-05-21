@@ -142,11 +142,10 @@ fn build_scenario(seed: u64) -> ChunkedTerrain {
         // Distribute material types: 70% sand, 20% water, 10% reactive (iron/acid pairs).
         rng = lcg_next(rng);
         let class = rng & 0x7;
-        let mat = match class {
-            0..=4 => 14u8,        // sand (powder)
-            5..=6 => 13u8,        // water (liquid)
+        let mat: u16 = match class {
+            0..=4 => 14,
+            5..=6 => 13,
             _ => {
-                // Reactive pair: iron + acid side-by-side.
                 terrain.set_material_pixel(x, y, 68, 0);
                 if x + 1 < 256 {
                     terrain.set_material_pixel(x + 1, y, 21, 0);

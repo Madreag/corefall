@@ -375,7 +375,7 @@ pub fn compute_kernel_checksum(terrain: &ChunkedTerrain, report: &KernelStepRepo
         hasher.update(&pos[1].to_le_bytes());
         hasher.update(&(id.len() as u16).to_le_bytes());
         hasher.update(id.as_bytes());
-        hasher.update(&[*output]);
+        hasher.update(&output.to_le_bytes());
     }
     // Phase transitions — sorted by (pos, material) to keep deterministic.
     let mut phases: Vec<_> = report
@@ -388,7 +388,8 @@ pub fn compute_kernel_checksum(terrain: &ChunkedTerrain, report: &KernelStepRepo
     for (pos, material, product) in &phases {
         hasher.update(&pos[0].to_le_bytes());
         hasher.update(&pos[1].to_le_bytes());
-        hasher.update(&[*material, *product]);
+        hasher.update(&material.to_le_bytes());
+        hasher.update(&product.to_le_bytes());
     }
     // CA pixels moved counter.
     hasher.update(&report.ca.pixels_moved.to_le_bytes());
