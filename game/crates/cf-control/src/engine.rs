@@ -438,6 +438,73 @@ fn build_atmos_cell(c: &cf_mission::ScenarioAtmosCell) -> cf_atmos::AtmosCell {
     }
 }
 
+/// **M15B § AmbientWorld inference** — derive the precipitation cycle's
+/// AmbientWorld from a scenario id. Per spec § "Vulcan ambient
+/// triggers acid rain" — scenarios opt into Vulcan / Mimas / Mars
+/// ambient by id prefix. Default fallback is Earth.
+///
+/// Naming conventions:
+/// - `*_vulcan*` → AmbientWorld::Vulcan (high humidity, pollutant > 5%, always-rain)
+/// - `*_mimas*` → AmbientWorld::Mimas (vacuum, never rain)
+/// - `*_mars*` → AmbientWorld::Mars (thin atm, rare rain)
+/// - anything else → AmbientWorld::Earth
+fn infer_ambient_world_from_scenario_id(scenario_id: &str) -> cf_material::AmbientWorld {
+    let id = scenario_id.to_ascii_lowercase();
+    if id.contains("vulcan") {
+        cf_material::AmbientWorld::Vulcan
+    } else if id.contains("mimas") {
+        cf_material::AmbientWorld::Mimas
+    } else if id.contains("mars") {
+        cf_material::AmbientWorld::Mars
+    } else {
+        cf_material::AmbientWorld::Earth
+    }
+}
+
+/// **M15 § HeatField initialization** — populate the per-cell heat
+/// field from a scenario's atmosphere_cells. Each atmosphere cell's
+/// `temp_k` is written to every HeatField cell whose world-space
+/// position falls within the atmosphere cell's bounding rect.
+///
+/// This is what makes phase transitions (water → steam at 373 K, etc.)
+/// actually fire in gameplay — without this initialization, the heat
+/// field stays at ambient (293 K) and no thermal threshold crossings
+/// ever happen.
+///
+/// Per-cell heat updates over time (radiator, fire-induced heating,
+/// cooling) are M19's responsibility; this just sets the initial
+/// state from scenario authoring.
+fn build_heat_field_from_atmosphere(cells: &[cf_atmos::AtmosCell]) -> cf_terrain::HeatField {
+    let mut field = cf_terrain::HeatField::default();
+    if cells.is_empty() {
+        return field;
+    }
+    // The HeatField uses HEAT_GRID_SIZE×HEAT_GRID_SIZE cells over the
+    // world. For each atmosphere cell, walk the HeatField cells whose
+    // world-space center falls within the atmosphere cell's bbox.
+    let grid_size = cf_terrain::HEAT_GRID_SIZE;
+    for atmos in cells {
+        let temp = atmos.temp_k;
+        if !temp.is_finite() || temp < 2.7 {
+            continue;
+        }
+        for cy in 0..grid_size {
+            for cx in 0..grid_size {
+                let world_x = field.anchor[0] + (cx as f32 + 0.5) * field.cell_size_px;
+                let world_y = field.anchor[1] + (cy as f32 + 0.5) * field.cell_size_px;
+                if world_x >= atmos.min[0]
+                    && world_x < atmos.max[0]
+                    && world_y >= atmos.min[1]
+                    && world_y < atmos.max[1]
+                {
+                    field.set_temperature(cx, cy, temp);
+                }
+            }
+        }
+    }
+    field
+}
+
 /// **M14B** § convert a [`cf_mission::ScenarioAtmosCell`] entry into a
 /// stratification cell with per-gas mole fractions. The string labels
 /// in the manifest map to [`cf_atmos::Gas`] variants; unknown labels
@@ -2174,6 +2241,11 @@ impl M0Engine {
         }
         let m14g_thermal_zones_init = config.initial_m14g_thermal_zones.clone();
         let m14g_material_contacts_init = config.initial_m14g_material_contacts.clone();
+        // **M15 § Active material kernel** — compute the per-tick
+        // state inputs from `config` BEFORE the Self construction
+        // moves `config` into `Self.config`.
+        let m15_initial_heat = build_heat_field_from_atmosphere(&config.initial_atmosphere_cells);
+        let m15_ambient_world = infer_ambient_world_from_scenario_id(&config.scenario_id);
         let engine = Self {
             config,
             state: RwLock::new(EngineMutable {
@@ -2339,11 +2411,9 @@ impl M0Engine {
                 material_kernel: cf_material::MaterialKernel::new(),
                 reaction_registry: cf_material::ReactionRegistry::load_default_or_hardcoded(),
                 phase_registry: cf_material::PhaseRegistry::load_default_or_hardcoded(),
-                heat_field: cf_terrain::HeatField::default(),
+                heat_field: m15_initial_heat,
                 prev_heat_field: None,
-                precipitation_cycle: cf_material::PrecipitationCycle::new(
-                    cf_material::AmbientWorld::Earth,
-                ),
+                precipitation_cycle: cf_material::PrecipitationCycle::new(m15_ambient_world),
                 precipitation_config: cf_material::PrecipitationConfig::load_default_or_baseline(),
             }),
             recorder,
