@@ -180,4 +180,45 @@ pub(crate) fn registry_color_hex_from_cache(
     }
 }
 
+/// for the F8 tile-inspect overlay so the HUD can render the spec's
+/// `element=Steel, mass=920kg, temp=298K, hardness=12, density=7800`
+/// row without a second cfctl call. Returns `None` if the registry
+/// cache is empty AND the on-disk lookup fails.
+pub(crate) fn registry_m15c_snapshot_from_cache(
+    cache: Option<&cf_material::MaterialRegistry>,
+    material_id: cf_terrain::MaterialId,
+) -> Option<serde_json::Value> {
+    if let Some(def) = cache.and_then(|reg| reg.find_by_id(material_id)) {
+        return Some(material_def_to_snapshot(def));
+    }
+    let path = cf_material::MaterialRegistry::locate_default()?;
+    let (reg, _) = cf_material::load_registry_from_file(&path).ok()?;
+    let def = reg.find_by_id(material_id)?;
+    Some(material_def_to_snapshot(def))
+}
+
+fn material_def_to_snapshot(def: &cf_material::MaterialDef) -> serde_json::Value {
+    serde_json::json!({
+        "display_name": def.display_name,
+        "state": def.material_state().label(),
+        "hardness": def.hardness,
+        "density_kg_per_m3": def.density_kg_per_m3,
+        "specific_heat_capacity_j_per_kg_k": def.specific_heat_capacity_j_per_kg_k,
+        "thermal_conductivity_w_per_m_k": def.thermal_conductivity_w_per_m_k,
+        "molar_mass_g_per_mol": def.molar_mass_g_per_mol,
+        "default_mass_per_tile_kg": def.default_mass_per_tile_kg,
+        "max_mass_per_tile_kg": def.max_mass_per_tile_kg,
+        "melt_temp_k": def.melt_temp_k,
+        "freeze_temp_k": def.freeze_temp_k,
+        "boil_temp_k": def.boil_temp_k,
+        "ignition_temp_k": def.ignition_temp_k,
+        "toxicity": def.toxicity,
+        "corrosiveness": def.corrosiveness,
+        "radioactivity": def.radioactivity,
+        "electrical_conductivity": def.electrical_conductivity,
+        "viscosity_pa_s": def.viscosity_pa_s,
+        "surface_tension_n_per_m": def.surface_tension_n_per_m,
+    })
+}
+
 

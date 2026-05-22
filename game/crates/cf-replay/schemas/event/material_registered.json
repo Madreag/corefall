@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/material.registered.v0.1",
+  "title": "material.registered",
+  "description": "M15C § Files: emitted once per material at scenario start when the material registry loads cleanly. Surface for cfctl + content tooling to enumerate the live registry. Payload mirrors the M15C MaterialDef header (id, name, display_name, state) plus the five required-non-default M15C numeric fields (hardness, density_kg_per_m3, specific_heat_capacity_j_per_kg_k, thermal_conductivity_w_per_m_k, color_hex) so consumers don't have to round-trip back through `cfctl inspect.material.<id>` to confirm registration.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "material" },
+    "event_type": { "const": "registered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "name": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string", "minLength": 1 },
+        "state": {
+          "type": "string",
+          "enum": ["solid", "liquid", "gas", "powder", "plasma", "energy_field"]
+        },
+        "hardness": { "type": "number" },
+        "density_kg_per_m3": { "type": "number", "minimum": 0 },
+        "specific_heat_capacity_j_per_kg_k": { "type": "number", "minimum": 0 },
+        "thermal_conductivity_w_per_m_k": { "type": "number", "minimum": 0 },
+        "color_hex": { "type": "string" },
+        "molar_mass_g_per_mol": { "type": ["number", "null"], "minimum": 0 },
+        "toxicity": { "type": ["number", "null"], "minimum": 0 },
+        "corrosiveness": { "type": ["number", "null"], "minimum": 0 },
+        "radioactivity": { "type": ["number", "null"], "minimum": 0 }
+      },
+      "required": [
+        "id",
+        "name",
+        "display_name",
+        "state",
+        "hardness",
+        "density_kg_per_m3",
+        "specific_heat_capacity_j_per_kg_k",
+        "thermal_conductivity_w_per_m_k",
+        "color_hex"
+      ]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -491,4 +491,74 @@ impl M0Engine {
         self.emit_m7_mission_director_baselines(tick, sim_time_ms, parent_event_id);
     }
 
+    /// material.registered` once per entry + `material.registry_validation_failed`
+    /// once per offending validation error. Surfaces the canonical
+    /// registry to replay viewers + cfctl + cf-mod CI without requiring
+    /// them to round-trip back through `cfctl inspect.material.<id>`.
+    pub(crate) fn emit_material_registry_events(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        parent_event_id: Option<&str>,
+    ) {
+        let path = match cf_material::MaterialRegistry::locate_default() {
+            Some(p) => p,
+            None => return,
+        };
+        let (registry, report) = match cf_material::load_registry_from_file(&path) {
+            Ok(rv) => rv,
+            Err(err) => {
+                tracing::warn!(
+                    target: "cf_control::engine_baselines",
+                    ?err,
+                    "material_registry.json failed to load — no registered events emitted"
+                );
+                return;
+            }
+        };
+        let parent_owned: Option<String> = parent_event_id.map(|s| s.to_string());
+        for m in &registry.materials {
+            let state_label = m.material_state().label();
+            let payload = json!({
+                "id": m.id,
+                "name": m.name,
+                "display_name": m.display_name,
+                "state": state_label,
+                "hardness": m.hardness,
+                "density_kg_per_m3": m.density_kg_per_m3_value(),
+                "specific_heat_capacity_j_per_kg_k": m.specific_heat_capacity_j_per_kg_k_value(),
+                "thermal_conductivity_w_per_m_k": m.thermal_conductivity_w_per_m_k_value(),
+                "color_hex": m.color_hex,
+                "molar_mass_g_per_mol": m.molar_mass_g_per_mol,
+                "toxicity": m.toxicity,
+                "corrosiveness": m.corrosiveness,
+                "radioactivity": m.radioactivity,
+            });
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "material",
+                "registered",
+                payload,
+                parent_owned.clone(),
+            );
+        }
+        for err in &report.errors {
+            let payload = json!({
+                "kind": err.kind,
+                "path": err.path,
+                "message": err.message,
+                "hint": err.hint,
+            });
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "material",
+                "registry_validation_failed",
+                payload,
+                parent_owned.clone(),
+            );
+        }
+    }
+
 }

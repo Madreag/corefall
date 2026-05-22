@@ -404,6 +404,8 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("material", "precipitation_started") => Some(SCHEMA_MATERIAL_PRECIPITATION_STARTED),
         ("material", "gpu_cpu_divergence_detected") => Some(SCHEMA_MATERIAL_GPU_CPU_DIVERGENCE_DETECTED),
         ("material", "violent_burst") => Some(SCHEMA_MATERIAL_VIOLENT_BURST),
+        ("material", "registered") => Some(SCHEMA_MATERIAL_REGISTERED),
+        ("material", "registry_validation_failed") => Some(SCHEMA_MATERIAL_REGISTRY_VALIDATION_FAILED),
         _ => None,
     }
 }

@@ -1104,6 +1104,7 @@ impl M0Engine {
         if let Ok(mut s) = self.state.write() {
             s.run_started_event_id = Some(started_id.clone());
         }
+        self.emit_material_registry_events(tick, sim_time_ms, Some(&started_id));
         self.emit_initial_snapshots(tick, sim_time_ms, Some(&started_id));
         self.emit_category_baseline(tick, sim_time_ms, &started_id);
         // baseline as part of run_started so the cadence is anchored from

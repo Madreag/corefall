@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-2020-12/schema",
   "$id": "cf-material/material_def.v1",
   "title": "MaterialDef",
-  "description": "One material entry in the canonical registry. Schema v1 (M2). Future-compat fields (heat_capacity, ignition_temperature, etc.) are optional and read by M5.6 active material kernel.",
+  "description": "One material entry in the canonical registry. Schema v1 (M2). M5.6 added active-material kernel fields; M12B added acoustic registry; M14E/M14F added structural fields; M15C added the full thermodynamic + chemistry schema (state, density_kg_per_m3, specific_heat_capacity_j_per_kg_k, thermal_conductivity_w_per_m_k, melt/freeze/boil/ignition_temp_k, molar_mass_g_per_mol, toxicity, corrosiveness, radioactivity, electrical_conductivity, viscosity_pa_s, surface_tension_n_per_m, default_mass_per_tile_kg, max_mass_per_tile_kg, reactions[], container_rules).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,7 +19,7 @@
     "description"
   ],
   "properties": {
-    "id": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "id": { "type": "integer", "minimum": 0, "maximum": 65535 },
     "name": { "type": "string", "minLength": 1 },
     "display_name": { "type": "string", "minLength": 1 },
     "hardness": { "type": "number" },
@@ -61,6 +61,34 @@
     "conductivity": { "type": ["number", "null"] },
     "wetting": { "type": ["number", "null"] },
     "reaction_tags": { "type": "array", "items": { "type": "string" } },
-    "ai_affordances": { "type": "array", "items": { "type": "string" } }
+    "ai_affordances": { "type": "array", "items": { "type": "string" } },
+    "echo_coefficient": { "type": ["number", "null"] },
+    "decay_band": { "type": ["string", "null"] },
+    "acoustic_transmission_loss_db": { "type": ["number", "null"] },
+    "low_pass_cutoff_hz": { "type": ["number", "null"] },
+    "structural_support_strength": { "type": ["integer", "null"], "minimum": 0 },
+    "lateral_yield_strength": { "type": ["integer", "null"], "minimum": 0 },
+    "state": {
+      "type": ["string", "null"],
+      "enum": ["solid", "liquid", "gas", "powder", "plasma", "energy_field", null]
+    },
+    "density_kg_per_m3": { "type": ["number", "null"], "minimum": 0 },
+    "specific_heat_capacity_j_per_kg_k": { "type": ["number", "null"], "minimum": 0 },
+    "thermal_conductivity_w_per_m_k": { "type": ["number", "null"], "minimum": 0 },
+    "melt_temp_k": { "type": ["number", "null"] },
+    "freeze_temp_k": { "type": ["number", "null"] },
+    "boil_temp_k": { "type": ["number", "null"] },
+    "ignition_temp_k": { "type": ["number", "null"] },
+    "molar_mass_g_per_mol": { "type": ["number", "null"], "minimum": 0 },
+    "toxicity": { "type": ["number", "null"], "minimum": 0 },
+    "corrosiveness": { "type": ["number", "null"], "minimum": 0 },
+    "radioactivity": { "type": ["number", "null"], "minimum": 0 },
+    "electrical_conductivity": { "type": ["number", "null"], "minimum": 0 },
+    "viscosity_pa_s": { "type": ["number", "null"], "minimum": 0 },
+    "surface_tension_n_per_m": { "type": ["number", "null"], "minimum": 0 },
+    "default_mass_per_tile_kg": { "type": ["number", "null"], "minimum": 0 },
+    "max_mass_per_tile_kg": { "type": ["number", "null"], "minimum": 0 },
+    "reactions": { "type": "array" },
+    "container_rules": { "type": ["object", "null"] }
   }
 }

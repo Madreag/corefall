@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/material.registry_validation_failed.v0.1",
+  "title": "material.registry_validation_failed",
+  "description": "M15C § Files: emitted once per offending entry when the material registry fails the M15C schema validator (missing required field, invalid state, unknown field, etc.). The payload pairs the structured `kind` from cf-material::loader::RegistryValidationError with the JSON path of the bad entry and a single-line `hint` so cfctl + cf-mod CLI can present actionable errors to content authors.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "material" },
+    "event_type": { "const": "registry_validation_failed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "schema_version_mismatch",
+            "duplicate_id",
+            "unknown_field",
+            "missing_required_field",
+            "launch_set_mismatch",
+            "integrity_overflow",
+            "affordance_conflict",
+            "color_format",
+            "unknown_spawn_material"
+          ]
+        },
+        "path": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "hint": { "type": "string" },
+        "material_id": { "type": ["integer", "null"], "minimum": 0, "maximum": 65535 },
+        "material_name": { "type": ["string", "null"] }
+      },
+      "required": ["kind", "path", "message", "hint"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

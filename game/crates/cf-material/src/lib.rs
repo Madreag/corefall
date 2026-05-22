@@ -57,7 +57,10 @@ pub mod phase;
 pub mod precipitation;
 pub mod reactions;
 pub mod registry;
+pub mod schema_m15c;
 pub mod thermal_sources;
+
+pub use schema_m15c::{ContainerRules, MaterialReactionRef, MaterialState};
 
 pub use thermal_sources::{ThermalSource, ThermalSourceLoadError, ThermalSourceTable};
 
@@ -245,6 +248,52 @@ pub struct MaterialDef {
     pub acoustic_transmission_loss_db: Option<f32>,
     #[serde(default)]
     pub low_pass_cutoff_hz: Option<f32>,
+
+    // --- M15C full thermodynamic + chemistry schema. See `schema_m15c` for
+    // the typed companions ([`MaterialState`], [`MaterialReactionRef`],
+    // [`ContainerRules`]). Optional in Rust so existing entries deserialize;
+    // the loader's M15C validator enforces non-default values on the five
+    // required fields (hardness already required; plus density_kg_per_m3,
+    // specific_heat_capacity_j_per_kg_k, thermal_conductivity_w_per_m_k,
+    // color_hex already required, state).
+    #[serde(default)]
+    pub state: Option<MaterialState>,
+    #[serde(default)]
+    pub density_kg_per_m3: Option<f32>,
+    #[serde(default)]
+    pub specific_heat_capacity_j_per_kg_k: Option<f32>,
+    #[serde(default)]
+    pub thermal_conductivity_w_per_m_k: Option<f32>,
+    #[serde(default)]
+    pub melt_temp_k: Option<f32>,
+    #[serde(default)]
+    pub freeze_temp_k: Option<f32>,
+    #[serde(default)]
+    pub boil_temp_k: Option<f32>,
+    #[serde(default)]
+    pub ignition_temp_k: Option<f32>,
+    #[serde(default)]
+    pub molar_mass_g_per_mol: Option<f32>,
+    #[serde(default)]
+    pub toxicity: Option<f32>,
+    #[serde(default)]
+    pub corrosiveness: Option<f32>,
+    #[serde(default)]
+    pub radioactivity: Option<f32>,
+    #[serde(default)]
+    pub electrical_conductivity: Option<f32>,
+    #[serde(default)]
+    pub viscosity_pa_s: Option<f32>,
+    #[serde(default)]
+    pub surface_tension_n_per_m: Option<f32>,
+    #[serde(default)]
+    pub default_mass_per_tile_kg: Option<f32>,
+    #[serde(default)]
+    pub max_mass_per_tile_kg: Option<f32>,
+    #[serde(default)]
+    pub reactions: Vec<MaterialReactionRef>,
+    #[serde(default)]
+    pub container_rules: Option<ContainerRules>,
 }
 
 /// is missing any of the four acoustic fields, lookups return these defaults
@@ -395,6 +444,63 @@ impl MaterialDef {
             return v;
         }
         self.compressive_strength()
+    }
+
+    /// Resolve the canonical [`MaterialState`] for this entry. Falls back
+    /// to `MaterialState::Solid` for entries authored before M15C added
+    /// the `state` field, so existing scenarios continue to work.
+    #[must_use]
+    pub fn material_state(&self) -> MaterialState {
+        self.state.unwrap_or(MaterialState::Solid)
+    }
+
+    /// Per-spec density in kg/m³. Returns 0.0 when the M15C field is
+    /// absent (callers should treat that as "not yet authored"); use
+    /// [`MaterialDef::density_kg_per_m3_or`] for an explicit default.
+    #[must_use]
+    pub fn density_kg_per_m3_value(&self) -> f32 {
+        self.density_kg_per_m3.unwrap_or(0.0)
+    }
+
+    /// Specific heat capacity in J/(kg·K). Returns 0.0 when absent.
+    #[must_use]
+    pub fn specific_heat_capacity_j_per_kg_k_value(&self) -> f32 {
+        self.specific_heat_capacity_j_per_kg_k.unwrap_or(0.0)
+    }
+
+    /// Thermal conductivity in W/(m·K). Returns 0.0 when absent.
+    #[must_use]
+    pub fn thermal_conductivity_w_per_m_k_value(&self) -> f32 {
+        self.thermal_conductivity_w_per_m_k.unwrap_or(0.0)
+    }
+
+    /// Default mass per tile in kg. Returns 0.0 when absent.
+    #[must_use]
+    pub fn default_mass_per_tile_kg_value(&self) -> f32 {
+        self.default_mass_per_tile_kg.unwrap_or(0.0)
+    }
+
+    /// Whether this material satisfies the five M15C required non-default
+    /// fields: hardness, density_kg_per_m3, specific_heat_capacity_j_per_kg_k,
+    /// thermal_conductivity_w_per_m_k, color_hex. The first three are
+    /// "non-default" if > 0 (energy fields are the exception — they
+    /// declare `state="energy_field"` and skip the >0 rule).
+    #[must_use]
+    pub fn satisfies_m15c_schema(&self) -> bool {
+        let st = self.material_state();
+        let energy = matches!(st, MaterialState::EnergyField);
+        let hardness_ok = self.hardness.is_finite() && (energy || self.hardness >= 0.0);
+        let density_ok = self
+            .density_kg_per_m3
+            .is_some_and(|v| v.is_finite() && (energy || v >= 0.0));
+        let cp_ok = self
+            .specific_heat_capacity_j_per_kg_k
+            .is_some_and(|v| v.is_finite() && (energy || v >= 0.0));
+        let k_ok = self
+            .thermal_conductivity_w_per_m_k
+            .is_some_and(|v| v.is_finite() && v >= 0.0);
+        let color_ok = self.color_hex.len() == 6 && self.color_hex.chars().all(|c| c.is_ascii_hexdigit());
+        hardness_ok && density_ok && cp_ok && k_ok && color_ok
     }
 
     /// fields fall back to [`AcousticProfile::fallback`].

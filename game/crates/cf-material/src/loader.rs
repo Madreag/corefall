@@ -234,6 +234,8 @@ pub fn validate_registry_json(value: &serde_json::Value) -> RegistryValidationRe
                 });
             }
         }
+
+        validate_m15c_entry(idx, obj, &mut report);
     }
 
     // Launch-set check: must contain the 8 DR-007 ids with the correct
@@ -338,7 +340,120 @@ fn known_material_fields() -> &'static [&'static str] {
         "structural_support_strength",
         // M14F § per-material lateral yield strength for wall collapse.
         "lateral_yield_strength",
+        // M15C § full thermodynamic + chemistry schema.
+        "state",
+        "density_kg_per_m3",
+        "specific_heat_capacity_j_per_kg_k",
+        "thermal_conductivity_w_per_m_k",
+        "melt_temp_k",
+        "freeze_temp_k",
+        "boil_temp_k",
+        "ignition_temp_k",
+        "molar_mass_g_per_mol",
+        "toxicity",
+        "corrosiveness",
+        "radioactivity",
+        "electrical_conductivity",
+        "viscosity_pa_s",
+        "surface_tension_n_per_m",
+        "default_mass_per_tile_kg",
+        "max_mass_per_tile_kg",
+        "reactions",
+        "container_rules",
     ]
+}
+
+const M15C_VALID_STATES: &[&str] = &["solid", "liquid", "gas", "powder", "plasma", "energy_field"];
+
+/// hardness, density_kg_per_m3, specific_heat_capacity_j_per_kg_k,
+/// thermal_conductivity_w_per_m_k, color_hex. Energy fields skip the
+/// `> 0` clause but still require explicit values.
+fn validate_m15c_entry(
+    idx: usize,
+    obj: &serde_json::Map<String, serde_json::Value>,
+    report: &mut RegistryValidationReport,
+) {
+    let path_prefix = format!("materials[{idx}]");
+
+    let state_str = obj.get("state").and_then(|v| v.as_str());
+    let is_energy_field = state_str == Some("energy_field");
+    let is_vacuum = obj.get("name").and_then(|v| v.as_str()) == Some("vacuum");
+
+    if let Some(s) = state_str {
+        if !M15C_VALID_STATES.contains(&s) {
+            report.errors.push(RegistryValidationError {
+                kind: "missing_required_field".to_string(),
+                path: format!("{path_prefix}.state"),
+                message: format!("M15C: state `{s}` must be one of {M15C_VALID_STATES:?}"),
+                hint: "Use one of: solid, liquid, gas, powder, plasma, energy_field.".to_string(),
+            });
+        }
+    } else {
+        report.errors.push(RegistryValidationError {
+            kind: "missing_required_field".to_string(),
+            path: format!("{path_prefix}.state"),
+            message: "M15C: required field `state` missing".to_string(),
+            hint: "Add `\"state\": \"solid\"` (or liquid/gas/powder/plasma/energy_field).".to_string(),
+        });
+    }
+
+    let strict = !is_energy_field && !is_vacuum;
+    let required_non_default: &[(&str, bool)] = &[
+        ("density_kg_per_m3", strict),
+        ("specific_heat_capacity_j_per_kg_k", strict),
+        ("thermal_conductivity_w_per_m_k", strict),
+    ];
+
+    for (field, require_gt_zero) in required_non_default {
+        match obj.get(*field).and_then(|v| v.as_f64()) {
+            Some(v) => {
+                if !v.is_finite() {
+                    report.errors.push(RegistryValidationError {
+                        kind: "missing_required_field".to_string(),
+                        path: format!("{path_prefix}.{field}"),
+                        message: format!("M15C: field `{field}` must be finite; got {v}"),
+                        hint: "Use a finite, non-negative numeric value.".to_string(),
+                    });
+                } else if *require_gt_zero && v <= 0.0 {
+                    report.errors.push(RegistryValidationError {
+                        kind: "missing_required_field".to_string(),
+                        path: format!("{path_prefix}.{field}"),
+                        message: format!("M15C: field `{field}` must be > 0 (non-default); got {v}"),
+                        hint: "Use ONI / Stationeers wiki values; air is the only exception.".to_string(),
+                    });
+                }
+            }
+            None => {
+                report.errors.push(RegistryValidationError {
+                    kind: "missing_required_field".to_string(),
+                    path: format!("{path_prefix}.{field}"),
+                    message: format!("M15C: field '{field}' required"),
+                    hint: format!("Add `\"{field}\": <value>` (ONI / Stationeers parity)."),
+                });
+            }
+        }
+    }
+
+    if let Some(mass) = obj.get("default_mass_per_tile_kg").and_then(|v| v.as_f64()) {
+        if !mass.is_finite() || mass < 0.0 {
+            report.errors.push(RegistryValidationError {
+                kind: "integrity_overflow".to_string(),
+                path: format!("{path_prefix}.default_mass_per_tile_kg"),
+                message: format!("default_mass_per_tile_kg {mass} must be finite, non-negative"),
+                hint: "Use a finite, non-negative kg-per-tile value.".to_string(),
+            });
+        }
+    }
+    if let Some(mass) = obj.get("max_mass_per_tile_kg").and_then(|v| v.as_f64()) {
+        if !mass.is_finite() || mass < 0.0 {
+            report.errors.push(RegistryValidationError {
+                kind: "integrity_overflow".to_string(),
+                path: format!("{path_prefix}.max_mass_per_tile_kg"),
+                message: format!("max_mass_per_tile_kg {mass} must be finite, non-negative"),
+                hint: "Use a finite, non-negative kg-per-tile cap.".to_string(),
+            });
+        }
+    }
 }
 
 fn allowed_fields_csv() -> String {
@@ -373,14 +488,22 @@ mod tests {
         serde_json::json!({
             "schema_version": 1,
             "materials": [
-                {"id": 0, "name": "air", "display_name": "Air", "hardness": 0.0, "diggable": false, "anchorable": false, "hazard": false, "path_cost": 1.0, "density": 0.0, "color_hex": "000000", "description": "Empty"},
-                {"id": 1, "name": "dirt", "display_name": "Dirt", "hardness": 10.0, "diggable": true, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 1.5, "color_hex": "8B6914", "description": "Default destructible terrain"},
-                {"id": 2, "name": "concrete", "display_name": "Concrete", "hardness": 40.0, "diggable": true, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 2.3, "color_hex": "808080", "description": "Bunker wall"},
-                {"id": 3, "name": "metal_nohook", "display_name": "Reinforced Metal", "hardness": 100.0, "diggable": false, "anchorable": false, "hazard": false, "path_cost": 999.0, "density": 7.8, "color_hex": "4A4A4A", "description": "Refuse-by-default metal"},
-                {"id": 4, "name": "hazard", "display_name": "Hazard Tile", "hardness": 50.0, "diggable": false, "anchorable": false, "hazard": true, "path_cost": 10.0, "density": 3.0, "color_hex": "FF4444", "description": "Damage-on-touch surface"},
-                {"id": 5, "name": "loose_fill", "display_name": "Loose Rubble", "hardness": 5.0, "diggable": true, "anchorable": false, "hazard": false, "path_cost": 2.0, "density": 1.2, "color_hex": "C8A864", "description": "Soft fill"},
-                {"id": 6, "name": "repair_fill", "display_name": "Repair Foam", "hardness": 15.0, "diggable": true, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 0.8, "color_hex": "44FF44", "description": "Player-placed repair"},
-                {"id": 7, "name": "anchor", "display_name": "Anchor Rock", "hardness": 60.0, "diggable": false, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 2.6, "color_hex": "6B4226", "description": "Hard anchorable surface"}
+                {"id": 0, "name": "air", "display_name": "Air", "hardness": 0.0, "diggable": false, "anchorable": false, "hazard": false, "path_cost": 1.0, "density": 0.0, "color_hex": "000000", "description": "Empty",
+                 "state": "gas", "density_kg_per_m3": 1.225, "specific_heat_capacity_j_per_kg_k": 1005.0, "thermal_conductivity_w_per_m_k": 0.026},
+                {"id": 1, "name": "dirt", "display_name": "Dirt", "hardness": 10.0, "diggable": true, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 1.5, "color_hex": "8B6914", "description": "Default destructible terrain",
+                 "state": "solid", "density_kg_per_m3": 1500.0, "specific_heat_capacity_j_per_kg_k": 800.0, "thermal_conductivity_w_per_m_k": 0.5},
+                {"id": 2, "name": "concrete", "display_name": "Concrete", "hardness": 40.0, "diggable": true, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 2.3, "color_hex": "808080", "description": "Bunker wall",
+                 "state": "solid", "density_kg_per_m3": 2300.0, "specific_heat_capacity_j_per_kg_k": 880.0, "thermal_conductivity_w_per_m_k": 1.7},
+                {"id": 3, "name": "metal_nohook", "display_name": "Reinforced Metal", "hardness": 100.0, "diggable": false, "anchorable": false, "hazard": false, "path_cost": 999.0, "density": 7.8, "color_hex": "4A4A4A", "description": "Refuse-by-default metal",
+                 "state": "solid", "density_kg_per_m3": 7800.0, "specific_heat_capacity_j_per_kg_k": 466.0, "thermal_conductivity_w_per_m_k": 50.0},
+                {"id": 4, "name": "hazard", "display_name": "Hazard Tile", "hardness": 50.0, "diggable": false, "anchorable": false, "hazard": true, "path_cost": 10.0, "density": 3.0, "color_hex": "FF4444", "description": "Damage-on-touch surface",
+                 "state": "solid", "density_kg_per_m3": 3000.0, "specific_heat_capacity_j_per_kg_k": 700.0, "thermal_conductivity_w_per_m_k": 1.0},
+                {"id": 5, "name": "loose_fill", "display_name": "Loose Rubble", "hardness": 5.0, "diggable": true, "anchorable": false, "hazard": false, "path_cost": 2.0, "density": 1.2, "color_hex": "C8A864", "description": "Soft fill",
+                 "state": "powder", "density_kg_per_m3": 1200.0, "specific_heat_capacity_j_per_kg_k": 800.0, "thermal_conductivity_w_per_m_k": 0.4},
+                {"id": 6, "name": "repair_fill", "display_name": "Repair Foam", "hardness": 15.0, "diggable": true, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 0.8, "color_hex": "44FF44", "description": "Player-placed repair",
+                 "state": "solid", "density_kg_per_m3": 800.0, "specific_heat_capacity_j_per_kg_k": 1500.0, "thermal_conductivity_w_per_m_k": 0.05},
+                {"id": 7, "name": "anchor", "display_name": "Anchor Rock", "hardness": 60.0, "diggable": false, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 2.6, "color_hex": "6B4226", "description": "Hard anchorable surface",
+                 "state": "solid", "density_kg_per_m3": 2600.0, "specific_heat_capacity_j_per_kg_k": 790.0, "thermal_conductivity_w_per_m_k": 2.5}
             ]
         })
     }

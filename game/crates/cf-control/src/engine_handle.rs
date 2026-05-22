@@ -1039,6 +1039,11 @@ impl EngineHandle for M0Engine {
             state.material_registry_cache.as_ref(),
             material_id,
         );
+        let m15c = crate::engine_build::registry_m15c_snapshot_from_cache(
+            state.material_registry_cache.as_ref(),
+            material_id,
+        );
+        let tile_temperature_k = state.heat_field.temperature_at_world(x, y);
         drop(state);
         let aff = cf_terrain::material_affordance(material_id)?;
         let produces_debris = aff.spawn_material.is_some();
@@ -1047,7 +1052,7 @@ impl EngineHandle for M0Engine {
             let [r, g, b, _] = aff.overlay_rgba;
             format!("{:02X}{:02X}{:02X}", r, g, b)
         });
-        Some(serde_json::json!({
+        let mut payload = serde_json::json!({
             "schema_version": 1,
             "x": x,
             "y": y,
@@ -1070,7 +1075,37 @@ impl EngineHandle for M0Engine {
                 "produces_sound": produces_sound,
             },
             "hardness": aff.hardness,
-        }))
+            "temperature_k": tile_temperature_k,
+        });
+        if let Some(snap) = m15c {
+            if let Some(obj) = payload.as_object_mut() {
+                let registry_hardness = snap.get("hardness").cloned();
+                let display_name = snap.get("display_name").cloned();
+                let state_label = snap.get("state").cloned();
+                let density_kg = snap.get("density_kg_per_m3").cloned();
+                let mass_kg = snap.get("default_mass_per_tile_kg").cloned();
+                if let Some(v) = display_name {
+                    obj.insert("display_name".to_string(), v.clone());
+                    obj.insert("element".to_string(), v);
+                }
+                if let Some(v) = state_label {
+                    obj.insert("state".to_string(), v);
+                }
+                if let Some(v) = density_kg {
+                    obj.insert("density_kg_per_m3".to_string(), v.clone());
+                    obj.insert("density".to_string(), v);
+                }
+                if let Some(v) = mass_kg {
+                    obj.insert("mass_kg".to_string(), v.clone());
+                    obj.insert("default_mass_per_tile_kg".to_string(), v);
+                }
+                if let Some(v) = registry_hardness {
+                    obj.insert("registry_hardness".to_string(), v);
+                }
+                obj.insert("m15c".to_string(), snap);
+            }
+        }
+        Some(payload)
     }
 
     async fn dispatch(&self, command: ControlCommand) -> CommandResult {

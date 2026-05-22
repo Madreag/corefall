@@ -13,6 +13,7 @@ pub use crate::loader::{
     RegistryValidationReport,
 };
 pub use crate::{
-    AcousticDefaults, AcousticProfile, MaterialDef, MaterialId, MaterialRegistry, PhaseChange,
-    LAUNCH_MATERIAL_IDS, LAUNCH_MATERIAL_NAMES, MATERIAL_SCHEMA_VERSION,
+    AcousticDefaults, AcousticProfile, ContainerRules, MaterialDef, MaterialId, MaterialReactionRef,
+    MaterialRegistry, MaterialState, PhaseChange, LAUNCH_MATERIAL_IDS, LAUNCH_MATERIAL_NAMES,
+    MATERIAL_SCHEMA_VERSION,
 };

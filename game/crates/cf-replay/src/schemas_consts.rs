@@ -512,3 +512,6 @@ pub(crate) const SCHEMA_MATERIAL_PRECIPITATION_STARTED: &str =
 pub(crate) const SCHEMA_MATERIAL_GPU_CPU_DIVERGENCE_DETECTED: &str =
     include_str!("../schemas/event/material_gpu_cpu_divergence_detected.json");
 pub(crate) const SCHEMA_MATERIAL_VIOLENT_BURST: &str = include_str!("../schemas/event/material_violent_burst.json");
+pub(crate) const SCHEMA_MATERIAL_REGISTERED: &str = include_str!("../schemas/event/material_registered.json");
+pub(crate) const SCHEMA_MATERIAL_REGISTRY_VALIDATION_FAILED: &str =
+    include_str!("../schemas/event/material_registry_validation_failed.json");
