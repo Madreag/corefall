@@ -722,6 +722,12 @@ pub(crate) struct EngineMutable {
     pub(crate) precipitation_cycle: cf_material::PrecipitationCycle,
     /// `content/materials/precipitation_config.json` at engine init.
     pub(crate) precipitation_config: cf_material::PrecipitationConfig,
+    /// `content/physics/tuning.json` loaded at engine init.
+    #[allow(dead_code)]
+    pub(crate) physics_tuning: cf_physics::PhysicsTuning,
+    /// `content/atmos/tuning.json` loaded at engine init.
+    #[allow(dead_code)]
+    pub(crate) atmos_tuning: cf_atmos::AtmosTuning,
 }
 
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the

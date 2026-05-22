@@ -496,6 +496,8 @@ impl M0Engine {
                 prev_heat_field: None,
                 precipitation_cycle: cf_material::PrecipitationCycle::new(m15_ambient_world),
                 precipitation_config: cf_material::PrecipitationConfig::load_default_or_baseline(),
+                physics_tuning: cf_physics::PhysicsTuning::load_default_or_baseline(),
+                atmos_tuning: cf_atmos::AtmosTuning::load_default_or_baseline(),
             }),
             recorder,
             current_tick,
