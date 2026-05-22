@@ -131,6 +131,13 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn inspect_material(&self, _id: u16) -> Option<serde_json::Value> {
         None
     }
+    /// match before hitting disk; falls back to the cf-terrain canonical
+    /// name table for the launch set. Returns `None` for unknown names.
+    /// Used by `inspect.material` to support `cfctl inspect.material iron`
+    /// (M15C spec § "Per-material properties accessible via cfctl").
+    async fn resolve_material_id_by_name(&self, _name: &str) -> Option<u16> {
+        None
+    }
     /// world-space `(x, y)` — the 9 affordance flags (actor_passable,
     /// projectile_passable, diggable, anchorable, blocks_light,
     /// contact_damage, path_cost, produces_debris, produces_sound) plus

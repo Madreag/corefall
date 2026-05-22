@@ -251,13 +251,20 @@ impl Recorder {
             None
         };
         // is on, compute the per-event BLAKE3 keyed chain hash over the
-        // canonical-JSON of the payload. Both `prev_event_hash` and
-        // `chained_hash_hex` are stored on the envelope so the verifier
-        // can pinpoint a tamper to the exact event_id.
+        // canonical-JSON of the payload. The chain hash must use the same
+        // canonical string that the on-disk events.jsonl will produce on
+        // verifier re-read; otherwise the chain breaks even for clean
+        // bundles because serde_json without `arbitrary_precision` can
+        // lose 1 ULP on f64 values that derived from f32 narrowing (e.g.
+        // f32 0.12 → f64 0.11999999731779099 serializes cleanly, but
+        // parsing that string back gives a slightly different f64 that
+        // re-serializes as "0.119999997317791"). Both `prev_event_hash`
+        // and `chained_hash_hex` are stored on the envelope so the
+        // verifier can pinpoint a tamper to the exact event_id.
         let (prev_hash, chained_hash) = {
             let mut chain_guard = self.chain_encoder.lock().expect("chain_encoder mutex poisoned");
             if let Some(encoder) = chain_guard.as_mut() {
-                let canonical = serde_json::to_string(&payload).unwrap_or_else(|_| "null".to_string());
+                let canonical = canonical_payload_for_chain(&payload);
                 let chained = encoder.append(&event_id, &canonical);
                 (chained.prev_event_hash, Some(chained.chained_hash_hex))
             } else {
@@ -435,4 +442,55 @@ pub struct AssetRefRecordParams<'a> {
     pub parent_event_id: Option<String>,
     pub asset_ref: String,
     pub cosmetic: bool,
+}
+
+/// the chain hash + the verifier (after disk round-trip) produce the same
+/// bytes. serde_json without the `arbitrary_precision` feature can lose
+/// 1 ULP on f64 values that came from f32 narrowing — Ryu serializes them
+/// fine, but the parser doesn't always reverse to the exact same f64. The
+/// fix is to round-trip the payload through string serialization here so
+/// the canonical string passed to the chain encoder matches what's later
+/// written to events.jsonl + re-parsed by the verifier.
+pub(crate) fn canonical_payload_for_chain(payload: &serde_json::Value) -> String {
+    let direct = serde_json::to_string(payload).unwrap_or_else(|_| "null".to_string());
+    let reparsed: serde_json::Value = match serde_json::from_str(&direct) {
+        Ok(v) => v,
+        Err(_) => return direct,
+    };
+    serde_json::to_string(&reparsed).unwrap_or(direct)
+}
+
+#[cfg(test)]
+mod canonical_chain_tests {
+    use super::canonical_payload_for_chain;
+    use serde_json::json;
+
+    /// f32 → f64 narrowing yields an f64 that does NOT have a stable
+    /// JSON round-trip in serde_json (without `arbitrary_precision`).
+    /// `canonical_payload_for_chain` must run that round-trip once
+    /// itself so the chain hash + disk re-read produce the same bytes.
+    #[test]
+    fn canonical_round_trip_is_stable_for_f32_derived_values() {
+        let v: f32 = 0.12;
+        let payload = json!({"k": v});
+        let canonical = canonical_payload_for_chain(&payload);
+        let reparsed: serde_json::Value = serde_json::from_str(&canonical).unwrap();
+        let canonical_2 = serde_json::to_string(&reparsed).unwrap();
+        assert_eq!(
+            canonical, canonical_2,
+            "round-tripped canonical must be byte-identical on second pass"
+        );
+    }
+
+    /// Multiple problematic f32 values all round-trip stably.
+    #[test]
+    fn canonical_round_trip_stable_for_assorted_f32_values() {
+        for raw in [0.12_f32, 162.14_f32, 0.0001785_f32, 0.0000898_f32, 7.87_f32, 1700.0_f32] {
+            let payload = json!({"k": raw});
+            let canonical = canonical_payload_for_chain(&payload);
+            let reparsed: serde_json::Value = serde_json::from_str(&canonical).unwrap();
+            let canonical_2 = serde_json::to_string(&reparsed).unwrap();
+            assert_eq!(canonical, canonical_2, "unstable round-trip for f32={raw}");
+        }
+    }
 }

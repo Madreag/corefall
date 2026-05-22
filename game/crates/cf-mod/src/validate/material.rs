@@ -49,26 +49,62 @@ mod tests {
     use crate::report::ValidationReport;
     use crate::test_helpers::write_tmp;
 
+    fn launch_entry(
+        id: u16,
+        name: &str,
+        display_name: &str,
+        hardness: f64,
+        diggable: bool,
+        anchorable: bool,
+        hazard: bool,
+        path_cost: f64,
+        density: f64,
+        color_hex: &str,
+        state: &str,
+        density_kg_per_m3: f64,
+        cp: f64,
+        k: f64,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "id": id,
+            "name": name,
+            "display_name": display_name,
+            "hardness": hardness,
+            "diggable": diggable,
+            "anchorable": anchorable,
+            "hazard": hazard,
+            "path_cost": path_cost,
+            "density": density,
+            "color_hex": color_hex,
+            "description": display_name,
+            "state": state,
+            "density_kg_per_m3": density_kg_per_m3,
+            "specific_heat_capacity_j_per_kg_k": cp,
+            "thermal_conductivity_w_per_m_k": k,
+            "molar_mass_g_per_mol": 0.0,
+            "toxicity": 0.0,
+            "corrosiveness": 0.0,
+            "radioactivity": 0.0,
+            "electrical_conductivity": 0.0,
+            "viscosity_pa_s": 0.0,
+            "surface_tension_n_per_m": 0.0,
+            "default_mass_per_tile_kg": 0.0,
+            "max_mass_per_tile_kg": 0.0
+        })
+    }
+
     fn launch_set_with_m15c() -> serde_json::Value {
         serde_json::json!({
             "schema_version": 1,
             "materials": [
-                {"id": 0, "name": "air", "display_name": "Air", "hardness": 0.0, "diggable": false, "anchorable": false, "hazard": false, "path_cost": 1.0, "density": 0.0, "color_hex": "000000", "description": "Empty",
-                 "state": "gas", "density_kg_per_m3": 1.225, "specific_heat_capacity_j_per_kg_k": 1005.0, "thermal_conductivity_w_per_m_k": 0.026},
-                {"id": 1, "name": "dirt", "display_name": "Dirt", "hardness": 10.0, "diggable": true, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 1.5, "color_hex": "8B6914", "description": "Dirt",
-                 "state": "solid", "density_kg_per_m3": 1500.0, "specific_heat_capacity_j_per_kg_k": 800.0, "thermal_conductivity_w_per_m_k": 0.5},
-                {"id": 2, "name": "concrete", "display_name": "Concrete", "hardness": 40.0, "diggable": true, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 2.3, "color_hex": "808080", "description": "Concrete",
-                 "state": "solid", "density_kg_per_m3": 2300.0, "specific_heat_capacity_j_per_kg_k": 880.0, "thermal_conductivity_w_per_m_k": 1.7},
-                {"id": 3, "name": "metal_nohook", "display_name": "Metal", "hardness": 100.0, "diggable": false, "anchorable": false, "hazard": false, "path_cost": 999.0, "density": 7.8, "color_hex": "4A4A4A", "description": "Metal",
-                 "state": "solid", "density_kg_per_m3": 7800.0, "specific_heat_capacity_j_per_kg_k": 466.0, "thermal_conductivity_w_per_m_k": 50.0},
-                {"id": 4, "name": "hazard", "display_name": "Hazard", "hardness": 50.0, "diggable": false, "anchorable": false, "hazard": true, "path_cost": 10.0, "density": 3.0, "color_hex": "FF4444", "description": "Hazard",
-                 "state": "solid", "density_kg_per_m3": 3000.0, "specific_heat_capacity_j_per_kg_k": 700.0, "thermal_conductivity_w_per_m_k": 1.0},
-                {"id": 5, "name": "loose_fill", "display_name": "Loose Rubble", "hardness": 5.0, "diggable": true, "anchorable": false, "hazard": false, "path_cost": 2.0, "density": 1.2, "color_hex": "C8A864", "description": "Loose",
-                 "state": "powder", "density_kg_per_m3": 1200.0, "specific_heat_capacity_j_per_kg_k": 800.0, "thermal_conductivity_w_per_m_k": 0.4},
-                {"id": 6, "name": "repair_fill", "display_name": "Repair", "hardness": 15.0, "diggable": true, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 0.8, "color_hex": "44FF44", "description": "Repair",
-                 "state": "solid", "density_kg_per_m3": 800.0, "specific_heat_capacity_j_per_kg_k": 1500.0, "thermal_conductivity_w_per_m_k": 0.05},
-                {"id": 7, "name": "anchor", "display_name": "Anchor", "hardness": 60.0, "diggable": false, "anchorable": true, "hazard": false, "path_cost": 1.0, "density": 2.6, "color_hex": "6B4226", "description": "Anchor",
-                 "state": "solid", "density_kg_per_m3": 2600.0, "specific_heat_capacity_j_per_kg_k": 790.0, "thermal_conductivity_w_per_m_k": 2.5}
+                launch_entry(0, "air", "Air", 0.0, false, false, false, 1.0, 0.0, "000000", "gas", 1.225, 1005.0, 0.026),
+                launch_entry(1, "dirt", "Dirt", 10.0, true, true, false, 1.0, 1.5, "8B6914", "solid", 1500.0, 800.0, 0.5),
+                launch_entry(2, "concrete", "Concrete", 40.0, true, true, false, 1.0, 2.3, "808080", "solid", 2300.0, 880.0, 1.7),
+                launch_entry(3, "metal_nohook", "Metal", 100.0, false, false, false, 999.0, 7.8, "4A4A4A", "solid", 7800.0, 466.0, 50.0),
+                launch_entry(4, "hazard", "Hazard", 50.0, false, false, true, 10.0, 3.0, "FF4444", "solid", 3000.0, 700.0, 1.0),
+                launch_entry(5, "loose_fill", "Loose Rubble", 5.0, true, false, false, 2.0, 1.2, "C8A864", "solid", 1200.0, 800.0, 0.4),
+                launch_entry(6, "repair_fill", "Repair", 15.0, true, true, false, 1.0, 0.8, "44FF44", "solid", 800.0, 1500.0, 0.05),
+                launch_entry(7, "anchor", "Anchor", 60.0, false, true, false, 1.0, 2.6, "6B4226", "solid", 2600.0, 790.0, 2.5)
             ]
         })
     }

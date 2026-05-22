@@ -563,12 +563,20 @@ pub struct InspectTerrainChunkParams {
     pub y: i32,
 }
 
-/// given id (resolved against the canonical launch set).
+/// resolved either by canonical material id OR by snake-case material name
+/// (e.g. `iron`, `steel`). Exactly one of `id` / `name` must be supplied;
+/// providing both is OK and `id` wins. Used by the cfctl `inspect.material`
+/// command (M15C spec § "Per-material properties accessible via cfctl"):
+/// `cfctl inspect.material iron` → resolves the name to id 68 then dumps
+/// the full MaterialDef.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InspectMaterialParams {
     pub schema_version: u32,
-    pub id: u16,
+    #[serde(default)]
+    pub id: Option<u16>,
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 /// returns the MaterialInfo at world-space coordinates with the nine

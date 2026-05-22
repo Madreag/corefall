@@ -1,14 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "InspectMaterialParams",
-  "description": "given id (resolved against the canonical launch set).",
+  "description": "resolved either by canonical material id OR by snake-case material name\n(e.g. `iron`, `steel`). Exactly one of `id` / `name` must be supplied;\nproviding both is OK and `id` wins. Used by the cfctl `inspect.material`\ncommand (M15C spec § \"Per-material properties accessible via cfctl\"):\n`cfctl inspect.material iron` → resolves the name to id 68 then dumps\nthe full MaterialDef.",
   "type": "object",
   "properties": {
     "id": {
-      "type": "integer",
+      "type": [
+        "integer",
+        "null"
+      ],
       "format": "uint16",
+      "default": null,
       "maximum": 65535,
       "minimum": 0
+    },
+    "name": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
     },
     "schema_version": {
       "type": "integer",
@@ -18,7 +29,6 @@
   },
   "additionalProperties": false,
   "required": [
-    "schema_version",
-    "id"
+    "schema_version"
   ]
 }

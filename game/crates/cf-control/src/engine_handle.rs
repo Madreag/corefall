@@ -967,8 +967,23 @@ impl EngineHandle for M0Engine {
         }))
     }
 
+    async fn resolve_material_id_by_name(&self, name: &str) -> Option<u16> {
+        if let Some(reg) = self.state.read().ok().and_then(|s| s.material_registry_cache.clone()) {
+            if let Some(def) = reg.find_by_name(name) {
+                return Some(def.id);
+            }
+        }
+        if let Some(path) = cf_material::MaterialRegistry::locate_default() {
+            if let Ok((registry, _)) = cf_material::load_registry_from_file(&path) {
+                if let Some(def) = registry.find_by_name(name) {
+                    return Some(def.id);
+                }
+            }
+        }
+        cf_terrain::material_id_from_name(name)
+    }
+
     async fn inspect_material(&self, id: u16) -> Option<serde_json::Value> {
-        let aff = cf_terrain::material_affordance(id)?;
         if let Some(reg) = self.state.read().ok().and_then(|s| s.material_registry_cache.clone()) {
             if let Some(def) = reg.find_by_id(id) {
                 if let Ok(value) = serde_json::to_value(def) {
@@ -985,6 +1000,7 @@ impl EngineHandle for M0Engine {
                 }
             }
         }
+        let aff = cf_terrain::material_affordance(id)?;
         Some(serde_json::json!({
             "id": aff.id,
             "name": aff.name,

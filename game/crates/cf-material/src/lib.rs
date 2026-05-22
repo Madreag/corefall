@@ -249,21 +249,25 @@ pub struct MaterialDef {
     #[serde(default)]
     pub low_pass_cutoff_hz: Option<f32>,
 
-    // --- M15C full thermodynamic + chemistry schema. See `schema_m15c` for
-    // the typed companions ([`MaterialState`], [`MaterialReactionRef`],
-    // [`ContainerRules`]). Optional in Rust so existing entries deserialize;
-    // the loader's M15C validator enforces non-default values on the five
-    // required fields (hardness already required; plus density_kg_per_m3,
-    // specific_heat_capacity_j_per_kg_k, thermal_conductivity_w_per_m_k,
-    // color_hex already required, state).
+    // --- M15C full thermodynamic + chemistry schema (spec § Full MaterialDef
+    // schema). Field types match the spec literal exactly: non-Option for the
+    // base scalar block (state + density + cp + k + molar_mass + toxicity +
+    // corrosiveness + radioactivity + electrical_conductivity + viscosity +
+    // surface_tension + default/max_mass_per_tile_kg + reactions[] +
+    // container_rules); Option only for the four temperature thresholds
+    // (melt/freeze/boil/ignition_temp_k) which are genuinely "may be absent
+    // when not applicable" per the spec literal. `#[serde(default)]` keeps
+    // deserialization tolerant; the loader's M15C validator enforces
+    // explicit JSON declaration + the non-default-value rule on the five
+    // strict fields.
     #[serde(default)]
-    pub state: Option<MaterialState>,
+    pub state: MaterialState,
     #[serde(default)]
-    pub density_kg_per_m3: Option<f32>,
+    pub density_kg_per_m3: f32,
     #[serde(default)]
-    pub specific_heat_capacity_j_per_kg_k: Option<f32>,
+    pub specific_heat_capacity_j_per_kg_k: f32,
     #[serde(default)]
-    pub thermal_conductivity_w_per_m_k: Option<f32>,
+    pub thermal_conductivity_w_per_m_k: f32,
     #[serde(default)]
     pub melt_temp_k: Option<f32>,
     #[serde(default)]
@@ -273,27 +277,27 @@ pub struct MaterialDef {
     #[serde(default)]
     pub ignition_temp_k: Option<f32>,
     #[serde(default)]
-    pub molar_mass_g_per_mol: Option<f32>,
+    pub molar_mass_g_per_mol: f32,
     #[serde(default)]
-    pub toxicity: Option<f32>,
+    pub toxicity: f32,
     #[serde(default)]
-    pub corrosiveness: Option<f32>,
+    pub corrosiveness: f32,
     #[serde(default)]
-    pub radioactivity: Option<f32>,
+    pub radioactivity: f32,
     #[serde(default)]
-    pub electrical_conductivity: Option<f32>,
+    pub electrical_conductivity: f32,
     #[serde(default)]
-    pub viscosity_pa_s: Option<f32>,
+    pub viscosity_pa_s: f32,
     #[serde(default)]
-    pub surface_tension_n_per_m: Option<f32>,
+    pub surface_tension_n_per_m: f32,
     #[serde(default)]
-    pub default_mass_per_tile_kg: Option<f32>,
+    pub default_mass_per_tile_kg: f32,
     #[serde(default)]
-    pub max_mass_per_tile_kg: Option<f32>,
+    pub max_mass_per_tile_kg: f32,
     #[serde(default)]
     pub reactions: Vec<MaterialReactionRef>,
     #[serde(default)]
-    pub container_rules: Option<ContainerRules>,
+    pub container_rules: ContainerRules,
 }
 
 /// is missing any of the four acoustic fields, lookups return these defaults
@@ -446,59 +450,54 @@ impl MaterialDef {
         self.compressive_strength()
     }
 
-    /// Resolve the canonical [`MaterialState`] for this entry. Falls back
-    /// to `MaterialState::Solid` for entries authored before M15C added
-    /// the `state` field, so existing scenarios continue to work.
+    /// Canonical [`MaterialState`] for this entry. Trivial accessor —
+    /// schema-level guarantees the field is always populated.
     #[must_use]
     pub fn material_state(&self) -> MaterialState {
-        self.state.unwrap_or(MaterialState::Solid)
+        self.state
     }
 
-    /// Per-spec density in kg/m³. Returns 0.0 when the M15C field is
-    /// absent (callers should treat that as "not yet authored"); use
-    /// [`MaterialDef::density_kg_per_m3_or`] for an explicit default.
+    /// Per-spec density in kg/m³. Backward-compat alias retained for callers
+    /// that ported from the Option-typed M15C draft. Trivial accessor.
     #[must_use]
     pub fn density_kg_per_m3_value(&self) -> f32 {
-        self.density_kg_per_m3.unwrap_or(0.0)
+        self.density_kg_per_m3
     }
 
-    /// Specific heat capacity in J/(kg·K). Returns 0.0 when absent.
+    /// Specific heat capacity in J/(kg·K). Trivial accessor.
     #[must_use]
     pub fn specific_heat_capacity_j_per_kg_k_value(&self) -> f32 {
-        self.specific_heat_capacity_j_per_kg_k.unwrap_or(0.0)
+        self.specific_heat_capacity_j_per_kg_k
     }
 
-    /// Thermal conductivity in W/(m·K). Returns 0.0 when absent.
+    /// Thermal conductivity in W/(m·K). Trivial accessor.
     #[must_use]
     pub fn thermal_conductivity_w_per_m_k_value(&self) -> f32 {
-        self.thermal_conductivity_w_per_m_k.unwrap_or(0.0)
+        self.thermal_conductivity_w_per_m_k
     }
 
-    /// Default mass per tile in kg. Returns 0.0 when absent.
+    /// Default mass per tile in kg. Trivial accessor.
     #[must_use]
     pub fn default_mass_per_tile_kg_value(&self) -> f32 {
-        self.default_mass_per_tile_kg.unwrap_or(0.0)
+        self.default_mass_per_tile_kg
     }
 
     /// Whether this material satisfies the five M15C required non-default
     /// fields: hardness, density_kg_per_m3, specific_heat_capacity_j_per_kg_k,
-    /// thermal_conductivity_w_per_m_k, color_hex. The first three are
-    /// "non-default" if > 0 (energy fields are the exception — they
-    /// declare `state="energy_field"` and skip the >0 rule).
+    /// thermal_conductivity_w_per_m_k, color_hex. The first three must be
+    /// strictly > 0 except for `energy_field` materials and the vacuum
+    /// sentinel which represent absence of matter and are exempt.
     #[must_use]
     pub fn satisfies_m15c_schema(&self) -> bool {
-        let st = self.material_state();
-        let energy = matches!(st, MaterialState::EnergyField);
-        let hardness_ok = self.hardness.is_finite() && (energy || self.hardness >= 0.0);
-        let density_ok = self
-            .density_kg_per_m3
-            .is_some_and(|v| v.is_finite() && (energy || v >= 0.0));
-        let cp_ok = self
-            .specific_heat_capacity_j_per_kg_k
-            .is_some_and(|v| v.is_finite() && (energy || v >= 0.0));
-        let k_ok = self
-            .thermal_conductivity_w_per_m_k
-            .is_some_and(|v| v.is_finite() && v >= 0.0);
+        let energy = matches!(self.state, MaterialState::EnergyField);
+        let vacuum = self.name == "vacuum";
+        let strict = !energy && !vacuum;
+        let hardness_ok = self.hardness.is_finite() && self.hardness >= 0.0;
+        let density_ok = self.density_kg_per_m3.is_finite() && (!strict || self.density_kg_per_m3 > 0.0);
+        let cp_ok = self.specific_heat_capacity_j_per_kg_k.is_finite()
+            && (!strict || self.specific_heat_capacity_j_per_kg_k > 0.0);
+        let k_ok = self.thermal_conductivity_w_per_m_k.is_finite()
+            && (!strict || self.thermal_conductivity_w_per_m_k > 0.0);
         let color_ok = self.color_hex.len() == 6 && self.color_hex.chars().all(|c| c.is_ascii_hexdigit());
         hardness_ok && density_ok && cp_ok && k_ok && color_ok
     }
@@ -533,6 +532,30 @@ impl MaterialDef {
             low_pass_cutoff_hz: self.low_pass_cutoff_hz.unwrap_or(fb.low_pass_cutoff_hz).max(20.0),
         }
     }
+}
+
+/// from `start` (up to `max_hops` ancestors) checking each one for a
+/// `content/materials/material_registry.json` or
+/// `game/content/materials/material_registry.json` child. Returns the
+/// first match or `None`.
+fn walk_up_for_registry(start: &std::path::Path, max_hops: usize) -> Option<std::path::PathBuf> {
+    let mut current = Some(start.to_path_buf());
+    for _ in 0..=max_hops {
+        let here = match current {
+            Some(p) => p,
+            None => return None,
+        };
+        let direct = here.join("content/materials/material_registry.json");
+        if direct.exists() {
+            return Some(direct);
+        }
+        let nested = here.join("game/content/materials/material_registry.json");
+        if nested.exists() {
+            return Some(nested);
+        }
+        current = here.parent().map(|p| p.to_path_buf());
+    }
+    None
 }
 
 /// log spam is bounded — the warning fires exactly once per missing
@@ -597,20 +620,41 @@ impl MaterialRegistry {
         Path::new("content/materials/material_registry.json")
     }
 
-    /// Resolve the registry path: prefer `content/materials/...` then
-    /// `../content/materials/...` (so `cargo run` from `game/` and from
-    /// the repo root both work).
+    /// Resolve the registry path. Tries (in order): CWD-relative candidates,
+    /// then walks up from CWD looking for `content/materials/...` or
+    /// `game/content/materials/...`, then falls back to the `CARGO_MANIFEST_DIR`
+    /// of cf-material (if available) walking up the same way. The walk-up
+    /// step lets tests invoked from sub-crate working directories (e.g.
+    /// `game/crates/cf-control/`) find the canonical workspace registry
+    /// without each test having to hand-pass an absolute path.
     pub fn locate_default() -> Option<std::path::PathBuf> {
-        for candidate in [
-            std::path::PathBuf::from("content/materials/material_registry.json"),
-            std::path::PathBuf::from("../content/materials/material_registry.json"),
-            std::path::PathBuf::from("game/content/materials/material_registry.json"),
-        ] {
-            if candidate.exists() {
-                return Some(candidate);
+        let cwd_relative: &[&str] = &[
+            "content/materials/material_registry.json",
+            "../content/materials/material_registry.json",
+            "../../content/materials/material_registry.json",
+            "../../../content/materials/material_registry.json",
+            "game/content/materials/material_registry.json",
+            "../game/content/materials/material_registry.json",
+            "../../game/content/materials/material_registry.json",
+        ];
+        for rel in cwd_relative {
+            let p = std::path::PathBuf::from(rel);
+            if p.exists() {
+                return Some(p);
             }
         }
-        None
+        // Walk up from CWD until we find a `content/materials/...` or
+        // `game/content/materials/...` neighbour. Bounded to 12 hops.
+        if let Ok(cwd) = std::env::current_dir() {
+            if let Some(p) = walk_up_for_registry(&cwd, 12) {
+                return Some(p);
+            }
+        }
+        // Last-ditch fallback: walk up from cf-material's manifest dir
+        // (set at compile time). Only useful inside cargo-test contexts
+        // where CWD might be the per-target tempdir.
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        walk_up_for_registry(&manifest_dir, 8)
     }
 
     /// Material-name lookup map for fast `name → id` resolution.

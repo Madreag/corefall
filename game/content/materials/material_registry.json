@@ -36,7 +36,8 @@
       "max_mass_per_tile_kg": 0.01,
       "toxicity": 0.0,
       "corrosiveness": 0.0,
-      "radioactivity": 0.0
+      "radioactivity": 0.0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 1,
@@ -69,7 +70,11 @@
       "default_mass_per_tile_kg": 1.5,
       "max_mass_per_tile_kg": 2.0,
       "viscosity_pa_s": 0.0,
-      "electrical_conductivity": 0.01
+      "electrical_conductivity": 0.01,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 2,
@@ -101,7 +106,12 @@
       "molar_mass_g_per_mol": 100.0,
       "default_mass_per_tile_kg": 2.3,
       "max_mass_per_tile_kg": 3.0,
-      "electrical_conductivity": 1e-07
+      "electrical_conductivity": 1e-07,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 3,
@@ -135,7 +145,12 @@
       "molar_mass_g_per_mol": 55.85,
       "default_mass_per_tile_kg": 7.8,
       "max_mass_per_tile_kg": 10.0,
-      "electrical_conductivity": 10000000.0
+      "electrical_conductivity": 10000000.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 4,
@@ -168,7 +183,10 @@
       "corrosiveness": 1.0,
       "default_mass_per_tile_kg": 3.0,
       "max_mass_per_tile_kg": 4.0,
-      "electrical_conductivity": 0.1
+      "electrical_conductivity": 0.1,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 5,
@@ -193,13 +211,19 @@
       "decay_band": "anechoic",
       "acoustic_transmission_loss_db": 5.0,
       "low_pass_cutoff_hz": 2200,
-      "state": "powder",
+      "state": "solid",
       "density_kg_per_m3": 1200.0,
       "specific_heat_capacity_j_per_kg_k": 800.0,
       "thermal_conductivity_w_per_m_k": 0.4,
       "molar_mass_g_per_mol": 60.0,
       "default_mass_per_tile_kg": 1.2,
-      "max_mass_per_tile_kg": 1.8
+      "max_mass_per_tile_kg": 1.8,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 6,
@@ -230,7 +254,13 @@
       "thermal_conductivity_w_per_m_k": 0.05,
       "molar_mass_g_per_mol": 100.0,
       "default_mass_per_tile_kg": 0.8,
-      "max_mass_per_tile_kg": 1.2
+      "max_mass_per_tile_kg": 1.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 7,
@@ -262,7 +292,13 @@
       "melt_temp_k": 1473.0,
       "molar_mass_g_per_mol": 100.0,
       "default_mass_per_tile_kg": 2.6,
-      "max_mass_per_tile_kg": 3.5
+      "max_mass_per_tile_kg": 3.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 8,
@@ -293,7 +329,13 @@
       "ignition_temp_k": 573.0,
       "molar_mass_g_per_mol": 162.14,
       "default_mass_per_tile_kg": 0.7,
-      "max_mass_per_tile_kg": 1.0
+      "max_mass_per_tile_kg": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 9,
@@ -324,7 +366,13 @@
       "ignition_temp_k": 523.0,
       "molar_mass_g_per_mol": 162.14,
       "default_mass_per_tile_kg": 0.3,
-      "max_mass_per_tile_kg": 0.5
+      "max_mass_per_tile_kg": 0.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 10,
@@ -355,7 +403,13 @@
       "melt_temp_k": 1773.0,
       "molar_mass_g_per_mol": 60.08,
       "default_mass_per_tile_kg": 2.5,
-      "max_mass_per_tile_kg": 3.5
+      "max_mass_per_tile_kg": 3.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 11,
@@ -386,7 +440,13 @@
       "ignition_temp_k": 533.0,
       "molar_mass_g_per_mol": 162.14,
       "default_mass_per_tile_kg": 0.5,
-      "max_mass_per_tile_kg": 0.7
+      "max_mass_per_tile_kg": 0.7,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 12,
@@ -418,7 +478,13 @@
       "boil_temp_k": 373.15,
       "molar_mass_g_per_mol": 18.02,
       "default_mass_per_tile_kg": 0.4,
-      "max_mass_per_tile_kg": 0.8
+      "max_mass_per_tile_kg": 0.8,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 13,
@@ -454,7 +520,10 @@
       "surface_tension_n_per_m": 0.0728,
       "default_mass_per_tile_kg": 1.0,
       "max_mass_per_tile_kg": 1.5,
-      "electrical_conductivity": 0.0055
+      "electrical_conductivity": 0.0055,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0
     },
     {
       "id": 14,
@@ -485,7 +554,13 @@
       "melt_temp_k": 1873.0,
       "molar_mass_g_per_mol": 60.08,
       "default_mass_per_tile_kg": 1.6,
-      "max_mass_per_tile_kg": 2.0
+      "max_mass_per_tile_kg": 2.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 15,
@@ -517,7 +592,13 @@
       "freeze_temp_k": 273.15,
       "molar_mass_g_per_mol": 18.02,
       "default_mass_per_tile_kg": 0.917,
-      "max_mass_per_tile_kg": 1.2
+      "max_mass_per_tile_kg": 1.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 16,
@@ -548,7 +629,13 @@
       "melt_temp_k": 1473.0,
       "molar_mass_g_per_mol": 100.0,
       "default_mass_per_tile_kg": 2.7,
-      "max_mass_per_tile_kg": 3.5
+      "max_mass_per_tile_kg": 3.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 17,
@@ -579,7 +666,13 @@
       "ignition_temp_k": 723.0,
       "molar_mass_g_per_mol": 100.0,
       "default_mass_per_tile_kg": 0.2,
-      "max_mass_per_tile_kg": 0.4
+      "max_mass_per_tile_kg": 0.4,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 18,
@@ -610,7 +703,13 @@
       "ignition_temp_k": 553.0,
       "molar_mass_g_per_mol": 162.14,
       "default_mass_per_tile_kg": 0.3,
-      "max_mass_per_tile_kg": 0.5
+      "max_mass_per_tile_kg": 0.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 19,
@@ -648,7 +747,11 @@
       "viscosity_pa_s": 0.084,
       "surface_tension_n_per_m": 0.03,
       "default_mass_per_tile_kg": 0.88,
-      "max_mass_per_tile_kg": 1.2
+      "max_mass_per_tile_kg": 1.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 20,
@@ -686,7 +789,11 @@
       "viscosity_pa_s": 0.0024,
       "surface_tension_n_per_m": 0.027,
       "default_mass_per_tile_kg": 0.74,
-      "max_mass_per_tile_kg": 1.0
+      "max_mass_per_tile_kg": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 21,
@@ -726,7 +833,9 @@
       "viscosity_pa_s": 0.0245,
       "surface_tension_n_per_m": 0.055,
       "default_mass_per_tile_kg": 1.84,
-      "max_mass_per_tile_kg": 2.5
+      "max_mass_per_tile_kg": 2.5,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 22,
@@ -766,7 +875,9 @@
       "viscosity_pa_s": 0.004,
       "surface_tension_n_per_m": 0.075,
       "default_mass_per_tile_kg": 1.32,
-      "max_mass_per_tile_kg": 1.8
+      "max_mass_per_tile_kg": 1.8,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 23,
@@ -802,7 +913,10 @@
       "viscosity_pa_s": 0.004,
       "surface_tension_n_per_m": 0.055,
       "default_mass_per_tile_kg": 1.06,
-      "max_mass_per_tile_kg": 1.5
+      "max_mass_per_tile_kg": 1.5,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 24,
@@ -842,7 +956,10 @@
       "viscosity_pa_s": 0.0012,
       "surface_tension_n_per_m": 0.022,
       "default_mass_per_tile_kg": 0.789,
-      "max_mass_per_tile_kg": 1.0
+      "max_mass_per_tile_kg": 1.0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 25,
@@ -883,7 +1000,9 @@
       "viscosity_pa_s": 0.001526,
       "surface_tension_n_per_m": 0.485,
       "default_mass_per_tile_kg": 13.534,
-      "max_mass_per_tile_kg": 18.0
+      "max_mass_per_tile_kg": 18.0,
+      "corrosiveness": 0,
+      "radioactivity": 0
     },
     {
       "id": 26,
@@ -922,7 +1041,10 @@
       "viscosity_pa_s": 100.0,
       "surface_tension_n_per_m": 0.4,
       "default_mass_per_tile_kg": 3.1,
-      "max_mass_per_tile_kg": 4.0
+      "max_mass_per_tile_kg": 4.0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 27,
@@ -959,7 +1081,10 @@
       "viscosity_pa_s": 5.0,
       "surface_tension_n_per_m": 0.05,
       "default_mass_per_tile_kg": 1.1,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 28,
@@ -988,7 +1113,13 @@
       "melt_temp_k": 1473.0,
       "molar_mass_g_per_mol": 100.0,
       "default_mass_per_tile_kg": 3.0,
-      "max_mass_per_tile_kg": 3.8
+      "max_mass_per_tile_kg": 3.8,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 29,
@@ -1018,7 +1149,13 @@
       "melt_temp_k": 1873.0,
       "molar_mass_g_per_mol": 60.08,
       "default_mass_per_tile_kg": 1.92,
-      "max_mass_per_tile_kg": 2.4
+      "max_mass_per_tile_kg": 2.4,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 30,
@@ -1047,7 +1184,13 @@
       "melt_temp_k": 1093.0,
       "molar_mass_g_per_mol": 100.09,
       "default_mass_per_tile_kg": 2.71,
-      "max_mass_per_tile_kg": 3.5
+      "max_mass_per_tile_kg": 3.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 31,
@@ -1077,7 +1220,13 @@
       "melt_temp_k": 1923.0,
       "molar_mass_g_per_mol": 60.08,
       "default_mass_per_tile_kg": 2.3,
-      "max_mass_per_tile_kg": 3.0
+      "max_mass_per_tile_kg": 3.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 32,
@@ -1106,7 +1255,13 @@
       "melt_temp_k": 1533.0,
       "molar_mass_g_per_mol": 100.0,
       "default_mass_per_tile_kg": 2.75,
-      "max_mass_per_tile_kg": 3.5
+      "max_mass_per_tile_kg": 3.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 33,
@@ -1142,7 +1297,12 @@
       "molar_mass_g_per_mol": 12.01,
       "default_mass_per_tile_kg": 1.35,
       "max_mass_per_tile_kg": 1.8,
-      "electrical_conductivity": 1000.0
+      "electrical_conductivity": 1000.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 34,
@@ -1171,7 +1331,13 @@
       "melt_temp_k": 1811.0,
       "molar_mass_g_per_mol": 159.69,
       "default_mass_per_tile_kg": 5.0,
-      "max_mass_per_tile_kg": 6.5
+      "max_mass_per_tile_kg": 6.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 35,
@@ -1200,7 +1366,13 @@
       "melt_temp_k": 1337.0,
       "molar_mass_g_per_mol": 197.0,
       "default_mass_per_tile_kg": 6.4,
-      "max_mass_per_tile_kg": 8.0
+      "max_mass_per_tile_kg": 8.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 36,
@@ -1229,7 +1401,13 @@
       "melt_temp_k": 1358.0,
       "molar_mass_g_per_mol": 159.16,
       "default_mass_per_tile_kg": 4.5,
-      "max_mass_per_tile_kg": 6.0
+      "max_mass_per_tile_kg": 6.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 37,
@@ -1265,7 +1443,11 @@
       "radioactivity": 6.0,
       "toxicity": 5.0,
       "default_mass_per_tile_kg": 8.5,
-      "max_mass_per_tile_kg": 10.5
+      "max_mass_per_tile_kg": 10.5,
+      "corrosiveness": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 38,
@@ -1294,7 +1476,13 @@
       "melt_temp_k": 1838.0,
       "molar_mass_g_per_mol": 159.69,
       "default_mass_per_tile_kg": 5.24,
-      "max_mass_per_tile_kg": 6.5
+      "max_mass_per_tile_kg": 6.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 39,
@@ -1323,7 +1511,13 @@
       "thermal_conductivity_w_per_m_k": 0.9,
       "molar_mass_g_per_mol": 60.0,
       "default_mass_per_tile_kg": 1.75,
-      "max_mass_per_tile_kg": 2.2
+      "max_mass_per_tile_kg": 2.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 40,
@@ -1351,7 +1545,13 @@
       "thermal_conductivity_w_per_m_k": 0.1,
       "molar_mass_g_per_mol": 12.01,
       "default_mass_per_tile_kg": 0.5,
-      "max_mass_per_tile_kg": 0.8
+      "max_mass_per_tile_kg": 0.8,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 41,
@@ -1378,14 +1578,20 @@
       "reaction_tags": [
         "flammable"
       ],
-      "state": "solid",
+      "state": "powder",
       "density_kg_per_m3": 500.0,
       "specific_heat_capacity_j_per_kg_k": 840.0,
       "thermal_conductivity_w_per_m_k": 0.1,
       "ignition_temp_k": 600.0,
       "molar_mass_g_per_mol": 12.01,
       "default_mass_per_tile_kg": 0.5,
-      "max_mass_per_tile_kg": 0.8
+      "max_mass_per_tile_kg": 0.8,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 42,
@@ -1414,7 +1620,13 @@
       "melt_temp_k": 1074.0,
       "molar_mass_g_per_mol": 58.44,
       "default_mass_per_tile_kg": 2.16,
-      "max_mass_per_tile_kg": 2.8
+      "max_mass_per_tile_kg": 2.8,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 43,
@@ -1444,7 +1656,13 @@
       "ignition_temp_k": 658.0,
       "molar_mass_g_per_mol": 342.3,
       "default_mass_per_tile_kg": 1.59,
-      "max_mass_per_tile_kg": 2.0
+      "max_mass_per_tile_kg": 2.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 44,
@@ -1479,7 +1697,13 @@
       "ignition_temp_k": 593.0,
       "molar_mass_g_per_mol": 68.12,
       "default_mass_per_tile_kg": 1.5,
-      "max_mass_per_tile_kg": 1.9
+      "max_mass_per_tile_kg": 1.9,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 45,
@@ -1513,7 +1737,13 @@
       "ignition_temp_k": 620.0,
       "molar_mass_g_per_mol": 28.05,
       "default_mass_per_tile_kg": 1.05,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 46,
@@ -1542,7 +1772,13 @@
       "ignition_temp_k": 488.0,
       "molar_mass_g_per_mol": 100.0,
       "default_mass_per_tile_kg": 0.86,
-      "max_mass_per_tile_kg": 1.2
+      "max_mass_per_tile_kg": 1.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 47,
@@ -1576,7 +1812,13 @@
       "ignition_temp_k": 506.0,
       "molar_mass_g_per_mol": 162.14,
       "default_mass_per_tile_kg": 0.8,
-      "max_mass_per_tile_kg": 1.0
+      "max_mass_per_tile_kg": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 48,
@@ -1611,7 +1853,13 @@
       "ignition_temp_k": 573.0,
       "molar_mass_g_per_mol": 174.0,
       "default_mass_per_tile_kg": 1.7,
-      "max_mass_per_tile_kg": 2.0
+      "max_mass_per_tile_kg": 2.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 49,
@@ -1645,7 +1893,13 @@
       "ignition_temp_k": 510.0,
       "molar_mass_g_per_mol": 162.14,
       "default_mass_per_tile_kg": 0.4,
-      "max_mass_per_tile_kg": 0.6
+      "max_mass_per_tile_kg": 0.6,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 50,
@@ -1682,7 +1936,12 @@
       "molar_mass_g_per_mol": 18.02,
       "viscosity_pa_s": 1.3e-05,
       "default_mass_per_tile_kg": 0.0006,
-      "max_mass_per_tile_kg": 0.005
+      "max_mass_per_tile_kg": 0.005,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 51,
@@ -1717,7 +1976,12 @@
       "molar_mass_g_per_mol": 32.0,
       "viscosity_pa_s": 2.04e-05,
       "default_mass_per_tile_kg": 0.001429,
-      "max_mass_per_tile_kg": 0.01
+      "max_mass_per_tile_kg": 0.01,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 52,
@@ -1752,7 +2016,12 @@
       "molar_mass_g_per_mol": 28.01,
       "viscosity_pa_s": 1.78e-05,
       "default_mass_per_tile_kg": 0.001251,
-      "max_mass_per_tile_kg": 0.01
+      "max_mass_per_tile_kg": 0.01,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 53,
@@ -1790,7 +2059,11 @@
       "toxicity": 3.0,
       "viscosity_pa_s": 1.47e-05,
       "default_mass_per_tile_kg": 0.001977,
-      "max_mass_per_tile_kg": 0.012
+      "max_mass_per_tile_kg": 0.012,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 54,
@@ -1828,7 +2101,12 @@
       "molar_mass_g_per_mol": 16.04,
       "viscosity_pa_s": 1.1e-05,
       "default_mass_per_tile_kg": 0.000657,
-      "max_mass_per_tile_kg": 0.005
+      "max_mass_per_tile_kg": 0.005,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 55,
@@ -1866,7 +2144,12 @@
       "molar_mass_g_per_mol": 2.02,
       "viscosity_pa_s": 8.8e-06,
       "default_mass_per_tile_kg": 8.99e-05,
-      "max_mass_per_tile_kg": 0.001
+      "max_mass_per_tile_kg": 0.001,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 56,
@@ -1901,7 +2184,12 @@
       "molar_mass_g_per_mol": 44.01,
       "viscosity_pa_s": 1.46e-05,
       "default_mass_per_tile_kg": 0.001977,
-      "max_mass_per_tile_kg": 0.012
+      "max_mass_per_tile_kg": 0.012,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 57,
@@ -1935,7 +2223,12 @@
       "molar_mass_g_per_mol": 4.0026,
       "viscosity_pa_s": 1.96e-05,
       "default_mass_per_tile_kg": 0.0001785,
-      "max_mass_per_tile_kg": 0.002
+      "max_mass_per_tile_kg": 0.002,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 58,
@@ -1973,7 +2266,11 @@
       "toxicity": 7.0,
       "viscosity_pa_s": 1.32e-05,
       "default_mass_per_tile_kg": 0.00214,
-      "max_mass_per_tile_kg": 0.015
+      "max_mass_per_tile_kg": 0.015,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 59,
@@ -2010,7 +2307,12 @@
       "molar_mass_g_per_mol": 46.07,
       "viscosity_pa_s": 1.04e-05,
       "default_mass_per_tile_kg": 0.00208,
-      "max_mass_per_tile_kg": 0.015
+      "max_mass_per_tile_kg": 0.015,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 60,
@@ -2049,7 +2351,10 @@
       "corrosiveness": 5.0,
       "viscosity_pa_s": 1.34e-05,
       "default_mass_per_tile_kg": 0.003214,
-      "max_mass_per_tile_kg": 0.02
+      "max_mass_per_tile_kg": 0.02,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 61,
@@ -2088,7 +2393,10 @@
       "corrosiveness": 2.0,
       "viscosity_pa_s": 1.01e-05,
       "default_mass_per_tile_kg": 0.00073,
-      "max_mass_per_tile_kg": 0.005
+      "max_mass_per_tile_kg": 0.005,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 62,
@@ -2122,7 +2430,11 @@
       "toxicity": 2.0,
       "viscosity_pa_s": 1.8e-05,
       "default_mass_per_tile_kg": 0.001,
-      "max_mass_per_tile_kg": 0.008
+      "max_mass_per_tile_kg": 0.008,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 63,
@@ -2157,7 +2469,12 @@
       "molar_mass_g_per_mol": 30.0,
       "electrical_conductivity": 1000000.0,
       "default_mass_per_tile_kg": 0.0001,
-      "max_mass_per_tile_kg": 0.001
+      "max_mass_per_tile_kg": 0.001,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 64,
@@ -2192,7 +2509,12 @@
       "molar_mass_g_per_mol": 30.0,
       "electrical_conductivity": 10000000.0,
       "default_mass_per_tile_kg": 0.0001,
-      "max_mass_per_tile_kg": 0.001
+      "max_mass_per_tile_kg": 0.001,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 65,
@@ -2225,7 +2547,13 @@
       "thermal_conductivity_w_per_m_k": 0.1,
       "molar_mass_g_per_mol": 30.0,
       "default_mass_per_tile_kg": 0.0003,
-      "max_mass_per_tile_kg": 0.003
+      "max_mass_per_tile_kg": 0.003,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 66,
@@ -2264,7 +2592,10 @@
       "viscosity_pa_s": 0.0012,
       "surface_tension_n_per_m": 0.071,
       "default_mass_per_tile_kg": 1.02,
-      "max_mass_per_tile_kg": 1.5
+      "max_mass_per_tile_kg": 1.5,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 67,
@@ -2301,7 +2632,10 @@
       "surface_tension_n_per_m": 0.074,
       "default_mass_per_tile_kg": 1.18,
       "max_mass_per_tile_kg": 1.6,
-      "electrical_conductivity": 6.0
+      "electrical_conductivity": 6.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0
     },
     {
       "id": 68,
@@ -2336,7 +2670,12 @@
       "molar_mass_g_per_mol": 55.85,
       "electrical_conductivity": 10000000.0,
       "default_mass_per_tile_kg": 7.87,
-      "max_mass_per_tile_kg": 10.0
+      "max_mass_per_tile_kg": 10.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 69,
@@ -2373,7 +2712,12 @@
       "molar_mass_g_per_mol": 55.85,
       "electrical_conductivity": 1400000.0,
       "default_mass_per_tile_kg": 7.8,
-      "max_mass_per_tile_kg": 10.0
+      "max_mass_per_tile_kg": 10.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 70,
@@ -2402,7 +2746,13 @@
       "melt_temp_k": 1273.0,
       "molar_mass_g_per_mol": 60.08,
       "default_mass_per_tile_kg": 2.6,
-      "max_mass_per_tile_kg": 3.5
+      "max_mass_per_tile_kg": 3.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 71,
@@ -2435,7 +2785,13 @@
       "boil_temp_k": 373.15,
       "molar_mass_g_per_mol": 18.02,
       "default_mass_per_tile_kg": 0.0005,
-      "max_mass_per_tile_kg": 0.005
+      "max_mass_per_tile_kg": 0.005,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 72,
@@ -2464,7 +2820,13 @@
       "melt_temp_k": 271.0,
       "molar_mass_g_per_mol": 18.5,
       "default_mass_per_tile_kg": 1.1,
-      "max_mass_per_tile_kg": 1.5
+      "max_mass_per_tile_kg": 1.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 73,
@@ -2496,7 +2858,12 @@
       "molar_mass_g_per_mol": 197.0,
       "electrical_conductivity": 41000000.0,
       "default_mass_per_tile_kg": 19.3,
-      "max_mass_per_tile_kg": 24.0
+      "max_mass_per_tile_kg": 24.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 74,
@@ -2528,7 +2895,12 @@
       "molar_mass_g_per_mol": 63.55,
       "electrical_conductivity": 58000000.0,
       "default_mass_per_tile_kg": 8.96,
-      "max_mass_per_tile_kg": 11.0
+      "max_mass_per_tile_kg": 11.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 75,
@@ -2562,7 +2934,10 @@
       "viscosity_pa_s": 0.004,
       "surface_tension_n_per_m": 0.04,
       "default_mass_per_tile_kg": 1.05,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 76,
@@ -2594,7 +2969,11 @@
       "viscosity_pa_s": 0.003,
       "surface_tension_n_per_m": 0.051,
       "default_mass_per_tile_kg": 1.03,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 77,
@@ -2627,7 +3006,10 @@
       "viscosity_pa_s": 0.06,
       "surface_tension_n_per_m": 0.035,
       "default_mass_per_tile_kg": 1.3,
-      "max_mass_per_tile_kg": 1.7
+      "max_mass_per_tile_kg": 1.7,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 78,
@@ -2659,7 +3041,11 @@
       "viscosity_pa_s": 0.00099,
       "surface_tension_n_per_m": 0.072,
       "default_mass_per_tile_kg": 1.0,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 79,
@@ -2691,7 +3077,11 @@
       "viscosity_pa_s": 0.00098,
       "surface_tension_n_per_m": 0.072,
       "default_mass_per_tile_kg": 1.0,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 80,
@@ -2725,7 +3115,10 @@
       "viscosity_pa_s": 0.05,
       "surface_tension_n_per_m": 0.04,
       "default_mass_per_tile_kg": 1.1,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 81,
@@ -2758,7 +3151,10 @@
       "viscosity_pa_s": 0.0014,
       "surface_tension_n_per_m": 0.068,
       "default_mass_per_tile_kg": 1.02,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 82,
@@ -2790,7 +3186,11 @@
       "viscosity_pa_s": 0.0011,
       "surface_tension_n_per_m": 0.071,
       "default_mass_per_tile_kg": 1.01,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 83,
@@ -2822,7 +3222,11 @@
       "toxicity": 6.0,
       "viscosity_pa_s": 1.6e-05,
       "default_mass_per_tile_kg": 0.002,
-      "max_mass_per_tile_kg": 0.012
+      "max_mass_per_tile_kg": 0.012,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 84,
@@ -2850,7 +3254,13 @@
       "thermal_conductivity_w_per_m_k": 0.0,
       "molar_mass_g_per_mol": 0.0,
       "default_mass_per_tile_kg": 0.0,
-      "max_mass_per_tile_kg": 0.0
+      "max_mass_per_tile_kg": 0.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 85,
@@ -2879,7 +3289,12 @@
       "molar_mass_g_per_mol": 0.0,
       "electrical_conductivity": 1000000000.0,
       "default_mass_per_tile_kg": 0.0,
-      "max_mass_per_tile_kg": 0.0
+      "max_mass_per_tile_kg": 0.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 86,
@@ -2907,7 +3322,13 @@
       "thermal_conductivity_w_per_m_k": 0.0,
       "molar_mass_g_per_mol": 0.0,
       "default_mass_per_tile_kg": 0.0,
-      "max_mass_per_tile_kg": 0.0
+      "max_mass_per_tile_kg": 0.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 87,
@@ -2943,7 +3364,11 @@
       "viscosity_pa_s": 0.001,
       "surface_tension_n_per_m": 0.0728,
       "default_mass_per_tile_kg": 1.0,
-      "max_mass_per_tile_kg": 1.5
+      "max_mass_per_tile_kg": 1.5,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 88,
@@ -2984,7 +3409,9 @@
       "viscosity_pa_s": 0.0019,
       "surface_tension_n_per_m": 0.055,
       "default_mass_per_tile_kg": 1.05,
-      "max_mass_per_tile_kg": 1.4
+      "max_mass_per_tile_kg": 1.4,
+      "radioactivity": 0,
+      "electrical_conductivity": 0
     },
     {
       "id": 89,
@@ -3012,7 +3439,13 @@
       "thermal_conductivity_w_per_m_k": 0.0,
       "molar_mass_g_per_mol": 0.0,
       "default_mass_per_tile_kg": 0.0,
-      "max_mass_per_tile_kg": 0.0
+      "max_mass_per_tile_kg": 0.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 90,
@@ -3041,7 +3474,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 91,
@@ -3070,7 +3508,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 92,
@@ -3099,7 +3542,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 93,
@@ -3128,7 +3576,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 94,
@@ -3158,7 +3611,11 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 95,
@@ -3187,7 +3644,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 96,
@@ -3217,7 +3679,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 97,
@@ -3248,13 +3715,17 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 98,
       "name": "sulfur",
       "display_name": "Sulfur",
-      "state": "powder",
+      "state": "solid",
       "hardness": 2,
       "density": 2.07,
       "color_hex": "F8E058",
@@ -3278,7 +3749,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.2
+      "path_cost": 1.2,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 99,
@@ -3307,7 +3783,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 100,
@@ -3336,7 +3817,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 101,
@@ -3365,7 +3851,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 102,
@@ -3398,7 +3889,10 @@
       "beam_cuttable": true,
       "projectile_passable": false,
       "blocks_line_of_sight": true,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "corrosiveness": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 103,
@@ -3428,7 +3922,11 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 104,
@@ -3462,7 +3960,10 @@
       "beam_cuttable": true,
       "projectile_passable": false,
       "blocks_line_of_sight": true,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "corrosiveness": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 105,
@@ -3489,7 +3990,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 106,
@@ -3516,7 +4023,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 107,
@@ -3543,7 +4056,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 108,
@@ -3572,7 +4091,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 109,
@@ -3601,7 +4125,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 110,
@@ -3629,7 +4158,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 111,
@@ -3658,7 +4192,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 112,
@@ -3684,7 +4223,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 113,
@@ -3712,7 +4257,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 114,
@@ -3741,7 +4292,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 115,
@@ -3770,7 +4326,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 116,
@@ -3799,7 +4360,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 117,
@@ -3827,7 +4393,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 118,
@@ -3855,7 +4426,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 119,
@@ -3881,7 +4457,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.2
+      "path_cost": 1.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 120,
@@ -3907,7 +4489,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.2
+      "path_cost": 1.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 121,
@@ -3934,7 +4522,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.2
+      "path_cost": 1.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 122,
@@ -3962,7 +4556,12 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.2
+      "path_cost": 1.2,
+      "toxicity": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 123,
@@ -3993,7 +4592,11 @@
       "projectile_passable": false,
       "actor_passable": false,
       "blocks_line_of_sight": true,
-      "path_cost": 1.2
+      "path_cost": 1.2,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 124,
@@ -4019,7 +4622,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.2
+      "path_cost": 1.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 125,
@@ -4045,7 +4654,13 @@
       "actor_passable": false,
       "blocks_line_of_sight": true,
       "hazard": false,
-      "path_cost": 1.2
+      "path_cost": 1.2,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 126,
@@ -4075,7 +4690,12 @@
       "beam_cuttable": false,
       "projectile_passable": true,
       "blocks_line_of_sight": false,
-      "path_cost": 50.0
+      "path_cost": 50.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 127,
@@ -4105,7 +4725,12 @@
       "beam_cuttable": false,
       "projectile_passable": true,
       "blocks_line_of_sight": false,
-      "path_cost": 50.0
+      "path_cost": 50.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 128,
@@ -4131,7 +4756,13 @@
       "actor_passable": true,
       "blocks_line_of_sight": false,
       "hazard": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "radioactivity": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     },
     {
       "id": 129,
@@ -4160,7 +4791,12 @@
       "beam_cuttable": false,
       "projectile_passable": true,
       "blocks_line_of_sight": false,
-      "path_cost": 1.0
+      "path_cost": 1.0,
+      "toxicity": 0,
+      "corrosiveness": 0,
+      "electrical_conductivity": 0,
+      "viscosity_pa_s": 0,
+      "surface_tension_n_per_m": 0
     }
   ]
 }

@@ -1788,7 +1788,21 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 Ok(v) => v,
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
-            match engine.inspect_material(p.id).await {
+            let resolved = match (p.id, p.name.as_deref()) {
+                (Some(id), _) => Some(id),
+                (None, Some(name)) => engine.resolve_material_id_by_name(name).await,
+                (None, None) => {
+                    return Some(missing_param_error(
+                        request.id,
+                        "inspect.material requires either `id` or `name`",
+                    ))
+                }
+            };
+            let id = match resolved {
+                Some(id) => id,
+                None => return Some(invalid_param_reason(request.id, "unknown_material_name")),
+            };
+            match engine.inspect_material(id).await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "unknown_material_id")),
             }
