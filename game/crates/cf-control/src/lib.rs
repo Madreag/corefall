@@ -68,6 +68,11 @@ pub mod runtime;
 pub mod scenario;
 pub mod schemas;
 pub mod server;
+pub mod server_command;
+pub mod server_engine_handle;
+pub mod server_process_request;
+#[cfg(test)]
+mod server_tests;
 pub mod settings;
 pub mod state;
 pub mod world;
