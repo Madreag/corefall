@@ -1,7 +1,61 @@
 # Corefall — Refactor Ledger
 
 **Purpose**: persistent cross-session memory. Read this FIRST when resuming work.
-Last updated: 5/21/2026 2:15 AM MST
+Last updated: 5/21/2026 5:30 PM MST (Session 12 in flight)
+
+---
+
+## Session 12 (5/21/2026): Massive audit + comment + LOC + chemistry + settings pass — IN FLIGHT
+
+### User directives (this session)
+
+1. Audit ALL previous missions — anything compromised/deferred must be fixed.
+2. **Chemistry/realism**: full phase states (solid/liquid/gas/plasma), visually distinct + interactive. Temperature + pressure affect reaction kinetics, speed, violence, colors.
+3. **Files ≤1000 LOC ideal, ≤2000 max**. Split anything bigger where safe.
+4. **Settings configurable** — organize for player/admin/modder access.
+5. **Cut comments** — multi-line narratives bloat LOC + pollute diffs.
+6. **Specific items the user named "DO IT NOW, no more deferrals"**:
+   - Parallelize M15 kernel — needs BTreeMap storage refactor + determinism tests
+   - Parallelize CA stepper
+   - SIMD penetration math
+   - MaterialId u16 expansion
+
+### Baseline at session start
+
+- 4295 tests passing, 0 failed (workspace)
+- AGENTS.md updated: stricter comment rule (no multi-line narratives), 1000 LOC ideal / 2000 LOC hard ceiling, settings under `content/settings/`
+- Per-file LOC inventory:
+  - cf-material/kernel.rs 1680 LOC (has DEAD_ dead code from parallel refactor — ~250 LOC to drop)
+  - cf-material/kernel_parallel.rs 401 LOC
+  - cf-material/reactions.rs 1490 LOC
+  - cf-material/phase.rs 706 LOC
+  - 5 cf-control engine spillover still 2k-3.3k LOC (engine_dispatch_router, server_process_request, engine_drive_tick, engine_tests, engine_dispatch)
+- Verification of user's "no more deferrals" list — **status from code/ledger at session start**:
+  - MaterialId u16 — DONE Session 11 (`pub type MaterialId = u16` in chunked_materials.rs)
+  - SIMD penetration — DONE Session 11 (`try_penetrate_batch4` in cf-physics)
+  - Parallel CA + reactions + phase — DONE Session 11 (kernel_parallel.rs lives in tree; kernel.rs imports from it)
+  - But kernel.rs still carries DEAD_ leftovers from the refactor — CLEAN UP REQUIRED
+
+### Audit findings (cumulative; new findings appended as I work)
+
+| # | Finding | Severity | Status |
+|---|---|---|---|
+| 1 | kernel.rs has 2 `DEAD_*` fns with `#[allow(dead_code)]` (~250 LOC) | LOW (cleanup) | OPEN |
+| 2 | reaction_registry.json has 37 reactions; M15D spec demands 55+ | MEDIUM | OPEN |
+| 3 | phase_registry.json has 22 transitions; need coverage audit for solids/liquids/gases | MEDIUM | OPEN |
+| 4 | reactions.rs at 1490 LOC (over 1000 ideal) | LOW | OPEN |
+| 5 | kernel.rs at 1680 LOC even after DEAD_ removal will still be ~1430 LOC | LOW | OPEN |
+| 6 | Comments across cf-control engine_*.rs files are still multi-line narratives | MEDIUM | OPEN |
+| 7 | Settings scattered across `content/` without an organized `content/settings/` topology | MEDIUM | OPEN |
+| 8 | Material loader re-parses JSON on every lookup (LEDGER pending #11) | MEDIUM | OPEN |
+| 9 | Material registry has 89 entries; need to verify all carry M15C full thermodynamic schema | MEDIUM | OPEN |
+| 10 | engine_dispatch_router/server_process_request/engine_drive_tick/engine_tests/engine_dispatch all >2000 LOC | MEDIUM | OPEN |
+| 11 | Active milestones: M15C, M15D, M16, M16A-C, M17, M18, M18A, M19, M19B-R, M20-49 — large active backlog | INFO | OPEN |
+| 12 | Visual feedback for active phase states (liquid flow, gas billow, plasma glow) — coverage TBD | HIGH | OPEN |
+| 13 | Hazardous-material damage on actor contact wired only for: acid, lava, fire_intense, acid_droplet (per Session 9). Many other hazards (chlorine, ammonia gas, cold burn, electric shock) may not damage | HIGH | OPEN |
+| 14 | Reaction violence + flash colors only on 8 reactions; many should have visual signatures | MEDIUM | OPEN |
+
+
 
 ---
 

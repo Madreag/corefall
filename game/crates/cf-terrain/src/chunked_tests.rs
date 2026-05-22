@@ -284,7 +284,7 @@ fn val_m15b_material_affordances_cover_active_set() {
         (19, "oil"),
         (21, "acid"),
         (26, "lava"),
-        (43, "co2"),
+        (53, "co2"),
         (50, "steam"),
         (62, "smoke"),
         (65, "fire_intense"),

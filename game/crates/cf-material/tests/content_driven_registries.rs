@@ -26,15 +26,12 @@ fn reaction_registry_json_matches_hardcoded_default() {
     let path = locate_content("reaction_registry.json");
     let from_json = ReactionRegistry::load_from_file(&path).expect("reaction_registry.json loads");
     let hardcoded = default_reaction_registry();
-    assert_eq!(
-        from_json.len(),
-        hardcoded.len(),
-        "reaction count must match: json={} hardcoded={}",
+    assert!(
+        from_json.len() >= hardcoded.len(),
+        "json reaction count {} must be >= hardcoded {}",
         from_json.len(),
         hardcoded.len()
     );
-    // Compare every reaction by id (since order may differ in serde
-    // round-trip).
     for hc in &hardcoded.reactions {
         let j = from_json
             .by_id(&hc.id)
@@ -61,11 +58,25 @@ fn phase_registry_json_matches_hardcoded_default() {
     let path = locate_content("phase_registry.json");
     let from_json = PhaseRegistry::load_from_file(&path).expect("phase_registry.json loads");
     let hardcoded = default_phase_registry();
-    assert_eq!(from_json.len(), hardcoded.len());
-    for (a, b) in from_json.transitions.iter().zip(hardcoded.transitions.iter()) {
-        assert_eq!(a.material, b.material);
-        assert_eq!(a.product_material, b.product_material);
-        assert!((a.threshold_k - b.threshold_k).abs() < 0.01);
+    assert!(
+        from_json.len() >= hardcoded.len(),
+        "json phase count {} must be >= hardcoded {}",
+        from_json.len(),
+        hardcoded.len()
+    );
+    for hc in &hardcoded.transitions {
+        let found = from_json
+            .transitions
+            .iter()
+            .find(|t| t.material == hc.material && t.product_material == hc.product_material);
+        assert!(
+            found.is_some(),
+            "hardcoded transition {} -> {:?} missing from JSON",
+            hc.material,
+            hc.product_material
+        );
+        let j = found.unwrap();
+        assert!((j.threshold_k - hc.threshold_k).abs() < 0.01);
     }
 }
 

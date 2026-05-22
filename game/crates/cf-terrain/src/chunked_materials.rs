@@ -495,7 +495,7 @@ const MATERIAL_TABLE: [MaterialAffordance; 21] = [
         refusal_reason: None,
     },
     MaterialAffordance {
-        id: 43, // co2
+        id: 53, // co2
         name: "co2",
         solid: false,
         diggable: false,
