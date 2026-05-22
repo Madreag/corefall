@@ -16,6 +16,9 @@ pub mod components;
 pub mod engine;
 pub mod engine_audio;
 pub mod engine_baselines;
+pub mod engine_new;
+#[cfg(test)]
+mod engine_tests;
 pub mod engine_build;
 pub mod engine_chassis_emit;
 pub mod engine_cinematic;
