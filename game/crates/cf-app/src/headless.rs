@@ -239,6 +239,19 @@ pub(crate) fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0Engine
         "bevy-interactive".to_string()
     };
     let cli_duration = compute_duration(cli.ticks, cli.run_seconds, cli.tick_rate_hz);
+    let content_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut settings = Settings::load_from_content_dir(&content_root);
+    settings.ui_scale = cli.ui_scale;
+    settings.high_contrast = cli.high_contrast;
+    settings.captions = cli.captions.as_bool();
+    settings.reduced_motion = cli.reduced_motion;
+    settings.reduced_shake = cli.reduced_shake;
+    settings.reduced_flash = cli.reduced_flash;
+    settings.hold_to_confirm = cli.hold_to_confirm;
+    settings.hold_threshold_ms = cli.hold_threshold_ms;
+    settings.key_remap_enabled = cli.key_remap_enabled;
+    settings.tick_rate_hz = cli.tick_rate_hz;
+    settings.ai_debug = cli.ai_debug;
     let inputs = ConfigInputs {
         scenario_id: cli.scenario.clone(),
         scenario_path,
@@ -250,30 +263,7 @@ pub(crate) fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0Engine
         tick_rate_hz: cli.tick_rate_hz,
         capture_grid_enabled: cli.capture_grid,
         paced: cli_duration > 0,
-        settings: Settings {
-            ui_scale: cli.ui_scale,
-            high_contrast: cli.high_contrast,
-            captions: cli.captions.as_bool(),
-            reduced_motion: cli.reduced_motion,
-            reduced_shake: cli.reduced_shake,
-            reduced_flash: cli.reduced_flash,
-            hold_to_confirm: cli.hold_to_confirm,
-            hold_threshold_ms: cli.hold_threshold_ms,
-            key_remap_enabled: cli.key_remap_enabled,
-            key_bindings: std::collections::BTreeMap::new(),
-            reduce_camera_shake_pct: 0.0,
-            tick_rate_hz: cli.tick_rate_hz,
-            accel: 1500.0,
-            friction: 1200.0,
-            gravity: -980.0,
-            jump_force: 420.0,
-            recoil_decay_per_tick: 0.05,
-            sharp_aim_build_ticks: 30,
-            walk_threshold: 1.5,
-            ai_difficulty: "tough_crowd".to_string(),
-            ai_debug: cli.ai_debug,
-            ..Settings::default()
-        },
+        settings,
         seed_override: cli.seed,
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },
         debug_inject_panic_at_tick: cli.debug_inject_panic_at_tick,
