@@ -62,7 +62,7 @@ pub fn trigger_shutdown(tx: &ShutdownSignal) {
 
 /// Await the next moment the receiver observes shutdown==true. If the value
 /// was already `true` when called, returns immediately on the next poll.
-async fn wait_for_shutdown(rx: &mut ShutdownReceiver) {
+pub(crate) async fn wait_for_shutdown(rx: &mut ShutdownReceiver) {
     if *rx.borrow() {
         return;
     }

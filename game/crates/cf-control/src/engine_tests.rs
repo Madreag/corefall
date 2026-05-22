@@ -1,4 +1,26 @@
 //! Tests for engine.rs (moved here so engine.rs stays under 2000 LOC).
+#[allow(unused_imports)]
+use crate::engine::*;
+#[allow(unused_imports)]
+use crate::engine_helpers::*;
+#[allow(unused_imports)]
+use crate::server::*;
+#[allow(unused_imports)]
+use crate::server_command::*;
+#[allow(unused_imports)]
+use crate::server_engine_handle::*;
+#[allow(unused_imports)]
+use crate::state::*;
+#[allow(unused_imports)]
+use crate::{Settings, SCHEMA_VERSION, SCHEMA_VERSION_MIN};
+#[allow(unused_imports)]
+use cf_actor::{ActorId, ControlIntent, IntentSource};
+#[allow(unused_imports)]
+use cf_sim_core::{Tick, WallClock};
+#[allow(unused_imports)]
+use std::path::{Path, PathBuf};
+#[allow(unused_imports)]
+use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
