@@ -76,6 +76,20 @@ Last updated: 5/21/2026 5:30 PM MST (Session 12 in flight)
 - **Round 2 splits (in addition to closing summary)**: scenario.rs 1738 → 877 (6 siblings), m7_ai.rs 1729 → 491 (7 siblings), engine.rs 1725 → 1225 (engine_config.rs extracted). reaction_registry.json: tuned 28 pre-existing reactions with realistic activation_k (1500-8400K) + pressure_order (0.0-1.5).
 - **Final**: 4298 workspace tests pass (was 4295 entering session 12, net +3). 0 clippy errors workspace-wide.
 
+### Session 12 post-close audit pass (final-final)
+
+| Audit area | Finding | Fix | Test delta |
+|---|---|---|---|
+| 4 user-flagged items (M15 parallel kernel / CA parallel / SIMD penetration / MaterialId u16) | All VERIFIED DONE in code (cf-control engine_new.rs wires `MaterialKernel::new().with_parallel(true)`, cf-terrain ca.rs uses `into_par_iter`, cf-physics has `try_penetrate_batch4`, chunked_materials.rs `pub type MaterialId = u16`) | none | 0 |
+| AGENTS.md hard rules (no println!/thread_rng/unsafe/hardcoded-60 in sim) | All clean — only doc comments mention forbidden patterns, no actual violations | none | 0 |
+| Material loaders silent-fallback | All cf-material loaders (reactions/phase/precipitation/thermal_sources) DO emit `tracing::warn!` on parse failure — compliant | none | 0 |
+| **violent_burst rendering** | GAP: engine emits material.violent_burst events with flash_color_hex but cf-app render-effects pump ignored them | New cf-render-2d::chem_flash module + ChemFlashState resource + (material, violent_burst) handler in pump that parses hex color, scales lifetime/radius from energy_release_j, adds proportional camera shake | +4 |
+| **MATERIAL_TABLE coverage** | GAP: 28 chemistry-active materials (phase products + reaction outputs) missing from MATERIAL_TABLE — rendered transparent + ignored actor collision/damage | Added 28 entries (glass/snow/sand/ice/alkali/blood/alcohol/basalt/granite/coal/ore_iron/rust/ash/charcoal/salt/rubber/plastic/oxygen/nitrogen/hydrogen/ozone/ethanol_vapor/neutralized_brine/steel/obsidian/frozen_blood/gold/copper) with realistic physics + hazard flags + render rgba. Table 27 → 55. | 0 |
+| **Settings JSON loader call site** | GAP: Settings::load_from_content_dir existed but no production code called it — content/settings/*.json was dead | cf-app::build_config now calls load_from_content_dir(cwd) then layers CLI overrides | 0 |
+| Done-spec deferral audit (M2/M3 forward-compat fields) | All M3 deferrals (active_region, last_modified_tick, color_grid) verified PICKED UP in M8A + cf-terrain chunked.rs | none | 0 |
+
+**Final state after audit**: 4302 workspace tests pass (+4 from chem_flash). Player can now SEE + take damage from + interact with every reaction product + see violent reactions with their proper flash colors at intensity scaled to energy release.
+
 ### Audit findings (cumulative; new findings appended as I work)
 
 | # | Finding | Severity | Status |
