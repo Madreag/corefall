@@ -61,12 +61,23 @@ mod tests {
     use cf_material::reactions::default_reaction_registry;
     use cf_terrain::chunked::{ChunkedTerrain, MATERIAL_AIR};
 
-    /// report shape.
+    fn seal_iron_acid_chamber(terrain: &mut ChunkedTerrain) {
+        for x in 0..8 {
+            terrain.set_material_pixel(x, 0, 1, 0);
+            terrain.set_material_pixel(x, 2, 1, 0);
+        }
+        for y in 0..=2 {
+            terrain.set_material_pixel(1, y, 1, 0);
+            terrain.set_material_pixel(4, y, 1, 0);
+        }
+        terrain.set_material_pixel(2, 1, 68, 0);
+        terrain.set_material_pixel(3, 1, 21, 0);
+    }
+
     #[test]
     fn cpu_kernel_step_matches_kernel_step() {
         let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
-        terrain.set_material_pixel(3, 3, 68, 0);
-        terrain.set_material_pixel(4, 3, 21, 0);
+        seal_iron_acid_chamber(&mut terrain);
         let reactions = default_reaction_registry();
         let phase = default_phase_registry();
         let heat = HeatField::default();
@@ -80,15 +91,14 @@ mod tests {
             }
         }
         assert!(fired, "iron+acid reaction must fire within 3600 ticks");
-        assert_eq!(terrain.material_at(3, 3), 38, "iron→rust on CPU fallback");
+        assert_eq!(terrain.material_at(2, 1), 38, "iron→rust on CPU fallback");
     }
 
     #[test]
     fn cpu_kernel_step_checksum_deterministic() {
         fn one_run() -> [u8; 32] {
             let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
-            terrain.set_material_pixel(3, 3, 68, 0);
-            terrain.set_material_pixel(4, 3, 21, 0);
+            seal_iron_acid_chamber(&mut terrain);
             let reactions = default_reaction_registry();
             let phase = default_phase_registry();
             let heat = HeatField::default();

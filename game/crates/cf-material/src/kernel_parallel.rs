@@ -328,6 +328,9 @@ fn try_fire_reaction_snap(
     } else {
         (pb_pos, pa_pos)
     };
+    if !rxn.fires_at(tick, a_pos[0], a_pos[1], temp, cf_terrain::air::AMBIENT_PRESSURE_KPA) {
+        return false;
+    }
     snap_write_at(snap, cross_writes, cross_occupied, cx, cy, a_pos[0], a_pos[1], rxn.output);
     if let Some(by) = rxn.byproduct {
         snap_write_at(snap, cross_writes, cross_occupied, cx, cy, b_pos[0], b_pos[1], by);

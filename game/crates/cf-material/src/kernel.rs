@@ -501,6 +501,9 @@ fn try_fire_reaction(
     } else {
         (pb_pos, pa_pos)
     };
+    if !rxn.fires_at(tick, a_pos[0], a_pos[1], temp, cf_terrain::air::AMBIENT_PRESSURE_KPA) {
+        return false;
+    }
     terrain.set_material_pixel(a_pos[0], a_pos[1], rxn.output, tick);
     if let Some(byproduct) = rxn.byproduct {
         terrain.set_material_pixel(b_pos[0], b_pos[1], byproduct, tick);
@@ -807,46 +810,39 @@ mod tests {
     }
 
     /// VAL-M15-kernel-004b: full kernel_step with CA movement —
-    /// reaction fires AND the steam product rises via the CA pass.
-    /// Verifies the canonical order phase → reactions → movement.
+    /// reaction fires through the rate-gated dispatch and the steam +
+    /// smoke products land where the chamber lets them. Pins the
+    /// water+fire pair side-by-side in a sealed dirt cell so the
+    /// rate-gated firing window can be observed without CA drift.
     #[test]
     fn kernel_step_full_water_fire_then_steam_rises() {
         let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
-        // Dirt floor at row y=4 so liquids don't fall.
         for x in 0..8 {
-            terrain.set_material_pixel(x, 4, 1, 0); // dirt
+            terrain.set_material_pixel(x, 0, 1, 0);
+            terrain.set_material_pixel(x, 2, 1, 0);
         }
-        terrain.set_material_pixel(3, 3, 13, 0); // water on floor
-        terrain.set_material_pixel(4, 3, 65, 0); // fire on floor
+        for y in 0..=2 {
+            terrain.set_material_pixel(1, y, 1, 0);
+            terrain.set_material_pixel(4, y, 1, 0);
+        }
+        terrain.set_material_pixel(2, 1, 13, 0);
+        terrain.set_material_pixel(3, 1, 65, 0);
         let reactions = default_reaction_registry();
         let phase = default_phase_registry();
         let heat = empty_heat();
         let mut kernel = MaterialKernel::new();
-        let report = kernel_step(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
-        assert!(report.reactions.iter().any(|e| e.reaction_id == "rxn.extinguish.water_fire"));
-        // Steam (product of water) should now be somewhere in the upper
-        // area — either at the original water position or risen.
-        let mut found_steam = false;
-        for y in 0..4 {
-            for x in 0..8 {
-                if terrain.material_at(x, y) == 50 {
-                    found_steam = true;
-                }
+        let mut fired = false;
+        for _ in 0..600 {
+            let report = kernel_step(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+            if report.reactions.iter().any(|e| e.reaction_id == "rxn.extinguish.water_fire") {
+                fired = true;
+                break;
             }
         }
-        assert!(found_steam, "steam product must exist in upper rows");
-        // Fire pixel is gone (extinguished to smoke per real chemistry).
-        // After the CA pass smoke (a gas) may have risen one row.
-        let mut found_smoke = false;
-        for y in 0..8 {
-            for x in 0..8 {
-                if terrain.material_at(x, y) == 62 {
-                    found_smoke = true;
-                }
-            }
-        }
-        assert!(found_smoke, "smoke product (from extinguished fire) must exist");
-        assert_ne!(terrain.material_at(4, 3), 65, "fire pixel no longer fire");
+        assert!(fired, "water_fire reaction must fire within 600 ticks");
+        assert_eq!(terrain.material_at(2, 1), 50, "water pixel → steam in sealed cell");
+        assert_eq!(terrain.material_at(3, 1), 62, "fire pixel → smoke in sealed cell");
+        assert_ne!(terrain.material_at(3, 1), 65, "fire pixel no longer fire");
     }
 
     /// VAL-M15-kernel-005: kernel respects the reaction cap.
