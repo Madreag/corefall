@@ -1602,6 +1602,8 @@ dependencies = [
  "cf-audio",
  "cf-material",
  "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
@@ -1991,6 +1993,7 @@ dependencies = [
  "cf-wound",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 

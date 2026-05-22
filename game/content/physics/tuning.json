@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "ricochet": {
+    "angle_threshold_rad": 1.0471975512,
+    "hardness_factor": 4.0,
+    "energy_loss": 0.4
+  },
+  "projectile_pair": {
+    "broadphase_bucket_px": 32.0,
+    "narrowphase_candidate_budget": 12,
+    "kinetic_deflect_energy_retained": 0.6,
+    "kinetic_deflect_min_angle_deg": 10.0,
+    "energy_cancel_min_angle_deg": 30.0
+  },
+  "wounds": {
+    "m14g_tooth_threshold": 9.5
+  },
+  "rope": {
+    "default_segment_count": 8,
+    "default_solver_iterations": 4
+  },
+  "perf": {
+    "projectile_sim_p99_budget_ms": 1.0
+  }
+}

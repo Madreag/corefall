@@ -16,7 +16,13 @@
 
 pub mod room;
 pub mod stratification;
+pub mod tuning;
 pub mod wind;
+
+pub use tuning::{
+    AmbientPressureTuning, AtmosTuning, AtmosTuningLoadError, IgnitionTuning, PipeTuning, RespirationTuning,
+    SuitTuning, WindTuning,
+};
 
 use cf_audio::{Medium, MediumFilter};
 use serde::{Deserialize, Serialize};

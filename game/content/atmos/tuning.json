@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "wind": {
+    "buoyancy_force_per_k_delta": 0.5,
+    "wind_force_per_kpa_differential": 2.0
+  },
+  "ignition": {
+    "volatiles_autoignite_k": 573.15,
+    "volatiles_autoignite_n2o_k": 323.15,
+    "min_fuel_ratio_for_ignition": 0.05,
+    "min_oxidizer_ratio_for_ignition": 0.05,
+    "min_total_pressure_for_ignition_kpa": 10.0
+  },
+  "respiration": {
+    "min_o2_partial_kpa": 16.0,
+    "critical_o2_partial_kpa": 12.0,
+    "damage_o2_partial_kpa": 5.0,
+    "inhaled_mol_per_tick_base": 0.0048
+  },
+  "suit": {
+    "pressure_min_kpa": 11.0,
+    "pressure_max_kpa": 300.0,
+    "temp_min_c": -10.0,
+    "temp_max_c": 49.0
+  },
+  "pipes": {
+    "gas_rupture_kpa": 60795.0,
+    "liquid_rupture_kpa": 6079.0
+  },
+  "ambient_pressure_kpa": {
+    "earth": 101.0,
+    "mars": 2.5,
+    "vacuum": 0.01,
+    "venus": 239.0
+  }
+}
