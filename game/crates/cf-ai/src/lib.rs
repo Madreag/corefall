@@ -236,6 +236,7 @@ pub use reactive_guard_params::ReactiveGuardParams;
 use reactive_guard_params::seconds_to_ticks;
 pub use difficulty::DifficultyPreset;
 pub use guard_state::{GuardState, GuardStateTransition, Tactic};
+pub use perception::PerceptionRecord;
 
 /// Per-actor controller state. Lives across ticks; the engine owns the storage.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -520,16 +521,6 @@ pub struct TargetAcquiredRecord {
 pub struct TargetLostRecord {
     pub target_actor: u64,
     pub reason: &'static str,
-}
-
-/// Recorded `ai.perception` payload.
-#[derive(Debug, Clone, PartialEq)]
-pub struct PerceptionRecord {
-    pub player_seen: bool,
-    pub distance: Option<f32>,
-    pub angle_degrees: Option<f32>,
-    pub last_seen_position: Option<[f32; 2]>,
-    pub state: GuardState,
 }
 
 /// Recorded `ai.tactic_chosen` payload. `score_*` fields are the utility scores

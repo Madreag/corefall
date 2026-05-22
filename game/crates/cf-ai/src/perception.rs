@@ -1,9 +1,11 @@
-//! M2 — Reactive guard perception.
-//!
-//! Per the M2 spec's "## Files" section, `cf-ai/src/perception.rs` is the
-//! canonical home for sight_cone + hearing + memory_grid. The current
-//! implementation lives in `cf-ai/src/lib.rs` for compactness; this module
-//! re-exports the public surface so consumers that import per the spec path
-//! `cf_ai::perception::*` resolve cleanly.
+use crate::GuardState;
 
-pub use crate::PerceptionRecord;
+/// Recorded `ai.perception` payload.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PerceptionRecord {
+    pub player_seen: bool,
+    pub distance: Option<f32>,
+    pub angle_degrees: Option<f32>,
+    pub last_seen_position: Option<[f32; 2]>,
+    pub state: GuardState,
+}
