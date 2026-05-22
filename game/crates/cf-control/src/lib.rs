@@ -53,6 +53,8 @@ pub mod engine_m14f;
 pub mod engine_m14g;
 pub mod engine_m15;
 pub mod engine_m6_tick;
+pub mod engine_m6_tick_actor;
+pub mod engine_m6_tick_equipment;
 pub mod engine_m7;
 pub mod engine_m7_baselines;
 pub mod engine_m7b_emit;
