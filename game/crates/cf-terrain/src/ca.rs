@@ -395,10 +395,10 @@ fn step_ca_filtered_parallel(
 }
 
 /// Margolus 2×2 sweep over a local chunk pixel buffer. Same logic as
-/// `apply_margolus_2x2` but operates on `&mut Vec<MaterialId>` with
+/// `apply_margolus_2x2` but operates on `&mut [MaterialId]` with
 /// chunk-local coordinates so it parallelizes safely.
 fn apply_chunk_ca_to_buffer(
-    pixels: &mut Vec<MaterialId>,
+    pixels: &mut [MaterialId],
     parity: u8,
     chunk_origin_x: i64,
     chunk_origin_y: i64,
