@@ -176,15 +176,18 @@ impl MaterialReaction {
         if threshold <= 0.0 {
             return false;
         }
+        let interval = (1.0 / threshold).round().max(1.0) as u64;
         let mut h: u64 = 0xCBF29CE484222325;
         for b in self.id.as_bytes() {
             h = h.wrapping_mul(0x100000001B3).wrapping_add(*b as u64);
         }
-        h = h.wrapping_mul(0x100000001B3).wrapping_add(tick);
         h = h.wrapping_mul(0x100000001B3).wrapping_add(x as u64);
         h = h.wrapping_mul(0x100000001B3).wrapping_add(y as u64);
-        let frac = ((h % 1_000_000) as f32) / 1_000_000.0;
-        frac < threshold
+        h ^= h >> 30;
+        h = h.wrapping_mul(0xBF58476D1CE4E5B9);
+        h ^= h >> 27;
+        let phase = h % interval;
+        tick % interval == phase
     }
 }
 

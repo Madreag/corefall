@@ -65,14 +65,21 @@ mod tests {
     #[test]
     fn cpu_kernel_step_matches_kernel_step() {
         let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
-        terrain.set_material_pixel(3, 3, 68, 0); // iron
-        terrain.set_material_pixel(4, 3, 21, 0); // acid
+        terrain.set_material_pixel(3, 3, 68, 0);
+        terrain.set_material_pixel(4, 3, 21, 0);
         let reactions = default_reaction_registry();
         let phase = default_phase_registry();
         let heat = HeatField::default();
         let mut k = MaterialKernel::new();
-        let r = cpu_kernel_step(&mut terrain, &mut k, &reactions, &phase, &heat, None);
-        assert!(!r.inner.reactions.is_empty());
+        let mut fired = false;
+        for _ in 0..3600 {
+            let r = cpu_kernel_step(&mut terrain, &mut k, &reactions, &phase, &heat, None);
+            if !r.inner.reactions.is_empty() {
+                fired = true;
+                break;
+            }
+        }
+        assert!(fired, "iron+acid reaction must fire within 3600 ticks");
         assert_eq!(terrain.material_at(3, 3), 38, "iron→rust on CPU fallback");
     }
 

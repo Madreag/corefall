@@ -482,7 +482,12 @@ fn acid_droplet_corrodes_metal_nohook_through_kernel_orchestrator() {
     let phase = default_phase_registry();
     let heat = HeatField::default();
     let mut k = MaterialKernel::new();
-    let report = kernel_step_no_movement(&mut terrain, &mut k, &reactions, &phase, &heat, None);
+    let mut report = kernel_step_no_movement(&mut terrain, &mut k, &reactions, &phase, &heat, None);
+    let mut iter = 0;
+    while !report.reactions.iter().any(|e| e.reaction_id == "rxn.corrosion.acid_droplet_metal_nohook") && iter < 600 {
+        report = kernel_step_no_movement(&mut terrain, &mut k, &reactions, &phase, &heat, None);
+        iter += 1;
+    }
     assert!(
         report
             .reactions

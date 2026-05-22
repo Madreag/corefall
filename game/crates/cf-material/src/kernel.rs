@@ -493,12 +493,9 @@ fn try_fire_reaction(
         return false;
     }
     let temp = heat.temperature_at_world(pa_pos[0] as f32, pa_pos[1] as f32);
-    // **Perf** § O(1) table lookup instead of linear scan over registry.
     let Some(rxn) = reaction_lookup.evaluate(reactions, pa, pb, temp) else {
         return false;
     };
-    // Identify which pixel is `input_a` (gets `output`) and which is
-    // `input_b` (gets `byproduct` if Some, else stays).
     let (a_pos, b_pos) = if pa == rxn.input_a {
         (pa_pos, pb_pos)
     } else {
@@ -717,9 +714,17 @@ mod tests {
         let phase = default_phase_registry();
         let heat = empty_heat();
         let mut kernel = MaterialKernel::new();
-        let report =
-            kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
-        assert!(!report.reactions.is_empty(), "at least one reaction fires");
+        let mut fired = false;
+        for _ in 0..600 {
+            let mut report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+            let mut iter = 0;
+            while report.reactions.is_empty() && iter < 600 {
+                report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+                iter += 1;
+            }
+            if !report.reactions.is_empty() { fired = true; break; }
+        }
+        assert!(fired, "at least one reaction fires within 600 ticks");
         let iron_now = terrain.material_at(4, 4);
         let acid_now = terrain.material_at(5, 4);
         assert_eq!(iron_now, 38, "iron pixel must transform to rust");
@@ -739,8 +744,12 @@ mod tests {
         let phase = default_phase_registry();
         let heat = empty_heat();
         let mut kernel = MaterialKernel::new();
-        let report =
-            kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut iter = 0;
+        while report.reactions.is_empty() && iter < 600 {
+            report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+            iter += 1;
+        }
         assert!(report.reactions.iter().any(|e| e.reaction_id == "rxn.extinguish.water_fire"));
         assert_eq!(terrain.material_at(3, 3), 50, "water pixel → steam");
         assert_eq!(terrain.material_at(4, 3), 62, "fire pixel → smoke (extinguished)");
@@ -814,7 +823,6 @@ mod tests {
         let heat = empty_heat();
         let mut kernel = MaterialKernel::new();
         let report = kernel_step(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
-        // Reaction must have fired.
         assert!(report.reactions.iter().any(|e| e.reaction_id == "rxn.extinguish.water_fire"));
         // Steam (product of water) should now be somewhere in the upper
         // area — either at the original water position or risen.
@@ -981,7 +989,12 @@ mod tests {
             }
         }
         let mut kernel = MaterialKernel::new();
-        let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut iter = 0;
+        while report.reactions.is_empty() && iter < 600 {
+            report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+            iter += 1;
+        }
 
         // Reaction fired.
         let rxn = report
@@ -1032,7 +1045,12 @@ mod tests {
             }
         }
         let mut kernel = MaterialKernel::new();
-        let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut iter = 0;
+        while report.reactions.is_empty() && iter < 600 {
+            report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+            iter += 1;
+        }
         let rxn = report
             .reactions
             .iter()
@@ -1068,7 +1086,12 @@ mod tests {
             }
         }
         let mut kernel = MaterialKernel::new();
-        let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut iter = 0;
+        while report.reactions.is_empty() && iter < 600 {
+            report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+            iter += 1;
+        }
         let rxn = report
             .reactions
             .iter()
@@ -1102,7 +1125,12 @@ mod tests {
             }
         }
         let mut kernel = MaterialKernel::new();
-        let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        let mut iter = 0;
+        while report.reactions.is_empty() && iter < 600 {
+            report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+            iter += 1;
+        }
         let rxn = report
             .reactions
             .iter()

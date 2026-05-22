@@ -336,8 +336,13 @@ fn e2e_acid_iron_pixel_transforms_to_rust() {
     let phase = default_phase_registry();
     let heat = HeatField::default();
     let mut kernel = MaterialKernel::new();
-    let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
-    assert!(!report.reactions.is_empty(), "reaction must fire");
+    let mut report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+    let mut iter = 0;
+    while report.reactions.is_empty() && iter < 600 {
+        report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        iter += 1;
+    }
+    assert!(!report.reactions.is_empty(), "reaction must fire within 600 ticks");
     assert!(report
         .reactions
         .iter()
@@ -359,7 +364,12 @@ fn e2e_water_fire_extinguishes_and_makes_steam() {
     let phase = default_phase_registry();
     let heat = HeatField::default();
     let mut kernel = MaterialKernel::new();
-    let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+    let mut report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+    let mut iter = 0;
+    while !report.reactions.iter().any(|e| e.reaction_id == "rxn.extinguish.water_fire") && iter < 600 {
+        report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        iter += 1;
+    }
     assert!(report
         .reactions
         .iter()
@@ -452,13 +462,17 @@ fn e2e_acid_flask_thrown_at_iron_rusts() {
     let phase = default_phase_registry();
     let heat = HeatField::default();
     let mut kernel = MaterialKernel::new();
-    let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
-    let rusted = report
-        .reactions
-        .iter()
-        .filter(|e| e.reaction_id == "rxn.corrosion.acid_iron")
-        .count();
-    assert!(rusted > 0, "at least one iron pixel rusted");
+    let mut rusted = 0;
+    for _ in 0..600 {
+        let report = kernel_step_no_movement(&mut terrain, &mut kernel, &reactions, &phase, &heat, None);
+        rusted += report
+            .reactions
+            .iter()
+            .filter(|e| e.reaction_id == "rxn.corrosion.acid_iron")
+            .count();
+        if rusted > 0 { break; }
+    }
+    assert!(rusted > 0, "at least one iron pixel rusted within 600 ticks");
     // At least one iron pixel transformed (those touched by acid splash).
     let mut rust_count = 0;
     for y in 28..34 {
