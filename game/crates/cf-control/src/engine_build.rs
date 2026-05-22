@@ -170,4 +170,14 @@ pub(crate) fn registry_color_hex_for(material_id: cf_terrain::MaterialId) -> Opt
     Some(def.color_hex.clone())
 }
 
+pub(crate) fn registry_color_hex_from_cache(
+    cache: Option<&cf_material::MaterialRegistry>,
+    material_id: cf_terrain::MaterialId,
+) -> Option<String> {
+    match cache {
+        Some(reg) => reg.find_by_id(material_id).map(|def| def.color_hex.clone()),
+        None => registry_color_hex_for(material_id),
+    }
+}
+
 

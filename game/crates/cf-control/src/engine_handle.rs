@@ -969,9 +969,13 @@ impl EngineHandle for M0Engine {
 
     async fn inspect_material(&self, id: u16) -> Option<serde_json::Value> {
         let aff = cf_terrain::material_affordance(id)?;
-        // Try to load the JSON registry to surface the full MaterialDef
-        // (with future-compat fields). If load fails we fall back to the
-        // runtime affordance projection.
+        if let Some(reg) = self.state.read().ok().and_then(|s| s.material_registry_cache.clone()) {
+            if let Some(def) = reg.find_by_id(id) {
+                if let Ok(value) = serde_json::to_value(def) {
+                    return Some(value);
+                }
+            }
+        }
         if let Some(path) = cf_material::MaterialRegistry::locate_default() {
             if let Ok((registry, _)) = cf_material::load_registry_from_file(&path) {
                 if let Some(def) = registry.find_by_id(id) {
@@ -1031,11 +1035,15 @@ impl EngineHandle for M0Engine {
         let in_bounds = px >= 0 && py >= 0 && (px as u64) < width_px as u64 && (py as u64) < height_px as u64;
         let integrity = terrain.pixel_integrity(px, py);
         let band = cf_terrain::IntegrityBand::from_integrity(integrity);
+        let cached_color_hex = crate::engine_build::registry_color_hex_from_cache(
+            state.material_registry_cache.as_ref(),
+            material_id,
+        );
         drop(state);
         let aff = cf_terrain::material_affordance(material_id)?;
         let produces_debris = aff.spawn_material.is_some();
         let produces_sound = aff.solid;
-        let color_hex = registry_color_hex_for(material_id).unwrap_or_else(|| {
+        let color_hex = cached_color_hex.unwrap_or_else(|| {
             let [r, g, b, _] = aff.overlay_rgba;
             format!("{:02X}{:02X}{:02X}", r, g, b)
         });

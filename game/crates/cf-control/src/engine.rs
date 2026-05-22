@@ -728,6 +728,10 @@ pub(crate) struct EngineMutable {
     /// `content/atmos/tuning.json` loaded at engine init.
     #[allow(dead_code)]
     pub(crate) atmos_tuning: cf_atmos::AtmosTuning,
+    /// `content/materials/material_registry.json` cached at engine init
+    /// so observe-paths (inspect_material, observe_terrain_material_at)
+    /// don't re-parse JSON on every cfctl call.
+    pub(crate) material_registry_cache: Option<cf_material::MaterialRegistry>,
 }
 
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the

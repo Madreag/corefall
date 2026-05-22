@@ -498,6 +498,14 @@ impl M0Engine {
                 precipitation_config: cf_material::PrecipitationConfig::load_default_or_baseline(),
                 physics_tuning: cf_physics::PhysicsTuning::load_default_or_baseline(),
                 atmos_tuning: cf_atmos::AtmosTuning::load_default_or_baseline(),
+                material_registry_cache: cf_material::MaterialRegistry::locate_default()
+                    .and_then(|path| match cf_material::load_registry_from_file(&path) {
+                        Ok((reg, _)) => Some(reg),
+                        Err(err) => {
+                            tracing::warn!(target: "cf_control::engine_new", ?err, "material_registry.json failed to load — cache disabled");
+                            None
+                        }
+                    }),
             }),
             recorder,
             current_tick,

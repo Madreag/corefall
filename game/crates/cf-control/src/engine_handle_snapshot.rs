@@ -15,7 +15,7 @@ use crate::state::{ActorView, ObserveFrame, ObserveSettings, RunStatus};
 use crate::{Settings, SCHEMA_VERSION};
 
 impl M0Engine {
-    pub(crate) fn snapshot_impl(&self, filter: Option<&str>) -> ObserveFrame {
+    pub(crate) fn snapshot_impl(&self, _filter: Option<&str>) -> ObserveFrame {
         let state = self.state.read().expect("engine state poisoned");
         let actors = if let Some(sim) = state.actor_state.as_ref() {
             sim.world
