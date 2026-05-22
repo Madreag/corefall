@@ -18,7 +18,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::EARTH_AMBIENT_KPA;
 
-/// **M14B** § per-cell atmospheric state used by the wind producer.
 /// Authored by the scenario manifest (and by M19's pipe-network kernel
 /// at runtime). The wind kernel only needs pressure + a bounding rect to
 /// find which cell an actor stands in; gas composition belongs to
@@ -55,7 +54,6 @@ impl AtmosCell {
     }
 }
 
-/// **M14B** § wind source — an aperture (open door, breach, vent, pipe
 /// rupture) that couples two cells. The aperture's `area_m2` × the
 /// pressure differential (cell_high.pressure - cell_low.pressure)
 /// produces the wind force applied to actors standing in the jet lane.
@@ -76,7 +74,6 @@ pub struct WindSource {
     pub jet_half_width: f32,
 }
 
-/// **M14B** § per-actor wind force outcome surfaced by [`wind_force_at`].
 ///
 /// `force_n` is the net force vector in newtons (chassis-mass-aware
 /// caller scales by mass for Δv integration). `source_aperture_id` is
@@ -103,7 +100,6 @@ impl WindForceOutcome {
     }
 }
 
-/// **M14B** § Stationeers wind formula `F = ΔP × aperture_area × k`.
 ///
 /// The constant `k = 1000` Pa/kPa converts kPa-differential to Pa for
 /// proper N output (`F_N = ΔP_Pa × A_m² × 0.001` per Stationeers; the
@@ -123,7 +119,6 @@ pub fn wind_force_from_aperture(
     delta_kpa * 1000.0 * aperture_area_m2.max(0.0) * crate::WIND_FORCE_PER_KPA_DIFFERENTIAL / 1000.0
 }
 
-/// **M14B** § chimney effect / buoyancy lift in N for an actor at
 /// `actor_pos`. Implements the spec implementer note:
 ///
 /// > Wind impulse direction must include gravity bias (vertical wind
@@ -179,7 +174,6 @@ pub fn buoyancy_lift_at(actor_pos: [f32; 2], cells: &[AtmosCell], local_g_m_s2: 
 /// Earth gravity produces ~150 N of lift (enough to push a light actor).
 pub const BUOYANCY_FORCE_PER_K_DELTA: f32 = 0.5;
 
-/// **M14B** § sample the wind force vector at `actor_pos` from the cell
 /// + aperture index. Walks every [`WindSource`] in `wind_sources`,
 ///   projects `actor_pos` onto the jet lane (origin + axis × jet_length,
 ///   half_width perpendicular), and sums the contributions.
@@ -247,7 +241,6 @@ pub fn wind_force_at(
     }
 }
 
-/// **M14B** § wind force WITH chimney/buoyancy lift folded into the
 /// vertical component. Combines [`wind_force_at`] (horizontal ΔP from
 /// apertures + vertical from axis projection) with [`buoyancy_lift_at`]
 /// (vertical lift from temperature differential between stacked cells).

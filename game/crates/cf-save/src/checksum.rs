@@ -28,7 +28,6 @@ pub fn canonical_blake3_hex<T: serde::Serialize>(value: &T) -> Result<String, se
     Ok(blake3_hex_of(canonical.as_bytes()))
 }
 
-/// **M4B § "BLAKE3 keyed mode binds the chain to its run"** — keyed BLAKE3
 /// over a byte slice using a 32-byte key. Used by [`crate::ledger_chain`]
 /// to bind the per-event chain to the run id + scenario seed.
 pub fn blake3_keyed_hex_of(key: &[u8; 32], bytes: &[u8]) -> String {

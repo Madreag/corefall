@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::phases::MissionPhase;
 
-/// **M7**: one reinforcement wave declaration.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReinforcementWave {
     pub id: String,
@@ -35,7 +34,6 @@ impl ReinforcementWave {
     }
 }
 
-/// **M7**: emitted when a wave triggers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReinforcementWaveSpawnedEvent {
     pub wave_id: String,
@@ -45,7 +43,6 @@ pub struct ReinforcementWaveSpawnedEvent {
     pub tick: u64,
 }
 
-/// **M7**: registry of pending waves (one mission may declare many).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ReinforcementRegistry {
     pub waves: Vec<ReinforcementWave>,

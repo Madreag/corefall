@@ -42,7 +42,6 @@ pub const NODES: &[&str] = &[
     "sniper_track_mover",
 ];
 
-/// **M7B**: squad verbs the Sniper exposes as distinct BT subtrees.
 pub const SQUAD_VERB_IDS: &[&str] = &[
     "suppress_window",
     "suppress_target",

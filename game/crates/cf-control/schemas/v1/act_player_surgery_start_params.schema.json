@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerSurgeryStartParams",
-  "description": "**M14H** § `act.player.surgery_start` — begin a 5-phase surgery on a target.",
   "type": "object",
   "properties": {
     "schema_version": {

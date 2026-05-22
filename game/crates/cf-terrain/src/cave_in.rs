@@ -199,7 +199,6 @@ impl CaveInPayload {
 mod tests {
     use super::*;
 
-    /// VAL-M14E-020: cave_in_chance_per_tick matches `(span - 16) × 0.0001 × vib`
     /// across 6 input cases bit-equal to the formula.
     #[test]
     fn chance_formula_matches_spec_literal() {
@@ -228,7 +227,6 @@ mod tests {
         assert_eq!(cave_in_chance_per_tick(17, 0.0), 0.0);
     }
 
-    /// VAL-M14E-021: falling_debris_count = min(span × thickness, 200)
     /// across the 3 spec-cited input cases.
     #[test]
     fn falling_debris_count_matches_spec_table() {
@@ -271,7 +269,6 @@ mod tests {
         assert_eq!(cave_in_roll(f32::NAN, 32, 1.0), CaveInOutcome::Hold);
     }
 
-    /// VAL-M14E-018: cascade reports 4 side neighbors in deterministic
     /// order.
     #[test]
     fn cascade_returns_four_side_neighbors_in_canonical_order() {
@@ -303,7 +300,6 @@ mod tests {
         assert!(!p.cascade_primary);
     }
 
-    /// VAL-M14E-015: plasma cutter doubles vibration → cave-in roll
     /// at tick 200 instead of tick 600.
     #[test]
     fn plasma_cutter_doubles_chance_per_tick() {
@@ -315,7 +311,6 @@ mod tests {
         );
     }
 
-    /// VAL-M14E-017: same-seed determinism — fixed draw + fixed input
     /// produces the same outcome on every call.
     #[test]
     fn roll_is_deterministic_for_fixed_inputs() {

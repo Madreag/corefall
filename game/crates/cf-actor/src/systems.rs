@@ -26,7 +26,6 @@
 
 use crate::components::ActorBundle;
 
-/// **M8A**: pre-rolled RNG table indexed by stable actor id.
 ///
 /// Per `docs/plan/spec/determinism-island-contract.md` rule 2: RNG calls
 /// must NOT happen inside `par_iter` closures. Pre-roll into a `Vec<u64>`
@@ -61,7 +60,6 @@ impl PreRolledRng {
     }
 }
 
-/// **M8A**: stage 1 — consume `ControlIntent` → update Stance / Aim / Vel.
 ///
 /// Each actor's work is per-entity isolated (no cross-actor reads). Safe
 /// to par_iter over `actors_in.iter().zip(actors_out.iter_mut())`.
@@ -72,7 +70,6 @@ pub fn apply_intent(actors_in: &[ActorBundle], actors_out: &mut [ActorBundle], _
     }
 }
 
-/// **M8A**: stage 2 — integrate Pos = Pos + Vel * dt; terrain snapshot read.
 pub fn step_kinematics(actors: &mut [ActorBundle], dt_seconds: f32) {
     for actor in actors {
         actor.pos.x += actor.vel.x * dt_seconds;
@@ -80,14 +77,12 @@ pub fn step_kinematics(actors: &mut [ActorBundle], dt_seconds: f32) {
     }
 }
 
-/// **M8A**: stage 3 — derive HP / Stability / Stamina from previous-tick.
 pub fn derive_status(actors: &mut [ActorBundle]) {
     for actor in actors {
         actor.stamina.value = (actor.stamina.value + actor.stamina.regen_per_tick).min(100.0);
     }
 }
 
-/// **M8A**: stage 4 — write back tick outcomes.
 ///
 /// The actual outcome serialization happens in cf-replay; this stage is
 /// the merge point where per-actor outcomes converge for the recorder.
@@ -95,7 +90,6 @@ pub fn latch_outcomes(_actors: &[ActorBundle]) {
     // Outcome latching is hooked from cf-control's drive_tick in M9+.
 }
 
-/// **M8A § Determinism**: M8A spec verifies that uniform-f32 conversion
 /// from u64 RNG uses the 53-bit-mantissa trick, with f32 output (no f64
 /// passes the boundary into sim state).
 ///

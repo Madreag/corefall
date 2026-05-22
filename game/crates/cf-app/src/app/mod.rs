@@ -230,7 +230,6 @@ pub(crate) fn run_bevy(
     Ok(())
 }
 
-/// **M12** § Slideshow audio playback — point AssetServer at the
 /// workspace root so `AssetServer::load("game/content/audio/...")` and
 /// `AssetServer::load("content/assets/placeholders/...")` both resolve
 /// cleanly. Without this override, Bevy defaults to a `./assets/`

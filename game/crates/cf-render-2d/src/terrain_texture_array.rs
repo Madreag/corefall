@@ -29,7 +29,6 @@ impl TerrainTextureArrayDescriptor {
         }
     }
 
-    /// **M8A**: O(1) descriptor-set bindings — the renderer binds the
     /// array once at frame start and writes only dirty sub-rects via
     /// per-tick texture copy operations.
     pub fn binding_complexity_is_constant(&self) -> bool {

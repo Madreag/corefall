@@ -32,7 +32,6 @@ pub fn light_mech_spec() -> ChassisSpec {
         ChassisModule::new("shield.heavy", ModuleKind::Shield, BodyZone::Torso, 100.0),
         ChassisModule::new("sensor.array", ModuleKind::Sensor, BodyZone::Head, 50.0),
         ChassisModule::new("repair_drone.bay", ModuleKind::RepairDrone, BodyZone::Torso, 50.0),
-        // **M13** § "Per-chassis module positions" — Light Mech (cockpit + frame):
         // cockpit (top-front), reactor (torso center), fuel_tank (torso back),
         // ammo_rack (torso side; explosive), engine (torso back; fire-risk),
         // transmission (between torso + leg), motor_controller_per_leg,

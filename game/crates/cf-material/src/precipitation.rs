@@ -42,7 +42,6 @@ use cf_terrain::chunked::ChunkedTerrain;
 
 use crate::MaterialId;
 
-/// **M15B** § Material ids that participate in the precipitation chain.
 /// Stable across mod loads because the launch registry pins them.
 pub mod ids {
     use super::MaterialId;
@@ -54,35 +53,28 @@ pub mod ids {
     pub const POLLUTANT_PROXY: MaterialId = 62; // smoke / pollutant_x for Vulcan ambient
 }
 
-/// **M15B** § Altitude (px above sea-level) at which steam nucleates
 /// into cloud. Per spec literal: "altitude > 80 px".
 pub const NUCLEATION_ALTITUDE_PX: f32 = 80.0;
 
-/// **M15B** § Ambient temperature gate (Kelvin) for nucleation. Per spec
 /// literal: "ambient temp < 80°C" = 353.15 K. Above this, steam stays
 /// gaseous.
 pub const NUCLEATION_TEMP_K_MAX: f32 = 353.15;
 
-/// **M15B** § Saturation threshold (0..1) for cloud → rain precipitation.
 /// Per spec literal: "cloud at saturation > 80% (locked threshold)".
 pub const PRECIPITATION_SATURATION_THRESHOLD: f32 = 0.80;
 
-/// **M15B** § Tick gate between saturation crossing and the
 /// `material_precipitation_started` event firing. Per spec literal:
 /// "When 60 ticks elapse Then material_precipitation_started event
 /// fires".
 pub const PRECIPITATION_TICK_GATE: u64 = 60;
 
-/// **M15B** § Pollutant fraction trigger for acid rain. Per spec literal:
 /// "pollutant fraction > 5% Then the rain droplets become acid_droplet".
 pub const ACID_RAIN_POLLUTANT_FRACTION_MIN: f32 = 0.05;
 
-/// **M15B** § Earth-equivalent reference atmospheric pressure (kPa).
 /// Used as the pressure denominator in the precipitation rate multiplier
 /// so worlds at ambient Earth pressure produce a multiplier of 1.0.
 pub const REFERENCE_PRESSURE_KPA: f32 = 101.325;
 
-/// **M15B** § Vacuum pressure cutoff (kPa) — below this, no precipitation
 /// can nucleate regardless of humidity / pollutant fraction. Per spec
 /// literal: "Mimas = never rain (vacuum)". Mimas's pressure (effectively
 /// zero) sits below this gate; Mars's ~0.6 kPa thin atmosphere is also
@@ -90,7 +82,6 @@ pub const REFERENCE_PRESSURE_KPA: f32 = 101.325;
 /// [`AmbientWorld::always_precipitates`].
 pub const NUCLEATION_PRESSURE_MIN_KPA: f32 = 1.0;
 
-/// **M15B** § Pressure-influence clamp on the nucleation rate multiplier.
 /// Per real meteorology: low-pressure systems → faster cloud formation
 /// (adiabatic cooling lets water vapor expand + condense). High-pressure
 /// systems → slower formation. The multiplier is `REFERENCE_PRESSURE_KPA
@@ -98,7 +89,6 @@ pub const NUCLEATION_PRESSURE_MIN_KPA: f32 = 1.0;
 /// chamber doesn't divide-by-zero + a deep mine doesn't slow to a halt.
 pub const PRESSURE_MULTIPLIER_RANGE: (f32, f32) = (0.5, 2.0);
 
-/// **M15B** § Configurable precipitation tuning parameters. Mirrors
 /// the spec-locked constants but allows content-driven overrides via
 /// `content/materials/precipitation_config.json`. The schema is a
 /// 1:1 JSON map of this struct; missing fields fall back to the
@@ -174,7 +164,6 @@ impl Default for PrecipitationConfig {
 }
 
 impl PrecipitationConfig {
-    /// **M15B** § Load precipitation tuning from a JSON file. Missing
     /// fields fall back to the spec-locked baseline values via serde
     /// defaults.
     pub fn load_from_file(
@@ -195,7 +184,6 @@ impl PrecipitationConfig {
         Ok(cfg)
     }
 
-    /// **M15B** § Resolve the canonical precipitation config path.
     #[must_use]
     pub fn locate_default() -> Option<std::path::PathBuf> {
         for candidate in [
@@ -210,7 +198,6 @@ impl PrecipitationConfig {
         None
     }
 
-    /// **M15B** § Load from the default path or fall back to spec-
     /// baked constants when the JSON file isn't present.
     ///
     /// **Modder feedback**: emits a `tracing::warn!` when the JSON
@@ -234,7 +221,6 @@ impl PrecipitationConfig {
         Self::default()
     }
 
-    /// **M15B** § Pressure-rate multiplier using THIS config's pressure
     /// range (vs the module-level constant). Modders override the
     /// `pressure_multiplier_lo/hi` to tune cloud-formation aggression.
     #[must_use]
@@ -245,7 +231,6 @@ impl PrecipitationConfig {
     }
 }
 
-/// **M15B** § Errors from [`PrecipitationConfig::load_from_file`].
 #[derive(Debug, thiserror::Error)]
 pub enum PrecipitationConfigLoadError {
     #[error("failed to read precipitation config at {}: {source}", path.display())]
@@ -260,7 +245,6 @@ pub enum PrecipitationConfigLoadError {
     },
 }
 
-/// **M15B** § Per-scenario ambient world preset. The full world cycle
 /// scales with per-world humidity; the spec literal enumerates three:
 /// > Vulcan = always-rain due to high humidity from oceans; Mimas =
 /// > never rain (vacuum); Mars = rare rain (thin atm).
@@ -323,7 +307,6 @@ impl AmbientWorld {
     }
 }
 
-/// **M15B** § One cloud-state sample per atmospheric cell. The
 /// precipitation cycle scans every cell with a non-zero cloud level
 /// per tick.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -358,7 +341,6 @@ impl CloudCell {
     }
 }
 
-/// **M15B** § Event emitted when a steam pixel nucleates into a cloud
 /// pixel. Mirrors the `material_phase_nucleated.json` schema in
 /// `cf-replay/schemas/event/`.
 ///
@@ -382,7 +364,6 @@ pub struct PhaseNucleatedEvent {
     pub tick: u64,
 }
 
-/// **M15B** § Material id → snake_case name table for the precipitation
 /// chain. Used by [`PhaseNucleatedEvent`] + [`PrecipitationStartedEvent`]
 /// payload builders so the JSON event is self-describing.
 #[must_use]
@@ -402,7 +383,6 @@ pub fn material_id_to_name(id: MaterialId) -> &'static str {
 }
 
 impl PhaseNucleatedEvent {
-    /// **M15B** § Build the recorder payload JSON for this event. The
     /// shape matches `cf-replay/schemas/event/material_phase_nucleated.json`
     /// 1:1. The engine layer plugs this into
     /// `Recorder::record(tick, sim_time_ms, "material",
@@ -422,7 +402,6 @@ impl PhaseNucleatedEvent {
 }
 
 impl PrecipitationStartedEvent {
-    /// **M15B** § Build the recorder payload JSON for this event. The
     /// shape matches
     /// `cf-replay/schemas/event/material_precipitation_started.json`.
     #[must_use]
@@ -437,7 +416,6 @@ impl PrecipitationStartedEvent {
     }
 }
 
-/// **M15B** § Event emitted when a cloud cell crosses the precipitation
 /// gate and begins raining.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrecipitationStartedEvent {
@@ -449,9 +427,7 @@ pub struct PrecipitationStartedEvent {
     pub tick: u64,
 }
 
-/// **M15B** § Per-tick inputs for the precipitation evaluator.
 ///
-/// Per spec § Dependencies — "M19 atmospherics (active): provides
 /// temperature + pressure inputs for precipitation gating" — this
 /// struct accepts BOTH temperature and pressure from the M19 air-
 /// pressure + heat fields. The `ambient_pressure_kpa` field is the
@@ -466,7 +442,6 @@ pub struct PrecipitationInputs {
     pub world_y: i32,
     pub altitude_px: f32,
     pub ambient_temp_k: f32,
-    /// **M15B** § Per-cell ambient air pressure (kPa). M19 atmospherics
     /// is the canonical producer; defaults to [`REFERENCE_PRESSURE_KPA`]
     /// (Earth sea level) when not supplied. Drives the
     /// [`pressure_rate_multiplier`] applied to nucleation + saturation.
@@ -505,7 +480,6 @@ impl PrecipitationInputs {
     }
 }
 
-/// **M15B** § Pressure-induced multiplier applied to nucleation +
 /// saturation rates. Per real meteorology: low-pressure systems
 /// accelerate cloud formation (adiabatic cooling expands rising air),
 /// high-pressure systems slow it. The multiplier is `REFERENCE_PRESSURE_KPA
@@ -525,11 +499,9 @@ pub fn pressure_rate_multiplier(ambient_pressure_kpa: f32) -> f32 {
     raw.clamp(PRESSURE_MULTIPLIER_RANGE.0, PRESSURE_MULTIPLIER_RANGE.1)
 }
 
-/// **M15B** § Evaluate one steam pixel for nucleation. Returns a
 /// [`PhaseNucleatedEvent`] when the pixel crosses the altitude +
 /// temperature gates, else `None`.
 ///
-/// Per spec § acceptance scenario 3:
 /// > When steam particles reach altitude > 80 px with ambient temp <
 /// > 80°C Then material_phase_nucleated event fires with from="steam"
 /// > to="cloud"
@@ -544,7 +516,6 @@ pub fn evaluate_steam_nucleation(inputs: PrecipitationInputs) -> Option<PhaseNuc
     if inputs.ambient_temp_k >= NUCLEATION_TEMP_K_MAX {
         return None;
     }
-    // **M15B** § pressure gate. Per spec § "Mimas = never rain (vacuum)":
     // vacuum / near-vacuum pressures block nucleation entirely. The cutoff
     // is conservative (1.0 kPa) so Mars's ~0.6 kPa thin atmosphere is
     // gated out unless the per-world `always_precipitates` override fires.
@@ -563,7 +534,6 @@ pub fn evaluate_steam_nucleation(inputs: PrecipitationInputs) -> Option<PhaseNuc
     })
 }
 
-/// **M15B** § Per-tick saturation increment. The cloud accumulates per
 /// tick at a rate proportional to world humidity. Per-cell rate is
 /// `humidity * 0.05` per tick — Vulcan saturates in ~21 ticks, Earth
 /// in ~36 ticks, Mars in ~400 ticks. Default for unspecified is
@@ -573,7 +543,6 @@ pub fn saturation_rate_per_tick(world: AmbientWorld) -> f32 {
     world.humidity() * 0.05
 }
 
-/// **M15B** § Per-tick saturation increment with pressure modulation.
 /// Per real meteorology, low-pressure systems accelerate cloud
 /// formation (adiabatic cooling). Multiplies the base humidity rate by
 /// the [`pressure_rate_multiplier`].
@@ -590,11 +559,9 @@ pub fn saturation_rate_per_tick_with_pressure(world: AmbientWorld, ambient_press
     saturation_rate_per_tick(world) * pressure_rate_multiplier(ambient_pressure_kpa)
 }
 
-/// **M15B** § Update one cloud cell against per-tick inputs. Returns
 /// `Some(PrecipitationStartedEvent)` when this update crosses the
 /// precipitation tick gate.
 ///
-/// Per spec § acceptance scenarios 4 + 5:
 /// > Given an accumulated cloud at saturation > 80% (locked threshold)
 /// > When 60 ticks elapse Then material_precipitation_started event
 /// > fires
@@ -610,7 +577,6 @@ pub fn update_cloud_cell(
     update_cloud_cell_with_pressure(cell, world, REFERENCE_PRESSURE_KPA, pollutant_fraction_inc, tick)
 }
 
-/// **M15B** § Update one cloud cell with explicit pressure input. Per
 /// spec § dependency — M19 atmospherics provides the ambient pressure
 /// sample; this entry point honors it via the
 /// [`pressure_rate_multiplier`].
@@ -666,7 +632,6 @@ pub fn update_cloud_cell_with_pressure(
     None
 }
 
-/// **M15B** § Per-tick precipitation orchestrator. Holds a per-cell
 /// cloud map + the per-tick output channel. The engine calls
 /// [`PrecipitationCycle::step`] each tick with the inputs of every
 /// active cell.
@@ -697,7 +662,6 @@ impl PrecipitationCycle {
         )
     }
 
-    /// **M15B** § Process one steam pixel. Records a nucleation event
     /// when the cell crosses the gates AND advances the per-cell cloud
     /// saturation toward the precipitation threshold. Honors the per-
     /// cell ambient pressure sample from the M19 atmospherics input.
@@ -724,7 +688,6 @@ impl PrecipitationCycle {
         }
     }
 
-    /// **M15B** § Process one cell tick (without a fresh nucleation
     /// observation). Used by the orchestrator to keep already-saturated
     /// cells running toward the precipitation tick gate. Pressure
     /// defaults to Earth reference (101.325 kPa) — callers wishing to
@@ -734,7 +697,6 @@ impl PrecipitationCycle {
         self.step_cell_with_pressure(world_x, world_y, REFERENCE_PRESSURE_KPA, tick);
     }
 
-    /// **M15B** § Process one cell tick with explicit ambient pressure
     /// (kPa). Per spec § dependency — M19 atmospherics provides the
     /// pressure input that drives the pressure-rate multiplier.
     pub fn step_cell_with_pressure(&mut self, world_x: i32, world_y: i32, ambient_pressure_kpa: f32, tick: u64) {
@@ -751,7 +713,6 @@ impl PrecipitationCycle {
         self.cells.values().filter(|c| c.raining).count()
     }
 
-    /// **M15B** § Apply the cycle to the terrain in one deterministic
     /// pass. For every nucleated steam pixel, transform it into a
     /// cloud (id=71) pixel; for every raining cloud cell, spawn one
     /// rain/acid_droplet pixel one row below the cloud position. This
@@ -759,7 +720,6 @@ impl PrecipitationCycle {
     /// once per tick after running [`Self::observe_steam_pixel`] /
     /// [`Self::step_cell`] for the live steam pixel set.
     ///
-    /// Per spec § acceptance scenarios 3 + 4:
     /// > And cloud material accumulates in the upper atmospheric layer
     /// > And rain droplet particles spawn falling toward the terrain
     ///
@@ -844,7 +804,6 @@ mod tests {
     }
 
     /// VAL-M15B-precip-003: nucleation fires above 80 px + below 80°C.
-    /// Per spec § acceptance scenario 3.
     #[test]
     fn steam_nucleates_above_threshold() {
         let inputs = PrecipitationInputs::with_default_pressure(
@@ -930,7 +889,6 @@ mod tests {
     }
 
     /// VAL-M15B-precip-008: vulcan ambient → acid_droplet output.
-    /// Per spec § acceptance scenario 5.
     #[test]
     fn vulcan_ambient_produces_acid_droplets() {
         let mut cell = CloudCell::new(0, 0);

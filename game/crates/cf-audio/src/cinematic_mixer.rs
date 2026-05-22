@@ -27,16 +27,12 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Per spec § Loudness contract — narration target LUFS.
 pub const CINEMATIC_NARRATION_LUFS: f32 = -14.0;
 
-/// Per spec § Loudness contract — music bed LUFS during narration.
 pub const CINEMATIC_MUSIC_LUFS_DURING_NARRATION: f32 = -22.0;
 
-/// Per spec § Loudness contract — music bed LUFS outside narration.
 pub const CINEMATIC_MUSIC_LUFS_OUTSIDE_NARRATION: f32 = -16.0;
 
-/// Per spec § Loudness contract — SFX bus LUFS during cinematics.
 pub const CINEMATIC_SFX_LUFS: f32 = -16.0;
 
 /// Per spec acceptance criterion: "music bed ducks to -22 LUFS WITHIN

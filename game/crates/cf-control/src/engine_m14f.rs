@@ -207,11 +207,9 @@ impl M0Engine {
                         yield_strength,
                         trigger,
                     );
-                    // **M14F § VAL-M14F-003 / Cluster 2**: carve the
                     // breach bbox into the chunked-terrain pixel buffer
                     // so the breach persists past tick 600.
                     self.m14f_mutate_wall_to_air(bbox_min, bbox_max, chunk_id);
-                    // **M14G § VAL-CROSS-008**: route the wall-rupture
                     // falling-debris impulse on the downstream actor
                     // through `classify_fall_fracture` so the actor in
                     // the debris path receives a typed `Fracture*`/`CrushLimb`/
@@ -277,7 +275,6 @@ impl M0Engine {
                             None,
                         );
                     }
-                    // **M14F § VAL-M14F-007 / 008 / 011**: kick off the
                     // downstream consumer surfaces (M15 fluid, M19
                     // atmospherics, M19C vacuum exposure) on rupture.
                     self.m14f_start_downstream_consumers(
@@ -428,7 +425,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14F § VAL-M14F-003 / Cluster 2**: mutate the chunked-terrain
     /// pixel buffer at the breach bbox to `MATERIAL_AIR`. Idempotent —
     /// safe to call repeatedly.
     pub(crate) fn m14f_mutate_wall_to_air(&self, bbox_min: [i64; 2], bbox_max: [i64; 2], chunk_id: (i32, i32)) {
@@ -444,7 +440,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14F § VAL-M14F-007 / 008 / 011**: prime the downstream
     /// consumer surfaces (M15 fluid mass, M19 pressure samples, M19C
     /// vacuum exposure) at the rupture tick. The actual per-tick
     /// updates flow through [`Self::m14f_advance_downstream_consumers`].
@@ -480,7 +475,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14F § VAL-M14F-007 / 008 / 009 / 011**: per-tick downstream
     /// consumer update. Drives:
     ///   - M15 fluid mass accumulation through dam breaches.
     ///   - M19 atmospheric pressure equalization across sealed-room
@@ -514,7 +508,6 @@ impl M0Engine {
                         if elapsed <= 600 {
                             *mass = mass.saturating_add(1 + elapsed.saturating_mul(2));
                         }
-                        // VAL-M14F-009: downstream actor gets the
                         // submerged latch within 60 ticks of rupture.
                         if let Some(actor) = actor_opt {
                             if elapsed >= 30 && !s.m14f_actor_submerged_tick.contains_key(&actor) {
@@ -523,7 +516,6 @@ impl M0Engine {
                         }
                     }
                     "sealed_room" => {
-                        // VAL-M14F-008: M19 pressure-equalization. The
                         // room-side decays toward the vacuum-side
                         // each tick so the delta is monotonically
                         // decreasing.
@@ -534,7 +526,6 @@ impl M0Engine {
                         let new_room = (room - step).max(vac);
                         let new_vac = (vac + step * 0.5).min(new_room);
                         *entry = (new_room, new_vac);
-                        // VAL-M14F-011: M19C vacuum-exposure damage on
                         // the actor inside the sealed room — latched
                         // within 60 ticks of the rupture.
                         if let Some(actor) = actor_opt {

@@ -126,7 +126,6 @@ pub struct ChainBreak {
     pub actual_hash: String,
 }
 
-/// **M4B § "Ledger chain rejects tampered bundle"** — walk the chain
 /// front-to-back, recompute every event's hash, and compare against the
 /// recorded `chained_hash_hex`. Returns [`VerifyOutcome::Tampered`] with
 /// the first break + the run-end anchor when clean.

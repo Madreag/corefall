@@ -66,7 +66,6 @@ impl M0Engine {
             actor: u64,
             reason: &'static str,
         }
-        /// **M6B**: per-tick band transition emit captured during the
         /// inventory-weight pass so the recorder can fire the
         /// `inventory.encumbrance_threshold_crossed` event after the
         /// write-guard is released.
@@ -290,7 +289,6 @@ impl M0Engine {
 
             // (f) Inventory-weight recompute.
             //
-            // **M6B**: each slot consults the canonical ItemSpec
             // registry (`cf_equipment::mass_kg_for_id`) for the
             // per-item mass — the M6 hardcoded SLOT_WEIGHT_RIFLE_KG=8
             // placeholder is now stale data drift. Unknown ids fall
@@ -310,7 +308,6 @@ impl M0Engine {
                 })
                 .sum();
             actor.inventory_weight_kg = total_weight;
-            // **M6B**: the per-actor inventory grid is the canonical
             // M6B surface; ensure it's attached + the envelope is
             // refreshed every tick so liquid-drain, M6C SKU swap,
             // M27B loot pickup, etc. always see a current
@@ -375,7 +372,6 @@ impl M0Engine {
         }
 
         // (g) WeaponSwap tick — drain completed swaps + collect emissions.
-        // **M6**: when a swap completes, set the actor's selected slot to
         // the target (deferred from dispatch time), clear the
         // `weapon_swap_in_progress` flag so firing unlocks, and emit
         // `equipment.weapon_swap_completed`.
@@ -517,7 +513,6 @@ impl M0Engine {
         }
     }
 
-    /// **M6**: tick the grenade + knife projectiles + facing-from-aim
     /// derivation + per-tool bipod auto-stow. Emits
     /// `equipment.grenade_detonated`, `combat.knife_throw_landed`, and
     /// `actor.facing_changed` events. Called from `drive_tick` after
@@ -763,7 +758,6 @@ impl M0Engine {
             // Type-specific effect emissions.
             match det.kind {
                 cf_equipment::GrenadeKind::Frag => {
-                    // **M14** § "HE round overpressure model" — emit the
                     // overpressure wave + per-actor combat.explosive_hit_mo +
                     // explosion severance + 3-organ routing.
                     let _ = self.recorder.record(
@@ -1167,7 +1161,6 @@ impl M0Engine {
             );
         }
 
-        // **M6**: tick `AdvancedFireMode::Burst3` follow-up shots. The first
         // round in a burst already fired through the M1 path; this scheduler
         // emits the remaining 2 rounds at `BURST3_INTER_SHOT_SECONDS` cadence
         // so the full 3-round burst lands within 100 ms per spec § "SMG
@@ -1402,7 +1395,6 @@ impl M0Engine {
         }
     }
 
-    /// **M6**: per-tick perception emissions. Drives the new
     /// `perception.footstep_emitted` / `perception.occlusion_applied` event
     /// families from the unified cf-perception kernel. Co-exists with the
     /// legacy M2 `ai.perception_signal` event (emitted from
@@ -1425,11 +1417,9 @@ impl M0Engine {
             surface: &'static str,
             loudness: f32,
             band: &'static str,
-            /// **M12B** § Source world position. Used by the spatial
             /// resolve pass to emit `audio.spatial_resolved` etc. for
             /// each footstep cue.
             position: [f32; 2],
-            /// **M12B** § Source velocity (m/s).
             velocity: [f32; 2],
         }
         struct OcclusionEmit {
@@ -1446,7 +1436,6 @@ impl M0Engine {
         };
 
         // Footstep emission — actors moving horizontally on a surface.
-        // **M12B**: snapshot full velocity (not just speed) so the
         // spatial-resolve pass can emit a moving-source doppler factor.
         let actor_movement: Vec<(ActorId, cf_actor::Vec2, cf_actor::Vec2, f32, bool, bool)> = state
             .actor_state
@@ -1580,7 +1569,6 @@ impl M0Engine {
                 }),
                 None,
             );
-            // **M12B** § Per-footstep spatial-resolve emission. Spec
             // acceptance "Player locates an unseen footstep by ear within
             // 15 degrees": `audio.spatial_resolved` fires with azimuth +
             // distance + hrir_index when the footstep SFX fires.
@@ -1614,7 +1602,6 @@ impl M0Engine {
         }
     }
 
-    /// **M6**: tick the squad of followers — each follower consults its
     /// `current_command` and acts accordingly. M6 implements two of the
     /// four kinds end-to-end (FollowLeader + HoldPosition); DefendPoint and
     /// PushToWaypoint move toward a waypoint when one is set. Full AI

@@ -151,7 +151,6 @@ mod tests {
     use super::*;
     use cf_fortification::FortificationId;
 
-    /// VAL-M9C-051: every fortification kind has at least the base
     /// layer; sandbag walls additionally have the fill layer; wire
     /// kinds have the wire sprite layer.
     #[test]

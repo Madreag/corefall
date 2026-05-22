@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::chunked::MaterialId;
 
-/// **M14A** § "Per-material walk modulator" — friction + speed scaling.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct WalkModulator {
     /// Friction multiplier (1.0 = dry concrete; 0.2 = oil; 0.4 = wet).
@@ -39,7 +38,6 @@ impl Default for WalkModulator {
     }
 }
 
-/// **M14A** § "material_walk_modulator" — lookup per-material walk modifier.
 ///
 /// Material id mapping mirrors the DR-007 launch set (`air`/`dirt`/`concrete`
 /// /`metal_nohook`/`hazard`/`loose_fill`/`repair_fill`/`anchor`). M15
@@ -135,7 +133,6 @@ pub fn material_walk_modulator(id: MaterialId) -> WalkModulator {
     }
 }
 
-/// **M14A** § "material_thermal_contact" — heat-transfer params per material.
 #[allow(clippy::match_same_arms)]
 pub fn material_thermal_contact(id: MaterialId) -> ThermalContact {
     let key = id;

@@ -51,7 +51,6 @@ mod tests {
         }
     }
 
-    /// VAL-M9B-DIG-001: standard variant carves over 12 in-game seconds
     /// (4× the 5s shallow_scrape baseline).
     #[test]
     fn dig_time_standard_is_4x_shallow_scrape() {
@@ -69,7 +68,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9B-DIG-003: deep on hardness ≥ 0.5 falls back to
     /// shallow_scrape with a downgrade reason.
     #[test]
     fn dig_substrate_fallback_at_threshold() {
@@ -248,7 +246,6 @@ mod tests {
             .count()
     }
 
-    /// VAL-M9B-DRAINAGE-001: drainage tick fires
     /// `trench.drainage_flushed` when the sump kicks.
     #[test]
     fn drainage_tick_emits_flush_event() {
@@ -275,7 +272,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9B-DRAINAGE-002: no-sump tick does NOT emit a flush event.
     #[test]
     fn drainage_tick_without_sump_emits_no_event() {
         let engine = make_engine();
@@ -296,7 +292,6 @@ mod tests {
         assert_eq!(count_events(&engine, "trench", "drainage_flushed"), 0);
     }
 
-    /// VAL-M9B-BREASTWORK-001: 80 rounds at 6 J emits exactly one
     /// `trench.breastwork_breached` event.
     #[test]
     fn breastwork_hits_emit_exactly_one_breach() {
@@ -318,7 +313,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9B-REVETMENT-001: no revetment + soft dirt → ≥ 1
     /// `trench.segment_collapsed` event over 1800 ticks.
     #[test]
     fn collapse_tick_no_revetment_emits_collapse_event() {
@@ -341,7 +335,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9B-REVETMENT-002: revetment installed → 0
     /// `trench.segment_collapsed` events over 1800 ticks.
     #[test]
     fn collapse_tick_with_revetment_emits_no_collapse() {

@@ -224,7 +224,6 @@ pub struct AtDitchStuckInputs {
     pub world_seed: u64,
     pub vehicle_class: AntiTankVehicleClass,
     /// Attempt index (0 = first attempt; 1 = first escape retry; …).
-    /// Per spec § "Multiple attempts to escape are independent rolls
     /// (no save-scumming bias)". The attempt index seeds the roll so
     /// successive attempts diverge.
     pub attempt_index: u32,
@@ -301,7 +300,6 @@ pub fn at_ditch_stuck_roll(inputs: AtDitchStuckInputs) -> AtDitchStuckOutcome {
     }
 }
 
-/// VAL-CROSS-NEW-015: AT-ditch infantry cover-state derives via the
 /// shared cf-trench `cover_state` engine. Per the feature definition's
 /// cross-area note, the AT ditch (8 px wide × 4 px deep, comparable to
 /// shallow_scrape) maps to [`SegmentVariant::ShallowScrape`] so the
@@ -665,7 +663,6 @@ mod tests {
         assert!(result.is_err(), "unknown enum must reject");
     }
 
-    /// VAL-M9C-039: anti-tank ditch rolls deterministic stuck chance
     /// (light 30%, heavy 80%, SPG/howitzer impassable). Two runs with
     /// the same (actor_id, ditch_id, world_seed, attempt) inputs must
     /// produce byte-identical outcomes.
@@ -766,7 +763,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9C-040: dragon's teeth deal per-component suspension
     /// damage (NOT hull armor); tank stops after ~2 contacts at 600
     /// HP per contact (M44C suspension budget = 1200).
     #[test]
@@ -800,7 +796,6 @@ mod tests {
         assert!(light.suspension_event.is_none());
     }
 
-    /// VAL-M9C-041: tank trap X HP 800; light vehicle full-stops +
     /// per-component damage; heavy plows in ~5 s. With 60 Hz tick rate
     /// the plow completes in `5 × 60 = 300 ticks` (within ±0.5s gate).
     #[test]
@@ -867,7 +862,6 @@ mod tests {
         assert_eq!(b.hp, BOLLARD_CONCRETE_HP);
     }
 
-    /// VAL-CROSS-NEW-015: AT-ditch infantry cover_state equals
     /// shallow_scrape cover_state for matching depth — i.e. both
     /// surfaces consult the same cf-trench cover-state derivation
     /// engine.

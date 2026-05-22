@@ -200,7 +200,6 @@ pub use deployables::{
 pub use weapon::{m6_weapon_presets, m6c_firearm_presets, WeaponClass, WeaponPreset};
 pub use weapon_swap::{swap_duration_for_target, WeaponSwap, PISTOL_SWAP_SECONDS, WEAPON_SWAP_SECONDS};
 
-/// **M1**: how the weapon's fire button is consumed.
 ///
 /// - `Semi`: exactly one shot per `intent.fire` press (the press is latched in
 ///   `RifleState::semi_latched` and released only when the player releases
@@ -264,56 +263,44 @@ pub struct RifleSpec {
     pub damage_per_hit: f32,
     /// Seconds of flight time before the projectile expires if it never hits.
     pub projectile_lifetime_seconds: f32,
-    /// **M1**: per-tick decay of the recoil_accumulator (CCCP `HDFirearm.cpp:891`).
     /// Default 0.05 = subtract 0.05 toward zero per tick.
     #[serde(default = "default_recoil_decay_rate")]
     pub recoil_decay_rate: f32,
-    /// **M1**: per-shot loudness radius scalar (multiplied with the damage-scaled
     /// alarm radius). 1.0 = baseline; higher = louder. CCCP `HDFirearm.cpp:948`.
     #[serde(default = "default_loudness_scalar")]
     pub loudness: f32,
-    /// **M1**: when true, the spawned projectile inherits a fraction of the
     /// firer's velocity (running-and-gunning shots arc). When false (mortar-
     /// style), only the muzzle velocity is used. Default true.
     #[serde(default = "default_inherits_firer_velocity")]
     pub inherits_firer_velocity: bool,
-    /// **M1**: number of projectile particles spawned per shot (CCCP
     /// `Round.ParticleCount`). 1 = single round; >1 = shotgun-style spread.
     /// M1 ships a single rifle (=1); the field is data so future presets can
     /// describe pellet weapons without code changes.
     #[serde(default = "default_particle_count")]
     pub particle_count: u32,
-    /// **M1**: cone spread in radians applied to multi-particle shots
     /// (CCCP `Round.Spread`). 0 = no spread; ~0.15 ≈ ±9° pellet cone.
     #[serde(default)]
     pub spread_radians: f32,
-    /// **M1**: tracer round cadence (CCCP `Magazine.RTTRatio`). 1 in N
     /// projectiles uses the tracer visual preset. 0 = no tracers. M1's
     /// default rifle ships without tracers (=0).
     #[serde(default)]
     pub tracer_round_to_total_ratio: u32,
-    /// **M1 AI**: ai_fire_vel hint (CCCP `Round::Create` AI default). Defaults
     /// to `projectile_speed` so AI threat estimation matches the live shot.
     #[serde(default)]
     pub ai_fire_vel: f32,
-    /// **M1 AI**: ai_penetration hint (CCCP `Round::Create`). Defaults to 0;
     /// future presets fill in mass * sharpness * fire_vel.
     #[serde(default)]
     pub ai_penetration: f32,
-    /// **M1 AI**: ai_life_time hint (CCCP `Round::Create`). Defaults to the
     /// first particle's lifetime (= `projectile_lifetime_seconds`).
     #[serde(default)]
     pub ai_life_time: f32,
-    /// **M1 AI**: ai_blast_radius hint. 0 for non-explosive rifles; future
     /// grenade / rocket presets set this for AI avoidance.
     #[serde(default)]
     pub ai_blast_radius: f32,
-    /// **M1**: fire-mode discriminator (Semi or FullAuto). Default Semi so M1's
     /// canonical rifle keeps its single-press semantics. New presets opt in to
     /// FullAuto by setting this field.
     #[serde(default = "default_fire_mode")]
     pub fire_mode: FireMode,
-    /// **M14C** § primary round kind popped by this rifle's magazine when no
     /// per-shot override (`ControlIntent::ammo_kind`) is provided. Defaults
     /// to [`RoundKind::Regular`] so every pre-M14C preset preserves byte-
     /// identical behavior. The M14C tank-grade presets (`rpg_launcher_v1`,
@@ -518,7 +505,6 @@ impl OriginCompatibility {
     }
 }
 
-/// **M5 role-record**: the canonical data model for one piece of equipment.
 /// Drives chassis socket binding, AI doctrine, HUD inspect, modding, and replay.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RoleRecord {
@@ -600,7 +586,6 @@ impl RoleRecord {
 /// Per-shot firing profile carried by ranged role records. Mirrors [`RifleSpec`]
 /// for backward compat — the rifle preset registry now delegates to this.
 ///
-/// **M15B+** extension: `bullet_mass_kg` + `bullet_sharpness` make the
 /// projectile-vs-terrain penetration formula configurable per-RON.
 /// Tank-grade rounds (HEAT shaped-charge, APFSDS long-rod) override
 /// the rifle baseline so heavy weapons punch through walls per the
@@ -675,7 +660,6 @@ pub struct Loadout {
     pub provenance: String,
 }
 
-/// **M13** JSON DTO for `content/equipment/loadouts/*.json`. The on-disk
 /// shape is intentionally permissive: `schema_version` is required so
 /// downstream migrations can step the field set forward; `description` is
 /// optional flavour text consumed by mod-tools and stripped by the runtime
@@ -705,12 +689,10 @@ impl LoadoutFile {
     }
 }
 
-/// **M13** schema version stamp for `content/equipment/loadouts/*.json`.
 /// Bumped only on breaking field changes; additive fields (like `description`)
 /// keep the version stable.
 pub const LOADOUT_SCHEMA_VERSION: u32 = 1;
 
-/// **M13** JSON-loadout parse errors.
 #[derive(Debug)]
 pub enum LoadoutLoadError {
     /// `serde_json` deserialization failed.
@@ -743,7 +725,6 @@ impl std::fmt::Display for LoadoutLoadError {
 
 impl std::error::Error for LoadoutLoadError {}
 
-/// **M13** parse a single loadout from a JSON string. Validates the schema
 /// version + role-id references against [`role_record`]. The `expected_id`
 /// argument lets the caller assert filename↔id parity at load time; pass
 /// `None` for free-form parsing.
@@ -778,7 +759,6 @@ pub fn load_loadout_from_json(
     Ok(file.into_loadout())
 }
 
-/// **M13** load every `*.json` loadout in `dir`. Returns a registry keyed by
 /// loadout id. Files whose `schema_version`, `role_ids`, or id don't validate
 /// return an error so cf-mod / scenario.load can surface a typed reason.
 pub fn load_loadouts_from_dir(
@@ -841,7 +821,6 @@ fn rifle_m1_default() -> RifleSpec {
     }
 }
 
-/// **M1**: shotgun preset. Multi-particle round with cone spread.
 pub const SHOTGUN_M1_DEFAULT_ID: &str = "shotgun_m1_default";
 
 fn shotgun_m1_default() -> RifleSpec {
@@ -873,7 +852,6 @@ fn shotgun_m1_default() -> RifleSpec {
     }
 }
 
-/// **M1**: tracer-rich preset used to verify the 1-in-N tracer cadence
 /// (`RTTRatio` per CCCP `Magazine`). Same baseline as the default rifle but
 /// with `tracer_round_to_total_ratio=4` (every 4th shot is a tracer).
 pub const RIFLE_M1_TRACER_ID: &str = "rifle_m1_tracer";
@@ -947,17 +925,14 @@ fn rifle_m5_mech_heavy() -> RifleSpec {
     }
 }
 
-/// **M14C** § Stable id for the HEAT-capable RPG launcher rifle preset.
 /// Drives `RoundKind::Heat` rounds through the M14C HEAT producer when
 /// the magazine is popped.
 pub const RPG_LAUNCHER_V1_RIFLE_ID: &str = "rpg_launcher_v1";
 
-/// **M14C** § Stable id for the APFSDS-capable chassis-mounted autocannon
 /// rifle preset. Drives `RoundKind::Apfsds` rounds through the M14C APFSDS
 /// producer when the magazine is popped.
 pub const TANK_AUTOCANNON_T3_RIFLE_ID: &str = "tank_autocannon_t3";
 
-/// **M14C** § HEAT-capable launcher RifleSpec. Backed by `rpg_launcher_v1.ron`
 /// magnitudes: 1-round magazine, 4.5 s reload, 320 m/s muzzle velocity. The
 /// `primary_round = Heat` field ensures the magazine pops a HEAT round on
 /// every fire so the cfctl drive of `m14c_heat_vs_era.ron` actually exercises
@@ -996,7 +971,6 @@ fn rpg_launcher_v1_rifle() -> RifleSpec {
     }
 }
 
-/// **M14C** § APFSDS-capable chassis-mounted autocannon RifleSpec. Backed by
 /// `tank_autocannon_t3.ron` magnitudes: 15-round mag, 2.5 s reload, 1600 m/s
 /// muzzle velocity (DU long-rod). The `primary_round = Apfsds` field ensures
 /// every popped round routes to the M14C APFSDS producer.
@@ -1142,7 +1116,6 @@ pub fn rifle_preset(preset_id: &str) -> Option<RifleSpec> {
     rifle_presets().get(preset_id).cloned()
 }
 
-/// **M6**: resolve the available [`AdvancedFireMode`] list for a given
 /// weapon preset id. M1 rifle presets default to the full Single / Burst3 /
 /// Auto ladder per spec § "Weapons" (M1 rifle table row "Single / Burst-3 /
 /// Auto"). M6 launch-weapon presets surface their declared
@@ -1182,19 +1155,16 @@ pub struct RifleState {
     pub fire_cooldown_ticks: u32,
     /// Ticks remaining in an in-progress reload. 0 = idle.
     pub reload_remaining_ticks: u32,
-    /// **M1 / Semi**: latched after a Semi-mode shot until the trigger is
     /// released. Prevents the next held-tick from re-firing. Cleared when
     /// `RifleTickInputs::fire_pressed=false`.
     #[serde(default)]
     pub semi_latched: bool,
-    /// **M1**: per-mag shot index, starting at 0 on reload. Drives the
     /// tracer cadence: shot index N produces a tracer when
     /// `(N % tracer_round_to_total_ratio) == (tracer_round_to_total_ratio - 1)`
     /// for non-zero ratios (so the LAST shot in each cycle is the tracer, per
     /// CCCP Magazine semantics). Reset to 0 by `reset()` and on reload completion.
     #[serde(default)]
     pub shot_index_in_mag: u32,
-    /// **M1 re-audit pass 4 (2026-05-13)**: stable per-rifle magazine
     /// counter; incremented on each successful reload. Used by the engine
     /// to synthesize a stable `magazine_id` (e.g. `<preset_id>:<index>`)
     /// for `equipment.weapon_reload_started` / `equipment.weapon_reload_completed`.
@@ -1249,7 +1219,6 @@ impl RifleState {
         self.shot_index_in_mag = 0;
     }
 
-    /// **M1**: returns true if the next shot (index `shot_index_in_mag`) should
     /// emit a tracer projectile per `tracer_round_to_total_ratio`. Deterministic
     /// — same mag index always produces the same answer for the same ratio.
     pub fn next_shot_is_tracer(&self) -> bool {
@@ -1273,24 +1242,20 @@ pub struct TickOutcomes {
     pub reload_completed: bool,
     pub dry_fire: bool,
     pub recoil_impulse_applied: f32,
-    /// **M1**: tracer flag for the shot fired this tick (per CCCP `Magazine.RTTRatio`).
     /// Always false when no shot fired.
     #[serde(default)]
     pub fired_is_tracer: bool,
-    /// **M1 re-audit pass 4 (2026-05-13)**: total reload-duration in ticks
     /// at the moment a reload was initiated this tick. Engine emits
     /// `equipment.weapon_reload_started.reload_duration_ticks` from this.
     /// Zero when `reload_started=false`.
     #[serde(default)]
     pub reload_ticks_total: u32,
-    /// **M1 re-audit pass 4 (2026-05-13)**: stable magazine slot index
     /// (incremented on each successful reload). Drives the per-mag
     /// `magazine_id` exposed on `equipment.weapon_reload_started` /
     /// `equipment.weapon_reload_completed` so M10 replay viewers can group
     /// per-magazine shots.
     #[serde(default)]
     pub magazine_index_after: u32,
-    /// **M1 re-audit pass 4 (2026-05-13)**: fire intent was received but
     /// the rifle silently gated it (reload in progress). Engine emits
     /// `control.command_rejected reason="reloading"` from this.
     #[serde(default)]
@@ -1335,7 +1300,6 @@ impl Default for RifleTickInputs {
 /// One fixed-tick step of the rifle. Returns the outcomes the caller should turn into
 /// recorder events, plus any recoil impulse the caller should apply to the firer.
 ///
-/// **M1**: honors `RifleSpec::fire_mode`. `Semi` latches after each shot until
 /// the trigger is released so a held button fires exactly once. `FullAuto` fires
 /// at `fire_interval_seconds` cadence while held.
 #[must_use]

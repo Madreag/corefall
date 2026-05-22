@@ -396,7 +396,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-027: tick-aligned mix; drift over 30 min ≤ 1 frame.
     #[test]
     fn commentary_drift_under_30_minutes_is_under_one_frame() {
         // Build a 30-minute commentary script with ten 1-minute clips.

@@ -129,7 +129,6 @@ pub fn m6c_medical_presets() -> Vec<MedicalPreset> {
     ]
 }
 
-/// **M14H** § "22+ medical items + crafting recipes" — full catalog of 22
 /// SKUs spanning the M6C 12 base SKUs + 10 M14H additions. Each entry
 /// corresponds 1:1 to a `cf_treatment::TreatmentKind` producer.
 #[must_use]
@@ -148,7 +147,6 @@ pub fn m14h_medical_presets() -> Vec<MedicalPreset> {
     v
 }
 
-/// **M14H** § "22+ medical items + crafting recipes" — declarative recipe
 /// table mapping treatment SKUs to per-tier ingredients.
 #[must_use]
 pub fn m14h_medical_recipes() -> Vec<MedicalRecipe> {
@@ -464,7 +462,6 @@ fn hospital_bed() -> MedicalPreset {
     }
 }
 
-/// **M14H** § per-treatment crafting recipe.
 ///
 /// `category` is one of `"consumable"`, `"tool"`, or `"furniture"` and
 /// `ingredients` is a flat ingredient → quantity list.
@@ -534,7 +531,6 @@ mod tests {
         }
     }
 
-    /// **M14H** § "cf-equipment::medical NEW (deep): 22+ medical items".
     #[test]
     fn m14h_registry_has_22_items() {
         assert_eq!(m14h_medical_presets().len(), 22);

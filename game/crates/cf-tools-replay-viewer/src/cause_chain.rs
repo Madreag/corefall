@@ -17,7 +17,6 @@ use crate::bundle::Bundle;
 /// (`run_started` → `command_accepted` → … → terminal), but defensive against
 /// pathological loops or malformed data.
 ///
-/// **M4 § Parent-event-id cause chains** sets MAX_CHAIN_DEPTH = 50 by spec
 /// literal.
 pub const DEFAULT_MAX_DEPTH: usize = 50;
 

@@ -69,7 +69,6 @@ impl M0Engine {
         }
     }
 
-    /// **M7-B**: emit `ai.personality_changed`, `ai.faction_allegiance_changed`,
     /// `ai.mood_changed`, and `ai.stress_threshold_crossed` for the initial
     /// state of every spawned bot + the seeded faction matrix. This gives
     /// each event family a deterministic production emission site at run

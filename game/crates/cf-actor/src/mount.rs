@@ -21,26 +21,21 @@ use serde::{Deserialize, Serialize};
 
 use crate::ActorId;
 
-/// **M14J** § "mounted-pairing combined mass" — fraction of the critter's
 /// top speed retained when carrying a human-mass rider. Spec § "notes for
 /// the implementer": "The critter loses ~20% top speed when carrying a
 /// human-mass rider; tune in content RON".
 pub const MOUNT_TOP_SPEED_RETAINED: f32 = 0.80;
 
-/// **M14J** § "Dismount mid-gallop staggers the actor" — fraction of the
 /// critter's instantaneous velocity the rider inherits on mid-motion
 /// dismount.
 pub const DISMOUNT_VELOCITY_INHERIT_FRACTION: f32 = 0.70;
 
-/// **M14J** § "Dismount mid-gallop" — speed threshold above which the
 /// dismount is considered "mid-motion" and triggers a stagger. The critter
 /// is "stationary" below this (units of world / s).
 pub const DISMOUNT_STATIONARY_SPEED_THRESHOLD: f32 = 0.5;
 
-/// **M14J** § "Dismount mid-gallop" — stagger window in milliseconds.
 pub const DISMOUNT_MID_MOTION_STAGGER_MS: u32 = 200;
 
-/// **M14J** § "Mount weapon aim spread penalty" — extra spread (radians)
 /// added when a mounted rider fires a one-handed weapon at gallop.
 pub const MOUNT_MOTION_AIM_SPREAD_RAD: f32 = 0.1;
 
@@ -53,7 +48,6 @@ pub const MOUNT_MOTION_AIM_SPREAD_RAD: f32 = 0.1;
 /// effectively-infinite mass.
 pub const MAX_COMBINED_MASS_KG: f32 = 10_000.0;
 
-/// **M14J** § per-rider mount state. Lives on the rider's
 /// [`ActorState`](crate::ActorState) so save/load round-trips preserve
 /// the pairing. `None` when the rider is not mounted.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
@@ -100,7 +94,6 @@ impl MountState {
     }
 }
 
-/// **M14J** § "Mount weapon aim spread" — compute the effective aim spread
 /// from the base spread + the mount-motion penalty + critter speed.
 #[must_use]
 pub fn mounted_aim_spread(base_spread_rad: f32, critter_speed: f32) -> f32 {
@@ -112,7 +105,6 @@ pub fn mounted_aim_spread(base_spread_rad: f32, critter_speed: f32) -> f32 {
     base_spread_rad + penalty
 }
 
-/// **M14J** § "Dismount mid-gallop staggers the actor" — outcome of a
 /// dismount attempt. `inherited_velocity` is what the rider's velocity
 /// should become after the dismount (zero on stationary; 70% of critter
 /// velocity on mid-motion). `stagger_ms` is the stagger window applied

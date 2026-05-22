@@ -37,7 +37,6 @@ use crate::protocol::semver::Semver;
 use crate::rollback::resimulate::ResimulateOutcome;
 use crate::transport_select::TransportMode;
 
-/// **M8B § locked**: every M8B recovery event is non-cosmetic.
 pub const NET_RECOVERY_EVENT_COSMETIC: bool = false;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,7 +120,6 @@ impl FecRecoveredEvent {
     }
 }
 
-/// **M8B § Acceptance "TURN relay engages when ICE-lite fails"** + ICE-lite
 /// direct-path scenario: the canonical session-level outcome event.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NatTraversalOutcomeEvent {
@@ -179,7 +177,6 @@ impl RollbackWindowEvent {
     }
 }
 
-/// **M8B § convenience**: build a session transport projection that the
 /// observe.net.session_transport JSON-RPC handler returns when a live
 /// session is in flight.
 pub fn session_transport_view(
@@ -201,7 +198,6 @@ pub fn session_transport_view(
     })
 }
 
-/// **M8B § convenience**: re-export of [`FecError`] for convenience —
 /// caller can use this type when constructing fec_recovered events from
 /// a fallible decode result.
 pub type FecRecoveryError = FecError;
@@ -317,7 +313,6 @@ mod tests {
 
     #[test]
     fn all_recovery_events_are_non_cosmetic() {
-        // **M8B § Notes "All new events MUST cap their cosmetic flag at
         // `false`"** — this is a flat assertion that the canonical
         // constant + the producer side both adhere to the rule.
         const _: () = assert!(!NET_RECOVERY_EVENT_COSMETIC);

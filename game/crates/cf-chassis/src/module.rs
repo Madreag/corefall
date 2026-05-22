@@ -15,29 +15,17 @@ pub enum ModuleKind {
     Shield = 2,
     Sensor = 3,
     RepairDrone = 4,
-    /// **M13** § "Cockpit module (pilot inside; mech weight class only)".
     Cockpit = 5,
-    /// **M13** § "Ammo rack module (explosive cascade)".
     AmmoRack = 6,
-    /// **M13** § "Engine module (fire risk)".
     Engine = 7,
-    /// **M13** § "Optics module (vision impairment)".
     Optics = 8,
-    /// **M13** § "Transmission module (mobility)".
     Transmission = 9,
-    /// **M13** § "Reactor module (catastrophic if destroyed)".
     Reactor = 10,
-    /// **M13** § "Per-chassis module positions" — power core (drone + powered armor).
     PowerCore = 11,
-    /// **M13** § "Per-chassis module positions" — internal fuel tank.
     FuelTank = 12,
-    /// **M13** § "Per-chassis module positions" — targeting computer.
     TargetingComputer = 13,
-    /// **M13** § "Per-chassis module positions" — comm relay.
     CommRelay = 14,
-    /// **M13** § "Per-chassis module positions" — per-leg motor controller.
     MotorController = 15,
-    /// **M14C** § "ERA (Explosive Reactive Armor)" — one-shot consumable
     /// panel that pre-detonates incoming HEAT jets. ERA panels are
     /// HEAT-specific (APFSDS bypasses them per VAL-M14C-024).
     Era = 16,
@@ -66,7 +54,6 @@ impl ModuleKind {
         }
     }
 
-    /// **M13** § "Critical chassis modules with full mechanics". True for
     /// modules whose destruction triggers a chassis-wide catastrophic
     /// cascade (`AmmoRack` cook-off, `Reactor` overpressure, `Cockpit`
     /// pilot loss, `Engine` immobilization + fire). The engine wires
@@ -84,7 +71,6 @@ impl ModuleKind {
     }
 }
 
-/// **M13** § "Per-module positioning + War Thunder-style module ray traversal".
 /// Axis-aligned bounding box in chassis local space (origin = chassis center;
 /// units = world pixels). Used to resolve which module a penetrating ray
 /// strikes; identity Aabb (size 0) means "module has no positioned hitbox
@@ -113,7 +99,6 @@ impl Aabb {
     }
 }
 
-/// **M13** § "Critical chassis modules with full mechanics". Per-module
 /// behavior the engine triggers when a module reaches `Failed`. The
 /// `engine.rs` event emitters key off these to surface module-specific
 /// `chassis.*` / `module.*` events.
@@ -204,37 +189,29 @@ pub struct ChassisModule {
     /// `bound_zone_destroyed`, `armor_breached`, `direct_hit`, `overheated`,
     /// `jammed`, `repaired`, `salvaged`, or a mod-supplied string.
     pub last_reason: String,
-    /// **M13** § "Per-module positioning + War Thunder-style module ray
     /// traversal". Chassis-local AABB describing this module's hitbox for
     /// ray traversal. Empty (`is_positioned() == false`) when the module
     /// has no positioned geometry; ray traversal then falls back to
     /// bound-zone presence.
     #[serde(default)]
     pub local_aabb: Aabb,
-    /// **M13** § "Critical chassis modules" — what cascade fires when this
     /// module reaches `Failed`.
     #[serde(default)]
     pub failure_cascade: FailureCascade,
-    /// **M13** AmmoRack-only: rounds remaining in the rack. Drives the
     /// `module.ammo_rack_cooking` / `module.ammo_rack_detonated` event
     /// cascade. Zero for modules whose kind != `AmmoRack`.
     #[serde(default)]
     pub ammo_quantity_remaining: u32,
-    /// **M13** AmmoRack-only: cumulative `rounds_cooked_off` counter.
     #[serde(default)]
     pub rounds_cooked_off: u32,
-    /// **M13** Engine-only: oil reservoir (0..1). 1.0 = full; below 0.3
     /// raises fire-risk on engine penetration.
     #[serde(default = "default_fluid_level")]
     pub oil_level: f32,
-    /// **M13** Engine-only: coolant reservoir (0..1).
     #[serde(default = "default_fluid_level")]
     pub coolant_level: f32,
-    /// **M13** Reactor-only: pressure tier 0..4 (per M9 5-tier signature).
     /// 0 = nominal, 4 = critical (volatile release imminent).
     #[serde(default)]
     pub pressure_state: u8,
-    /// **M14 audit pass 4 (Finding 8)**: highest `ModuleStateKind` for which
     /// this module has already emitted its tier-crossing cascade events
     /// (AmmoCooking / EngineOilLeak / EngineFire / ReactorPressureAdvanced /
     /// OpticsImpaired / MobilityReduced). Used to prevent redundant
@@ -244,14 +221,12 @@ pub struct ChassisModule {
     /// Initialized to `Nominal` (no cascade has fired yet).
     #[serde(default = "default_module_state_kind")]
     pub last_cascade_emitted_state: ModuleStateKind,
-    /// **M14C** § ERA-only (`ModuleKind::Era`): one-shot consumable flag.
     /// `true` = ERA panel intact, `false` = ERA has already pre-detonated
     /// against a prior HEAT impact and can no longer disrupt a jet (per
     /// VAL-M14C-002). Initialized true for ERA modules, false for all
     /// other kinds (irrelevant).
     #[serde(default = "default_era_consumable")]
     pub era_consumable: bool,
-    /// **M14C** § ERA-only: panel charge mass (kg). Drives the
     /// `era_charge_kg × 0.7` HEAT penetration reduction formula per
     /// VAL-M14C-025. Defaults to 1.0 kg (~70% reduction) which matches
     /// Gherkin-2's "~70% reduction" band.
@@ -299,21 +274,18 @@ impl ChassisModule {
         }
     }
 
-    /// **M13**: builder helper that attaches a chassis-local hitbox to the module.
     #[must_use]
     pub fn with_local_aabb(mut self, aabb: Aabb) -> Self {
         self.local_aabb = aabb;
         self
     }
 
-    /// **M13**: builder helper that wires the failure cascade onto the module.
     #[must_use]
     pub fn with_failure_cascade(mut self, cascade: FailureCascade) -> Self {
         self.failure_cascade = cascade;
         self
     }
 
-    /// **M13** AmmoRack-only: pre-seed the rounds remaining + cascade.
     #[must_use]
     pub fn with_ammo(mut self, rounds: u32) -> Self {
         self.ammo_quantity_remaining = rounds;
@@ -345,7 +317,6 @@ impl ChassisModule {
         }
     }
 
-    /// **M14C** § ERA-only builder: configure the one-shot consumable +
     /// `era_charge_kg` for an ERA panel module. Other module kinds ignore
     /// the call (the helper returns `self` unchanged).
     #[must_use]
@@ -357,7 +328,6 @@ impl ChassisModule {
         self
     }
 
-    /// **M14C** § ERA pre-detonation handshake. If this module is an ERA
     /// panel and is still consumable (intact), mark it spent and return
     /// the panel's `era_charge_kg`. Returns `None` for non-ERA modules or
     /// already-spent ERA panels (per VAL-M14C-002 one-shot rule).
@@ -391,7 +361,6 @@ impl ChassisModule {
     }
 }
 
-/// **M13** § "Engineer auto-repair contract" — per-module-class repair time
 /// table (seconds per HP point + tool requirement + Engineer priority weight).
 /// Consumed by M7's Engineer-role utility scorer.
 #[derive(Debug, Clone, Copy, PartialEq)]

@@ -210,12 +210,10 @@ fn schemas_load_for_every_registered_event_type() {
         ("equipment", "weapon_swap_started"),
         ("inventory", "tank_slot_reserved"),
         ("inventory", "weight_changed"),
-        // **M6B**: ItemSpec canonicalization event surface.
         ("equipment", "item_picked_up_with_mass"),
         ("equipment", "item_dropped_with_mass"),
         ("inventory", "encumbrance_threshold_crossed"),
         ("inventory", "container_nested"),
-        // **M6C**: equipment catalog buildout event surface.
         ("body_armor", "degraded"),
         ("atgm", "lock_acquired"),
         ("actor", "revived"),
@@ -228,7 +226,6 @@ fn schemas_load_for_every_registered_event_type() {
         ("squad", "command_issued"),
         ("squad", "member_added"),
         ("squad", "waypoint_marked"),
-        // **M9** reactor defense + 5-tier integrity event surface.
         ("mission", "reactor_hp_changed"),
         ("mission", "reactor_destroyed"),
         ("mission", "reactor_pressure_state_changed"),
@@ -237,17 +234,14 @@ fn schemas_load_for_every_registered_event_type() {
         ("terrain", "pixel_removed"),
         ("terrain", "cascade_triggered"),
         ("terrain", "debris_spawned"),
-        // M9 audit round-3 fix gaps 1+2 — utility-scored target selection
         // and per-guard path invalidation.
         ("ai", "target_scored"),
         ("ai", "path_invalidated"),
-        // **M8B**: net protocol + rollback + loss recovery + NAT events.
         ("net", "protocol_negotiated"),
         ("net", "rollback_window"),
         ("net", "input_resent_redundant"),
         ("net", "fec_recovered"),
         ("net", "nat_traversal_outcome"),
-        // **M12C**: cinematic playback event surface.
         ("cinematic", "started"),
         ("cinematic", "chapter_marker"),
         ("cinematic", "skipped"),
@@ -262,7 +256,6 @@ fn schemas_load_for_every_registered_event_type() {
     }
 }
 
-/// **M8B § Acceptance**: validate the canonical payload shape for
 /// each new net.* event family.
 #[test]
 fn m8b_net_protocol_negotiated_validates() {
@@ -387,7 +380,6 @@ fn terrain_penetration_threshold_event_validates() {
     validate_event_payload("terrain", "terrain_penetration_threshold", &payload).expect("valid");
 }
 
-// **M12B** § HRTF spatial audio + per-room reverb + per-material echo
 // + per-source occlusion + Doppler shift. All four schemas are
 // payload-shaped (additionalProperties: true; required fields gated).
 
@@ -512,7 +504,6 @@ fn m12b_audio_doppler_shifted_rejects_unknown_medium() {
     assert!(err.contains("medium"), "got: {err}");
 }
 
-// **M12C** § In-engine cinematic event surface. All 7 schemas are
 // payload-shaped (additionalProperties: true; required fields gated).
 
 #[test]
@@ -641,7 +632,6 @@ fn validates_projectile_spawned_array_arity() {
     assert!(err.contains("origin"), "got: {err}");
 }
 
-/// **M5**: per-spec sample armor.layer_destroyed payload validates against
 /// the envelope-shaped schema (the validator must walk into
 /// `properties.payload` to find required/properties).
 #[test]
@@ -655,7 +645,6 @@ fn m5_armor_layer_destroyed_payload_validates() {
     validate_event_payload("armor", "layer_destroyed", &payload).expect("valid payload");
 }
 
-/// **M5**: an additive extra field (`bound_zone`) is accepted (the schema
 /// declares `additionalProperties: true` at the payload level so producer
 /// extensions don't bump the envelope).
 #[test]
@@ -670,7 +659,6 @@ fn m5_armor_layer_destroyed_accepts_additive_payload_extension() {
     validate_event_payload("armor", "layer_destroyed", &payload).expect("additive ok");
 }
 
-/// **M5**: a missing required payload field fails validation.
 #[test]
 fn m5_armor_layer_destroyed_rejects_missing_breach_kind() {
     let payload = json!({
@@ -682,7 +670,6 @@ fn m5_armor_layer_destroyed_rejects_missing_breach_kind() {
     assert!(err.contains("breach_kind"), "got: {err}");
 }
 
-/// **M5-A1**: per-family happy-path round trip — one event per family
 /// validates with a representative payload. Closes the test-coverage gap
 /// flagged by the validator audit.
 #[test]
@@ -932,7 +919,6 @@ fn m5_per_family_happy_path() {
     .expect("combat.explosive_hit_mo valid");
 }
 
-/// **M5-A2**: `applied_afflictions` array items now enforce the
 /// 23-affliction enum.
 #[test]
 fn m5_internal_failure_cascade_rejects_unknown_affliction() {
@@ -949,7 +935,6 @@ fn m5_internal_failure_cascade_rejects_unknown_affliction() {
     );
 }
 
-/// **M5-A2**: `applied_afflictions` happy path with a real affliction.
 #[test]
 fn m5_internal_failure_cascade_accepts_known_affliction() {
     let payload = json!({
@@ -961,7 +946,6 @@ fn m5_internal_failure_cascade_accepts_known_affliction() {
     validate_event_payload("internal", "organ_failure_cascade", &payload).expect("valid applied_afflictions array");
 }
 
-/// **M5-A2**: nested-object recursion validates
 /// environment.signal_aggregated.signal.{schema_version, active_hazards}.
 /// A missing required nested field is rejected.
 #[test]
@@ -977,7 +961,6 @@ fn m5_environment_signal_aggregated_rejects_missing_signal_field() {
     assert!(err.contains("schema_version"), "got: {err}");
 }
 
-/// **M5-A2**: nested-object recursion rejects unknown HazardClass enum
 /// values in active_hazards array.
 #[test]
 fn m5_environment_signal_aggregated_rejects_bad_hazard_class() {
@@ -996,7 +979,6 @@ fn m5_environment_signal_aggregated_rejects_bad_hazard_class() {
     );
 }
 
-/// **M5-A2**: nested-object recursion accepts valid signal sub-struct.
 #[test]
 fn m5_environment_signal_aggregated_accepts_valid_signal() {
     let payload = json!({
@@ -1010,7 +992,6 @@ fn m5_environment_signal_aggregated_accepts_valid_signal() {
     validate_event_payload("environment", "signal_aggregated", &payload).expect("valid signal");
 }
 
-/// **M5-A2**: concussion.dose_changed `to_dose: 100.0` is exactly at the
 /// new locked maximum and should pass.
 #[test]
 fn m5_concussion_dose_changed_accepts_max_dose() {
@@ -1024,7 +1005,6 @@ fn m5_concussion_dose_changed_accepts_max_dose() {
     validate_event_payload("concussion", "dose_changed", &payload).expect("dose=100 accepted");
 }
 
-/// **M5-A2**: concussion.dose_changed `to_dose: 100.1` exceeds locked
 /// maximum and is rejected.
 #[test]
 fn m5_concussion_dose_changed_rejects_over_max_dose() {
@@ -1039,7 +1019,6 @@ fn m5_concussion_dose_changed_rejects_over_max_dose() {
     assert!(err.contains("100"), "expected error about maximum 100, got: {err}");
 }
 
-/// **M5-A2**: armor.ricochet `ricochet_probability: 1.5` exceeds locked
 /// maximum 1.0 and is rejected.
 #[test]
 fn m5_armor_ricochet_rejects_probability_over_one() {
@@ -1053,7 +1032,6 @@ fn m5_armor_ricochet_rejects_probability_over_one() {
     assert!(err.contains("ricochet_probability"), "got: {err}");
 }
 
-/// **M5-A2**: armor.spalling.fragment_count is locked to 1..3 per spec.
 #[test]
 fn m5_armor_spalling_rejects_fragment_count_out_of_range() {
     let payload_high = json!({
@@ -1078,7 +1056,6 @@ fn m5_armor_spalling_rejects_fragment_count_out_of_range() {
     assert!(err.contains("fragment_count"), "got: {err}");
 }
 
-/// **M5-A2**: hazard.spread now requires hazard_id for M10 cause-chain
 /// integrity.
 #[test]
 fn m5_hazard_spread_requires_hazard_id() {
@@ -1093,7 +1070,6 @@ fn m5_hazard_spread_requires_hazard_id() {
     assert!(err.contains("hazard_id"), "got: {err}");
 }
 
-/// **M5-A2**: concussion.ko_threshold_crossed.ko_duration_s is now
 /// locked to 5..10 per spec ("full blackout 5-10s").
 #[test]
 fn m5_concussion_ko_threshold_crossed_rejects_out_of_range_duration() {
@@ -1111,7 +1087,6 @@ fn m5_concussion_ko_threshold_crossed_rejects_out_of_range_duration() {
     assert!(err.contains("ko_duration_s"), "got: {err}");
 }
 
-/// **M5-A1**: combat.projectile_hit_mo payload now requires
 /// `parent_hit_event_id` instead of the envelope-colliding
 /// `parent_event_id`.
 #[test]
@@ -1147,7 +1122,6 @@ fn m5_combat_projectile_hit_mo_rejects_envelope_named_parent() {
     );
 }
 
-/// **M5-A1**: Origin enum is locked — a non-canonical Origin string is
 /// rejected on concussion.dose_changed.
 #[test]
 fn m5_concussion_dose_changed_rejects_bad_origin() {
@@ -1162,7 +1136,6 @@ fn m5_concussion_dose_changed_rejects_bad_origin() {
     assert!(result.is_err(), "expected rejection of non-canonical Origin");
 }
 
-/// **M5-A1**: payload enum mismatch on `zone` is rejected.
 #[test]
 fn m5_armor_layer_destroyed_rejects_bad_zone_enum() {
     let payload = json!({
@@ -1175,7 +1148,6 @@ fn m5_armor_layer_destroyed_rejects_bad_zone_enum() {
     assert!(err.contains("zone"), "got: {err}");
 }
 
-/// **M9** (audit round-3 fix gap 1) — ai.target_scored validates a
 /// representative utility-scored target payload (one player candidate +
 /// one reactor candidate, player chosen, full weights breakdown).
 #[test]
@@ -1220,7 +1192,6 @@ fn m9_ai_target_scored_validates_happy_path() {
     validate_event_payload("ai", "target_scored", &payload).expect("ai.target_scored valid");
 }
 
-/// **M9** (audit round-3 fix gap 1) — missing required field is rejected.
 #[test]
 fn m9_ai_target_scored_requires_chosen_id() {
     let payload = json!({
@@ -1233,7 +1204,6 @@ fn m9_ai_target_scored_requires_chosen_id() {
     assert!(err.contains("chosen_id"), "got: {err}");
 }
 
-/// **M9** (audit round-3 fix gap 2) — ai.path_invalidated validates a
 /// representative payload (guard's planned pursuit line crosses a
 /// freshly-carved bbox).
 #[test]
@@ -1249,7 +1219,6 @@ fn m9_ai_path_invalidated_validates_happy_path() {
     validate_event_payload("ai", "path_invalidated", &payload).expect("ai.path_invalidated valid");
 }
 
-/// **M9** (audit round-3 fix gap 2) — missing required `bbox` is rejected.
 #[test]
 fn m9_ai_path_invalidated_requires_bbox() {
     let payload = json!({
@@ -1263,7 +1232,6 @@ fn m9_ai_path_invalidated_requires_bbox() {
     assert!(err.contains("bbox"), "got: {err}");
 }
 
-/// **M5**: every registered M5 schema declares `schema_version: "0.1"` as
 /// a const property — proves the M5 conformance contract per the spec's
 /// "each schema declares schema_version=\"0.1\" matching the M4 locked
 /// envelope" scenario.
@@ -1363,7 +1331,6 @@ fn m5_schemas_declare_schema_version_v0_1() {
         ("audio", "event_requested"),
         ("combat", "melee_hit_mo"),
         ("combat", "explosive_hit_mo"),
-        // M9 audit round-3 fix gaps 1+2 — both new AI schemas use the
         // canonical M4 envelope shape per the M5-locked contract.
         ("ai", "target_scored"),
         ("ai", "path_invalidated"),

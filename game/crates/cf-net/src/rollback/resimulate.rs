@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::rollback::ring_buffer::{InputFrame, RollbackRingBuffer};
 
-/// **M8B § acceptance "6-frame rollback resimulates inside budget"**:
 /// total resimulation cost ≤ 8 ms p99 on the reference platform.
 /// `rollback_to_tick_budget_us` covers the "rolls back to tick T within
 /// 1 ms" sub-bound; the remaining headroom is the per-frame resim cost.
@@ -59,7 +58,6 @@ pub struct ResimulateOutcome {
     pub cause: String,
 }
 
-/// **M8B § resimulate**: run the resimulation orchestration. Takes a
 /// `step_one_tick` callable (the deterministic sim core's `World::tick`
 /// entry point) and applies each authoritative input in commit order.
 ///

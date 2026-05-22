@@ -49,7 +49,6 @@ pub struct ConfigInputs {
     /// M3A: override checksum cadence (ticks between sim_checksum events).
     /// `None` = use default from `ChecksumConfig::m0_default().cadence_ticks` (60).
     pub checksum_cadence_ticks: Option<u64>,
-    /// **M4 § Expected outcome contract**: declared lifecycle outcome.
     /// `None` = leave whatever the engine derives (e.g. Panic if
     /// `debug_inject_panic_at_tick` is set, otherwise Clean). When the CLI
     /// sets `--expected-outcome <clean|panic|abort>` the manifest enforces

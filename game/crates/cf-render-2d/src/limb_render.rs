@@ -6,7 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14A** § "Sprite frame index keyed off stride_frame_index". Walk-cycle
 /// frames cycle through `walk_1..walk_6` per stride; idle frame is `walk_0`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct WalkSpriteFrame {
@@ -29,7 +28,6 @@ impl WalkSpriteFrame {
     }
 }
 
-/// **M14A** § "Chassis rotation rendered" — apply the actor's body rotation
 /// to a sprite transform z-rotation in radians. Returns angle in radians for
 /// the renderer to feed to Bevy's `Transform::rotation_z`.
 pub fn body_rotation_for_render(body_rot_rad: f32, h_flipped: bool) -> f32 {
@@ -40,7 +38,6 @@ pub fn body_rotation_for_render(body_rot_rad: f32, h_flipped: bool) -> f32 {
     }
 }
 
-/// **M14A** § "Arm rotations per flail scalars". Returns the FG arm angle for
 /// the renderer.
 pub fn fg_arm_rotation_for_render(fg_arm_rot_rad: f32, h_flipped: bool) -> f32 {
     if h_flipped {
@@ -58,7 +55,6 @@ pub fn bg_arm_rotation_for_render(bg_arm_rot_rad: f32, h_flipped: bool) -> f32 {
     }
 }
 
-/// **M14A** § "Head rotation per aim track" — apply the head angle.
 pub fn head_rotation_for_render(head_rot_rad: f32, h_flipped: bool) -> f32 {
     if h_flipped {
         -head_rot_rad

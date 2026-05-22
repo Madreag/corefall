@@ -24,7 +24,6 @@ use cf_prosthetic::ProstheticInstance;
 use cf_scar::ScarRecord;
 use cf_veteran::VeteranDossier;
 
-/// **M14I** § canonical dossier view.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct VeteranDossierView {
     pub actor_id: u64,
@@ -43,7 +42,6 @@ pub struct VeteranDossierView {
     pub concussion_count: u32,
 }
 
-/// **M14I** § per-scar row in the dossier timeline.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ScarRow {
     pub scar_id: u64,
@@ -55,7 +53,6 @@ pub struct ScarRow {
     pub tick_acquired: u64,
 }
 
-/// **M14I** § per-prosthetic row.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ProstheticRow {
     pub kind: String,
@@ -66,14 +63,12 @@ pub struct ProstheticRow {
     pub installed_tick: u64,
 }
 
-/// **M14I** § per-zone state row (Severed / Prosthetic).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ZoneRow {
     pub zone: String,
     pub state: String,
 }
 
-/// **M14I** § build a [`VeteranDossierView`] from the per-actor long-term
 /// state + optional VeteranDossier (e.g. retired-veteran persistence).
 #[must_use]
 pub fn build_view(
@@ -195,7 +190,6 @@ fn retirement_state(lt: &LongTermState, persisted: Option<&VeteranDossier>) -> S
     }
 }
 
-/// **M14I** § render a single-line summary of the dossier (HUD card +
 /// roster row).
 #[must_use]
 pub fn render_summary_line(view: &VeteranDossierView) -> String {
@@ -210,7 +204,6 @@ pub fn render_summary_line(view: &VeteranDossierView) -> String {
     )
 }
 
-/// **M14I** § render the full dossier as a multi-line text block (used
 /// by cfctl observe + headless UI).
 #[must_use]
 pub fn render_dossier(view: &VeteranDossierView) -> String {

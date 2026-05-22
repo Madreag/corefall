@@ -18,7 +18,6 @@ pub(crate) fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report
         if projectile.remaining_ticks > 0 {
             projectile.remaining_ticks -= 1;
         }
-        // **M14 audit pass 3 (Findings 3 + 4)**: swept-collision priority
         // queue. Collect EVERY actor whose AABB the segment crosses this
         // tick, sort by entry-t ascending (ties: ActorId), then resolve
         // hits in priority order. The projectile carries `damage` as
@@ -69,12 +68,10 @@ pub(crate) fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report
                 .get_mut(&target_id)
                 .expect("hit target must exist by construction");
             let previous_status = target.status;
-            // **M14**: passthrough energy decays per hit. The projectile
             // either STOPS in the target (delivers full remaining damage)
             // OR passes through (60% absorbed by the actor, 40% continues
             // to the next actor in priority order).
             //
-            // **M14 audit pass 4 (Finding 5)**: energy is conserved across
             // passthroughs (was 1.66× over-applied), AND when there's only
             // ONE candidate (the common single-target case), the entire
             // remaining damage lands on that one actor — the 60/40 split

@@ -51,7 +51,6 @@ impl M0Engine {
                     .as_ref()
                     .and_then(|s| s.world.actors.get(&pid).cloned())
             });
-            // **M7-A fix-round-2**: collect every other reactive-guard
             // ActorState so we can derive the squad-comm receiver list +
             // friendly-fire avoidance check. Reactive guards spawned by
             // the scenario all share the AiEnemy faction by default
@@ -68,7 +67,6 @@ impl M0Engine {
             return;
         };
 
-        // **M7-A fix-round-2**: compute the engine-side signals that drive
         // the 7 behavior-sub-plan events. All signals are pure functions
         // of the snapshot above so they don't need a write borrow.
         let enemy_visible = player_actor
@@ -165,7 +163,6 @@ impl M0Engine {
                 false,
             );
             let tick_emit = crate::m7_ai::tick_bot(bot, ctx);
-            // **M7-A fix-round-2**: drive the 7 behavior sub-plan
             // detections from the per-tick chosen task + engine signal
             // snapshot. The `reactive_override` flag flows in from the
             // ReactiveLayer's `last_decision` (Defer = no override).
@@ -199,7 +196,6 @@ impl M0Engine {
                 .record(tick, sim_time_ms, "ai", "thinking_layer_invoked", payload, None);
         }
 
-        // **M7-A fix-round-2 (audit gaps A1-A7)**: emit the 7 behavior
         // sub-plan events whose payload helpers + cf-ai modules already
         // existed but whose engine emission sites were missing.
         if let Some(payload) = behavior_emit.cover_seeking_started {
@@ -230,7 +226,6 @@ impl M0Engine {
             self.recorder
                 .record(tick, sim_time_ms, "ai", "high_ground_preference_applied", payload, None);
         }
-        // **M7-A**: emit `ai.archetype_chosen` whenever the reason-label
         // flips. The first tick a bot ticks the label is fresh, so this
         // also fires the initial archetype assignment for replay viewers.
         if label_changed {
@@ -238,7 +233,6 @@ impl M0Engine {
             self.recorder
                 .record(tick, sim_time_ms, "ai", "archetype_chosen", payload, None);
         }
-        // **M9 audit pass (GAP-M9-02 LOW fix)**: emit `ai.scope_settle`
         // when a Sniper archetype enters EngageVisibleEnemy (the BT's
         // ScopeSettle action). Per M9 spec § Sniper scenario: "When in
         // position: ai.scope_settle fires (settles 1.5s before fire)".
@@ -262,7 +256,6 @@ impl M0Engine {
                 None,
             );
         }
-        // **M14 audit pass 3 (GAP-M7-03 MEDIUM fix)**: M7 spec § Acceptance
         // criteria — "Engineer digs cover + sets traps: ai.tactic_chosen=set_trap";
         // "Spotter calls reinforcements: ai.tactic_chosen=call_reinforcements";
         // "Assault throws grenade: ai.tactic_chosen=throw_grenade". The
@@ -313,7 +306,6 @@ impl M0Engine {
                 );
             }
         }
-        // **M7-B**: chatter scaffold — when a bot's chosen_task transitions
         // into a chatter-emitting task family, route through the cooldown
         // table. The cooldown gate prevents chatter spam (4s window per
         // (actor, category) per spec § Chatter scaffold cooldown table).
@@ -368,7 +360,6 @@ impl M0Engine {
         }
     }
 
-    /// **M7 fix-round-2 (audit gaps A12-A17)**: per-tick mission director
     /// v0.5 wiring. Drives:
     ///
     /// - `mission.phase_changed` (A12) via
@@ -395,7 +386,6 @@ impl M0Engine {
         // `phase_state` field — if the scenario didn't seed it,
         // `world.phase` is None and `advance_phase` returns None.
         //
-        // **M9** (audit fix gap 3): a M9 reactor-defense scenario seeds the
         // 7-phase pacer in engine construction (see `m7_ai_world_seed`),
         // so the same drive path also produces `mission.director_phase_change`
         // events through `advance_phase_with_director_event`.
@@ -455,7 +445,6 @@ impl M0Engine {
         // `drain_boss_phase_ability` for the new phase's canonical
         // ability when the latch is open.
         //
-        // **M8** (Cluster D fix): the boss-defeat transition (defeated:
         // false → true latched by `apply_boss_damage`) is the production
         // wiring point for `slow_mo.kill_cam_triggered`. After applying
         // the per-tick damage, snapshot `boss.defeated` before/after,
@@ -541,7 +530,6 @@ impl M0Engine {
         }
     }
 
-    /// **M7-A fix-round-2 (audit gaps A8-A11)**: per-tick auto-triage and
     /// auto-repair production wiring.
     ///
     /// Phase 1 (A8): scan `report.actor_outcomes` for fresh
@@ -754,7 +742,6 @@ impl M0Engine {
         }
     }
 
-    /// **M7-B fix-round-2 (audit gap A18)**: drives the per-event mood /
     /// stress / faction-allegiance accumulators that M7-B's
     /// scenario-start baseline emission only seeded once. Spec § Mood
     /// changes on events ("ally killed → -15", "kill scored → +5",
@@ -977,7 +964,6 @@ impl M0Engine {
         for payload in mood_payloads {
             self.recorder
                 .record(tick, sim_time_ms, "ai", "mood_changed", payload.clone(), None);
-            // **M14 audit pass 3 (GAP-M7-02)**: M7 spec § Event families
             // lists `actor.mood_changed` (not `ai.mood_changed`). Dual-
             // emit under the spec-canonical category so consumers reading
             // the literal taxonomy see the event without losing backward
@@ -994,7 +980,6 @@ impl M0Engine {
                 payload.clone(),
                 None,
             );
-            // **M14 audit pass 3 (GAP-M7-01)**: M7 spec lists `faction.*`
             // as the canonical category. Dual-emit so spec-literal-
             // checking consumers find the event under `faction.relationship_changed`.
             self.recorder
@@ -1002,7 +987,6 @@ impl M0Engine {
         }
     }
 
-    /// **M9** § Reactive guard targeting + path reaction (DR-008 utility
     /// scoring): build the `ai.target_scored` payload by running
     /// `cf_ai::target_selection::score_all` against the live candidate set
     /// (player + every non-destroyed reactor). Returns a payload with:

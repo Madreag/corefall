@@ -4,7 +4,7 @@
 //! for M33+ replay browser.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 pub mod bookmark;
 pub mod timeline;

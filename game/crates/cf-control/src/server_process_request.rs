@@ -244,7 +244,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 Ok(v) => v,
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
-            // **M14C** § VAL-M14C-019: surface ammo_kind={heat,apfsds}.
             let ammo_kind = match p.ammo_kind.as_deref() {
                 None => None,
                 Some(label) => match cf_equipment::RoundKind::from_str_snake(label) {
@@ -533,7 +532,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M7-B**: commandability surface — per-task weight override.
         "act.player.set_priority" => {
             #[derive(Deserialize)]
             #[serde(deny_unknown_fields)]
@@ -559,7 +557,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M7-B**: set autonomy mode (FullAuto / Standard / Manual).
         "act.player.set_autonomy_mode" => {
             #[derive(Deserialize)]
             #[serde(deny_unknown_fields)]
@@ -582,7 +579,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M7-B**: load one of the 6 role templates.
         "act.player.apply_role_template" => {
             #[derive(Deserialize)]
             #[serde(deny_unknown_fields)]
@@ -605,7 +601,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M7-B**: apply one of the 5 quick presets (attack / defend /
         // overwatch / rescue / salvage).
         "act.player.apply_quick_preset" => {
             #[derive(Deserialize)]
@@ -629,7 +624,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M7B**: issue a verb from the squad command grammar.
         "act.squad.issue" => {
             let p: ActSquadIssueParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -646,7 +640,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M7B**: switch the squad's active formation kind.
         "act.squad.set_formation" => {
             let p: ActSquadSetFormationParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -662,7 +655,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M7B**: assign a sticky role to a squad member.
         "act.squad.assign_role" => {
             let p: ActSquadAssignRoleParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -679,7 +671,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M7B**: dump the full squad-state JSON view (verb registry +
         // formation catalog + archetype-BT node counts + per-squad state row).
         "srv.dump_squad_state" => {
             let p: SrvDumpSquadStateParams = match serde_json::from_value(params) {
@@ -692,7 +683,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_such_squad")),
             }
         }
-        // **M7-B**: read-only projection of an actor's PriorityTable.
         "observe.priority_table" => {
             #[derive(Deserialize)]
             #[serde(deny_unknown_fields)]
@@ -710,7 +700,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
             }
         }
-        // **M7-B**: read-only projection of an actor's autonomy mode + cap.
         "observe.autonomy" => {
             #[derive(Deserialize)]
             #[serde(deny_unknown_fields)]
@@ -1281,7 +1270,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M13** § "Brain hopping / multi-actor control".
         "act.player.brain_hop" => {
             let p: ActPlayerBrainHopParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1295,7 +1283,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M13** § "Chassis ability slots".
         "act.player.activate_ability" => {
             let p: ActPlayerActivateAbilityParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1309,7 +1296,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M13** § "Cockpit camera anchor".
         "act.input.camera_anchor" => {
             let p: ActInputCameraAnchorParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1323,7 +1309,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M13** § "Drone allies — 4 modes + autonomous behavior".
         "act.player.set_drone_mode" => {
             let p: ActPlayerSetDroneModeParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1337,7 +1322,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M13** § "Weapon modifier slots".
         "act.player.attach_modifier" => {
             let p: ActPlayerAttachModifierParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1364,7 +1348,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M13** § "Boarding / disembarking transitions".
         "act.player.board" => {
             let p: ActPlayerBoardParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1390,7 +1373,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M13** § "Pilot-inside-chassis dual silhouette" — chassis side.
         "observe.chassis.silhouette" => {
             let p: ObserveChassisSilhouetteParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1450,7 +1432,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M12C**: cinematic playback cfctl surface.
         "act.player.skip_cinematic" => {
             let _p: ActPlayerSkipCinematicParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1644,7 +1625,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
             Some(ack_response(request.id, &result))
         }
         // ==================================================================
-        // **M14J**: actor advanced mobility cfctl surface.
         // ==================================================================
         "act.player.vault" => {
             let _p: ActPlayerVaultParams = match serde_json::from_value(params) {
@@ -1834,7 +1814,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_player_actor")),
             }
         }
-        // **M14A** § "observe.quick_action projection".
         "observe.quick_action" => {
             let p: ObserveActorParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1855,7 +1834,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_player_actor")),
             }
         }
-        // **M13** § cfctl `inspect.chassis` — return the full body graph
         // (15 zones + 14 joints + 5 sockets) plus per-zone integrity,
         // per-module state, pilot state and the eject window for the
         // requested actor's chassis. Spec § "Body graph is inspectable
@@ -1870,7 +1848,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_chassis_attached")),
             }
         }
-        // **M9** (audit fix gap 1) § cfctl `inspect.actor.reactor` —
         // alias dispatch that returns the reactor projection (hp +
         // max_hp + pressure_state + armor_layers + heat_signature_k +
         // mission_critical + role + position) plus its last 30 actor-
@@ -1897,7 +1874,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
             }
         }
-        // **M9** § cfctl `observe.mission.reactor` — dedicated projection
         // returning `{ actor_id, hp, max_hp, hp_percent, pressure_state,
         // position, mission_critical, role, armor_layers, heat_signature_k }`
         // per spec § "When cfctl observe.mission.reactor runs".
@@ -1910,7 +1886,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_reactor_loaded")),
             }
         }
-        // **M9** § cfctl `observe.mission.timer` — color-coded countdown
         // projection per spec § "remaining_ticks / total_ticks /
         // remaining_seconds / color_state".
         "observe.mission.timer" => {
@@ -1922,7 +1897,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
             }
         }
-        // **M9** (audit fix gap 2) § cfctl `observe.mission.director` —
         // return `{ current_phase, phase_started_at_tick,
         // phases_completed, intensity, spawn_budget, active_objectives }`
         // per spec § Director state surface.
@@ -1935,14 +1909,12 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_mission_director")),
             }
         }
-        // M3 audit pass 7 (2026-05-13): dedicated `observe.terrain` cfctl
         // method per spec literal "When cfctl observe.terrain runs".
         // Returns the live `TerrainView` projection.
         "observe.terrain" => match engine.observe_terrain().await {
             Some(value) => Some(success_response(request.id, value)),
             None => Some(invalid_param_reason(request.id, "no_terrain_world")),
         },
-        // **M9** (audit round-3 fix gap 3) § cfctl `observe.terrain.material_at
         // { x, y }` — resolve the material at world-space `(x, y)` and
         // return a MaterialInfo JSON with the 9 affordance flags
         // (actor_passable, projectile_passable, diggable, anchorable,
@@ -2029,7 +2001,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }
             }
         }
-        // **M4B § "observe.save.last returns last save metadata"**.
         "observe.save.last" => {
             if let Err(resp) = parse_schema_only(request.id.clone(), params) {
                 return Some(resp);
@@ -2143,7 +2114,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M11 audit pass (GAP-M11-01 HIGH fix)**: keyed action press
         // surface for the BP3 self-play floor + pause-overlay cycling.
         "act.input.key_press" => {
             #[derive(Deserialize)]
@@ -2301,7 +2271,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
             if let Some(ref id) = p.id_override {
-                // **M4 § runbundle.write rejects path traversal**: spec
                 // requires distinct rejection codes:
                 //   - `absolute_path_rejected` for leading `/`
                 //   - `path_traversal_rejected` for `..` or `\`
@@ -2337,7 +2306,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M8B § cfctl new methods**: observe/admin net surface. The
         // engine-side projection is wired live at M9+ when the cf-net
         // server loop actually drives a session; M8B exposes the wire
         // contract (param shapes + return envelope) so M9+ + downstream
@@ -2375,7 +2343,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
             let _ = p.schema_version;
-            // **M8B**: command shape locked at v0.1. Live engine wires
             // the toggle at M9+; the M8B path returns a stable ack so
             // tooling can build against the wire surface.
             Some(success_response(
@@ -2387,7 +2354,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9B-3**: dig a trench segment with the player's current
         // tool. Routes to the engine's `ActPlayerDigTrenchSegment`
         // dispatch, which validates substrate hardness (VAL-M9B-DIG-003),
         // schedules the per-variant dig-time, and emits `trench.segment_dug`.
@@ -2430,7 +2396,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M9B-3**: place an embedded trench module on a built segment.
         // Routes to `ActPlayerPlaceTrenchModule`, which schedules the
         // per-module build_time + emits `trench.module_placed`.
         "act.player.place_trench_module" => {
@@ -2458,7 +2423,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M9B-3**: repair a damaged trench module. Routes to
         // `ActPlayerRepairTrenchModule`; consumes the declared
         // resources + emits `trench.module_repaired`.
         "act.player.repair_trench_module" => {
@@ -2486,7 +2450,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M9B-3**: read the actor's trench cover state per
         // VAL-M9B-CFCTL-002. Returns `{ cover_state: "Exposed" | "Partial" | "Full" }`.
         "observe.actor.cover_state" => {
             #[derive(Deserialize)]
@@ -2505,7 +2468,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
             let value = engine.observe_actor_cover_state(actor_id).await;
             Some(success_response(request.id, value))
         }
-        // **M9B-3**: read the trench segment at a tile coordinate per
         // VAL-M9B-CFCTL-002. Returns `null` for open ground OR a
         // segment view object.
         "observe.trench_segment_at_pos" => {
@@ -2524,7 +2486,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
             let value = engine.observe_trench_segment_at_pos(p.x, p.y).await;
             Some(success_response(request.id, value))
         }
-        // **M9B-2**: drop an authored trench template at the supplied
         // tile origin. Routes to the engine's
         // ActPlayerDropTrenchTemplate dispatch, which loads + hashes
         // the template + emits `trench.template_dropped`.
@@ -2553,7 +2514,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
-        // **M9C-2**: crew an MG nest / tripod / bunker firing slit per
         // VAL-M9C-012 / VAL-M9C-010. Binds the player's stance to
         // `Stance::Crewing { fortification_id }`; cover_state → Full;
         // primary fire is rebound to the mounted weapon; movement
@@ -2583,7 +2543,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-2**: release the crewing binding per
         // VAL-M9C-UNCREW-EMIT (the `voluntary` cause). Engine emits
         // `mg_nest_uncrewed { reason: "voluntary" }` and restores the
         // actor's personal weapon.
@@ -2611,7 +2570,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-2**: deploy the squad-portable MG tripod (4s timer)
         // per VAL-M9C-018. Accepts optional `mode: "pack"` so the
         // single cfctl surface can also drive the pack lifecycle per
         // VAL-M9C-PACK-TRIPOD-SURFACE (the implementer's choice).
@@ -2660,7 +2618,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-2**: pack a deployed tripod (4s timer) per
         // VAL-M9C-PACK-TRIPOD-SURFACE. Implementer chose to surface
         // BOTH `act.player.deploy_mg_tripod { mode: "pack" }` AND a
         // dedicated `pack_mg_tripod` method so client code can pick
@@ -2690,7 +2647,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-4**: deploy a minefield template per
         // VAL-M9C-MINEFIELD-DEPLOY-BEHAVIOR. The engine resolves the
         // template id to a `MinefieldTemplateSpec`, calls
         // `cf_fortification::deploy_template`, decrements inventory by
@@ -2727,7 +2683,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-4**: disarm a mine per VAL-M9C-026 (manual) /
         // VAL-M9C-043 (robot). Required param `mine_id`; optional
         // `actor_id` for the disarming actor; optional `robot_id` for
         // the bomb-disposal robot path.
@@ -2770,7 +2725,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-5**: cut a wire instance per VAL-M9C-033. The cfctl
         // surface accepts the wire instance id + the cutter actor;
         // the engine drives the per-tick cut timer + emits
         // `wire_cut` on completion. Wire kind is encoded in
@@ -2806,7 +2760,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-6**: repair a damaged fortification per
         // VAL-M9C-REPAIR-FORTIFICATION-BEHAVIOR. The cfctl handler
         // accepts the fortification id; the engine deducts the
         // declared per-asset repair materials from inventory + raises
@@ -2840,7 +2793,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-3**: AI-OBS-A-01 doctrine emits
         // `spotter_target_marked` automatically when LOS conditions
         // are met, but the cfctl surface lets a scripted scenario /
         // tool runner mark a target directly without waiting on the
@@ -2878,7 +2830,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-5**: re-energize an electrified fence after a breaker
         // toggle / coupling repair per VAL-M9C-036. The engine flips
         // `Wire::powered = true` + clears any latched
         // `fence_depowered` state.
@@ -2908,7 +2859,6 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
-        // **M9C-5**: depower an electrified fence per
         // VAL-M9C-036 — the breaker-toggle path. Fires
         // `fence_depowered { cause: "breaker_toggled" }` so
         // wire_cutters succeed on the next contact.

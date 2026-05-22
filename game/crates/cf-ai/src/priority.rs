@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::task::TaskType;
 
-/// **M7-A**: 22-task weight grid (per-actor).
 ///
 /// Weights are `u8` in `0..=9`. The `weights` array is indexed by
 /// `TaskType::ordinal()` so the layout is byte-stable across builds and
@@ -88,7 +87,6 @@ impl Default for PriorityTable {
     }
 }
 
-/// **M7-A**: 5 quick presets that bias a base template via `shift()`.
 /// Spec § Smart commandable AI — Quick presets (Aggressive / Defensive /
 /// Scout / Berserk / Custom).
 #[repr(u8)]

@@ -15,14 +15,12 @@ use super::{
     VerbArgValue,
 };
 
-/// **M7B**: structured + validated invocation, ready for doctrine check.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParsedVerb {
     pub verb_id: String,
     pub args: Vec<VerbArgValue>,
 }
 
-/// **M7B**: parse + validate (no doctrine check).
 pub fn parse_verb_invocation(
     registry: &VerbRegistry,
     verb_id: &str,
@@ -69,7 +67,6 @@ pub fn parse_verb_invocation(
     })
 }
 
-/// **M7B**: parser-side error variants.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseError {
     UnknownVerb {

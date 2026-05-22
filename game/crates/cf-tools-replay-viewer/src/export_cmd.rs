@@ -527,7 +527,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-DEFAULT-PATH: omitting `--out` resolves to
     /// `~/Movies/Corefall/<run_id>.mp4` on macOS, `~/Videos/Corefall/<run_id>.mp4`
     /// on Linux/Windows via dirs-next.
     #[test]
@@ -573,7 +572,6 @@ mod tests {
         );
     }
 
-    /// VAL-M10B-NO-AUDIO-BASE: `--no-audio-base` flag flows through the
     /// dispatch to the success envelope.
     #[test]
     fn export_cmd_threads_no_audio_base_flag() {
@@ -594,7 +592,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-SLOW-MO: `--slow-mo 2x` parses through to multiplier 2.
     #[test]
     fn export_cmd_slow_mo_2x_parses() {
         let tmp = tempdir().unwrap();
@@ -614,7 +611,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-SLOW-MO: `--slow-mo 4x` parses through to multiplier 4.
     #[test]
     fn export_cmd_slow_mo_4x_parses() {
         let tmp = tempdir().unwrap();
@@ -634,7 +630,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-SLOW-MO: `--slow-mo 3.5x` returns typed
     /// `SlowMoError::NonInteger`.
     #[test]
     fn export_cmd_slow_mo_3point5x_rejected_with_typed_error() {
@@ -655,7 +650,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-032: simulated-missing-FFmpeg returns
     /// `ExportError::MissingFfmpeg`.
     #[test]
     fn export_cmd_missing_ffmpeg_returns_typed_error() {
@@ -680,7 +674,6 @@ mod tests {
         assert!(parsed.suggested_install.contains("choco install ffmpeg"));
     }
 
-    /// VAL-M10B-032: `delete_partial_output` removes any file the
     /// encode left behind so subsequent invocations don't see a
     /// half-written MP4.
     #[test]

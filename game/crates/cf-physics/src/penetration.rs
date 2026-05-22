@@ -6,7 +6,6 @@
 //! `cf-control/src/engine.rs`; this module exposes a pure helper that
 //! consumers (M14+ projectile/terrain integration) can call directly.
 
-/// **M3**: penetration verdict per CCCP `SceneMan.cpp:571`. Returns true if
 /// the squared impulse exceeds the squared integrity — i.e. the projectile
 /// passes through the pixel and clears it to air. Squared comparison avoids
 /// `sqrt` in the hot path.
@@ -28,7 +27,6 @@ pub fn try_penetrate_impulse_vs_integrity(mass: f32, velocity: f32, sharpness: f
     }
 }
 
-/// **M3**: result of [`try_penetrate_impulse_vs_integrity`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Penetration {
     /// True if the projectile passes through and clears the pixel.

@@ -173,7 +173,6 @@ impl CollapseEnv {
 #[must_use]
 pub fn collapse_tick(current_integrity: f32, env: CollapseEnv) -> CollapseTickOutcome {
     if env.has_revetment {
-        // VAL-M9B-REVETMENT-002: revetment pins integrity at ≥ 600.
         let pinned = current_integrity.max(REVETMENT_INTEGRITY_FLOOR);
         return CollapseTickOutcome::Stable { integrity: pinned };
     }
@@ -250,7 +249,6 @@ pub fn variant_supports_collapse(variant: SegmentVariant) -> bool {
 mod tests {
     use super::*;
 
-    /// VAL-M9B-REVETMENT-001: soft dirt, no revetment, 1800 ticks →
     /// ≥ 1 collapse event.
     #[test]
     fn no_revetment_collapses_within_1800_ticks() {
@@ -264,7 +262,6 @@ mod tests {
         assert_eq!(final_integrity, 0.0);
     }
 
-    /// VAL-M9B-REVETMENT-002: soft dirt + revetment, 1800 ticks → 0
     /// collapse events AND integrity ≥ 600 throughout.
     #[test]
     fn revetment_prevents_collapse_over_1800_ticks() {

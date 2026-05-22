@@ -20,7 +20,6 @@
 use cf_audio::{derive_reverb_profile, fraction_of_walls_open, DecayBand, ReverbProfile, WallComposition};
 use cf_material::{MaterialId, MaterialRegistry};
 
-/// **M12B** § Per-room atmosphere descriptor. The M19 atmospherics kernel
 /// owns the full room (pressure, temperature, gas mix, etc.); this is
 /// the M12B audio-relevant projection — enough fields to derive a
 /// [`ReverbProfile`].
@@ -41,7 +40,6 @@ pub struct RoomAtmosphere {
 }
 
 impl RoomAtmosphere {
-    /// **M12B** § Resolve the [`ReverbProfile`] for this room given the
     /// canonical material registry.
     ///
     /// The wall composition is built by joining each `(material_id,
@@ -64,7 +62,6 @@ impl RoomAtmosphere {
     }
 }
 
-/// **M12B** § Convenience entry point matching the spec's exact callable
 /// shape. `reverb_profile(room_id) -> ReverbProfile`. Returns the
 /// open-outdoor profile when `rooms` doesn't contain `room_id`.
 #[must_use]

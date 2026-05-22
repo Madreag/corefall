@@ -138,7 +138,6 @@ pub fn run_breach_sequence(rounds: u32, per_round_damage: f32) -> (Vec<Breastwor
 mod tests {
     use super::*;
 
-    /// VAL-M9B-BREASTWORK-001: 80 rounds × 6 J = 480 J > 400 HP. The
     /// breastwork breaches by round 67 (400 / 6 = 66.67 → ceil = 67).
     /// Assert the sequence emits exactly one `Breached` outcome.
     #[test]
@@ -181,7 +180,6 @@ mod tests {
         assert!(matches!(outcome, BreastworkHitOutcome::AlreadyBreached));
     }
 
-    /// VAL-M9B-BREASTWORK-001: cover state for a breached `parapet_raised`
     /// downgrades from Full → Partial regardless of stance.
     #[test]
     fn cover_state_downgrades_full_to_partial_on_breach() {

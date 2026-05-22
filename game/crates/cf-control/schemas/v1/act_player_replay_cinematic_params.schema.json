@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerReplayCinematicParams",
-  "description": "**M12C**: `act.player.replay_cinematic { id }` — replay a watched\ncinematic from `Codex → Cinematics`. Per spec § \"Replay — any\ncinematic the player has watched is unlocked / Replay runs the\nscript identically (replay-deterministic) without affecting save\nstate.\"",
+  "description": "cinematic from `Codex → Cinematics`. Per spec § \"Replay — any\ncinematic the player has watched is unlocked / Replay runs the\nscript identically (replay-deterministic) without affecting save\nstate.\"",
   "type": "object",
   "properties": {
     "id": {

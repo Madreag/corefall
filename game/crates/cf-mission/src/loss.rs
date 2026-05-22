@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 /// Mission outcome reason once `Lost`. M1.5 only needs two reasons; M7 adds more
 /// (objective_failed, ally_lost, command_core_destroyed, etc.).
 ///
-/// **M2 re-audit (2026-05-13)**: `ObjectiveFailed` now carries the failing
 /// objective id + a reason label per the spec literal "ObjectiveFailed {
 /// id, reason }". `Aborted` variant added so the abort path doesn't have
 /// to route through a raw string literal.
@@ -26,7 +25,6 @@ pub enum LossReason {
     },
     /// M2: player-initiated mission abandonment via `act.player.abort`.
     Aborted,
-    /// **M13** § "Brain hopping" — the player's brain actor was destroyed.
     /// Brain death = mission lost regardless of which actor is currently
     /// being puppeted.
     BrainDestroyed,
@@ -44,7 +42,6 @@ impl LossReason {
         }
     }
 
-    /// **M2 re-audit (2026-05-13)**: when `ObjectiveFailed`, returns the
     /// failing objective id; otherwise `None`. Used by replay viewers and
     /// debrief markdown.
     pub fn objective_id(&self) -> Option<&str> {
@@ -54,7 +51,6 @@ impl LossReason {
         }
     }
 
-    /// **M2 re-audit (2026-05-13)**: when `ObjectiveFailed`, returns the
     /// failure reason label; otherwise `None`.
     pub fn objective_reason(&self) -> Option<&str> {
         match self {

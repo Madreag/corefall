@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "accel": {
-      "description": "**M1 Gap F1**: configurable feel cvars. All values must be finite\nand (where applicable) positive; `apply_settings_patch` rejects\ninvalid patches via `validation_error`.",
+      "description": "and (where applicable) positive; `apply_settings_patch` rejects\ninvalid patches via `validation_error`.",
       "type": [
         "number",
         "null"
@@ -12,35 +12,33 @@
       "format": "float"
     },
     "ai_debug": {
-      "description": "**M1.5**: AI debug overlay. `true` raises the floating intent label\nabove every reactive guard; `false` hides it. Defaults to current\nstate when omitted (Option-based settings patch).",
+      "description": "above every reactive guard; `false` hides it. Defaults to current\nstate when omitted (Option-based settings patch).",
       "type": [
         "boolean",
         "null"
       ]
     },
     "ai_difficulty": {
-      "description": "**M1.5 G6**: AI difficulty preset id. Valid values:\n`\"cakewalk\" | \"tough_crowd\" | \"veteran\"`. The engine looks up the\npreset in `cf-ai::DifficultyPreset::builtin(id)` and applies it to\nevery `ReactiveGuard` in the world.",
+      "description": "`\"cakewalk\" | \"tough_crowd\" | \"veteran\"`. The engine looks up the\npreset in `cf-ai::DifficultyPreset::builtin(id)` and applies it to\nevery `ReactiveGuard` in the world.",
       "type": [
         "string",
         "null"
       ]
     },
     "aim_assist": {
-      "description": "**M8**: aim assist mode (`off | steady_aim |\nauto_aim_with_damage_penalty`).",
+      "description": "auto_aim_with_damage_penalty`).",
       "type": [
         "string",
         "null"
       ]
     },
     "camera_motion": {
-      "description": "**M11**: camera-motion granularity (`reduced | standard`).",
       "type": [
         "string",
         "null"
       ]
     },
     "caption_background_opacity": {
-      "description": "**M11**: caption background opacity (0.0..=1.0).",
       "type": [
         "number",
         "null"
@@ -48,7 +46,6 @@
       "format": "float"
     },
     "caption_categories": {
-      "description": "**M11**: caption category subset.",
       "type": [
         "array",
         "null"
@@ -59,7 +56,7 @@
       "uniqueItems": true
     },
     "caption_mode": {
-      "description": "**M11**: captions verbosity mode (snake_case wire form\n`off | critical_only | standard | expanded`).",
+      "description": "`off | critical_only | standard | expanded`).",
       "type": [
         "string",
         "null"
@@ -72,77 +69,70 @@
       ]
     },
     "cinematic_kills": {
-      "description": "**M8**: cinematic kill cam toggle.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "color_cue_mode": {
-      "description": "**M8**: color blind / contrast palette mode (snake_case wire form\n`default | colorblind_safe | protanopia | deuteranopia | tritanopia\n| monochrome_test`).",
+      "description": "`default | colorblind_safe | protanopia | deuteranopia | tritanopia\n| monochrome_test`).",
       "type": [
         "string",
         "null"
       ]
     },
     "comic_death_recap": {
-      "description": "**M12**: comic death-recap toggle. When `true`, the death recap\nrenders as a 4-panel comic-style cause chain; when `false` (default),\nthe M10 replay viewer + cause-chain walker is used.",
+      "description": "renders as a 4-panel comic-style cause chain; when `false` (default),\nthe M10 replay viewer + cause-chain walker is used.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "comic_style_overlay": {
-      "description": "**M12**: comic-style overlay mode (`full | subtle | off`). Defaults to\n`subtle` in `Settings`; the patch lets the player drop to `off` or\nescalate to `full` from the settings UI. Per spec § Comic-style\nframing — opt-in juice, not core identity.",
+      "description": "`subtle` in `Settings`; the patch lets the player drop to `off` or\nescalate to `full` from the settings UI. Per spec § Comic-style\nframing — opt-in juice, not core identity.",
       "type": [
         "string",
         "null"
       ]
     },
     "compass_enabled": {
-      "description": "**M8**: compass enable toggle.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "contrast_mode": {
-      "description": "**M11**: contrast palette mode (snake_case wire form\n`standard | high_contrast_dark | high_contrast_light`).",
+      "description": "`standard | high_contrast_dark | high_contrast_light`).",
       "type": [
         "string",
         "null"
       ]
     },
     "damage_direction_enabled": {
-      "description": "**M8**: damage-direction indicator enable toggle.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "damage_numbers": {
-      "description": "**M8**: damage numbers cosmetic toggle.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "debug_enabled": {
-      "description": "**M8**: master debug-overlay gate (production builds).",
       "type": [
         "boolean",
         "null"
       ]
     },
     "debug_explainer_level": {
-      "description": "**M11**: debug-explainer level (`player | designer | raw`).",
       "type": [
         "string",
         "null"
       ]
     },
     "fog_of_war_on": {
-      "description": "**M8**: fog-of-war on.",
       "type": [
         "boolean",
         "null"
@@ -156,14 +146,13 @@
       "format": "float"
     },
     "friendly_fire_on": {
-      "description": "**M8**: friendly fire on.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "game_speed_assist": {
-      "description": "**M8**: slow-motion accessibility mode (snake_case wire form\n`off | slowdown_75 | slowdown_25 | full_pause`).",
+      "description": "`off | slowdown_75 | slowdown_25 | full_pause`).",
       "type": [
         "string",
         "null"
@@ -177,7 +166,6 @@
       "format": "float"
     },
     "hardcore_mode": {
-      "description": "**M8**: hardcore composite mode.",
       "type": [
         "boolean",
         "null"
@@ -190,14 +178,12 @@
       ]
     },
     "hit_stop_enabled": {
-      "description": "**M8**: hit-stop toggle.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "hold_behavior": {
-      "description": "**M11**: hold-behavior variant (`hold | toggle | press_to_cycle`).",
       "type": [
         "string",
         "null"
@@ -220,7 +206,7 @@
       ]
     },
     "input_profile": {
-      "description": "**M11**: input profile (snake_case wire form\n`keyboard_mouse | controller | keyboard_only | custom`).",
+      "description": "`keyboard_mouse | controller | keyboard_only | custom`).",
       "type": [
         "string",
         "null"
@@ -251,35 +237,31 @@
       ]
     },
     "killcam_enabled": {
-      "description": "**M8**: killcam toggle.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "language": {
-      "description": "**M8**: language code (`en` baseline; Tier-A 11 reserved for\nT-ACC-PLUS BP9+).",
+      "description": "T-ACC-PLUS BP9+).",
       "type": [
         "string",
         "null"
       ]
     },
     "limited_ammo": {
-      "description": "**M8**: limited-ammo modifier.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "mini_map_enabled": {
-      "description": "**M8**: master mini-map enable toggle.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "mini_map_zoom": {
-      "description": "**M8**: mini-map zoom (0.25..=4.0).",
       "type": [
         "number",
         "null"
@@ -287,28 +269,24 @@
       "format": "float"
     },
     "no_minimap": {
-      "description": "**M8**: hide the mini-map (overrides `mini_map_enabled`).",
       "type": [
         "boolean",
         "null"
       ]
     },
     "no_respawn": {
-      "description": "**M8**: no-respawn modifier.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "objective_help": {
-      "description": "**M11**: objective-help verbosity (`minimal | standard | verbose`).",
       "type": [
         "string",
         "null"
       ]
     },
     "permadeath": {
-      "description": "**M8**: permadeath modifier.",
       "type": [
         "boolean",
         "null"
@@ -322,7 +300,7 @@
       "format": "float"
     },
     "reduce_camera_shake_pct": {
-      "description": "**M1 / DR-055**: camera shake reduction. Clamped to `[0, 1]`.\n`1.0` = no shake (accessibility floor).",
+      "description": "`1.0` = no shake (accessibility floor).",
       "type": [
         "number",
         "null"
@@ -348,7 +326,6 @@
       ]
     },
     "remap_groups": {
-      "description": "**M11**: remap-action group subset.",
       "type": [
         "array",
         "null"
@@ -359,7 +336,6 @@
       "uniqueItems": true
     },
     "scope_zoom_fov": {
-      "description": "**M8**: scope ADS FOV in degrees (5..=90).",
       "type": [
         "number",
         "null"
@@ -367,7 +343,6 @@
       "format": "float"
     },
     "screen_shake_scale": {
-      "description": "**M11**: screen-shake scale (0.0..=1.0; multiplicative).",
       "type": [
         "number",
         "null"
@@ -383,14 +358,12 @@
       "minimum": 0
     },
     "speedrun_mode": {
-      "description": "**M8**: speedrun mode toggle.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "text_scale": {
-      "description": "**M8**: text scale (0.5..=4.0; mirrors `ui_scale`).",
       "type": [
         "number",
         "null"
@@ -398,7 +371,7 @@
       "format": "float"
     },
     "tick_rate_hz": {
-      "description": "**M1**: tick-rate observable. Clamped to `>= 1`. The engine does not\nlive-retick on patch; this mirrors the engine's configured tick rate\nso cfctl `observe.settings` is round-trippable.",
+      "description": "live-retick on patch; this mirrors the engine's configured tick rate\nso cfctl `observe.settings` is round-trippable.",
       "type": [
         "integer",
         "null"
@@ -407,14 +380,12 @@
       "minimum": 0
     },
     "time_limit": {
-      "description": "**M8**: time-limit modifier.",
       "type": [
         "boolean",
         "null"
       ]
     },
     "ui_density": {
-      "description": "**M8**: HUD density preset (`compact | normal | spacious`).",
       "type": [
         "string",
         "null"

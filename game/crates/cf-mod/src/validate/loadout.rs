@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use crate::report::ValidationReport;
 
-/// **M13**: validate one `content/equipment/loadouts/*.json` file.
 /// Verifies the schema_version, id↔filename parity, non-empty `role_ids`,
 /// and that every referenced role id resolves through `cf_equipment::role_record`.
 pub(crate) fn validate_loadout_file(path: &Path, report: &mut ValidationReport) {

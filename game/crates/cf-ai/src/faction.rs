@@ -7,7 +7,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7-A**: faction identity.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -43,7 +42,6 @@ impl FactionId {
     }
 }
 
-/// **M7-A**: 3×3 relationship matrix. Symmetric per spec — pair `(a, b)`
 /// uses `a.ordinal() * 3 + b.ordinal()` for stable layout. Default
 /// initialisation: self = +100; Player↔AiAllied = +75; Player↔AiEnemy =
 /// −75; AiAllied↔AiEnemy = −50.
@@ -103,7 +101,6 @@ impl Default for FactionRelationships {
     }
 }
 
-/// **M7-A**: `faction.relationship_changed` event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RelationshipChangedEvent {
     pub a: FactionId,

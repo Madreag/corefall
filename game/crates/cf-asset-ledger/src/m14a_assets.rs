@@ -13,7 +13,6 @@ pub struct M14aAssetEntry {
     pub category: &'static str,
 }
 
-/// **M14A** § "Tier 1 SVG + PNG assets (~30 files)" — canonical list with
 /// SVG path + PNG path per spec table. Categories: ui, decal, sprite.
 pub const M14A_ASSET_CATALOG: &[M14aAssetEntry] = &[
     // UI bar / radial

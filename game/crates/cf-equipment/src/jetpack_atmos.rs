@@ -6,13 +6,11 @@
 
 use crate::jetpack::jet_pressure_efficiency;
 
-/// **M14A** § "Atmospheric efficiency" — multiplier on jet thrust by ambient
 /// pressure. Linear between three anchors: vacuum ×1.5, Earth ×1.0, Venus ×0.5.
 pub fn pressure_modulated_thrust(base_thrust_n: f32, ambient_pressure_kpa: f32) -> f32 {
     base_thrust_n * jet_pressure_efficiency(ambient_pressure_kpa)
 }
 
-/// **M14A** § "Combustion atmosphere gating" — true when the local
 /// atmosphere supports muzzle-flash ignition per Stationeers.
 pub fn muzzle_flash_combusts(
     volatiles_partial_kpa: f32,

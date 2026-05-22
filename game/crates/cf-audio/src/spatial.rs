@@ -39,27 +39,18 @@ use crate::medium::{Medium, MediumFilter, SPEED_OF_SOUND_AIR_M_PER_S};
 use crate::occlusion::{resolve_occlusion, OcclusionEnvelope, WallAcoustics};
 use crate::reverb::ReverbProfile;
 
-/// **M12B** § HRTF table dimensions (locked per spec § HRTF table format).
 pub const HRTF_AZIMUTH_BUCKETS: usize = 32;
-/// **M12B** § HRTF elevation buckets (M12B only consumes the horizontal
 /// row; the 8 elevation rows reserve capacity for M14 verticality).
 pub const HRTF_ELEVATION_BUCKETS: usize = 8;
-/// **M12B** § HRTF ears per bucket (stereo, left + right).
 pub const HRTF_EARS: usize = 2;
-/// **M12B** § HRIR sample length (per ear, per az/el bucket).
 pub const HRTF_SAMPLES: usize = 128;
-/// **M12B** § Total f32 samples in the HRTF binary.
 pub const HRTF_TOTAL_F32: usize = HRTF_AZIMUTH_BUCKETS * HRTF_ELEVATION_BUCKETS * HRTF_EARS * HRTF_SAMPLES;
-/// **M12B** § Total bytes on disk (f32 = 4 bytes).
 pub const HRTF_TOTAL_BYTES: usize = HRTF_TOTAL_F32 * 4;
-/// **M12B** § "Here" range — sources closer than this collapse to the
 /// "here" direction string per spec § Direction-string section.
 pub const SPATIAL_HERE_RADIUS_M: f32 = 1.5;
-/// **M12B** § "Ahead/behind" half-cone width — `|azimuth_rad| < π/12` is
 /// "ahead"; `|azimuth_rad - π| < π/12` is "behind you".
 pub const AHEAD_BEHIND_CONE_RAD: f32 = std::f32::consts::FRAC_PI_2 / 6.0; // π/12
 
-/// **M12B** § HRIR table — the loaded f32 samples + a deterministic
 /// index resolver. Cf-app loads this once via [`HrirTable::placeholder`]
 /// (or, in production, [`HrirTable::from_bytes`]) and shares it as
 /// `Arc<HrirTable>`.
@@ -75,7 +66,6 @@ pub struct HrirTable {
 }
 
 impl HrirTable {
-    /// **M12B** § Construct a placeholder HRIR table — every bucket
     /// contains a single-tap impulse (sample 0 = 1.0, rest = 0.0).
     /// Replays use this when the production `mit_kemar_subset.bin` isn't
     /// on disk; behavior stays deterministic (the cf-app HRIR
@@ -98,7 +88,6 @@ impl HrirTable {
         }
     }
 
-    /// **M12B** § Parse from the canonical disk layout. Returns an error
     /// if the byte buffer doesn't match [`HRTF_TOTAL_BYTES`] exactly.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, HrirParseError> {
         if bytes.len() != HRTF_TOTAL_BYTES {
@@ -121,13 +110,11 @@ impl HrirTable {
         })
     }
 
-    /// **M12B** § Diagnostic label.
     #[must_use]
     pub fn label(&self) -> &'static str {
         self.label
     }
 
-    /// **M12B** § `O(1)` lookup into the HRIR table — `(az_bucket,
     /// el_bucket, ear) → f32 slice of [`HRTF_SAMPLES`] taps`. Used by
     /// the cf-app HRIR convolution adapter.
     #[must_use]
@@ -140,7 +127,6 @@ impl HrirTable {
     }
 }
 
-/// **M12B** § HRIR table parse failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HrirParseError {
     /// Byte length doesn't match the canonical layout.
@@ -176,7 +162,6 @@ impl std::fmt::Display for HrirParseError {
 
 impl std::error::Error for HrirParseError {}
 
-/// **M12B** § HRIR index — `(azimuth_bucket, elevation_bucket)` into the
 /// 32×8 grid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct HrirIndex {
@@ -187,7 +172,6 @@ pub struct HrirIndex {
 }
 
 impl HrirIndex {
-    /// **M12B** § Bucket lookup. Wraps azimuth into `[0, 2π)`. Elevation
     /// is clamped to 0 (M12B reserves the elevation rows; only the
     /// horizontal row is consumed).
     #[must_use]
@@ -207,7 +191,6 @@ impl HrirIndex {
     }
 }
 
-/// **M12B** § Direction string (caption-friendly).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum DirectionString {
     /// Source within [`SPATIAL_HERE_RADIUS_M`] of listener.
@@ -235,7 +218,6 @@ pub enum DirectionString {
 }
 
 impl DirectionString {
-    /// **M12B** § Player-facing label (matches captions exactly).
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
@@ -254,7 +236,6 @@ impl DirectionString {
     }
 }
 
-/// **M12B** § Resolve the caption-friendly direction string per spec §
 /// Direction-string for captions:
 ///
 /// > - `|azimuth_rad| < π/12` → `"ahead"`
@@ -312,7 +293,6 @@ pub fn direction_string(azimuth_rad: f32, distance_m: f32) -> DirectionString {
     }
 }
 
-/// **M12B** § Per-listener context required for spatial resolution.
 #[derive(Debug, Clone, Copy)]
 pub struct ListenerContext {
     /// Listener world position.
@@ -325,7 +305,6 @@ pub struct ListenerContext {
     pub room_id: Option<u64>,
 }
 
-/// **M12B** § Per-source context required for spatial resolution.
 #[derive(Debug, Clone, Copy)]
 pub struct SourceContext {
     /// Source world position.
@@ -341,7 +320,6 @@ pub struct SourceContext {
     pub room_id: Option<u64>,
 }
 
-/// **M12B** § Resolved spatial envelope. Mirror of the spec block.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SpatialEnvelope {
     /// Listener-relative azimuth in radians.
@@ -367,11 +345,9 @@ pub struct SpatialEnvelope {
     pub direction: DirectionString,
 }
 
-/// **M12B** § Resolve a [`SpatialEnvelope`] for a `(source, listener)`
 /// pair given the room reverb profile + the per-wall acoustic list.
 ///
 /// All inputs are deterministic; identical inputs → identical envelope
-/// (per spec § Determinism scenario).
 ///
 /// `walls_between_source_and_listener` carries the [`WallAcoustics`]
 /// list for every wall traversed by the ray (deduplicated). When the

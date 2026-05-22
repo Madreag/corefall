@@ -41,7 +41,6 @@ impl M0Engine {
         parent: Option<String>,
     ) {
         let zone = outcome.zone.map(|z| z.as_str().to_string()).unwrap_or_default();
-        // **M13** § "Hit reactions per body part" — emit the per-zone reaction
         // event when a zone takes damage AND apply the reaction window on the
         // actor.
         if let Some(zone_kind) = outcome.zone {
@@ -74,7 +73,6 @@ impl M0Engine {
                 parent.clone(),
             );
         }
-        // **M13** § "Limb loss functional consequences" — emit per-zone
         // severance event when the zone is destroyed.
         if outcome.zone_destroyed {
             if let Some(zone_kind) = outcome.zone {
@@ -196,7 +194,6 @@ impl M0Engine {
                 }),
                 parent.clone(),
             );
-            // **M13** § "Critical chassis modules with full mechanics" — when
             // a module transition crosses into Warning / Failed AND the
             // module has a failure_cascade, drive the corresponding cascade
             // events (`module.ammo_rack_cooking` / `_detonated`,
@@ -290,7 +287,6 @@ impl M0Engine {
                         );
                     }
                     cf_chassis::FailureCascade::EngineFire => {
-                        // **M14 audit pass 3 (Finding 5)**: drive the
                         // engine oil/coolant state mutations via the
                         // chassis-side critical helper. Previously the
                         // engine emitted `engine_oil_leak` / `engine_fire`
@@ -326,7 +322,6 @@ impl M0Engine {
                         );
                     }
                     cf_chassis::FailureCascade::ReactorOverpressure => {
-                        // **M14 audit pass 3 (Finding 5)**: drive the
                         // reactor pressure_state advancement via the
                         // critical helper. The previous code emitted
                         // `reactor_pressure_advanced` without mutating
@@ -356,7 +351,6 @@ impl M0Engine {
                         );
                     }
                     cf_chassis::FailureCascade::SightImpairment => {
-                        // **M14 audit pass 3 (Finding 5)**.
                         let _ = if let Ok(mut st) = self.state.write() {
                             st.actor_state.as_mut().and_then(|sim| {
                                 sim.world.actors.get_mut(&actor).and_then(|a| {
@@ -382,7 +376,6 @@ impl M0Engine {
                         );
                     }
                     cf_chassis::FailureCascade::MobilityLoss => {
-                        // **M14 audit pass 3 (Finding 5)**.
                         let _ = if let Ok(mut st) = self.state.write() {
                             st.actor_state.as_mut().and_then(|sim| {
                                 sim.world.actors.get_mut(&actor).and_then(|a| {
@@ -408,7 +401,6 @@ impl M0Engine {
                         );
                     }
                     cf_chassis::FailureCascade::PilotDirectDamage => {
-                        // **M14 audit pass 3 (Finding 5)**: critical
                         // helper promotes pilot_state to Injured per
                         // CCCP cockpit penetration rules. Previously the
                         // engine emitted `pilot_direct_hit` without
@@ -474,20 +466,17 @@ impl M0Engine {
         }
     }
 
-    /// **M5**: tick the chassis eject sequence on every actor. Emits
     /// `chassis.pilot_ejected` / `chassis.pilot_bailed_too_late` /
     /// `chassis.pilot_lost` based on the tick result, plus the matching
     /// stage transition.
     pub(crate) fn tick_chassis_eject_for_all(&self, tick: Tick, sim_time_ms: f64) {
         let mut emits: Vec<(ActorId, &'static str, String)> = Vec::new();
-        // **M13** § "Chassis ability slots" / "Boarding transitions" /
         // "Drone allies — fuel" / "Hit reactions per body part" — per-tick
         // updates collected here so we emit events in deterministic order.
         let mut ability_events: Vec<(ActorId, &'static str, cf_chassis::ChassisAbility)> = Vec::new();
         let mut transition_events: Vec<(ActorId, cf_chassis::TransitionCompleted)> = Vec::new();
         let mut drone_fuel_low: Vec<ActorId> = Vec::new();
         let mut hit_reaction_ended: Vec<ActorId> = Vec::new();
-        // **M13** § "Pilot eject is a real actor split: the pilot becomes a
         // new ActorId with its own ActorState (no chassis attached). The
         // chassis becomes a wreck (interactable for salvage)." Collect the
         // actor IDs whose pilot ejected this tick so we can perform the
@@ -500,21 +489,18 @@ impl M0Engine {
                     let Some(actor) = sim.world.actors.get_mut(&id) else {
                         continue;
                     };
-                    // **M13** drone fuel drain (only when chassis = Drone).
                     let drone_tick_rate = actor.chassis.as_ref().map(|c| c.tick_rate_hz).unwrap_or(60);
                     if let Some(drone) = actor.drone_ally.as_mut() {
                         if drone.tick_fuel(drone_tick_rate) {
                             drone_fuel_low.push(id);
                         }
                     }
-                    // **M13** hit-reaction timer.
                     if actor.tick_hit_reaction() {
                         hit_reaction_ended.push(id);
                     }
                     let Some(chassis) = actor.chassis.as_mut() else {
                         continue;
                     };
-                    // **M13** ability cooldowns + transitions.
                     let ability_outcome = chassis.tick_abilities();
                     for ab in ability_outcome.effects_ended {
                         ability_events.push((id, "effect_ended", ab));
@@ -541,7 +527,6 @@ impl M0Engine {
                 }
             }
         }
-        // **M13** § "Pilot eject is a real actor split" — perform the split
         // for each ejected pilot. The original ActorId stays at its position
         // as the chassis wreck (not controllable, stage=Wreck). A new ActorId
         // spawns as foot infantry (controllable, no chassis). The player
@@ -612,7 +597,6 @@ impl M0Engine {
                 None,
             );
         }
-        // **M13** § "Pilot eject is a real actor split" — emit
         // `chassis.actor_split` so consumers can chain wreck ↔ pilot ids.
         for (wreck_actor, pilot_actor) in split_events {
             self.recorder.record(
@@ -637,7 +621,6 @@ impl M0Engine {
                 None,
             );
         }
-        // **M14 audit pass 4 (Finding 1)**: drive the PLAYER-side boarding
         // timer + perform the pilot-into-chassis transfer when it expires.
         // This must run BEFORE the transition_events loop so we can drop
         // the target-side `Boarded` echo (the chassis-side `begin_boarding`
@@ -688,7 +671,6 @@ impl M0Engine {
                     .and_then(|sim| sim.world.actors.get(&target_id))
                     .map(|t| t.chassis.is_some() && t.status != cf_actor::Status::Dead)
                     .unwrap_or(false);
-                // **M14 audit pass 4 (Finding 1)**: cancel the transfer if
                 // either side became invalid during the 1500ms transition
                 // (player died, target chassis destroyed, etc.). Without
                 // this guard a dead player could be merged into a missing
@@ -727,7 +709,6 @@ impl M0Engine {
             self.recorder
                 .record(tick, sim_time_ms, "actor", event_type, json!({"actor": id.0}), None);
         }
-        // **M14 audit pass 4 (Finding 1)**: canonical actor.boarded — pair
         // matches the actor.boarding event so consumers can chain via
         // payload.actor.
         for (player_u64, target_u64) in boarded_emit {
@@ -740,7 +721,6 @@ impl M0Engine {
                 None,
             );
         }
-        // **M14 audit pass 4 (Finding 1)**: boarding aborted (player died
         // or target was destroyed during the transition).
         for (player_u64, target_u64, reason) in boarding_aborted {
             self.recorder.record(

@@ -24,7 +24,6 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// **M7-B**: taxonomy of chatter categories. Locked at M7 (additive-only
 /// in future milestones). The cooldown table indexes per `(actor_id,
 /// category)` so an actor can emit different categories in rapid
 /// succession (e.g. "Contact!" followed by "Engaging!") but not duplicate
@@ -130,7 +129,6 @@ impl ChatterCategory {
     }
 }
 
-/// **M7-B**: deterministic placeholder phoneme. The `tts_stub` lowers each
 /// ASCII character of a chatter text to one of these; M37's real TTS swap
 /// replaces this with phonetic IPA codes + duration metadata. The wire
 /// form (phoneme list) stays stable so the recorder envelope doesn't
@@ -149,7 +147,6 @@ pub struct Phoneme {
 /// Constant duration (ms) per placeholder phoneme. M37 overrides per-symbol.
 pub const PLACEHOLDER_PHONEME_MS: u16 = 80;
 
-/// **M7-B**: placeholder TTS — lowers `text` into a deterministic phoneme
 /// list. Each ASCII character becomes one `Phoneme` (lowercase symbol +
 /// constant duration). Non-ASCII characters lower to `'?'` so the
 /// recorder envelope stays byte-stable across locales. M37 swaps in real
@@ -167,7 +164,6 @@ pub fn tts_stub(text: &str) -> Vec<Phoneme> {
         .collect()
 }
 
-/// **M7-B**: per-actor per-category cooldown table. `try_emit` returns
 /// `Some(EmissionInfo)` when the chatter slot is open AND records the
 /// emission tick; `None` when the cooldown is still active.
 ///
@@ -250,7 +246,6 @@ impl ChatterCooldownTable {
     }
 }
 
-/// **M7-B**: `ai.chatter_emitted` event payload. Carries the structured
 /// chatter info the engine surfaces via cf-replay AND the M11 HUD caption
 /// ticker.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -284,7 +279,6 @@ impl ChatterEmittedEvent {
     }
 }
 
-/// **M7-B**: caption marker the engine mirrors into `HudState.captions` so
 /// deaf-or-headphones-off players see the same chatter as a text ticker.
 /// Spec § ACC-A captions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -297,7 +291,6 @@ pub struct ChatterCaption {
     pub category: ChatterCategory,
 }
 
-/// **M7-B**: convenience — convert a per-actor archetype hint into a
 /// stable `voice_id`. M37 replaces this with a per-voice-clip lookup
 /// table; M7's placeholder keeps a deterministic id per archetype so the
 /// recorder envelope is byte-stable.

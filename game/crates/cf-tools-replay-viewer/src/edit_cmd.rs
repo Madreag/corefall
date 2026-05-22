@@ -376,7 +376,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-035: bundle path is required.
     #[test]
     fn edit_cmd_missing_bundle_errors() {
         let args = EditArgs::default();
@@ -384,7 +383,6 @@ mod tests {
         assert!(matches!(err, EditError::MissingBundle));
     }
 
-    /// VAL-M10B-035: nonexistent bundle path → typed error.
     #[test]
     fn edit_cmd_bundle_not_found_errors() {
         let args = EditArgs {

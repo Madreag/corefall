@@ -48,7 +48,6 @@ fn default_projectile_sharpness() -> f32 {
     0.8
 }
 
-/// **M1 R2 / Gap G1**: a dropped inventory item subject to gravity + ground
 /// collision until it settles. Spawned on `actor.inventory_dropped` from the
 /// DYING entry path; settles when its velocity magnitude is below the
 /// settle threshold AND it has been on the ground for `settle_dwell_ticks`
@@ -76,7 +75,6 @@ pub struct ActorSimState {
     pub rifles: RifleStates,
     pub projectiles: Vec<Projectile>,
     next_projectile_id: u64,
-    /// **M1 R2 / Gap G1**: loose items spawned by `actor.inventory_dropped`.
     /// The sim applies gravity + ground collision each tick until they settle.
     #[serde(default)]
     pub loose_items: Vec<LooseItem>,
@@ -98,7 +96,6 @@ impl ActorSimState {
         }
     }
 
-    /// **M1 R2 / Gap G1**: spawn a `LooseItem` from an
     /// `actor.inventory_dropped` outcome. Returns the new item's id.
     pub fn spawn_loose_item(
         &mut self,
@@ -170,7 +167,6 @@ impl ActorSimState {
             out.extend_from_slice(&quantize_f32(p.velocity.y).to_le_bytes());
             out.extend_from_slice(&p.remaining_ticks.to_le_bytes());
         }
-        // **M1 R2 / Gap G1**: loose items appended AFTER the projectile
         // section so runs that produced zero loose items remain byte-stable
         // (the length prefix is 0 → no per-item bytes follow).
         out.extend_from_slice(&(self.loose_items.len() as u64).to_le_bytes());

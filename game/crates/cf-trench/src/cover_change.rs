@@ -128,7 +128,6 @@ mod tests {
         .is_none());
     }
 
-    /// VAL-M9B-COVER-002: segment boundary cross fires the event with
     /// `cause="segment_boundary"`.
     #[test]
     fn cover_state_change_event_on_boundary_cross() {
@@ -147,7 +146,6 @@ mod tests {
         assert_eq!(ev.new_segment_variant, Some(SegmentVariant::Deep));
     }
 
-    /// VAL-M9B-COVER-002: stance change inside the same segment fires
     /// the event with `cause="stance_change"`.
     #[test]
     fn cover_state_change_event_on_stance_change() {

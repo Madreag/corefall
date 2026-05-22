@@ -402,7 +402,6 @@ mod tests {
         assert_eq!(decision, ObserverDoctrineDecision::Idle);
     }
 
-    /// VAL-M9C-022: LOS lost for > 3s with prior mark → ExpireMark.
     #[test]
     fn observer_doctrine_expires_on_los_loss_over_3s() {
         let tick_rate_hz = 60u32;

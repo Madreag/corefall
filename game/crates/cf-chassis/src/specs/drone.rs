@@ -5,7 +5,6 @@ use crate::{
 
 use super::common::make_zone;
 
-/// **M13** § "Drone" body graph: 4 zones (chassis core + 2 arms + sensor pod).
 pub(crate) fn drone_body_graph() -> BodyGraph {
     let zones = vec![
         BodyZone::DroneCore,
@@ -88,7 +87,6 @@ pub(crate) fn drone_body_graph() -> BodyGraph {
     }
 }
 
-/// **M13** § "Drone" chassis spec. 4-zone autonomous miniature chassis; no pilot.
 pub fn drone_spec() -> ChassisSpec {
     let zones = vec![
         make_zone(BodyZone::DroneCore, 40.0, 4.0, 24.0, 2.0, 30.0, 16.0),

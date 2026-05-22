@@ -16,7 +16,6 @@ use crate::components::{
     RecorderComponent,
 };
 
-/// **M8A**: Bevy World wrapper marker. M9+ wraps a real `bevy_ecs::World`
 /// once the component types in `components.rs` carry actual state. At
 /// M8A this is a zero-cost wrapper that proves the cfctl JSON-RPC wire
 /// shape can route through ECS query patterns without breaking M1-M8

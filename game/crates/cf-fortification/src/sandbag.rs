@@ -477,7 +477,6 @@ mod tests {
         SandbagWall::new_full(FortificationId(1), SandbagTier::High, 50)
     }
 
-    /// VAL-M9C-017: erosion drains the top row first; bottom rows stay
     /// intact while the top row still has pixels.
     #[test]
     fn sandbag_erodes_top_row_first() {
@@ -509,7 +508,6 @@ mod tests {
         assert_eq!(r1_after, width - 2, "row 1 erodes only after row 0 is dry");
     }
 
-    /// VAL-M9C-016: HP < 400 fires high→mid; HP < 200 fires mid→low;
     /// HP 0 destroys the wall.
     #[test]
     fn sandbag_tier_transitions() {
@@ -580,7 +578,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9C-REPAIR-FORTIFICATION-BEHAVIOR: the spec's 50 HP / sandbag
     /// ratio computes the right `(sandbags, hp_after)` for the common
     /// repair scenarios.
     #[test]
@@ -613,9 +610,7 @@ mod tests {
         );
     }
 
-    /// VAL-M9C-REPAIR-FORTIFICATION-BEHAVIOR: repair restores HP +
     /// updates tier; partial repair scales to available sandbags.
-    /// Per the spec, repair brings HP toward the wall's CURRENT tier
     /// max — `tier` reflects the wall's structural state (eroded
     /// walls degrade tier; repair stabilises at the current tier's
     /// cap). Rebuilding to a higher tier is a separate action.

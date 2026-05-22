@@ -172,7 +172,6 @@ impl PhaseRegistry {
         }
     }
 
-    /// **M15B** § Load a `PhaseRegistry` from a JSON file. Modders +
     /// tuners edit `content/materials/phase_registry.json` (or a
     /// custom path) to add new phase transitions, tweak thresholds,
     /// or override latent-heat budgets without touching engine source.
@@ -199,7 +198,6 @@ impl PhaseRegistry {
         Ok(registry)
     }
 
-    /// **M15B** § Resolve the canonical phase registry path.
     #[must_use]
     pub fn locate_default() -> Option<std::path::PathBuf> {
         for candidate in [
@@ -214,7 +212,6 @@ impl PhaseRegistry {
         None
     }
 
-    /// **M15B** § Load the canonical registry from the default JSON
     /// path, or fall back to the hardcoded `default_phase_registry`
     /// when the file isn't present.
     ///
@@ -279,7 +276,6 @@ impl PhaseRegistry {
     }
 }
 
-/// **M15B** § Errors from [`PhaseRegistry::load_from_file`].
 #[derive(Debug, thiserror::Error)]
 pub enum PhaseRegistryLoadError {
     #[error("failed to read phase registry at {}: {source}", path.display())]
@@ -303,7 +299,6 @@ pub enum PhaseRegistryLoadError {
     },
 }
 
-/// **M15** § the canonical launch phase-transition registry. Material
 /// ids match `content/materials/material_registry.json`:
 /// - 13=water, 15=ice, 50=steam, 23=blood, 72=frozen_blood,
 /// - 26=lava, 70=obsidian, 34=ore_iron, 68=iron,
@@ -423,7 +418,6 @@ pub fn default_phase_registry() -> PhaseRegistry {
             latent_heat_j_per_kg: 334_000.0,
             reversible: false,
         },
-        // **M15B** § Steam (50) → cloud (71) when temperature drops below
         // 353.15 K (80°C). Per spec § "steam particles reach altitude >
         // 80 px with ambient temp < 80°C Then material_phase_nucleated
         // event fires with from='steam' to='cloud'". Note: the altitude
@@ -440,7 +434,6 @@ pub fn default_phase_registry() -> PhaseRegistry {
             latent_heat_j_per_kg: -200_000.0,
             reversible: true,
         },
-        // **M15B** § Cloud (71) → rain (87) at 273.15K (precipitation
         // forms when the cloud is cool enough for droplets). Saturation
         // gating + tick-gate enforcement happens in
         // `crate::precipitation::update_cloud_cell`; this entry serves
@@ -457,7 +450,6 @@ pub fn default_phase_registry() -> PhaseRegistry {
             latent_heat_j_per_kg: -334_000.0,
             reversible: false,
         },
-        // **M15B** § Rain (87) → water (13) on landing — the spec says
         // "puddles accumulate in low ground via cf-terrain liquid_flow",
         // so rain reverts to water once it pools. The transition fires
         // when the local temperature crosses below 273.15K (freeze) OR
@@ -558,7 +550,6 @@ pub fn default_phase_registry() -> PhaseRegistry {
     PhaseRegistry::new(raw.to_vec())
 }
 
-/// **M15** § event emitted on a phase transition. Per spec literal:
 /// > Events: `material.phase_transition { material, from_state, to_state,
 /// > pos, temperature }`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerQuickActionToggleParams",
-  "description": "**M14A**: `act.player.quick_action_toggle` — invoke the last-used slot (tap-Q).",
   "type": "object",
   "properties": {
     "schema_version": {

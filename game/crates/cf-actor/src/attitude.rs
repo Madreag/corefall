@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::move_state::{MoveState, ProneState};
 
-/// **M14A** § "Constants — the CC magic numbers".
 pub const STAND_ROT_TARGET: f32 = 0.0;
 pub const WALK_ROT_TARGET: f32 = 0.15;
 pub const CROUCH_ROT_TARGET: f32 = 0.30;
@@ -102,7 +101,6 @@ pub struct AttitudeState {
     pub prone_timer_ms: u32,
 }
 
-/// **M14A** § "Per-leg WalkAngle slope adapter" — per-leg slope tracking.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct WalkAngleState {
     /// Foreground leg slope in radians (-PI/2..+PI/2).
@@ -163,7 +161,6 @@ fn lerp(x1: f32, x2: f32, y1: f32, y2: f32, x: f32) -> f32 {
     y1 + (y2 - y1) * t
 }
 
-/// **M14A** § "STABLE update" — CCCP `AHuman.cpp:2688-2696`.
 pub fn attitude_spring_tick_stable(state: &mut AttitudeState, ctx: &SpringContext) {
     let target = ctx.rot_angle_targets.get(ctx.move_state) * ctx.facing_factor();
     let aim_dampen = if ctx.aim_angle > 0.0 {
@@ -195,7 +192,6 @@ pub fn attitude_spring_tick_stable(state: &mut AttitudeState, ctx: &SpringContex
     state.rot += state.angular_vel * (1.0 / 60.0);
 }
 
-/// **M14A** § "UNSTABLE update" — CCCP `AHuman.cpp:2703-2716`.
 pub fn attitude_spring_tick_unstable(state: &mut AttitudeState, ctx: &SpringContext) {
     let half_pi = std::f32::consts::FRAC_PI_2;
     let rot_target = if ctx.velocity_x.abs() > 1.0 {
@@ -217,7 +213,6 @@ pub fn attitude_spring_tick_unstable(state: &mut AttitudeState, ctx: &SpringCont
     state.rot += state.angular_vel * (1.0 / 60.0);
 }
 
-/// **M14A** § "DYING update" — CCCP `AHuman.cpp:2718-2725`.
 ///
 /// Returns `true` when the dying dwell exceeds 125 ms — caller should
 /// transition status to DEAD.
@@ -243,7 +238,6 @@ pub fn attitude_spring_tick_dying(state: &mut AttitudeState, ctx: &SpringContext
     }
 }
 
-/// **M14A** § "Prone state machine" — drive transitions + spring per state.
 ///
 /// Returns the (possibly new) prone state after this tick.
 pub fn tick_prone_state_machine(
@@ -292,7 +286,6 @@ pub fn tick_prone_state_machine(
     }
 }
 
-/// **M14A** § "Per-leg WalkAngle slope adapter" — clamped slope smoothing.
 ///
 /// Per-leg WalkAngle lerps to sampled slope (provided by caller from
 /// cf-terrain `cast_strength_ray`) clamped to ±40°.
@@ -306,7 +299,6 @@ pub fn tick_walk_angle(state: &mut WalkAngleState, sampled_fg: f32, sampled_bg: 
     state.bg += (bg_target - state.bg) * (smoothing * dt_secs).min(1.0);
 }
 
-/// **M14A** § "Off-center hit transfers linear → angular momentum" —
 /// `angular_vel += (offset × impulse_perpendicular) / MOI`.
 ///
 /// Returns the change in angular velocity.
@@ -321,7 +313,6 @@ pub fn angular_impulse_from_offcenter_hit(
     cross / moi
 }
 
-/// **M14A** § "Stagger resistance (knockdown immunity for heavy)".
 pub fn evaluate_knockdown(incoming_impulse_magnitude: f32, actor_mass_kg: f32) -> KnockdownOutcome {
     let stagger_threshold = actor_mass_kg.max(0.001) * 5.0;
     if incoming_impulse_magnitude > stagger_threshold {

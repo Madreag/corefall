@@ -8,7 +8,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// **M8A**: canonical snapshot envelope. M8A ships the determinism
 /// anchors (tick + rng_state + engine_build + content_hashes); chunks /
 /// actors / projectiles / mission stay as opaque payloads at M8A
 /// (M9+ wires the typed inner snapshots).
@@ -53,7 +52,6 @@ impl Snapshot {
         }
     }
 
-    /// **M8A**: blake3 of the snapshot's determinism-critical byte
     /// stream. Used by the cross-OS gate to detect divergence.
     pub fn determinism_checksum(&self) -> [u8; 32] {
         let mut hasher = blake3::Hasher::new();
@@ -77,7 +75,6 @@ impl Snapshot {
     }
 }
 
-/// **M8A § Snapshot delta encoding**: every snapshot can be expressed
 /// as a delta against a base snapshot.
 ///
 /// `Forward(old) → new` for applying server updates;

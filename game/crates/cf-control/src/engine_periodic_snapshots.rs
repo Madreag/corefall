@@ -99,7 +99,6 @@ impl M0Engine {
         }
     }
 
-    /// **M9** (audit fix gap 5): per-reactor periodic snapshot. Mirrors
     /// the scene-start payload built in `emit_initial_snapshots` so M10
     /// timeline + M11 reactor-strip widgets keep seeing the M9-enriched
     /// fields (pressure_state, armor_layers, heat_signature_k,
@@ -155,7 +154,6 @@ impl M0Engine {
         }
     }
 
-    /// **M4 § Snapshot cadence**: terrain summary fired every ~1 second.
     /// Same payload as the scene-start version.
     pub(crate) fn emit_periodic_snapshot_terrain_summary(&self, tick: Tick, sim_time_ms: f64, parent_event_id: Option<String>) {
         let chunked_terrain = self

@@ -257,7 +257,6 @@ impl MaterialGpuKernel {
     /// ## Execution path
     ///
     /// 1. The CPU truth path always runs (canonical sim state). Per
-    ///    DR-052: "CPU deterministic truth remains the acceptance
     ///    source".
     /// 2. When the GPU backend is active AND the `gpu` feature is
     ///    compiled in, the kernel also dispatches the GPU compute
@@ -291,7 +290,6 @@ impl MaterialGpuKernel {
         report
     }
 
-    /// **M15B** § Optional GPU verification dispatch. When the GPU
     /// backend is active (`feature = "gpu"` + a wgpu adapter is up),
     /// this packs the per-tick inputs into a [`GpuStepInputs`] and
     /// dispatches the GPU compute pipeline. The output bytes are
@@ -352,7 +350,6 @@ impl Default for MaterialGpuKernel {
 /// - The CA pixels-moved counter (a per-tick scalar that captures any
 ///   movement divergence).
 ///
-/// Per spec § acceptance scenario 1: "per-tick blake3 sim_checksum is
 /// byte-identical".
 #[must_use]
 pub fn compute_kernel_checksum(terrain: &ChunkedTerrain, report: &KernelStepReport) -> [u8; 32] {
@@ -420,7 +417,6 @@ mod tests {
     use cf_terrain::chunked::{ChunkedTerrain, MATERIAL_AIR};
     use cf_terrain::heat::HeatField;
 
-    /// VAL-M15B-001: a freshly-constructed kernel reports its selected
     /// backend. Without the `gpu` feature the CPU fallback is mandatory;
     /// with the `gpu` feature the kernel attempts wgpu init.
     #[test]
@@ -444,7 +440,6 @@ mod tests {
         }
     }
 
-    /// VAL-M15B-002: a force-CPU kernel runs deterministically over a
     /// known scenario.
     #[test]
     fn cpu_only_kernel_is_deterministic_across_runs() {
@@ -467,7 +462,6 @@ mod tests {
         assert_eq!(a, b, "CPU fallback must be deterministic across runs");
     }
 
-    /// VAL-M15B-003: checksum trace is bounded by `trace_cap`.
     #[test]
     fn trace_cap_bounds_growth() {
         let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
@@ -483,14 +477,12 @@ mod tests {
         assert_eq!(k.checksum_trace.len(), 4, "trace_cap must bound trace");
     }
 
-    /// VAL-M15B-004: hex encoding is stable.
     #[test]
     fn hex_encode_is_lowercase_hex() {
         let s = hex_encode(&[0xab, 0xcd, 0xef, 0x12]);
         assert_eq!(s, "abcdef12");
     }
 
-    /// VAL-M15B-005: compute_kernel_checksum reacts to terrain change.
     #[test]
     fn kernel_checksum_changes_when_terrain_changes() {
         let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
@@ -508,7 +500,6 @@ mod tests {
         assert_ne!(a.bytes, b.bytes, "checksum must move when terrain mutates");
     }
 
-    /// VAL-M15B-006: drain returns the trace and empties storage.
     #[test]
     fn drain_resets_trace() {
         let mut terrain = ChunkedTerrain::new(8, 8, MATERIAL_AIR);
@@ -525,7 +516,6 @@ mod tests {
         assert!(k.checksum_trace.is_empty());
     }
 
-    /// VAL-M15B-007: KernelChecksum serializes via serde for the
     /// determinism telemetry surface.
     #[test]
     fn kernel_checksum_round_trips() {
@@ -539,7 +529,6 @@ mod tests {
         assert_eq!(back, s);
     }
 
-    /// VAL-M15B-008: backend names are stable ("gpu" / "cpu_fallback").
     #[test]
     fn backend_str_names_are_stable() {
         assert_eq!(KernelBackend::Gpu.as_str(), "gpu");

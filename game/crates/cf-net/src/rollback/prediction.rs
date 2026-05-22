@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PredictionMode {
-    /// **M8B locked**: repeat the last known input verbatim until the
     /// authoritative server input arrives.
     #[default]
     LastInputRepeat,
@@ -26,7 +25,6 @@ pub enum PredictionMode {
     ExtrapolatedAim,
 }
 
-/// **M8B § locked**: predictor for unknown future ticks. Returns the
 /// last known input bytes for every requested forward tick.
 #[derive(Debug, Clone)]
 pub struct InputPredictor {

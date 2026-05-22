@@ -689,7 +689,6 @@ impl M0Engine {
             }),
             Some(accepted_id),
         );
-        // **M14J** § storyteller hook: actor_dismounted (mid-gallop) is a
         // story-grade narrative bullet per spec § "Storyteller hooks".
         if outcome.mid_motion {
             self.recorder.record(
@@ -715,7 +714,6 @@ impl M0Engine {
         self.state.read().ok().and_then(|s| s.player_actor)
     }
 
-    /// **M14J** § test helper — read the player actor by id from the
     /// engine's sim world. Clones the actor so tests can inspect any
     /// field without holding the engine lock.
     pub fn m14j_actor_clone(&self, actor_id: u64) -> Option<cf_actor::ActorState> {
@@ -724,13 +722,11 @@ impl M0Engine {
         sim.world.actors.get(&ActorId(actor_id)).cloned()
     }
 
-    /// **M14J** § test helper — return the player actor id.
     pub fn m14j_player_id(&self) -> Option<u64> {
         let s = self.state.read().ok()?;
         s.player_actor.map(|p| p.0)
     }
 
-    /// **M14J** § test helper — mutate the player actor through `f`.
     pub fn m14j_with_player_actor_mut<R>(&self, f: impl FnOnce(&mut cf_actor::ActorState) -> R) -> Option<R> {
         let mut s = self.state.write().ok()?;
         let player_id = s.player_actor?;
@@ -739,7 +735,6 @@ impl M0Engine {
         Some(f(actor))
     }
 
-    /// **M14J** § test helper — mutate any actor by id through `f`.
     pub fn m14j_with_actor_mut<R>(&self, actor_id: u64, f: impl FnOnce(&mut cf_actor::ActorState) -> R) -> Option<R> {
         let mut s = self.state.write().ok()?;
         let sim = s.actor_state.as_mut()?;
@@ -747,17 +742,14 @@ impl M0Engine {
         Some(f(actor))
     }
 
-    /// **M14J** § rope count helper.
     pub fn m14j_rope_count(&self) -> usize {
         self.state.read().map(|s| s.m14j_ropes.len()).unwrap_or(0)
     }
 
-    /// **M14J** § zip-line count helper.
     pub fn m14j_zipline_count(&self) -> usize {
         self.state.read().map(|s| s.m14j_zipline_ropes.len()).unwrap_or(0)
     }
 
-    /// **M14J** § "Wall-jump impulse magnitudes should be tuned against
     /// M14A's `JUMP_IMPULSE` constant" — read jump_impulse from settings.
     fn settings_jump_impulse_signed(&self) -> f32 {
         self.state
@@ -767,7 +759,6 @@ impl M0Engine {
             .unwrap_or(420.0)
     }
 
-    /// **M14J § ziplines** — deploy a zip line between two anchor points.
     /// Called by content / cfctl / scenario setup. Returns the new rope id.
     pub fn m14j_deploy_zipline(
         &self,
@@ -837,14 +828,12 @@ impl M0Engine {
         }
     }
 
-    /// **M14J § per-tick rope sim** — step every rope by `dt_seconds`. The
     /// per-rope nodes follow gravity + constraint relaxation; ziplines also
     /// advance their riders along the cable per
     /// [`cf_equipment::zipline_step_speed`].
     pub fn m14j_tick(&self, _tick: Tick, _sim_time_ms: f64) {
         let tick_rate_hz = self.config.tick_rate_hz.max(1) as f32;
         let dt = 1.0 / tick_rate_hz;
-        // **M14J § "swept-volume queries against M14 collision to find
         // chest-high / vertical surfaces"** — populate parkour candidates
         // BEFORE the per-actor M14J pass so auto-vault has a candidate to
         // commit on. Uses chunked terrain when present; otherwise candidates
@@ -1020,7 +1009,6 @@ impl M0Engine {
             // Snapshot per-actor M14J event outputs we then drain into the
             // recorder once the per-actor borrow is dropped.
             let mut per_actor_events: Vec<(u64, cf_actor::M14jTickEvents, f32)> = Vec::new();
-            // **M14J § "Mounted-pairing combined mass: rider.mass +
             // critter.mass → critter chassis aggregates both for M14A speed
             // curves"**. Compute per-critter rider mass before mutating sim.
             let mut critter_extra_mass: BTreeMap<u64, f32> = BTreeMap::new();
@@ -1040,13 +1028,11 @@ impl M0Engine {
                         continue;
                     };
                     let ev = cf_actor::tick_m14j_actor(actor, dt_ms, _tick.0);
-                    // **M14J § "Quick-action wheel" context flags update**.
                     let vault_av = actor.parkour_signal.vault_candidate.is_some();
                     let grapple_av = actor.holding_rope.is_none() && actor.zipline_attached.is_none();
                     let mount_av = actor.mount.is_some() || actor.is_being_ridden;
                     let zip_brake_av = actor.zipline_attached.is_some();
                     actor.quick_action_bar.update_m14j_context(vault_av, grapple_av, mount_av, zip_brake_av);
-                    // **M14J § "carries both masses → 20% top-speed reduction"**:
                     // when this actor is a critter being ridden, apply the rider
                     // mass to its mass cache (forces M14A walk-speed curves to
                     // recompute against combined mass).
@@ -1054,7 +1040,6 @@ impl M0Engine {
                         actor.total_mass_cached = actor.mass_kg + extra_mass;
                         actor.total_mass_dirty = false;
                     }
-                    // **M14J § "rider provides ride_direction (dx, dy) → critter
                     // locomotion goal"**: when the critter has a rider, use
                     // ride_direction (scaled by MOUNT_TOP_SPEED_RETAINED + critter's
                     // top speed) as the goal velocity. For BP-level baseline, use

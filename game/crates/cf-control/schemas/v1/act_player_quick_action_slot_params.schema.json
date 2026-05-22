@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerQuickActionSlotParams",
-  "description": "**M14A**: `act.player.quick_action_slot` — instant slot invocation (keys 1-8).",
   "type": "object",
   "properties": {
     "schema_version": {

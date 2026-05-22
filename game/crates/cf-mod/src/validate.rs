@@ -24,7 +24,6 @@ use event_schema::{is_envelope_schema_file, is_event_schema_file, validate_envel
 /// half-broken or schema-drifted manifests sneak into run-bundle evidence.
 /// (path-component, owning_milestone).
 ///
-/// **M2 update**: `materials/` is now validated by `validate_material_json`
 /// (cf-material loader) since M2 ships the v1 schema. Other BP4+ content
 /// types remain strict-fail until their milestones land.
 const STRICT_FAIL_CONTENT_CATEGORIES: &[(&str, &str)] = &[
@@ -53,15 +52,12 @@ pub(crate) fn walk(dir: &Path, report: &mut ValidationReport) {
             || (path.extension().and_then(|s| s.to_str()) == Some("json")
                 && path.components().any(|c| c.as_os_str() == "materials"))
             || path.file_name().and_then(|s| s.to_str()) == Some("ledger.jsonl")
-            // **M13**: `content/equipment/loadouts/*.json` loadout
             // descriptors validated against `cf_equipment::LoadoutFile`.
             || (path.extension().and_then(|s| s.to_str()) == Some("json")
                 && path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("loadouts"))
-            // **M13**: top-level `content/equipment/roles.json` mod-tooling export.
             || (path.extension().and_then(|s| s.to_str()) == Some("json")
                 && path.file_name().and_then(|s| s.to_str()) == Some("roles.json")
                 && path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("equipment"))
-            // **M5**: cf-mod validate <cf-replay/schemas/> covers all per-event
             // JSON schemas — every <family>_<type>.json under schemas/event/
             // plus the envelope schemas under schemas/v0_1/ + schemas/v1/.
             || is_event_schema_file(&path)
@@ -73,12 +69,10 @@ pub(crate) fn walk(dir: &Path, report: &mut ValidationReport) {
 }
 
 pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
-    // **M4A**: validate ledger.jsonl entries against the v1 AssetEntry schema.
     if path.file_name().and_then(|s| s.to_str()) == Some("ledger.jsonl") {
         ledger::validate_ledger_jsonl(path, report);
         return;
     }
-    // **M4A**: validate the per-pipeline regen manifest at
     // `content/asset_ledger/regen_manifest.ron` against its locked v1.0.0
     // schema (`cf-asset-ledger/schemas/v1/regen_manifest.schema.json`). Each
     // pipeline entry must declare pipeline_id / regen_command / model_version
@@ -87,7 +81,6 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         medical::validate_regen_manifest(path, report);
         return;
     }
-    // **M11**: validate the M11 interim TTD floors at
     // `content/balance/ttd_floors_interim.ron` against the minimal
     // shape locked in cf-actor::ttd. The validator only confirms the
     // schema_version and that floors/compound_modifiers are non-empty
@@ -97,17 +90,14 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         medical::validate_ttd_floors_interim(path, report);
         return;
     }
-    // **M5**: per-event JSON schema files under cf-replay/schemas/event/.
     if is_event_schema_file(path) {
         validate_event_schema_file(path, report);
         return;
     }
-    // **M5**: envelope schema files under cf-replay/schemas/v0_1/ or v1/.
     if is_envelope_schema_file(path) {
         validate_envelope_schema_file(path, report);
         return;
     }
-    // **M14G** § wound_specs/*.ron validation.
     if path
         .parent()
         .and_then(|p| p.file_name())
@@ -118,7 +108,6 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         medical::validate_wound_spec_ron(path, report);
         return;
     }
-    // **M14H** § treatments/*.ron validation.
     if path
         .parent()
         .and_then(|p| p.file_name())
@@ -129,7 +118,6 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         medical::validate_treatment_spec_ron(path, report);
         return;
     }
-    // **M14I** § prosthetics/*.ron validation.
     if path
         .parent()
         .and_then(|p| p.file_name())
@@ -140,7 +128,6 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         medical::validate_prosthetic_spec_ron(path, report);
         return;
     }
-    // **M6**: validate the four equipment registries under `content/equipment/`.
     // This must come BEFORE the scenarios fallthrough so the registry RONs
     // aren't mis-routed to `validate_scenario`.
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("equipment") {
@@ -174,7 +161,6 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
             _ => {}
         }
     }
-    // **M13**: validate `content/equipment/loadouts/*.json` against the
     // canonical [`cf_equipment::LoadoutFile`] schema (schema_version, role-id
     // resolution, id↔filename parity). See spec § "Equipment loadouts are
     // data-driven".
@@ -194,14 +180,12 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         loadout::validate_loadout_file(path, report);
         return;
     }
-    // **M6B**: validate `content/equipment/items/*.ron` per spec §
     // "Validate `content/equipment/items/*.ron` against ItemSpec
     // schema". `manifest.ron` is validated against the canonical
     // `cf_equipment::item_spec` registry (mirror drift detection);
     // any other `*.ron` file in the items dir is validated as a
     // standalone `cf_equipment::ItemSpec` definition.
     //
-    // **M6C** § "Crates / modules touched": `cf-mod` MODIFY — validate
     // per-category folder. The per-category folders
     // (`content/equipment/<category>/*.ron`) hold standalone
     // `cf_equipment::ItemSpec` files split per-category for modder
@@ -243,7 +227,6 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
             return;
         }
     }
-    // **M9B-2**: route trench segments + modules + templates BEFORE the
     // `scenarios` fallthrough so `content/trench_segments/*.ron`,
     // `content/trench_modules/*.ron`, and `content/trench_templates/*.trench.ron`
     // are validated through the cf-trench / cf-content loaders (which
@@ -283,7 +266,6 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         trench::validate_trench_template(path, report);
         return;
     }
-    // **M9C-1 / VAL-M9C-005 / VAL-M9C-007 / VAL-M9C-MOD-MISSING-DEPENDENCY**:
     // route fortification RONs under `content/fortifications/*.ron`
     // through the cf-fortification FortificationSpec loader. Unknown
     // FortificationKind / wire_kind / mine_kind / anti_tank_kind enum
@@ -301,7 +283,6 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         fortification::validate_fortification(path, report);
         return;
     }
-    // **M14A** § "cf-mod (EXTEND): validate content/limb_paths/*.ron +
     // content/jetpacks/*.ron + content/quick_action_layouts/*.ron".
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("limb_paths")
         && path.extension().and_then(|s| s.to_str()) == Some("ron")
@@ -339,7 +320,6 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         difficulty::validate_difficulty_json(path, report);
         return;
     }
-    // **M2**: material registry files under `content/materials/*.json`.
     let path_components: Vec<String> = path
         .components()
         .map(|c| c.as_os_str().to_string_lossy().to_string())

@@ -222,7 +222,6 @@ mod tests {
         }
     }
 
-    /// **M8B § Acceptance "Unreliable datagram carries per-tick input"**:
     /// the minimal InputCommand payload alone MUST be ≤ 96 bytes.
     #[test]
     fn input_command_minimal_payload_is_within_96_byte_budget() {

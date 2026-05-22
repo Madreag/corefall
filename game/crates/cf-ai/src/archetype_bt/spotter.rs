@@ -44,7 +44,6 @@ pub const NODES: &[&str] = &[
     "spotter_suppress_target",
 ];
 
-/// **M7B**: squad verbs the Spotter exposes as distinct BT subtrees.
 pub const SQUAD_VERB_IDS: &[&str] = &[
     "suppress_window",
     "suppress_target",

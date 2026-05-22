@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerSetDroneModeParams",
-  "description": "**M13** § \"Drone allies\" — switch the player's drone ally mode.",
   "type": "object",
   "properties": {
     "mode": {

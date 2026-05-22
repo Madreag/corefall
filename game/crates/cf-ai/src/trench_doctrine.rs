@@ -309,7 +309,6 @@ mod tests {
         }
     }
 
-    /// VAL-M9B-AI-001: enemy in range → step_up_for_shot with 1..=3 burst.
     #[test]
     fn trench_doctrine_step_up_for_shot_on_enemy_in_range() {
         let doctrine = TrenchDoctrine::new();
@@ -322,7 +321,6 @@ mod tests {
         assert_eq!(d.new_cover_state, CoverState::Exposed);
     }
 
-    /// VAL-M9B-AI-001: no enemy in range → hold_full_cover.
     #[test]
     fn trench_doctrine_hold_full_cover_when_no_enemy() {
         let doctrine = TrenchDoctrine::new();
@@ -332,7 +330,6 @@ mod tests {
         assert_eq!(d.reason, CoverDecisionReason::HoldFullCover);
     }
 
-    /// VAL-M9B-AI-001: max-exposure window enforces step_down_to_reload
     /// even if enemy still in range.
     #[test]
     fn trench_doctrine_step_down_after_max_exposure() {
@@ -351,7 +348,6 @@ mod tests {
         assert_eq!(d.burst_rounds, 0);
     }
 
-    /// VAL-M9B-AI-001: low-ammo + currently Exposed forces step_down.
     #[test]
     fn trench_doctrine_step_down_on_low_ammo_while_exposed() {
         let doctrine = TrenchDoctrine::new();
@@ -365,7 +361,6 @@ mod tests {
         assert_eq!(d.reason, CoverDecisionReason::StepDownToReload);
     }
 
-    /// VAL-M9B-AI-001: low-ammo while in Full cover → reload_safe.
     #[test]
     fn trench_doctrine_reload_safe_on_low_ammo_in_full_cover() {
         let doctrine = TrenchDoctrine::new();
@@ -380,7 +375,6 @@ mod tests {
         assert_eq!(d.burst_rounds, 0);
     }
 
-    /// VAL-M9B-AI-001: reload_in_progress + Full cover → reload_safe.
     #[test]
     fn trench_doctrine_reload_safe_on_reload_in_progress() {
         let doctrine = TrenchDoctrine::new();
@@ -395,7 +389,6 @@ mod tests {
         assert_eq!(d.reason, CoverDecisionReason::ReloadSafe);
     }
 
-    /// VAL-M9B-AI-001: no enemy in range + currently Exposed → step_down.
     #[test]
     fn trench_doctrine_step_down_when_exposed_no_enemy() {
         let doctrine = TrenchDoctrine::new();

@@ -183,7 +183,6 @@ pub fn run_drainage_window(
 mod tests {
     use super::*;
 
-    /// VAL-M9B-DRAINAGE-001: with the sump present, after 600 ticks of
     /// heavy rain the water depth stays ≤ 2 px AND ≥ 1 flush event has
     /// fired.
     #[test]
@@ -201,7 +200,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9B-DRAINAGE-002: without the sump, after 600 ticks the
     /// water has crossed the threshold AND footing is slippery.
     #[test]
     fn no_sump_floods_within_600_ticks_and_sets_slippery() {

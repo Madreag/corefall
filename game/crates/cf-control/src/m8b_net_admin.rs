@@ -193,7 +193,6 @@ mod tests {
         );
     }
 
-    /// **M8B § Notes "All new schemas MUST be added to `dump_schemas --check`"**:
     /// param shapes are schemars-derivable so the cf-control dump_schemas
     /// example can re-emit them.
     #[test]

@@ -281,7 +281,6 @@ pub fn throw_flask(
     })
 }
 
-/// **M15** § Paint a flask's splash on the chunked terrain. Called by
 /// the engine immediately after [`throw_flask`] to realize the splash
 /// pixels per the M15 spec § "flask glue" ownership for cf-material.
 ///

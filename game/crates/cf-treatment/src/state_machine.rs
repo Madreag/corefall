@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::producers::{treatment_spec, RiskKind, ToolRequirement, TreatmentKind};
 
-/// **M14H** § 4-state treatment apply machine.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -70,7 +69,6 @@ impl TreatmentFailureReason {
     }
 }
 
-/// **M14H** § immediate validation error (pre-flight).
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum TreatmentApplyError {
     #[error("treatment incompatible with actor origin")]
@@ -83,7 +81,6 @@ pub enum TreatmentApplyError {
     OutOfCharges,
 }
 
-/// **M14H** § outcome record returned on `tick()` when the apply machine
 /// completes (success or failure).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "outcome")]
@@ -99,7 +96,6 @@ pub enum TreatmentOutcome {
     },
 }
 
-/// **M14H** § per-tick event emitted by [`TreatmentApply::tick`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "event")]
 pub enum TreatmentEvent {
@@ -122,7 +118,6 @@ pub enum TreatmentEvent {
     },
 }
 
-/// **M14H** § per-actor context required by the apply machine.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TreatmentContext {
     pub actor_id: u64,
@@ -195,7 +190,6 @@ impl TreatmentContext {
     }
 }
 
-/// **M14H** § per-application apply-state-machine.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TreatmentApply {
     pub kind: TreatmentKind,
@@ -391,7 +385,6 @@ impl TreatmentApply {
     }
 }
 
-/// **M14H** Gherkin scenario 1: Bandage stops bleed and soaks through.
 /// Public helper that returns true if `seconds_since_bandage` exceeds the
 /// soak-through threshold (180s per spec).
 #[must_use]
@@ -403,7 +396,6 @@ pub fn bandage_soaked_through(seconds_since_bandage: f32) -> bool {
 mod tests {
     use super::*;
 
-    /// **M14H** Gherkin scenario 1 (first half): act.player.treat
     /// kind=field_bandage_v1 fires + 5s elapse → treatment.applied fires +
     /// treatment.completed fires.
     #[test]
@@ -428,7 +420,6 @@ mod tests {
         assert_eq!(apply.phase, TreatmentPhase::Completed);
     }
 
-    /// **M14H** Gherkin scenario 6: act.player.treat kind=field_bandage_v1
     /// on robot → treatment.failed reason="wrong_origin".
     #[test]
     fn robot_rejects_bandage_with_wrong_origin() {

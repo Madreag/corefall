@@ -12,7 +12,6 @@ use crate::constants::{
     seconds_to_ticks_for, ENGINEER_AUTO_REPAIR_FIRST_TICK_SECONDS, ENGINEER_AUTO_REPAIR_REACH_SECONDS,
 };
 
-/// **M7-A**: per-bot auto-repair tracker.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AutoRepairMission {
     pub engineer_actor_id: u64,
@@ -67,7 +66,6 @@ impl AutoRepairMission {
     }
 }
 
-/// **M7-A**: auto-repair lifecycle.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -91,7 +89,6 @@ impl AutoRepairState {
     }
 }
 
-/// **M7-A**: `ai.auto_repair_initiated` event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AutoRepairInitiatedEvent {
     pub engineer_actor_id: u64,
@@ -119,7 +116,6 @@ impl AutoRepairInitiatedEvent {
     }
 }
 
-/// **M7-A**: `ai.auto_repair_progressed` event payload (one per repair tick
 /// or per per-second sample, engine's choice).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AutoRepairProgressedEvent {

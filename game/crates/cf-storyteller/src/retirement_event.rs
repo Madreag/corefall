@@ -15,7 +15,6 @@ use crate::NarrativeEventKind;
 /// reference this string when registering a narrative beat to fire.
 pub const NARRATIVE_EVENT_ID_VETERAN_RETIRED: &str = "narrative.veteran_retired";
 
-/// **M14I** § per-veteran retirement narrative record. Populated when
 /// the M14I retire dispatcher fires + consumed by the storyteller / UI.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RetirementNarrative {
@@ -40,7 +39,6 @@ impl RetirementNarrative {
     }
 }
 
-/// **M14I** § engine-side registry of retirement narratives. Keyed by
 /// actor id. Cleared once a downstream consumer (storyteller) commits
 /// the narrative beat to a save.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

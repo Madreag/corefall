@@ -9,12 +9,10 @@ use crate::result::{MissionLifecycle, MissionResult};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MissionState {
-    /// **M2 re-audit (2026-05-13)**: scenario id (mirrors `scenario.id`).
     /// Empty string for legacy callers that didn't populate it; the engine
     /// sets this from the loaded scenario.
     #[serde(default)]
     pub id: String,
-    /// **M2 re-audit (2026-05-13)**: lifecycle state machine per spec
     /// (`Init → Loaded → InProgress → Resolved`). Distinct from `result`
     /// (which is the outcome SHAPE when `lifecycle == Resolved`).
     #[serde(default)]
@@ -33,13 +31,11 @@ pub struct MissionState {
     /// `LossReason::as_str()` when the mission resolves as Lost.
     #[serde(default)]
     pub loss_reason_label: Option<String>,
-    /// **M2 re-audit (2026-05-13)**: explicit typed loss reason (not just
     /// the as_str() label). Populated alongside `loss_reason_label` so
     /// consumers can access the structured payload (e.g.
     /// `LossReason::ObjectiveFailed { id, reason }`).
     #[serde(default)]
     pub loss_reason: Option<LossReason>,
-    /// **M1.5**: tutorial-modal pause flag. While `true`, `step()` is a
     /// no-op AND elapsed-tick accounting skips the paused duration so the
     /// mission timer does NOT advance. Toggled via `MissionState::pause()`
     /// / `resume()` so the engine can wire `act.mission.{pause,resume}`
@@ -47,23 +43,19 @@ pub struct MissionState {
     /// events.
     #[serde(default)]
     pub paused: bool,
-    /// **M1.5**: tick on which the most recent pause began. `None` when
     /// not paused; populated by `pause()`. `resume()` uses this to
     /// accumulate `total_paused_ticks` and then clears the field.
     #[serde(default)]
     pub pause_started_at_tick: Option<u64>,
-    /// **M1.5**: cumulative paused duration in ticks. `elapsed_ticks` and
     /// `ticks_remaining` subtract this so the timer truly freezes while
     /// the modal is up.
     #[serde(default)]
     pub total_paused_ticks: u64,
-    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor. Populated by
     /// the engine when the mission resolves as Lost; points at the player's
     /// last `input.intent_received` event so M3B's replay viewer can rewind
     /// to the divergence tick. Stays `None` for Won / Aborted / Active.
     #[serde(default)]
     pub show_me_why_event_id: Option<String>,
-    /// **M1.5**: cf-ui renders the "Show me why" CTA button on the
     /// mission-resolved modal when `true`. Latched from the
     /// mission_resolved event payload's `show_replay_cta` flag.
     #[serde(default)]
@@ -102,7 +94,6 @@ impl MissionState {
         }
     }
 
-    /// **M2 re-audit (2026-05-13)**: returns the id of the currently-active
     /// objective (if any), per the spec's `current_objective_id` field. Walks
     /// objectives in order, returning the first `Active`.
     pub fn current_objective_id(&self) -> Option<&str> {
@@ -112,7 +103,6 @@ impl MissionState {
             .map(|o| o.id.as_str())
     }
 
-    /// **M2 re-audit (2026-05-13)**: list of completed objective ids in
     /// declaration order, per the spec's `completed_objectives[]` field.
     pub fn completed_objective_ids(&self) -> Vec<String> {
         self.objectives
@@ -122,7 +112,6 @@ impl MissionState {
             .collect()
     }
 
-    /// **M2 re-audit (2026-05-13)**: list of failed objective ids in
     /// declaration order, per the spec's `failed_objectives[]` field.
     pub fn failed_objective_ids(&self) -> Vec<String> {
         self.objectives
@@ -132,7 +121,6 @@ impl MissionState {
             .collect()
     }
 
-    /// **M1.5**: pause the mission's tick-driven progress + timer.
     /// Returns the id of the currently active objective (if any) so the
     /// caller can emit `mission.objective_paused { objective: <id> }`.
     /// No-op (returns None) if the mission is terminal or already paused.
@@ -148,7 +136,6 @@ impl MissionState {
         self.active_objective_id()
     }
 
-    /// **M1.5**: resume after pause. Adds the paused duration to
     /// `total_paused_ticks` so timer reads correctly. Returns the id of
     /// the active objective so the engine can emit
     /// `mission.objective_resumed { objective: <id> }`. No-op (returns
@@ -228,7 +215,6 @@ impl MissionState {
     }
 
     /// Ticks elapsed since `started_at_tick`. Saturates at 0.
-    /// **M1.5**: subtracts `total_paused_ticks` AND the current pause
     /// in-flight (if `paused`) so the timer freezes while a tutorial
     /// modal is up.
     pub fn elapsed_ticks(&self, current_tick: u64) -> u64 {

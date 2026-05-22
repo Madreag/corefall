@@ -11,7 +11,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7**: extra objective kinds the v0.5 graph supports beyond the M2
 /// baseline. The existing `ObjectiveKind` enum (in lib.rs) is the primary
 /// type; this enum captures the additional kinds the director's graph
 /// nodes can declare, so scenario manifests can serialize them without
@@ -73,7 +72,6 @@ impl ExtendedObjectiveKind {
     }
 }
 
-/// **M7**: one objective node in the v0.5 graph.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObjectiveNode {
     pub id: String,
@@ -115,7 +113,6 @@ impl ObjectiveNodeStatus {
     }
 }
 
-/// **M7**: DiGraph storage. Plain adjacency-list (small mission graphs).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ObjectiveGraph {
     pub nodes: Vec<ObjectiveNode>,
@@ -169,7 +166,6 @@ impl ObjectiveGraph {
     }
 }
 
-/// **M7**: one branching point declared in the graph.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BranchingPoint {
     pub id: String,
@@ -180,7 +176,6 @@ pub struct BranchingPoint {
     pub offered_tick: Option<u64>,
 }
 
-/// **M7**: `mission.objective_branched` event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObjectiveBranchedEvent {
     pub branching_point_id: String,
@@ -189,7 +184,6 @@ pub struct ObjectiveBranchedEvent {
     pub tick: u64,
 }
 
-/// **M7**: `mission.optional_offered` event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OptionalOfferedEvent {
     pub objective_id: String,

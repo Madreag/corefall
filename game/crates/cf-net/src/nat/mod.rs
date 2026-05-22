@@ -23,7 +23,6 @@ pub use turn_relay::{TurnRelayClient, TurnRelayOutcome};
 
 use serde::{Deserialize, Serialize};
 
-/// **M8B § Acceptance**: ICE-lite candidate-pair connectivity checks
 /// have 4 seconds to find a working pair before TURN relay engages.
 pub const ICE_LITE_TIMEOUT_MS: u32 = 4000;
 
@@ -61,5 +60,4 @@ impl NatTraversalPath {
     }
 }
 
-/// **M8B § Acceptance "Online match join time stays under 6 seconds"**.
 pub const JOIN_TIME_TARGET_MS: u32 = 6000;

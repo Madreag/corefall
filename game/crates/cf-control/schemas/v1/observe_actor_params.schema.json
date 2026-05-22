@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ObserveActorParams",
-  "description": "**M1**: `observe.actor` — return full `ActorView` (with M1 fields) for the\nplayer by default, or for `actor_id` when supplied.",
+  "description": "player by default, or for `actor_id` when supplied.",
   "type": "object",
   "properties": {
     "actor_id": {

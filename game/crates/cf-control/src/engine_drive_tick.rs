@@ -135,7 +135,6 @@ impl M0Engine {
                 }
             }
 
-            // **M14C** § inject scripted director steps into `pending_intent`
             // BEFORE the actor sim consumes it. The scripted steps emulate
             // what cfctl `act.player.{aim,fire,reload}` would do at the
             // matching tick, so headless cfctl drives of
@@ -188,7 +187,6 @@ impl M0Engine {
                 .as_secs_f32();
                 let auto_reload = false;
                 let player = state.player_actor;
-                // **M6**: pre-step pass for `AdvancedFireMode::Charge` semantics.
                 // - While `intent.fire_held`: accumulate `weapon_charge_fraction`
                 //   at (tick_dt / SNIPER_CHARGE_MAX_SECONDS) per tick (so a full
                 //   charge lands at 0.8 s of hold per spec § "Sniper charge mode")
@@ -255,7 +253,6 @@ impl M0Engine {
                 // borrow the actor world mutably twice. The temporary `take()` of
                 // each guard releases the BTreeMap borrow so we can mutate state.rng.
                 let sim_time_ms = state.clock.sim_time_ms();
-                // **M9** (audit fix gap 3): when the M9 7-phase pacer is
                 // active, gate guard AI ticks on phase >= Launch so the
                 // player can pre-dig during Setup + Prep without taking
                 // fire. Scenarios without an M9 reactor director (M7
@@ -417,7 +414,6 @@ impl M0Engine {
             // `terrain.terrain_pixel_dislodged` debris event. Failing
             // projectiles roll for stickiness and may be drawn in.
             //
-            // **M9 § Destructible terrain — 5-tier per-pixel integrity**:
             // every projectile-vs-terrain hit (pass OR fail) also applies
             // per-pixel integrity damage via
             // `ChunkedTerrain::try_penetrate_pixel`. The pixel may survive
@@ -441,9 +437,7 @@ impl M0Engine {
                 damage: f32,
                 spawn_material: Option<cf_terrain::MaterialId>,
                 damage_outcome: Option<cf_terrain::PenetrationOutcome>,
-                /// **M14**: stickiness coefficient on this material (0..=1).
                 stickiness: f32,
-                /// **M14**: the seeded RNG draw used to decide the stickiness
                 /// check, captured so `combat.embedded_in_terrain` can carry
                 /// the exact roll for replay verification.
                 rng_roll: f32,
@@ -488,7 +482,6 @@ impl M0Engine {
                             rng_roll,
                         });
                         let pos = [proj.position.x, proj.position.y];
-                        // **M9 § Destructible terrain — per-pixel integrity**:
                         // normalize impact energy from projectile velocity
                         // (reference rifle round at ~150 u/s = 0.5 impact,
                         // matching the spec's "impact_energy=0.5" scenario).
@@ -509,7 +502,6 @@ impl M0Engine {
                             cf_terrain::DamageKind::ProjectileHit,
                             None,
                         );
-                        // **M9** keeps the binary cf_physics::try_penetrate
                         // decision for projectile lifecycle (lives/dies/stuck)
                         // but stops the redundant carve — destruction is now
                         // driven by integrity reaching 0. When the per-pixel
@@ -621,7 +613,6 @@ impl M0Engine {
                             s.total_debris_spawned = s.total_debris_spawned.saturating_add(1);
                         }
                     }
-                    // **M9 § Destructible terrain — 5-tier band machine +
                     // cascade rule**: emit per-pixel band crossings and
                     // cascade decay events. Each event carries
                     // parent_event_id = pen_id so the M10 cause-chain
@@ -663,7 +654,6 @@ impl M0Engine {
                                 Some(pen_id.clone()),
                             );
                         }
-                        // **M9 § Cascade rule**: one event per affected
                         // neighbor. affected_count surfaces total cascade
                         // reach so the M10 viewer can render a "domino"
                         // visualization.
@@ -711,7 +701,6 @@ impl M0Engine {
                             }
                         }
                     }
-                    // **M14** § "Bullet embedded in stickiness material" —
                     // when the stickiness roll pulled the projectile in
                     // (cf_physics::try_penetrate.outcome.stuck) emit
                     // `combat.embedded_in_terrain` carrying the seeded RNG
@@ -759,7 +748,6 @@ impl M0Engine {
                 }
             }
 
-            // **M14** § "Multiple limbs lost: bleed-out timer (6 HP/sec per
             // CCCP)". For every actor with at least one destroyed chassis
             // zone, apply per-tick bleed damage scaled by the number of
             // lost zones. Drops the actor's HP directly; the existing
@@ -966,7 +954,6 @@ impl M0Engine {
                 /// destroyed (so we emit `actor_status_changed` exactly
                 /// once per reactor).
                 triggered_destruction: bool,
-                // **M9** layer events + pressure-state crossings captured
                 // from `Reactor::apply_damage_cascade`.
                 layer_events: Vec<cf_mission::ArmorLayerHpEvent>,
                 pressure_state_change: Option<(cf_mission::PressureState, cf_mission::PressureState)>,
@@ -990,7 +977,6 @@ impl M0Engine {
                             }
                             if r.aabb_contains(proj.position.x, proj.position.y) {
                                 let prev_destroyed = r.is_destroyed();
-                                // **M9** (audit fix gap 6): consult
                                 // `engine.config.tutorial_safety` so the
                                 // reactor's lethal-damage path caps at 1
                                 // HP + Critical instead of destroying
@@ -1023,7 +1009,6 @@ impl M0Engine {
             if !reactor_hits.is_empty() {
                 let sim_time_ms = state.clock.sim_time_ms();
                 for hit in reactor_hits {
-                    // **M9** § Cause chains (Gap 11): thread the
                     // projectile's spawn event id through so M10's
                     // "show me why" walker can hop `projectile_hit →
                     // projectile_spawned → weapon_fired → ai.tactic_chosen
@@ -1061,7 +1046,6 @@ impl M0Engine {
                         }),
                         Some(hit_id.clone()),
                     );
-                    // **M9** § Acceptance criteria — emit
                     // `mission.reactor_hp_changed` with parent_event_id
                     // chain back to combat.projectile_hit (which itself
                     // parents to the projectile_spawned + weapon_fired).
@@ -1085,7 +1069,6 @@ impl M0Engine {
                         }),
                         Some(hit_id.clone()),
                     );
-                    // **M9** § Layered reactor armor — per-layer events fire
                     // per cascade entry. Layer destroyed events carry the
                     // breach_kind so the M10 viewer can render
                     // "Reactor External armor breached: punctured".
@@ -1139,7 +1122,6 @@ impl M0Engine {
                             );
                         }
                     }
-                    // **M9** § Reactor pressure state machine — only emit
                     // on crossings (the `pressure_state_change` is `Some`
                     // exactly when the band advanced).
                     if let Some((from, to)) = hit.pressure_state_change {
@@ -1158,7 +1140,6 @@ impl M0Engine {
                             }),
                             Some(hp_changed_id.clone()),
                         );
-                        // **M9** § Thermal signature couples to pressure
                         // state — Venting/Critical reactors radiate more.
                         // Future M16+ thermal kernel consumes this.
                         let thermal_k = match to {
@@ -1203,7 +1184,6 @@ impl M0Engine {
                             }),
                             Some(hit_id.clone()),
                         );
-                        // **M9** § Loss path — emit `mission.reactor_destroyed`
                         // with parent_event_id chain so M10's "Show me why"
                         // resolver finds: mission_resolved → reactor_destroyed
                         // → reactor_hp_changed → projectile_hit.
@@ -1274,7 +1254,6 @@ impl M0Engine {
                     mission_payload = Some((tick, sim_time_ms, report));
                 }
             }
-            // **M9** § Player narrative flow — fire `mission.timer_warning_threshold`
             // at 30s / 15s / 5s remaining (single-shot per threshold per run).
             // Computed against the active mission's `time_limit_ticks` so 120Hz
             // runs scale automatically (3600 @60Hz = 7200 @120Hz; same wall time).
@@ -1313,15 +1292,12 @@ impl M0Engine {
                     }
                 }
             }
-            // **M15 § Active material kernel** — per-tick orchestrator.
             // Runs after the dig + projectile + mission passes so the
             // chemistry sees the current pixel state. Fires when
             // chunked_terrain is loaded (M1.5/M2+ scenarios). Per
-            // DR-052 the kernel mutates terrain deterministically + the
             // resulting state participates in the next checksum.
             if state.chunked_terrain.is_some() {
                 let sim_time_ms = state.clock.sim_time_ms();
-                // **M15B § Heat field source injection** — before the
                 // kernel reads the heat field for phase transitions,
                 // inject heat from hot materials (fire_intense, lava,
                 // lightning) AND apply one diffusion pass to smooth
@@ -1436,7 +1412,6 @@ impl M0Engine {
                     );
                 }
 
-                // **M15B § Precipitation cycle** — scan steam pixels +
                 // feed them to the cycle. Per-tick PrecipitationCycle
                 // tracks cloud-saturation; fires nucleation +
                 // precipitation events when gates cross.
@@ -1585,7 +1560,6 @@ impl M0Engine {
 
         // Emit M1 events from the actor step.
         if let Some((tick, sim_time_ms, intent, mut report)) = step_report {
-            // **M6**: post-step pass for `AdvancedFireMode::Burst3`,
             // `AdvancedFireMode::Charge`, and the Grenade Launcher's
             // `AdvancedFireMode::Arc` mode. Mutates the in-flight projectile
             // list + the `report.spawned_projectiles` view so emit_actor_events
@@ -1595,27 +1569,23 @@ impl M0Engine {
             self.record_schedule_trace_marker("actor_collision_start");
             self.emit_actor_events(tick, sim_time_ms, &intent, &report);
             self.record_schedule_trace_marker("actor_collision_end");
-            // **M14D § VAL-M14D-020** projectile-projectile CCD pass —
             // STRICTLY between the actor-collision pass and the terrain
             // pass. Runs every tick (the pool is empty for pre-M14D
             // scenarios so the cost is negligible).
             self.record_schedule_trace_marker("projectile_pair_start");
             self.tick_m14d_projectile_pair(tick, sim_time_ms);
             self.record_schedule_trace_marker("projectile_pair_end");
-            // **M14E § VAL-M14E-016/-019** per-tick collapse-check pass.
             // Wired AFTER the projectile-pair pass + BEFORE the terrain
             // dirty-region flush so cascading cave-ins ride on the same
             // dirty batch as their primary. The pool is empty for
             // pre-M14E scenarios so the cost is zero.
             self.tick_m14e_structural_integrity(tick, sim_time_ms);
-            // **M14F § VAL-M14F-002 / VAL-M14F-016**: per-tick lateral
             // integrity pass — runs at the same N=15 cadence as the
             // M14E ceiling pass + drives the bulging → crack_advanced
             // → rupture cascade per lateral chunk. Runs immediately
             // after the ceiling pass so the union per-chunk budget is
             // bounded by VAL-CROSS-006.
             self.tick_m14f_lateral_collapse(tick, sim_time_ms);
-            // **M14G § VAL-M14G-013/014/030**: per-tick environmental
             // thermal pass — drives the
             // [`cf_environment::classify_tile_thermal`] producer for
             // every actor zone the scenario flagged as resting against
@@ -1623,49 +1593,41 @@ impl M0Engine {
             // emitted `wound.created` events feed the aging cadence on
             // the same tick they fire.
             self.tick_m14g_thermal_contacts(tick, sim_time_ms);
-            // **M14G § VAL-M14G-029**: per-tick material-contact pass —
             // fires one [`cf_material::classify_reaction`] call per
             // scenario-authored material contact at its `fire_tick`.
             self.tick_m14g_material_contacts(tick, sim_time_ms);
-            // **M14G § VAL-M14G-025 / VAL-M14G-046**: per-tick wound
             // aging pass. Increments `age_ticks` every tick on every
             // wound; commits visible-state mutations (bandage soak,
             // scab, scar, dirt escalation, Frostbite → Necrosis) every
             // 5 ticks. Does NOT roll infection chance (deferred to
             // M14H per VAL-M14G-047).
             self.tick_m14g_wound_aging(tick, sim_time_ms);
-            // **M14I**: per-tick long-term-consequence pass. Drives the
             // biological aging clock (per-year stat degradation +
             // retirement + per-week terminal-roll), prosthetic wear,
             // phantom-limb panic cadence, and radiation→cancer
             // hand-off.
             self.m14i_tick(tick, sim_time_ms);
-            // **M14J**: per-tick rope/zipline integration + swim breath
             // drain + drowning emission. Steps every verlet rope, advances
             // zip-line riders along the cable, and fires `actor.drowned`
             // when a submerged actor's breath reaches 0.
             self.m14j_tick(tick, sim_time_ms);
-            // **M12B** § Per-tick doppler emission for in-flight
             // projectiles. Spec § "Doppler shift on supersonic projectile
             // flyby": "audio.doppler_shifted fires per tick with the
             // resolved doppler_factor". Iterates `sim.projectiles` and
             // emits the 4 cosmetic spatial-resolve events for each live
             // projectile.
             self.emit_m12b_per_tick_projectile_audio(tick, sim_time_ms);
-            // **M7-A fix-round-2 (audit gaps A8-A11)**: dispatch
             // auto-triage / auto-repair missions on fresh DYING +
             // chassis-module-degraded transitions, and emit
             // `ai.auto_triage_applied` + `ai.auto_repair_progressed`
             // for missions whose deadlines elapsed this tick.
             self.emit_m7_auto_triage_repair_events(tick, sim_time_ms, &report);
-            // **M7 fix-round-2 (audit gaps A12-A17)**: drive the v0.5
             // mission director — phase pacing, reinforcement waves,
             // mini-boss damage + phase ability, objective-graph
             // branching + optional offers. Opt-in via the scenario
             // manifest's `phase_state` / `reinforcement_waves` /
             // `boss_state` / `objective_graph` fields.
             self.emit_m7_mission_director_events(tick, sim_time_ms, &report);
-            // **M7-B fix-round-2 (audit gap A18)**: surface the
             // per-event mood / stress / faction deltas the spec
             // mandates beyond the scenario-start baseline emission. Ally
             // killed (-15), kill scored (+5), and wounded (-10) on every
@@ -1677,7 +1639,6 @@ impl M0Engine {
             // `ai.faction_allegiance_changed` payloads.
             self.emit_m7_mood_stress_faction_events(tick, sim_time_ms, &report);
         }
-        // **M1.5 G2 (hearing) end-of-tick**: promote alarms staged during
         // this tick to the next-tick AI pending queue. Clear the staging
         // buffer so each tick produces a fresh batch.
         if let Ok(mut s) = self.state.write() {
@@ -1686,7 +1647,6 @@ impl M0Engine {
         }
 
         if let Some((tick, sim_time_ms, hex)) = checksum_payload {
-            // M3 audit pass 5 (2026-05-13): per-chunk hashes surface in
             // the `chunk_summary` field per M3.md spec literal "And it
             // appears in the determinism.sim_checksum payload's
             // chunk-summary field". Format: ordered array of
@@ -1814,7 +1774,6 @@ impl M0Engine {
                         broken,
                     } => {
                         dig_validity_update = Some((tick.0, ToolValidityUpdate::Carve));
-                        // M2 audit pass 5 (2026-05-13): strip carve payload
                         // must be schema-compatible with the chunked path
                         // (BreachStrip replaceability). Compute mask_id via
                         // the same recipe (tool_id, dig_radius, mask_shape),
@@ -1836,7 +1795,6 @@ impl M0Engine {
                                 "mode": "strip",
                                 "tool_id": "digger",
                                 "mask_id": strip_mask_id,
-                                // M3 audit pass 7 (2026-05-13): spec literal
                                 // requires scalar `material_id` and `bbox`
                                 // in (x, y, w, h) tuple form.
                                 "material_id": strip_material_id,
@@ -1897,7 +1855,6 @@ impl M0Engine {
                             "terrain",
                             "tool_refused",
                             json!({
-                                // M2 audit pass 7 (2026-05-13): spec literal
                                 // requires `tool_id` + `target_material_id`.
                                 "tool_id": "digger",
                                 "target_material_id": material.as_ref().and_then(|m| cf_terrain::material_id_from_name(m)),
@@ -1925,14 +1882,12 @@ impl M0Engine {
                             .iter()
                             .map(|c| json!({"cx": c.cx, "cy": c.cy}))
                             .collect();
-                        // **M2**: mask_id is a stable blake3 hash over
                         // (tool_id, dig_radius, mask_shape) so replay
                         // determinism holds — same carve at same spot
                         // produces the same mask_id. Mask shape is a
                         // circle with 12-px radius for the digger; the
                         // hash inputs are pure-data so wall-clock time
                         // doesn't leak in.
-                        // M3 audit pass 5 (2026-05-13): mask_id MUST be
                         // position-independent per spec implementer-notes
                         // ("blake3 hash over (mask_shape, tool_id,
                         // dig_radius)"). Position lives on the event's
@@ -1959,7 +1914,6 @@ impl M0Engine {
                                 "mode": "chunked",
                                 "tool_id": "digger",
                                 "mask_id": mask_id,
-                                // M3 audit pass 7 (2026-05-13): spec literal
                                 // requires `material_id` (scalar dominant id)
                                 // alongside `material_ids[]` AND `pixel_count`
                                 // for parity with the strip emit (BreachStrip
@@ -1986,7 +1940,6 @@ impl M0Engine {
                             }),
                             Some(action_id.clone()),
                         );
-                        // **M9** § Destructible terrain — 5-tier HP color
                         // states. Emit `terrain.material_state_changed`
                         // (Pristine → Destroyed band crossing) +
                         // `terrain.pixel_removed` (integrity reached 0) +
@@ -2044,7 +1997,6 @@ impl M0Engine {
                             }),
                             Some(chunk_carved_id.clone()),
                         );
-                        // **M9** § Cascade rule — adjacent low-hardness
                         // pixels decay on neighbor destruction. After the
                         // carve clears its bbox, walk the perimeter and
                         // apply REAL integrity decay to neighbors below
@@ -2222,7 +2174,6 @@ impl M0Engine {
                             "terrain",
                             "tool_refused",
                             json!({
-                                // M2 audit pass 7 (2026-05-13): spec literal
                                 // requires `tool_id` + `target_material_id`.
                                 "tool_id": "digger",
                                 "target_material_id": refusal.material,
@@ -2249,7 +2200,6 @@ impl M0Engine {
                             "terrain",
                             "tool_refused",
                             json!({
-                                // M2 audit pass 7 (2026-05-13): out-of-range
                                 // refusal has no target material; emit
                                 // tool_id only.
                                 "tool_id": "digger",
@@ -2350,7 +2300,6 @@ impl M0Engine {
             self.emit_guard_events(*tick, *sim_time_ms, *guard_id, report);
         }
 
-        // **M7-A**: drive the 5-layer thinking stack for every BotState
         // managed in `m7_ai_world`. The M2 reactive guards still drive the
         // M2 FSM + projectile spawn; M7-A's stack overlays the reason-label
         // + thinking_layer_invoked + auto-triage/auto-repair surfaces.
@@ -2366,7 +2315,6 @@ impl M0Engine {
         if let Some((tick, sim_time_ms, report)) = mission_payload {
             for id in &report.objective_started {
                 let parent = self.state.read().ok().and_then(|s| s.mission_started_event_id.clone());
-                // M2 audit pass 5 (2026-05-13): spec literal — payload must
                 // contain `objective_id` AND `kind`. We retain `objective`
                 // as a backwards-compat alias. `kind` is the typed
                 // `ObjectiveKind::category()` string (ReachZone →
@@ -2399,7 +2347,6 @@ impl M0Engine {
                     s.last_mission_event_id = Some(event_id);
                 }
             }
-            // **M1.5**: emit `mission.objective_updated` at 25/50/75/100%
             // milestones. The 100% milestone fires on the same tick as
             // `objective_completed` so the cause chain reads
             // `objective_updated{1.0} → objective_completed → mission_resolved`.
@@ -2409,7 +2356,6 @@ impl M0Engine {
                     .read()
                     .ok()
                     .and_then(|s| s.mission_objective_started_event_ids.get(&update.objective_id).cloned());
-                // M2 audit pass 7 (2026-05-13): payload must include
                 // `objective_id` per schema; `objective` retained as alias.
                 let event_id = self.recorder.record(
                     tick,
@@ -2427,7 +2373,6 @@ impl M0Engine {
                     s.last_mission_event_id = Some(event_id);
                 }
             }
-            // M2 audit pass 7 (2026-05-13): retain the LAST objective_completed
             // event id so `mission.mission_resolved` on the Won path can
             // chain back to it (spec literal cause chain).
             let mut last_completed_event_id: Option<String> = None;
@@ -2437,7 +2382,6 @@ impl M0Engine {
                     .read()
                     .ok()
                     .and_then(|s| s.mission_objective_started_event_ids.get(id).cloned());
-                // M2 audit pass 7 (2026-05-13): payload must include
                 // `objective_id` per schema; `objective` retained as alias.
                 let event_id = self.recorder.record(
                     tick,
@@ -2454,7 +2398,6 @@ impl M0Engine {
                 if let Ok(mut s) = self.state.write() {
                     s.last_mission_event_id = Some(event_id);
                 }
-                // **M5**: when an objective completes AND the player has
                 // ejected (Ejected pilot reached the extraction zone),
                 // promote the chassis pilot_state to Extracted so further
                 // damage is fully suppressed.
@@ -2482,11 +2425,9 @@ impl M0Engine {
                     }
                 }
             }
-            // **M1.5 G11**: chain objective_failed → mission_resolved so
             // M3B can walk the cause chain from mission_resolved back to
             // the trigger objective_failed → ... → player_dead chain.
             //
-            // M2 audit pass 5 (2026-05-13): spec literal — the
             // `objective_failed` payload must include a `reason` field
             // (e.g. "timer_expired", "player_dead", "reactor_destroyed").
             // We derive it from the mission's final_result so each
@@ -2503,7 +2444,6 @@ impl M0Engine {
                     .read()
                     .ok()
                     .and_then(|s| s.mission_objective_started_event_ids.get(id).cloned());
-                // M2 audit pass 7 (2026-05-13): payload must include
                 // `objective_id` per schema; `objective` retained as alias.
                 let mut payload = json!({
                     "objective_id": id,
@@ -2526,7 +2466,6 @@ impl M0Engine {
                 let payload = match &result {
                     cf_mission::MissionResult::Won => json!({"result": "won"}),
                     cf_mission::MissionResult::Lost { reason } => {
-                        // **M1.5**: DR-023 "Show me why" replay handoff —
                         // attach show_me_why_event_id pointing at the player's
                         // last input.intent_received event (the divergence
                         // anchor M3B's replay viewer rewinds to). cf-ui surfaces
@@ -2584,7 +2523,6 @@ impl M0Engine {
                         .ok()
                         .and_then(|s| s.last_player_status_event_id.clone())
                 } else if matches!(&result, cf_mission::MissionResult::Won) {
-                    // M2 audit pass 7 (2026-05-13): spec literal — Won path
                     // chains mission_resolved → objective_completed (the
                     // last one).
                     last_completed_event_id.clone()
@@ -2607,7 +2545,6 @@ impl M0Engine {
                     s.last_mission_event_id = Some(resolved_event_id);
                 }
             }
-            // **M4 § Parent-event-id cause chains** — re-emit snapshots on
             // any objective state change with a real `parent_event_id`.
             // Pick the most-specific mission event id this tick (in
             // priority order): mission_resolved > last objective_failed >
@@ -2624,7 +2561,6 @@ impl M0Engine {
             self.emit_initial_snapshots(tick, sim_time_ms, snapshot_parent.as_deref());
         }
 
-        // **M4 § Snapshot cadence**: periodic snapshot emit. Per spec:
         //   snapshot_actor every 15 ticks (250ms @ 60Hz)
         //   snapshot_terrain_summary every 1 second (60 ticks @ 60Hz, 120 @ 120Hz)
         // Implemented inline so the cadence rides the engine's
@@ -2640,7 +2576,6 @@ impl M0Engine {
             }
             if summary_period > 0 && t.0 > 0 && t.0 % summary_period == 0 {
                 self.emit_periodic_snapshot_terrain_summary(t, sim_time_ms, run_started_parent.clone());
-                // **M9** (audit fix gap 5): reactor snapshot cadence
                 // tied to the 1-second summary so M10 timeline + M11
                 // reactor strip see fresh `pressure_state` +
                 // `armor_layers` every wall-clock second irrespective
@@ -2649,7 +2584,6 @@ impl M0Engine {
                 // ample for the HUD.
                 self.emit_periodic_snapshot_reactor(t, sim_time_ms, run_started_parent.clone());
             }
-            // **M4 § system.critical_drop**: if any gameplay event was dropped
             // since the last tick, announce it so the canonical checker can
             // verify the priority discipline (critical events never silently
             // disappear).
@@ -2677,7 +2611,6 @@ impl M0Engine {
                     s.last_reported_dropped_gameplay = dropped_gameplay_now;
                 }
             }
-            // **M4 § performance.tick_cost_sample**: emit one performance
             // sample per `summary_period` ticks. Mirrors `system.tick_sample`
             // (existing) but exposes the spec-required category + event
             // type name so the M10 viewer and grading harness can filter.
@@ -2714,13 +2647,11 @@ impl M0Engine {
             }
         }
 
-        // **M5**: tick the chassis eject sequence for every actor + emit progress events.
         if let Some(t) = advanced {
             let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
             self.tick_chassis_eject_for_all(t, sim_time_ms);
         }
 
-        // **M6**: tick per-actor state machines that the cfctl surface drives —
         // stamina drain, cinematic countdown + transition, lean integration,
         // cover sampling, stealth-meter integration, inventory weight recompute,
         // and the WeaponSwap state machine. See `specs/active/M6.md` §
@@ -2733,7 +2664,6 @@ impl M0Engine {
             self.tick_m6_squad(t, sim_time_ms);
         }
 
-        // **M8** (Cluster B fix): advance the per-frame state machines the
         // M8 cfctl surfaces seed — `cf_camera::tick_hit_stop` decays the
         // 50-200ms camera freeze pulse, `cf_killcam::tick` walks the
         // Idle → Recording → Playing → Done playback timeline (and resets
@@ -2772,7 +2702,6 @@ impl M0Engine {
             self.refresh_hud_chassis_banners(&mut state, t);
         }
 
-        // **M7B** § "Slot solver runs at issue + every 2s while moving"
         // and "an actor that loses the slot position emits
         // `squad.formation_slot_broken` and the solver reassigns next 2s
         // tick." We tick the player squad's reslot cadence + slot-broken
@@ -2784,7 +2713,6 @@ impl M0Engine {
             self.tick_m7b_squad(t, sim_time_ms);
         }
 
-        // **M9B audit GAP-1..5**: drive per-tick trench surfaces.
         // - GAP-1 emits `trench.cover_state_changed` on actor segment
         //   boundary cross / stance change.
         // - GAP-2 ticks the AI-TRENCH-A-01 doctrine for opted-in actors
@@ -2803,7 +2731,6 @@ impl M0Engine {
             self.tick_m9b_collapse(t, sim_time_ms);
         }
 
-        // **M14B § gravity field + wind force + gas stratification producers.**
         // Per-tick step that:
         //   1. Samples per-actor gravity overrides → applies acceleration +
         //      emits gravity.override_activated / gravity.override_deactivated.
@@ -2818,7 +2745,6 @@ impl M0Engine {
             self.tick_m14b(t, sim_time_ms);
         }
 
-        // **M4B § "Delta baseline cadence is enforced"** — emit one snapshot
         // event per advanced tick. At ticks where `tick % cadence == 0` the
         // emitter fires `snapshot.baseline_emitted` (full state); otherwise it
         // fires `snapshot.delta_emitted` (JSON-Patch diff vs the previous

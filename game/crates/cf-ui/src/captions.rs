@@ -16,17 +16,14 @@ use crate::HudCaption;
 /// `[N more]` hint".
 pub const CAPTION_QUEUE_MAX_VISIBLE: usize = 4;
 
-/// **M12B** § "Here" radius — sources closer than this distance collapse
 /// to the "here" direction string. Mirrors `cf_audio::SPATIAL_HERE_RADIUS_M`
 /// so the caption renderer doesn't depend on cf-audio.
 pub const CAPTION_HERE_RADIUS_M: f32 = 1.5;
 
-/// **M12B** § Ahead/behind half-cone width — `|azimuth| < π/12` → "ahead";
 /// `|azimuth - π| < π/12` → "behind you". Mirrors
 /// `cf_audio::AHEAD_BEHIND_CONE_RAD`.
 pub const CAPTION_AHEAD_BEHIND_CONE_RAD: f32 = std::f32::consts::FRAC_PI_2 / 6.0;
 
-/// **M12B** § Caption-friendly direction string from listener-relative
 /// `(azimuth_rad, distance_m)`. The output exactly matches
 /// `cf_audio::DirectionString::label()` so the audio event stream + the
 /// caption text use the same vocabulary.
@@ -39,7 +36,6 @@ pub const CAPTION_AHEAD_BEHIND_CONE_RAD: f32 = std::f32::consts::FRAC_PI_2 / 6.0
 /// > - Else: 8-way compass projection (`N`, `NE`, `E`, `SE`, `S`, `SW`,
 /// >   `W`, `NW`)
 ///
-/// Per spec § Notes for the implementer: "Caption parity is
 /// non-negotiable: every `audio.spatial_resolved` event MUST produce
 /// the same caption direction string regardless of
 /// `settings.spatial_audio_enabled`. ACC-A holds.".
@@ -72,7 +68,6 @@ pub fn direction_string(azimuth_rad: f32, distance_m: f32) -> &'static str {
     }
 }
 
-/// **M12B** § Format a complete spatial caption line:
 /// `"<EVENT> — <DIR> <DIST>m"`. Example: `"FOOTSTEP — NW 10 m"`.
 /// The `"here"` direction omits the distance suffix.
 #[must_use]
@@ -210,7 +205,6 @@ mod tests {
         assert_eq!(s.visible().len(), 4);
     }
 
-    // **M12B** § direction_string + spatial_caption_line tests.
 
     #[test]
     fn direction_string_returns_here_within_radius() {

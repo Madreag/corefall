@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "SrvDumpSquadStateParams",
-  "description": "**M7B**: `srv.dump_squad_state` — return the full squad-state JSON\nview (verb registry + formation catalog + archetype-BT node counts +\nper-squad state row). Used by the M25 wheel + Tab overlay + assert\nthe spec's \"verb registry enumerates 50+ named squad commands\"\ninvariant.",
+  "description": "view (verb registry + formation catalog + archetype-BT node counts +\nper-squad state row). Used by the M25 wheel + Tab overlay + assert\nthe spec's \"verb registry enumerates 50+ named squad commands\"\ninvariant.",
   "type": "object",
   "properties": {
     "schema_version": {

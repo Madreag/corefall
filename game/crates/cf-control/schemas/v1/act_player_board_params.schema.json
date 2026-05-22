@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerBoardParams",
-  "description": "**M13** § \"Boarding / disembarking transitions\" — start the 1500ms\nboarding transition into a chassis actor.",
+  "description": "boarding transition into a chassis actor.",
   "type": "object",
   "properties": {
     "chassis_actor_id": {

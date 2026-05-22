@@ -304,7 +304,6 @@ pub fn compute_integrity_pass(
     }
 }
 
-/// **M14F § VAL-CROSS-005**: lateral-axis sibling of
 /// [`compute_integrity_pass`]. Operates on the SAME 256-byte
 /// `IntegrityField` per chunk — there is intentionally no parallel
 /// `lateral_integrity_field`. The wall pass observes integrity
@@ -426,7 +425,6 @@ mod tests {
     use std::mem::size_of;
     use std::time::Instant;
 
-    /// VAL-M14E-024: per-chunk integrity buffer is exactly 256 bytes
     /// shaped as a 16×16 u8 grid.
     #[test]
     fn integrity_field_storage_is_exactly_256_bytes_16_by_16_u8() {
@@ -447,7 +445,6 @@ mod tests {
         assert_eq!(f.effective_integrity(0, 0), u16::from(u8::MAX));
     }
 
-    /// VAL-M14E-008: locking a cell to the beam baseline reports
     /// `effective_integrity == 500` for that cell.
     #[test]
     fn lock_to_beam_promotes_effective_integrity_to_500() {
@@ -482,7 +479,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14E-001: an unsupported span at or below 16 pixels does NOT
     /// decay the integrity below the locked threshold.
     #[test]
     fn integrity_pass_holds_below_16_px_span() {
@@ -499,7 +495,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14E-019: the pass invocation count after T ticks equals
     /// `floor(T/15)` — covered by the higher-level cf-control scheduler
     /// test. Here we just assert cadence constant matches spec.
     #[test]
@@ -534,7 +529,6 @@ mod tests {
         assert_eq!(f.effective_integrity(7, 7), INTEGRITY_BEAM_LOCKED);
     }
 
-    /// VAL-M14E-016: the per-tick collapse-check pass must complete in
     /// ≤ 0.4 ms p99 with 500 actively-dug chunks. We run the pass on
     /// 500 fields and measure p99 wall time. The check runs in release
     /// build only — `cargo test --release -p cf-terrain integrity_pass_p99`.
@@ -579,7 +573,6 @@ mod tests {
         assert_eq!(f.iter().count(), 256);
     }
 
-    /// **M14F § VAL-CROSS-005**: the lateral pass operates against the
     /// SAME `IntegrityField` as the ceiling pass — no parallel buffer.
     /// Toggling a cell via the ceiling pass MUST be observed by the
     /// lateral pass on its next tick.
@@ -595,7 +588,6 @@ mod tests {
         assert_eq!(outcome.min_integrity, before);
     }
 
-    /// VAL-CROSS-005: cadence — when the same chunk's lateral pass is
     /// driven at the N=15 cadence, the union work per chunk per 15 ticks
     /// is exactly 2 pass invocations (one ceiling + one lateral), NOT
     /// 30 (one per tick).
@@ -615,7 +607,6 @@ mod tests {
         assert_eq!(invocations, 20);
     }
 
-    /// VAL-M14F-015: yield attenuation under fixed pressure produces
     /// strict ordering — softer materials (wood=15) bulge faster than
     /// stiffer ones (steel=200).
     #[test]
@@ -647,7 +638,6 @@ mod tests {
         }
     }
 
-    /// **M14F § VAL-CROSS-006**: unified ceiling + lateral pass on 500
     /// chunks completes in ≤ 0.4 ms p99 (release build).
     #[test]
     fn unified_e_f_integrity_pass_p99() {
@@ -675,7 +665,6 @@ mod tests {
         }
     }
 
-    /// **M14F § VAL-M14F-016**: lateral pass runs at N=15 cadence.
     #[test]
     fn lateral_pass_cadence_matches_m14e_n15() {
         assert_eq!(INTEGRITY_PASS_CADENCE_TICKS, 15);

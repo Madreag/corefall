@@ -33,14 +33,12 @@ use crate::{Settings, SCHEMA_VERSION};
 
 impl M0Engine {
     pub(crate) fn emit_actor_events(&self, tick: Tick, sim_time_ms: f64, intent: &ControlIntent, report: &StepReport) {
-        // **M1 Gap C**: collect weapon_fired event_id per actor so subsequent
         // projectile_spawned events parent to the closer fire event rather
         // than the input.intent_received root. Built during the actor-outcomes
         // loop below and consumed by the spawn loop.
         let mut weapon_fired_event_by_actor: BTreeMap<u64, String> = BTreeMap::new();
         // input.intent_received reflects what was actually consumed (after status gating).
         let player_outcome = report.actor_outcomes.iter().find(|o| o.actor == intent.actor).cloned();
-        // M1 audit pass 5 (2026-05-13): spec literal lists 9 player actions
         // whose edge-trigger flag the payload must include
         // (move/aim/fire/reload/jump/dig/select_item/reset/sharp_aim). The
         // prior payload omitted `dig` and `sharp_aim`. `dig` is consumed
@@ -74,14 +72,12 @@ impl M0Engine {
         let intent_event_id = self
             .recorder
             .record(tick, sim_time_ms, "input", "intent_received", player_view, None);
-        // **M1.5**: track latest input event_id for the mission_resolved
         // "show_me_why" replay-handoff anchor (DR-023).
         if let Ok(mut s) = self.state.write() {
             s.last_player_input_event_id = Some(intent_event_id.clone());
         }
 
         for outcome in &report.actor_outcomes {
-            // **M1.5 G8**: the dedicated dying-dwell-elapsed path below emits
             // its own actor_status_changed event with cause='dying_dwell_elapsed'
             // and the correct lethal-cause parent_event_id. Skip the generic
             // status-changed emission for that transition to avoid duplicate
@@ -109,7 +105,6 @@ impl M0Engine {
                         s.last_player_status_event_id = Some(status_event_id.clone());
                     }
                 }
-                // **M13** § "Brain hopping" — when the brain actor takes
                 // status-changing damage, emit `actor.brain_damaged`. On
                 // death (status -> Dead), emit `actor.brain_destroyed` and
                 // surface the LossReason::BrainDestroyed via
@@ -151,7 +146,6 @@ impl M0Engine {
                         );
                     }
                 }
-                // M1 audit pass 6 (2026-05-13): emit BodyHit audio cue when
                 // a travel-impulse triggered the status change (per spec
                 // "And a body-hit sound event is emitted").
                 // M12B: route through emit_audio_cue_for_actor so the 4
@@ -211,13 +205,11 @@ impl M0Engine {
                     }),
                     Some(intent_event_id.clone()),
                 );
-                // **M14** § "Falling damage → leg joint impulse → potential
                 // severance" — walk BOTH foot → shin → leg chains via
                 // `cf_physics::fall_impulse_chain`. When a joint detaches or
                 // gibs from the landing impulse, emit the M14 attachable
                 // events + impulse propagation cascade.
                 //
-                // **M14 audit pass 4 (Finding 2)**:
                 //   (a) Unit fix — `outcome.landed_impulse` is the landing
                 //       velocity magnitude in m/s (NOT impulse). Dividing
                 //       by mass_kg here turned the input into velocity / kg
@@ -419,7 +411,6 @@ impl M0Engine {
                 );
             }
             if outcome.fire_denied_by_swap {
-                // **M6**: per spec, fire is locked during weapon swap. Emit
                 // `actor.action_rejected reason="swap_in_progress"` so the
                 // HUD + replay surface the cause.
                 self.recorder.record(
@@ -447,7 +438,6 @@ impl M0Engine {
             }
             if outcome.fired {
                 let muzzle = outcome.muzzle_origin.unwrap_or(Vec2::ZERO);
-                // **M6**: when the M6 fire-mode post-step pass latched a Charge
                 // misfire, surface it on the `equipment.weapon_fired` payload
                 // alongside the charge_fraction so replay consumers can render
                 // the "MISFIRE" caption + accurate charge bar.
@@ -483,7 +473,6 @@ impl M0Engine {
                     Some(intent_event_id.clone()),
                 );
                 weapon_fired_event_by_actor.insert(outcome.actor.0, weapon_fired_id.clone());
-                // **M6**: emit `equipment.magazine_changed` for the pop +
                 // `equipment.shell_ejected` for the casing on each fire.
                 if let Some(popped) = outcome.popped_round.as_ref() {
                     self.recorder.record(
@@ -523,7 +512,6 @@ impl M0Engine {
                     },
                     tick,
                 );
-                // **M12B** § Per-tick spatial-resolve pass. Emits 4 cosmetic
                 // replay events (audio.spatial_resolved / reverb_applied /
                 // occluded / doppler_shifted) so the replay verifier sees
                 // the same event stream across two engines with identical
@@ -545,16 +533,13 @@ impl M0Engine {
                 // M1: acoustic noise alarm (CCCP HDFirearm.cpp:948 — registered
                 // alarm event consumed by M1.5+ AI perception within the radius).
                 if outcome.loudness_radius > 0.0 {
-                    // M2 audit pass 5 (2026-05-13): capture the
                     // `equipment.alarm_registered` event id and stage it
                     // alongside the AlarmInput so the next-tick AI loop
                     // can thread it through `PerceptionSignal.alarm_event_id`,
                     // which the engine emits as `ai.perception_signal.parent_event_id`.
-                    // M1 audit pass 7 (2026-05-13): spec literal payload
                     // includes `source_id` (the equipment preset id) and
                     // `pos` (= muzzle position). Keep existing aliases for
                     // back-compat.
-                    // **M6**: the `loudness_radius` was already multiplied
                     // by [`SUPPRESSOR_LOUDNESS_FACTOR`] inside
                     // `cf-actor::sim::fire_actor`. Surface the suppressed
                     // flag so replay consumers can render the "suppressed"
@@ -576,7 +561,6 @@ impl M0Engine {
                         }),
                         Some(weapon_fired_id.clone()),
                     );
-                    // **M1.5 G2**: stage the alarm for next tick's AI loop
                     // so guards inside the hearing_radius react ≤1 tick
                     // after the fire event.
                     if let Ok(mut s) = self.state.write() {
@@ -592,7 +576,6 @@ impl M0Engine {
                 // The renderer reads these to apply screen shake and brief
                 // freeze-frame on critical hits. The events fire at the surface
                 // boundary; full juice lands at M5+.
-                // **M4 § Cosmetic event types**: camera punch / shake is
                 // visual juice (see determinism-island-contract.md). Flag
                 // cosmetic so the determinism island excludes it AND the
                 // recorder drops it first under backpressure.
@@ -675,7 +658,6 @@ impl M0Engine {
                     }),
                     Some(dying_parent),
                 );
-                // **M14** § "Ragdoll-on-death" — DYING entry transitions
                 // the actor's body to physical-debris authority. Emit
                 // `physics.ragdoll_activated` carrying the reduced_motion
                 // gating so the renderer can skip the animation while
@@ -713,7 +695,6 @@ impl M0Engine {
                     }),
                     Some(dying_event_id.clone()),
                 );
-                // M2 audit pass 5 (2026-05-13): capture the entered_dying
                 // event id as the player's "last status changed" anchor.
                 // `mission.mission_resolved` on the PlayerDead loss path
                 // uses this so the cause chain walks
@@ -742,7 +723,6 @@ impl M0Engine {
                             "inventory_dropped",
                             json!({
                                 "actor": outcome.actor.0,
-                                // M1 audit pass 6 (2026-05-13): spec literal
                                 // requires `item_id` (the equipment preset id
                                 // like "rifle_m1_default"). Legacy `item_label`
                                 // ("rifle") kept as an alias for backwards
@@ -754,7 +734,6 @@ impl M0Engine {
                             }),
                             Some(dying_event_id.clone()),
                         );
-                        // **M1 R2 / Gap G1**: spawn a `LooseItem` in the sim
                         // so subsequent ticks integrate gravity + emit
                         // `actor.inventory_settled` once it comes to rest.
                         // We acquire the state lock briefly here; the lock
@@ -802,7 +781,6 @@ impl M0Engine {
                     }),
                     Some(dead_parent),
                 );
-                // **M14** § "Ragdoll-on-death" — DEAD transition promotes
                 // the actor's ragdoll to "active". The `physics.authority_changed`
                 // remains the legacy M1 stub; `physics.ragdoll_activated`
                 // here is the M14 dedicated event so consumers can index
@@ -849,7 +827,6 @@ impl M0Engine {
         // Spawn ids are persisted on `EngineMutable::projectile_spawn_event_ids`
         // so a projectile that hits N ticks later can still parent its hit
         // event to the originating spawn.
-        // **M14**: track projectile-spawn origins this tick so the swept-
         // collision priority queue can compute `distance_traveled` for each
         // multi-actor hit using the originating shot's spawn position.
         let mut spawn_origins_this_tick: BTreeMap<u64, [f32; 2]> = BTreeMap::new();
@@ -880,13 +857,11 @@ impl M0Engine {
             spawn_velocities_this_tick.insert(spawn.id, [spawn.velocity.x, spawn.velocity.y]);
             if let Ok(mut s) = self.state.write() {
                 s.projectile_spawn_event_ids.insert(spawn.id, id);
-                // **M14C** § stash the round kind so a HEAT / APFSDS hit
                 // resolved N ticks later still routes to the M14C
                 // producer pipeline.
                 s.projectile_round_kinds.insert(spawn.id, spawn.round_kind);
             }
         }
-        // **M14 audit pass 3 (Findings 3 + 4)**: build the swept-collision
         // priority queue per projectile from the new HitOutcome fields.
         // The cf-actor sim now collects ALL actors a projectile crosses
         // this tick (not just the closest) and stamps each HitOutcome
@@ -940,7 +915,6 @@ impl M0Engine {
             // Spawns persist on `EngineMutable::projectile_spawn_event_ids`
             // because hits commonly fire ticks after the spawn.
             //
-            // **M14** fix: do NOT prune the spawn entry inside the hit loop —
             // a swept-collision shot can produce multiple hits for the same
             // projectile this tick, and every hit's `parent_event_id` must
             // resolve to the same spawn. Pruning happens after the hits loop
@@ -973,7 +947,6 @@ impl M0Engine {
             // + the per-segment breastwork HP gate; M14 owns the energy
             // attenuation pass that consumes DamageRoute. Wire the call
             // here when M14's damage pipeline lands.
-            // **M14** § "Full swept-collision pipeline" — emit
             // `combat.swept_collision` for every projectile-vs-actor hit
             // with the priority index/total computed from the
             // closer-first ordering built above. The event chains to
@@ -1089,7 +1062,6 @@ impl M0Engine {
                     }
                 }
             }
-            // **M8** (Cluster C fix): the projectile-hit lethal edge is the
             // production wiring point for `killcam.played` / `killcam.skipped`.
             // When the projectile transitions the player from a live status
             // into DYING / DEAD, fire `M0Engine::trigger_killcam_on_death`
@@ -1106,7 +1078,6 @@ impl M0Engine {
                     }
                 }
             }
-            // **M14G § VAL-M14G-027 / VAL-CROSS-001 / VAL-M14G-011**:
             // emit a typed `wound.created` for the projectile hit using
             // the cf-physics `classify_gunshot` producer. The legacy
             // `combat.wound_added` placeholder is gone — per VAL-M14G-027
@@ -1149,7 +1120,6 @@ impl M0Engine {
                 }
             }
             let wound_event_id = wound_event_id.unwrap_or_else(|| projectile_hit_event_id.clone());
-            // **M9** § internal.* + concussion.* — fire the deep-damage
             // events from the production hit path. Spec § "Internal organ
             // damage / Internal circuit damage / Concussion bands" requires
             // schemas WITH emission sites. Schemas live in cf-replay/schemas/
@@ -1178,7 +1148,6 @@ impl M0Engine {
                 .and_then(|actors| actors.get(&hit.target).map(|a| a.team.clone()))
                 .map(|team| team.eq_ignore_ascii_case("red_robot") || team.eq_ignore_ascii_case("robot"))
                 .unwrap_or(false);
-            // **M14** § "Per-organ internal damage routing" — replace the
             // M9 organ_id/circuit_id stubs with cf_internal's weighted
             // selection. Hit zone proximity drives the candidate pool;
             // the engine's seeded RNG picks deterministically.
@@ -1256,7 +1225,6 @@ impl M0Engine {
                         }),
                         Some(circuit_event_id),
                     );
-                    // **M14** § "Per-circuit failure cascade applies afflictions".
                     let (affliction_kind, severity) = match circuit_id {
                         "power_core" => ("power_failure", 1.0),
                         "cpu" => ("control_lost", 1.0),
@@ -1320,7 +1288,6 @@ impl M0Engine {
                         }),
                         Some(organ_event_id),
                     );
-                    // **M14** § "Per-organ failure cascade applies afflictions".
                     // Each destroyed organ triggers a specific affliction
                     // per CCCP organ-failure-cascade table.
                     let (affliction_kind, severity) = match organ_id {
@@ -1352,7 +1319,6 @@ impl M0Engine {
                     );
                 }
             }
-            // **M9** § Concussion bands — accumulate dose per hit and emit
             // band crossings (Clear → Mild → Moderate → Severe → KO_Imminent
             // → KO) per concussion.band_changed schema. KO threshold (=100)
             // emits ko_threshold_crossed. Dose scales with damage (cap at
@@ -1432,7 +1398,6 @@ impl M0Engine {
             // damage grammar carries crit info.
             const CRITICAL_DAMAGE_THRESHOLD: f32 = 20.0;
             if hit.damage > CRITICAL_DAMAGE_THRESHOLD {
-                // **M4 § Cosmetic event types**: hit-stop is visual juice
                 // per determinism-island-contract.md.
                 self.recorder.record_cosmetic(
                     tick,
@@ -1448,7 +1413,6 @@ impl M0Engine {
                     Some(projectile_hit_event_id.clone()),
                 );
             }
-            // **M5**: emit chassis-grade events from the hit outcome.
             if let Some(outcome) = &hit.chassis_outcome {
                 self.emit_chassis_events(
                     tick,
@@ -1457,7 +1421,6 @@ impl M0Engine {
                     outcome,
                     Some(projectile_hit_event_id.clone()),
                 );
-                // **M14** § "Limb detachment via joint impulse" — when a
                 // zone is destroyed by this hit, route the impulse through
                 // a `cf_physics::Joint`. If `joint_impulse > joint_strength`
                 // emit `attachable.detached`; if `>= gib_impulse_limit`
@@ -1587,7 +1550,6 @@ impl M0Engine {
                             }),
                             Some(projectile_hit_event_id.clone()),
                         );
-                        // **M14I**: register the severed limb so the
                         // post-survival pass can promote it to phantom_limb.
                         // Chains phantom_limb.acquired to attachable.detached
                         // so the cause-chain walker traces back to the
@@ -1624,7 +1586,6 @@ impl M0Engine {
                         Some(projectile_hit_event_id.clone()),
                     );
                 }
-                // **M13** § "Limb loss functional consequences" — head/torso
                 // destruction is INSTANT DEATH per the CCCP decapitation rule.
                 // Forcing `actor.hp = 0` here lets the existing status-change
                 // pipeline emit `actor_status_changed → Dead` + brain death
@@ -1638,7 +1599,6 @@ impl M0Engine {
                         }
                     }
                 }
-                // **M14** § "Full penetration ray flow" — when armor was
                 // breached, traverse the chassis interior modules in ray-
                 // order via `cf_physics::traverse_ray`. Emits
                 // `armor.penetration_ray_traversed` + per-module damage
@@ -1654,7 +1614,6 @@ impl M0Engine {
                         Some(projectile_hit_event_id.clone()),
                     );
                 }
-                // **M14C** § HEAT / APFSDS producer wiring — when the
                 // projectile is a tank-grade round, route the impact
                 // through `heat_impact_producer` / `apfsds_impact_producer`
                 // and emit `armor.era_pre_detonated` (strict ordering)
@@ -1684,7 +1643,6 @@ impl M0Engine {
                     );
                 }
             }
-            // **M8** (Cluster E fix): auto-trigger a 100 ms hit-stop pulse on
             // an AP-round hit per spec § "Hit-stop on impact — Given melee
             // hit OR AP round hit". At M8 baseline, an AP-round hit is
             // detected via the closest available signal in the M6-M8
@@ -1719,7 +1677,6 @@ impl M0Engine {
                 let _ = self.recorder.record(tick, sim_time_ms, "camera", "hit_stop", payload, None);
             }
         }
-        // **M14** fix: prune the spawn_event_id map AFTER the hits loop so
         // multi-actor swept-collision hits all parent to the same spawn.
         // The pre-M14 code pruned per-hit which dropped the parent ref for
         // every subsequent hit of the same projectile (the priority queue
@@ -1733,7 +1690,6 @@ impl M0Engine {
                 if let Ok(mut s) = self.state.write() {
                     for id in &resolved_ids {
                         s.projectile_spawn_event_ids.remove(id);
-                        // **M14C** § drop the projectile's round-kind entry
                         // alongside the spawn-id entry; the projectile is
                         // resolved this tick so future ticks can't read
                         // it again.
@@ -1749,7 +1705,6 @@ impl M0Engine {
                 .ok()
                 .and_then(|s| s.projectile_spawn_event_ids.get(&expired.id).cloned())
                 .unwrap_or_else(|| intent_event_id.clone());
-            // **M14** § "Bullet sharpness decay over distance" — when the
             // projectile expires by reaching max_range (TTL elapsed), emit
             // `combat.bullet_sharpness_decay` carrying the distance + decay
             // band so replay viewers + AI agents can verify the round
@@ -1813,7 +1768,6 @@ impl M0Engine {
             );
         }
 
-        // **M1 R2 / Gap G1**: emit `actor.inventory_settled` for every loose
         // item that came to rest this tick. parent_event_id walks back to
         // the originating `actor.inventory_dropped` so cf-tools-replay-viewer
         // can render the full chain inventory_dropped → inventory_settled.

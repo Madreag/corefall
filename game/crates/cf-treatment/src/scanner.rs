@@ -11,7 +11,6 @@ use cf_wound::{SeverityBand, WoundKind};
 
 pub const SCAN_DURATION_SECONDS_DEFAULT: f32 = 30.0;
 
-/// **M14H** § single line on the scanner report (per-wound).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScanWoundLine {
     pub wound_id: u64,
@@ -24,7 +23,6 @@ pub struct ScanWoundLine {
     pub dirt_pct: f32,
 }
 
-/// **M14H** § single line on the scanner report (per-disease).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScanDiseaseLine {
     pub disease_id: String,
@@ -32,14 +30,12 @@ pub struct ScanDiseaseLine {
     pub severity: f32,
 }
 
-/// **M14H** § single line on the scanner report (per-psych signal).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScanPsychLine {
     pub signal_id: String,
     pub severity: f32,
 }
 
-/// **M14H** § scanner output snapshot consumed by the Patient Detail panel.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScanReport {
     pub actor_id: u64,
@@ -65,7 +61,6 @@ impl ScanReport {
     }
 }
 
-/// **M14H** § Medical Scanner state machine.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MedicalScanner {
     pub actor_id: u64,

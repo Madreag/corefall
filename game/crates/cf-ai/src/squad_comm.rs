@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::constants::{seconds_to_ticks_for, SQUAD_COMM_RELAY_DELAY_SECONDS};
 
-/// **M7-A**: pending squad-comm relay. The originator queues one entry per
 /// detection event; the engine ticks the latch each tick and fires the
 /// `ai.squad_comm_relayed` event when the delay elapses.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -37,7 +36,6 @@ impl SquadCommPending {
     }
 }
 
-/// **M7-A**: squad-comm relay event payload (consumed by cf-control).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SquadCommRelayedEvent {
     pub originator_actor_id: u64,

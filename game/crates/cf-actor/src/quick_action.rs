@@ -65,14 +65,12 @@ pub struct QuickActionSlot {
     /// `true` when this slot is disabled by an active hazard (EM disruption,
     /// comms blackout) — sets the rejection reason for invocations.
     pub disabled_by_hazard: bool,
-    /// **M14J** § "context-sensitive (only visible when the situation
     /// supports them)" — `true` when the slot's contextual prerequisite is
     /// currently satisfied (e.g. vault is only visible when a vault
     /// candidate is in the parkour signal). Defaults to `true` for slots
     /// without a context predicate.
     #[serde(default = "default_context_available")]
     pub context_available: bool,
-    /// **M14J** § set to a slice id when this slot represents one of the
     /// 4 advanced-mobility pie slices (`vault` / `grapple` / `mount` /
     /// `zip_brake`). Empty string for non-M14J slots.
     #[serde(default)]
@@ -267,7 +265,6 @@ pub struct QuickActionBarState {
     pub q_press_tick: u64,
     /// `true` while the Q key is held.
     pub q_held: bool,
-    /// **M14J § "Quick-action wheel (M14A) gets four new pie slices:
     /// `[Vault] [Grapple] [Mount/Dismount] [Zip-Brake]` — context-sensitive
     /// (only visible when the situation supports them)"**. Lives parallel
     /// to the 8-slot bar so the radial renderer can overlay them when
@@ -285,7 +282,6 @@ impl QuickActionBarState {
         bar.slots[2] = QuickActionSlot::melee("knife_m6_default");
         bar.slots[3] = QuickActionSlot::grenade("frag_m6_default", 3);
         bar.slots[4] = QuickActionSlot::consumable("medkit", 1);
-        // **M14J § "Quick-action wheel (M14A) gets four new pie slices:
         // `[Vault] [Grapple] [Mount/Dismount] [Zip-Brake]` — context-sensitive
         // (only visible when the situation supports them)". The slices live
         // in a parallel overlay (not in the 8-slot bar) so they don't
@@ -295,7 +291,6 @@ impl QuickActionBarState {
         bar
     }
 
-    /// **M14J** § "register the four new context-sensitive slices via the
     /// M14A `qab.register` API". Pushes the four slices into the parallel
     /// `m14j_slices` overlay. All slices start with `context_available=false`
     /// so they appear only when the engine sets the relevant context flag.
@@ -314,7 +309,6 @@ impl QuickActionBarState {
         }
     }
 
-    /// **M14J** § returns the list of registered M14J slice ids + whether
     /// they're currently context-available. Used by the HUD + observe surface.
     pub fn m14j_context_slices(&self) -> Vec<(String, bool)> {
         self.m14j_slices
@@ -323,7 +317,6 @@ impl QuickActionBarState {
             .collect()
     }
 
-    /// **M14J** § per-tick update of the M14J slice context flags. Called
     /// by the engine with the actor's current parkour/rope/mount/zipline
     /// state booleans.
     pub fn update_m14j_context(

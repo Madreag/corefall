@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ObserveActorCoverStateParams",
-  "description": "**M9B-3 / VAL-M9B-CFCTL-002**: `observe.actor.cover_state` — read\nthe actor's current trench cover state. Returns\n`{ cover_state: \"Exposed\" | \"Partial\" | \"Full\" }`. `actor_id=None`\nresolves to the player.",
+  "description": "the actor's current trench cover state. Returns\n`{ cover_state: \"Exposed\" | \"Partial\" | \"Full\" }`. `actor_id=None`\nresolves to the player.",
   "type": "object",
   "properties": {
     "actor_id": {

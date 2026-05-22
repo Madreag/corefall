@@ -12,7 +12,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14B** § scenario manifest entry for a gravity override.
 ///
 /// Serde-untagged so the on-disk RON form looks like an enum without the
 /// `kind: ` prefix:
@@ -81,7 +80,6 @@ impl ScenarioGravityOverride {
     }
 }
 
-/// **M14B** § scenario manifest entry for a wind aperture coupling two
 /// cells. The producer reads `(cell_high_id, cell_low_id)` pressures
 /// from `atmosphere_cells` and emits an actor-facing force vector
 /// along `axis` × aperture_area.
@@ -97,7 +95,6 @@ pub struct ScenarioWindSource {
     pub jet_half_width: f32,
 }
 
-/// **M14B** § scenario manifest entry for an authored atmosphere cell.
 /// Provides the pressure + temperature + gas composition the producer
 /// kernel consumes. M19's full PV=nRT kernel will eventually replace
 /// these authored cells with live state; the producer-facing surface

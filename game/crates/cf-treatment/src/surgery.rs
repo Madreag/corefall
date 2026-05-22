@@ -26,7 +26,6 @@ pub const SURGERY_PHASE_OPERATE_SECONDS_PER_STEP: f32 = 30.0;
 pub const SURGERY_PHASE_CLOSE_SECONDS: f32 = 20.0;
 pub const SURGERY_PHASE_RECOVER_SECONDS: f32 = 30.0 * 60.0;
 
-/// **M14H** § 5-phase surgery lifecycle.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -79,7 +78,6 @@ impl SurgeryFailureReason {
     }
 }
 
-/// **M14H** § final surgery outcome.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "outcome")]
 pub enum SurgeryOutcome {
@@ -94,7 +92,6 @@ pub enum SurgeryOutcome {
     },
 }
 
-/// **M14H** § surgery event stream entry.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "event")]
 pub enum SurgeryEvent {
@@ -130,7 +127,6 @@ pub enum SurgeryEvent {
     },
 }
 
-/// **M14H** § per-step result from the Operate phase.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SurgeryStepResult {
     pub step_index: u32,
@@ -139,7 +135,6 @@ pub struct SurgeryStepResult {
     pub threshold_x1000: u32,
 }
 
-/// **M14H** § surgery session state machine. Drive via [`SurgerySession::tick`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct SurgerySession {
     pub actor_id: u64,
@@ -373,7 +368,6 @@ impl SurgerySession {
 mod tests {
     use super::*;
 
-    /// **M14H** Gherkin scenario 3: Surgery removes embedded shrapnel.
     /// Given 3 ShrapnelEmbedded wounds + surgery_table + surgeon, when the
     /// full 5-phase sequence completes then 3× treatment.applied (one per
     /// shrapnel removed) — modeled here as 3 Operate skill-check passes.

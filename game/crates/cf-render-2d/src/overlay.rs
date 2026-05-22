@@ -44,7 +44,6 @@ pub enum OverlayMode {
     Mobility,
     Hazard,
     BuildRepair,
-    /// **M9B**: tactical cover-state overlay. Each trench segment on
     /// screen renders a chevron sprite labelled with its cover state.
     Tactical,
 }
@@ -78,7 +77,6 @@ impl OverlayMode {
         }
     }
 
-    /// VAL-M9B-HUD-002: every overlay variant in display order. After
     /// M9B the length is 6 (`Integrity..=Tactical`), excluding `Off`.
     #[must_use]
     pub const fn variants() -> [OverlayMode; 6] {
@@ -115,7 +113,6 @@ impl TacticalChevronSprite {
     }
 }
 
-/// VAL-M9B-HUD-TACTICAL-001: produce one chevron sprite per supplied
 /// trench segment, labelled with its derived cover state for the
 /// `stance` parameter (defaults to Standing).
 ///
@@ -192,7 +189,6 @@ pub fn material_tint(mode: OverlayMode, id: MaterialId) -> [u8; 4] {
             }
         }
         OverlayMode::Mobility => {
-            // M3 audit pass 5 (2026-05-13): metal_nohook detection moved
             // from refusal_reason string (renamed to material_not_diggable)
             // to direct material-id comparison.
             if aff.id == cf_terrain::MATERIAL_AIR {
@@ -215,7 +211,6 @@ pub fn material_tint(mode: OverlayMode, id: MaterialId) -> [u8; 4] {
             }
         }
         OverlayMode::BuildRepair => {
-            // M3 audit pass 5 (2026-05-13): all non-diggable surfaces share
             // the stable `material_not_diggable` refusal reason. The
             // anchor/metal_nohook visual cue now relies on the material id
             // directly rather than the refusal_reason vocabulary.
@@ -229,7 +224,6 @@ pub fn material_tint(mode: OverlayMode, id: MaterialId) -> [u8; 4] {
             }
         }
         OverlayMode::Tactical => {
-            // **M9B**: Tactical overlay tints the canonical terrain with a
             // neutral desaturated mask — the per-segment chevron sprites
             // carry the cover-state semantics. Air stays transparent.
             if aff.id == cf_terrain::MATERIAL_AIR {
@@ -277,7 +271,6 @@ mod tests {
         assert_eq!(OverlayMode::parse_mode("garbage"), OverlayMode::Off);
     }
 
-    /// VAL-M9B-HUD-002: `OverlayMode::variants().len() == 6` after M9B.
     #[test]
     fn material_overlay_tactical_mode_is_registered() {
         let variants = OverlayMode::variants();

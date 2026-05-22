@@ -32,7 +32,6 @@ use crate::state::{ActorView, ObserveFrame, ObserveSettings, RunStatus};
 use crate::{Settings, SCHEMA_VERSION};
 
 impl M0Engine {
-    /// **M12C**: shared helper — given an emitted `CinematicEvent`,
     /// translate it into the canonical replay event surface.
     pub(crate) fn emit_cinematic_event(
         &self,
@@ -109,10 +108,8 @@ impl M0Engine {
         );
     }
 
-    /// **M12C**: select a deterministic stinger variant for `cinematic_id`
     /// from the per-storyteller stinger table. Pure function of
     /// `(cinematic_id, seed, table)` so replay parity holds.
-    /// Per spec § "the per-storyteller stinger picks a variant".
     /// Returns `None` when the table parse fails or has zero variants.
     pub fn select_opening_stinger(
         &self,
@@ -123,7 +120,6 @@ impl M0Engine {
         table.pick(cinematic_id, self.config.seed).cloned()
     }
 
-    /// **M12C**: engage a cinematic kernel with an optional stinger
     /// variant pre-injected into the briefing card. The stinger's
     /// `line_a` / `line_b` are appended to `script.briefing_card_lines`
     /// before kernel construction so the stinger surfaces on the
@@ -153,7 +149,6 @@ impl M0Engine {
         self.engage_cinematic_kernel(id, source, storyteller, script, narration, replay);
     }
 
-    /// **M12C**: engage a cinematic kernel at scenario/mission load OR
     /// at codex replay. Fires the initial `cinematic.started` event +
     /// `cinematic.skipped { reason: sandbox_suppressed }` +
     /// `cinematic.ended` pair when the storyteller is Sandbox.
@@ -180,7 +175,6 @@ impl M0Engine {
         let parent = state.run_started_event_id.clone();
         let sandbox_suppressed = kernel.profile().suppress_cinematics;
         state.cinematic_seen_set = kernel.seen().clone();
-        // **M12C**: engage the per-cinematic audio mixer + per-storyteller
         // LUFS overrides (Cassandra cello @ -22 LUFS during narration,
         // Randy percussion +20% contrast, etc.) per spec acceptance
         // criterion "Per-storyteller cinematic profile biases camera +
@@ -215,7 +209,6 @@ impl M0Engine {
         }
     }
 
-    /// **M12C**: advance the cinematic kernel by `dt_ms`. cf-app's
     /// per-frame loop calls this between physics + render steps. Emits
     /// any `Started` / `Chapter` / `NarrationWord` / `Ended` events
     /// that fired during the advance. Returns the kernel state after
@@ -257,7 +250,6 @@ impl M0Engine {
         state.cinematic_seen_set = seen;
         let parent = state.run_started_event_id.clone();
         if kernel_ended {
-            // **M12C** § "the gameplay camera + input are restored on the
             // next tick" — release the takeover + mixer when the kernel
             // ends so the renderer falls back to gameplay camera.
             state.cinematic_kernel = None;
@@ -271,7 +263,6 @@ impl M0Engine {
         Some(snapshot)
     }
 
-    /// **M12C**: read the renderer-facing cinematic camera takeover
     /// snapshot. cf-app's bridge mirrors this into
     /// `cf-render-2d::camera_takeover::CinematicCameraTakeover` each
     /// frame. Per spec § Notes for the implementer: "The cinematic
@@ -281,7 +272,6 @@ impl M0Engine {
         self.state.read().ok().map(|s| s.cinematic_takeover).unwrap_or_default()
     }
 
-    /// **M12C**: read the cinematic-mixer LUFS snapshot. cf-app's audio
     /// bridge consumes this each frame to attenuate the live audio
     /// backend per spec § "Cinematic mixer ducks music under narration".
     pub fn cinematic_mixer_snapshot(&self) -> cf_audio::CinematicMix {
@@ -292,7 +282,6 @@ impl M0Engine {
             .unwrap_or_default()
     }
 
-    /// **M12C**: read-only handle to the persistent seen-set of
     /// cinematics the player has watched. Per spec § Notes: "Codex
     /// unlock state lives in `save.cinematic_seen_set: HashSet<CinematicId>`;
     /// persisted via M41 save format." M41 reads this; M12C ships the
@@ -304,7 +293,6 @@ impl M0Engine {
             .unwrap_or_default()
     }
 
-    /// **M12C**: bulk-replace the seen-set when M41 loads a save. Drops
     /// any in-memory seen-set the engine had accumulated. Per spec §
     /// Notes: "Codex unlock state lives in `save.cinematic_seen_set
     /// : HashSet<CinematicId>`; persisted via M41 save format."
@@ -314,8 +302,6 @@ impl M0Engine {
         }
     }
 
-    /// **M12C**: resolve the storyteller for the current cinematic boot.
-    /// Per spec § Per-storyteller cinematic style: "The cinematic player
     /// reads the active storyteller from M25 director state and applies
     /// its profile globally." M25 is still active; M12C reads from
     /// `Settings.storyteller`, falling back to Cassandra Classic.
@@ -325,7 +311,6 @@ impl M0Engine {
             .unwrap_or(cf_cinematic::StorytellerId::CassandraClassic)
     }
 
-    /// **M12C**: deterministic 40% rival-taunt roll per spec §
     /// Between-mission cinematic ("40% chance the rival's faction-
     /// channel taunt plays over a static portrait card"). Drained by
     /// the between-mission engage path. M25 will fold real rival-alive

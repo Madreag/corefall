@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::ChassisKind;
 
-/// **M13** § "Chassis ability slots — Time stop, Time slow, and 6 other launch
 /// abilities". Eight launch abilities + per-chassis slot count.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -46,7 +45,6 @@ impl ChassisAbility {
         }
     }
 
-    /// Per spec § "Chassis ability slots" table. (effect_seconds, cooldown_seconds).
     pub fn defaults(self) -> (f32, f32) {
         match self {
             ChassisAbility::TimeStop => (1.5, 30.0),
@@ -75,7 +73,6 @@ impl ChassisAbility {
     }
 }
 
-/// **M13** § "Chassis ability slots" — one slot's runtime state.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AbilitySlotState {
     pub ability: ChassisAbility,
@@ -111,7 +108,6 @@ impl AbilitySlotState {
     }
 }
 
-/// **M13** § "Chassis ability slots" — per-chassis active ability roster.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ChassisAbilitySlots {
     /// Maximum ability slot count for this chassis (derived from kind).

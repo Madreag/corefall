@@ -68,24 +68,18 @@ pub struct DamageRecap {
     pub reactor_damage_events: u64,
     pub reactor_destroyed: bool,
     pub reactor_destroyed_at_tick: Option<u64>,
-    /// **M14 audit pass 3 (GAP-M10-04 LOW fix)**: per-source actor hits
     /// + cumulative damage. Each entry maps shooter actor_id → (hits, damage).
     pub by_source_actor: BTreeMap<u64, (u64, f64)>,
-    /// **M14 audit pass 3 (GAP-M10-04)**: per-weapon hits keyed by weapon
     /// label (e.g. "rifle_m1_default", "knife_m6_default"). Sourced from
     /// `equipment.weapon_fired.weapon` events crossed with hits.
     pub by_weapon: BTreeMap<String, u64>,
-    /// **M14 audit pass 3 (GAP-M10-04)**: per-surface_kind hits keyed by
     /// the `surface_kind` payload field on `combat.projectile_hit_mo`.
     /// Drops projectile_hits w/o explicit surface_kind into "unknown".
     pub by_surface_kind: BTreeMap<String, u64>,
-    /// **M14 audit pass 3 (GAP-M10-04)**: per-damage_kind hits keyed by
     /// `damage_kind` (kinetic / piercing / slash / blunt / explosion / etc.).
     pub by_damage_kind: BTreeMap<String, u64>,
-    /// **M14 audit pass 3 (GAP-M10-04)**: per-layer (External / Internal / Core)
     /// hits sourced from `armor.layer_hp_changed.layer`.
     pub by_layer_struck: BTreeMap<String, u64>,
-    /// **M14 audit pass 3 (GAP-M10-04)**: count of armor breaches (layer_destroyed).
     pub pierced_count: u64,
 }
 
@@ -202,7 +196,6 @@ fn compose_objectives(bundle: &Bundle) -> Vec<Objective> {
 
 fn compose_damage(bundle: &Bundle) -> DamageRecap {
     let mut recap = DamageRecap::default();
-    // **M14 audit pass 3 (GAP-M10-04)**: track weapon-fired events to
     // resolve weapon labels on subsequent projectile_hit events.
     let mut weapon_by_projectile: BTreeMap<u64, String> = BTreeMap::new();
     for event in bundle.events.iter() {
@@ -592,7 +585,6 @@ pub fn render_markdown(debrief: &Debrief<'_>) -> String {
     }
     let _ = writeln!(out);
 
-    // **M14 audit pass 3 (GAP-M10-01 MEDIUM fix)**: M10 spec § Debrief
     // markdown lists 18 mandated `##` sections. Sections 9-17 are stubs
     // that ladder up when M9 producer events fire (most are placeholder
     // headers today; once armor/internal/concussion/fluid/origin/hazard/
@@ -933,7 +925,6 @@ mod tests {
             "## Cause Chain",
             "## Accessibility Surface",
             "## Recorder Health",
-            // M14 audit pass 3 (GAP-M10-01) — 10 additional spec-mandated sections.
             "## Mission State",
             "## Resource Timeline",
             "## Armor Durability",

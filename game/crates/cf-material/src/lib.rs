@@ -102,7 +102,6 @@ pub type MaterialId = u16;
 pub const LAUNCH_MATERIAL_IDS: &[MaterialId] = &[0, 1, 2, 3, 4, 5, 6, 7];
 
 /// Canonical material name per id. Used by the loader to enforce the
-/// DR-007 launch order (id=0 → "air", id=1 → "dirt", etc.).
 pub const LAUNCH_MATERIAL_NAMES: &[(MaterialId, &str)] = &[
     (0, "air"),
     (1, "dirt"),
@@ -137,7 +136,6 @@ pub struct MaterialDef {
     pub anchorable: bool,
     /// Damages actors on contact when true.
     ///
-    /// M3 audit pass 7 (2026-05-13): spec literal field name is
     /// `damage_on_touch`; `hazard` retained as the canonical Rust
     /// identifier with `damage_on_touch` accepted as a serde alias so
     /// scenario manifests authored against the spec literal deserialize
@@ -183,14 +181,12 @@ pub struct MaterialDef {
     pub priority: Option<i32>,
     #[serde(default)]
     pub piling: Option<bool>,
-    /// **M14E** § Per-material structural-support strength. Drives the
     /// per-chunk integrity field's "locked" baseline: integrity at any
     /// pixel anchored to a load-bearing material is at least this value
     /// (default 0 = no support; concrete=50; reinforced=200; support_beam=500).
     /// Missing entries fall back to 0 via [`structural_support_strength_for`].
     #[serde(default)]
     pub structural_support_strength: Option<u16>,
-    /// **M14F** § Per-material lateral yield strength. Drives the
     /// lateral integrity field's bulge/crack/rupture cascade — the
     /// 90°-rotated sibling of `structural_support_strength`. Spec
     /// literal: concrete=50, brick=30, steel=200, wood=15, dirt=10;
@@ -251,7 +247,6 @@ pub struct MaterialDef {
     pub low_pass_cutoff_hz: Option<f32>,
 }
 
-/// **M12B** § Canonical per-material acoustic fallback. When a material row
 /// is missing any of the four acoustic fields, lookups return these defaults
 /// (the "default dirt" row) so the audio backend always has a deterministic
 /// number to plug into the HRTF / reverb / occlusion / low-pass pipeline.
@@ -274,7 +269,6 @@ impl AcousticDefaults {
     pub const LOW_PASS_CUTOFF_HZ: f32 = 2000.0;
 }
 
-/// **M12B** § Resolved per-material acoustic profile. Returned by
 /// [`MaterialDef::acoustic_profile`] / [`MaterialRegistry::acoustic_for`]. All
 /// four fields are guaranteed populated — missing data falls back to the
 /// [`AcousticDefaults`] row.
@@ -323,7 +317,6 @@ impl AcousticProfile {
     }
 }
 
-/// **M14E** § Canonical per-material `structural_support_strength` for the
 /// load-bearing baseline that the per-chunk integrity field uses to lock
 /// anchored pixels. Returns the spec-baked values when the material name
 /// is recognized; falls back to `0` for unsupported materials.
@@ -341,7 +334,6 @@ pub fn structural_support_strength_for(material_name: &str) -> u16 {
     }
 }
 
-/// **M14F** § Canonical per-material `lateral_yield_strength` for the
 /// lateral wall collapse pass. Returns the spec-baked values when the
 /// material name is recognized; otherwise returns `None` so callers can
 /// fall back to the material's compressive strength
@@ -363,7 +355,6 @@ pub fn lateral_yield_strength_for(material_name: &str) -> Option<u16> {
     }
 }
 
-/// **M14F** § Effective lateral yield strength for a material identified
 /// only by name (no full `MaterialDef`). Returns the spec-baked value
 /// when known, otherwise falls back to compressive strength
 /// ([`structural_support_strength_for`]). Per VAL-M14F-021.
@@ -374,7 +365,6 @@ pub fn lateral_yield_strength_value_for(material_name: &str) -> u16 {
 }
 
 impl MaterialDef {
-    /// **M14E** § Resolved structural-support strength for this material.
     /// Uses the explicit registry field when set; otherwise falls back to
     /// [`structural_support_strength_for`].
     #[must_use]
@@ -383,7 +373,6 @@ impl MaterialDef {
             .unwrap_or_else(|| structural_support_strength_for(self.name.as_str()))
     }
 
-    /// **M14F** § Compressive strength for this material — alias for
     /// [`structural_support_strength_value`]. Surfaced under the
     /// "compressive" name so the lateral-yield default path
     /// (VAL-M14F-021) reads as the spec says: "default = same as
@@ -393,7 +382,6 @@ impl MaterialDef {
         self.structural_support_strength_value()
     }
 
-    /// **M14F** § Resolved lateral yield strength for this material.
     /// Resolution order (per VAL-M14F-015 + VAL-M14F-021):
     ///   1. Explicit `lateral_yield_strength` field on the registry row.
     ///   2. Spec-baked override via [`lateral_yield_strength_for`].
@@ -409,7 +397,6 @@ impl MaterialDef {
         self.compressive_strength()
     }
 
-    /// **M12B** § Resolved acoustic profile for this material. Missing
     /// fields fall back to [`AcousticProfile::fallback`].
     ///
     /// Per M12B spec § Notes for the implementer: "missing acoustic
@@ -442,7 +429,6 @@ impl MaterialDef {
     }
 }
 
-/// **M12B** § Once-per-material warning helper. Tracks seen ids so the
 /// log spam is bounded — the warning fires exactly once per missing
 /// material id (per process). Test-only `reset_acoustic_warning_cache`
 /// drains the state between tests.
@@ -526,7 +512,6 @@ impl MaterialRegistry {
         self.materials.iter().map(|m| (m.name.clone(), m.id)).collect()
     }
 
-    /// **M12B** § Acoustic profile lookup by material id. Returns the
     /// resolved [`AcousticProfile`] (with fallbacks applied per
     /// [`AcousticDefaults`]). Returns `AcousticProfile::fallback()` for
     /// unknown ids so audio resolution never panics on a missing material.
@@ -538,7 +523,6 @@ impl MaterialRegistry {
         }
     }
 
-    /// **M12B** § Acoustic profile lookup by material name (snake_case).
     /// Returns the canonical fallback when the name is unknown.
     #[must_use]
     pub fn acoustic_for_name(&self, name: &str) -> AcousticProfile {
@@ -689,7 +673,6 @@ mod tests {
         let _: MaterialId = 0;
     }
 
-    /// VAL-M14E-011: per-material structural_support_strength baseline
     /// per spec (default 0 / concrete=50 / reinforced=200 / support_beam=500).
     #[test]
     fn structural_support_strength_baseline_matches_spec() {
@@ -702,7 +685,6 @@ mod tests {
         assert_eq!(structural_support_strength_for("unknown_alloy"), 0);
     }
 
-    /// VAL-M14E-011: MaterialDef may carry an explicit override which wins
     /// over the canonical baseline.
     #[test]
     fn material_def_structural_support_strength_uses_override() {
@@ -720,7 +702,6 @@ mod tests {
         assert_eq!(r.materials[0].structural_support_strength_value(), 50);
     }
 
-    /// VAL-M14F-015: per-material lateral_yield_strength baseline matches
     /// the spec literal values (concrete=50, brick=30, steel=200, wood=15,
     /// dirt=10).
     #[test]
@@ -736,7 +717,6 @@ mod tests {
         assert_eq!(lateral_yield_strength_for("unknown_alloy"), None);
     }
 
-    /// VAL-M14F-021: default lateral_yield_strength for materials without
     /// an explicit override equals the material's compressive strength.
     #[test]
     fn lateral_yield_strength_defaults_to_compressive() {
@@ -755,7 +735,6 @@ mod tests {
         assert_eq!(lateral_yield_strength_value_for("air"), 0);
     }
 
-    /// VAL-CROSS-025: cf-material exposes BOTH structural_support_strength
     /// (M14E) and lateral_yield_strength (M14F) independently — no field
     /// shadowing.
     #[test]
@@ -774,7 +753,6 @@ mod tests {
         assert_eq!(m.lateral_yield_strength_value(), 200);
     }
 
-    /// VAL-CROSS-025: explicit registry override for lateral_yield_strength
     /// wins over the spec-baked table.
     #[test]
     fn material_def_lateral_yield_strength_uses_override() {
@@ -785,7 +763,6 @@ mod tests {
         assert_eq!(r.materials[0].lateral_yield_strength_value(), 77);
     }
 
-    /// VAL-M14F-023: material lateral-yield ordering is strictly
     /// `wood < brick < concrete < steel`. The spec asserts this in
     /// behaviour — having the values in this strict ordering is a
     /// necessary precondition for that behaviour.

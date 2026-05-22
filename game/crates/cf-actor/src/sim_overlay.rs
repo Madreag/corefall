@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::AtmosphereSample;
 
-/// **M14A** § "Atmospheric overlay walk-speed modifiers".
 pub const WALK_SPEED_HYPOXIA_MULT: f32 = 0.85;
 pub const WALK_SPEED_HYPERTHERMIC_MULT: f32 = 0.9;
 pub const WALK_SPEED_HYPOTHERMIC_MULT: f32 = 0.75;

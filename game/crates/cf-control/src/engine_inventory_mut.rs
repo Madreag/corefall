@@ -45,7 +45,6 @@ impl M0Engine {
             .record(tick, sim_time_ms, "control", "command_accepted", payload, None);
     }
 
-    /// **M8 helper**: record a `control.command_rejected` envelope log.
     pub(crate) fn record_command_rejected(&self, tick: Tick, sim_time_ms: f64, method: &str, reason: &str) {
         self.recorder.record(
             tick,
@@ -57,7 +56,6 @@ impl M0Engine {
         );
     }
 
-    /// **M8 helper**: record a generic event with no parent reference.
     /// Per mission AGENTS.md § Audit-grep visibility convention, callers
     /// SHOULD prefer the inline `#[rustfmt::skip] let _ = self.recorder.
     /// record(...)` form so the audit grep finds the literal record call
@@ -80,7 +78,6 @@ impl M0Engine {
         self.state.read().map(|s| s.shutdown_requested).unwrap_or(false)
     }
 
-    /// **M6B**: ensure the actor has an inventory grid + encumbrance
     /// envelope; add a top-level placement of `item_id` × `count` to it
     /// (with `liters_filled` for liquid containers); return
     /// `(total_mass_kg, total_bulk_l, instance_id)`. The instance id is
@@ -115,7 +112,6 @@ impl M0Engine {
         (total_mass, total_bulk, id)
     }
 
-    /// **M6B**: remove the most-recent top-level placement of `item_id`
     /// from the actor's inventory grid (FIFO order is arbitrary here —
     /// the drop flow doesn't pre-thread an instance id). Returns
     /// `(total_mass_kg, total_bulk_l, removed_instance_id)`; the
@@ -157,7 +153,6 @@ impl M0Engine {
         (total_mass, total_bulk, removed_id)
     }
 
-    /// **M6B**: after pickup / drop / liquid-fill changes the inventory,
     /// recompute the encumbrance envelope + emit
     /// `inventory.encumbrance_threshold_crossed` when the discrete band
     /// transitions. Also enforces the walk-speed-penalty side-effects

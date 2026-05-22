@@ -97,10 +97,8 @@ impl M0Engine {
         }
     }
 
-    /// **M5**: emit chassis-related events from a [`cf_chassis::ZoneDamageOutcome`].
     /// Also recomputes the chassis stage and emits `chassis.stage_changed` when it
     /// advances. **M13** appends `combat.hit_reaction_played` per zone hit, plus
-    /// **M14** § "Full penetration ray flow". When a projectile pierces
     /// outer armor, this helper traces the ray through every chassis
     /// interior module in distance-from-impact order, applies module
     /// damage per `damage_multiplier × (1 - armor_absorption)`, and emits:
@@ -112,7 +110,6 @@ impl M0Engine {
     ///     `armor.spalling_fragment_hit_module` when threshold crossed,
     ///     each spalling-fragment-hit ALSO mutates the target module's HP
     ///
-    /// **M14 audit pass 3 (Finding 6)**: previous implementation was
     /// "pure event emission" — replay bundles claimed modules were hit
     /// for damage X while the chassis state never moved. Now the helper
     /// actually applies damage to each module via the chassis API.
@@ -218,11 +215,9 @@ impl M0Engine {
             }),
             parent.clone(),
         );
-        // **M14 audit pass 3 (Finding 6)**: actually apply damage to each
         // interior module the ray traversed. This mutates module.hp +
         // module.state on the chassis so subsequent observe.frame +
         // snapshot_chassis events reflect the real state.
-        // **M14 audit pass 4 (Finding 3)**: capture each outcome + emit
         // the chassis.module_state_changed transition + per-cascade
         // chassis.* events so replay viewers can observe state changes
         // caused by penetration rays the same way zone-damage paths do.
@@ -242,7 +237,6 @@ impl M0Engine {
                 self.emit_critical_module_outcome_events(tick, sim_time_ms, actor, &outcome, Some(pen_ray_id.clone()));
             }
         }
-        // **M14** § "Spalling fragments spawn at impact point". When the
         // outer armor damage exceeds the spalling threshold, spawn 1-3
         // fragments + emit the per-fragment + per-module-hit events.
         let outer_armor_damage = outcome
@@ -309,10 +303,8 @@ impl M0Engine {
                     Some(spalling_id.clone()),
                 );
                 // Hit the next 1-2 modules along the ray + apply damage.
-                // **M14 audit pass 3 (Finding 6)**: spalling fragments now
                 // mutate module HP. Previous implementation emitted the
                 // hit event but never reduced module.hp.
-                // **M14 audit pass 4 (Finding 3)**: also emit
                 // module_state_changed + cascade events when the spalling
                 // hit pushes the module across a state threshold.
                 for hit_m in interior_modules.iter().take(2) {
@@ -359,7 +351,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14C** § per-hit producer wiring for HEAT + APFSDS rounds.
     ///
     /// When the projectile's `RoundKind` is `Heat`, this helper invokes
     /// [`cf_physics::heat_impact_producer`] against the target's chassis
@@ -547,7 +538,6 @@ impl M0Engine {
                         }),
                         last_parent.clone(),
                     );
-                    // **M14G § VAL-CROSS-001 / VAL-M14G-022**: emit the
                     // typed wound cluster from the HEAT jet — one Burn3rd
                     // per traversed module + one GunshotThrough on the
                     // crew compartment when the jet reaches it. Per
@@ -624,7 +614,6 @@ impl M0Engine {
                         }),
                         parent.clone(),
                     );
-                    // **M14G § VAL-CROSS-002**: APFSDS emits one
                     // `ShrapnelThrough` per traversed module + spalling
                     // fragments (one `ShrapnelEmbedded` per module). The
                     // shrapnel severity tracks the energy decay ratio.

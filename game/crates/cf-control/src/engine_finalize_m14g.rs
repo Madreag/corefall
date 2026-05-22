@@ -42,7 +42,6 @@ impl M0Engine {
         let sim_time_ms = state.clock.sim_time_ms();
         let run_aborted = state.run_aborted;
         drop(state);
-        // **M14 audit pass 2 (GAP-M4-02 HIGH fix)**: spec § Expected
         // outcome + system events lists three outcomes — clean, panic,
         // abort. Previously hardcoded clean/panic only; aborted runs
         // surfaced as clean. Now: exit_code != 0 → panic; else if
@@ -54,7 +53,6 @@ impl M0Engine {
         } else {
             "clean"
         };
-        // **M4 § Expected outcome + system events**: spec literal payload
         // is `{ outcome, ticks_run, wall_seconds, final_sim_checksum }`.
         // ticks_run is the last advanced tick; wall_seconds comes from
         // the engine's started_instant; final_sim_checksum is the latest
@@ -108,7 +106,6 @@ impl M0Engine {
         self.state.read().expect("engine state poisoned").clock.tick()
     }
 
-    /// **M14G test helper**: read the per-engine wound-aging pass
     /// invocation counter (VAL-M14G-046).
     pub fn m14g_wound_aging_invocations(&self) -> u64 {
         self.state
@@ -117,7 +114,6 @@ impl M0Engine {
             .unwrap_or(0)
     }
 
-    /// **M14G test helper**: append a typed wound to an actor's
     /// `m14g_wound_list`. Returns the allocated wound id.
     pub fn m14g_inject_wound(
         &self,
@@ -140,7 +136,6 @@ impl M0Engine {
         ))
     }
 
-    /// **M14G test helper**: latest computed checksum hex over the
     /// current engine state — exercises `build_checksum_bytes` directly
     /// without depending on the periodic `determinism.sim_checksum`
     /// event. Used by save/load round-trip + determinism tests.
@@ -152,7 +147,6 @@ impl M0Engine {
         cs.to_hex()
     }
 
-    /// **M14G test helper**: read an actor's wound list (cloned).
     pub fn m14g_actor_wound_list(&self, actor_id: u64) -> Option<cf_wound::ActorWoundList> {
         let s = self.state.read().ok()?;
         let sim = s.actor_state.as_ref()?;
@@ -160,7 +154,6 @@ impl M0Engine {
         Some(actor.m14g_wound_list.clone())
     }
 
-    /// **M14G test helper**: overwrite an actor's wound list (used by
     /// save/load round-trip tests).
     pub fn m14g_set_actor_wound_list(&self, actor_id: u64, list: cf_wound::ActorWoundList) -> bool {
         let mut s = match self.state.write() {
@@ -176,7 +169,6 @@ impl M0Engine {
         false
     }
 
-    /// **M14G § VAL-M14G-023 test helper**: dispatch a one-shot
     /// `MeleeShoulderCheck` via the M6 dispatch path so the engine's
     /// melee-resolve code (including the blunt-face dental-damage emit)
     /// fires exactly the same way it would for a cfctl-driven hit.

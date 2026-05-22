@@ -41,7 +41,6 @@ pub enum QuickAction {
     MechBay,
     Base,
     Workshop,
-    /// **M12** § CCCP-style intro slideshow — Main Menu → Story → Replay Intro.
     ReplayIntro,
 }
 
@@ -57,7 +56,6 @@ impl QuickAction {
         }
     }
 
-    /// **M12**: convert a Main Menu quick-action click into the matching
     /// `ShellApiCommand`. cf-app's main-menu input handler routes the
     /// click through this and writes the returned command on the
     /// `ShellApiCommand` event bus. Returning `None` means "no scripted
@@ -79,7 +77,6 @@ impl QuickAction {
     }
 }
 
-/// **M11A/M12** unused import guard — `SaveLoadMode` is re-exported so
 /// future quick-action variants can route to Save / Load without a churn
 /// of imports here.
 #[doc(hidden)]

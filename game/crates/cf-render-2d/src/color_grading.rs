@@ -22,7 +22,6 @@
 
 use bevy::prelude::*;
 
-/// **M12**: per-scene mood. cf-mission scenario authors set this when
 /// declaring scenario phases; the default is `Daylight` (bright + neutral).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
 pub enum SceneMood {
@@ -67,13 +66,11 @@ impl SceneMood {
     }
 }
 
-/// **M12**: minimum saturation floor — every grading mode preserves AT
 /// LEAST this much saturation so a scene never collapses to pure grayscale.
 /// Per the acceptance criterion "nighttime scenes shift cool but never go
 /// monochrome / hazard scenes shift warm but never go monochrome".
 pub const MONOCHROME_FLOOR: f32 = 0.45;
 
-/// **M12**: one fully-resolved color grade derived from a [`SceneMood`] +
 /// intensity. Consumers feed this into the post-process shader.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColorGrade {
@@ -125,7 +122,6 @@ impl Default for ColorGrade {
     }
 }
 
-/// **M12**: resolve the canonical color grade for `mood` at full intensity.
 /// Per the M12 spec § Visual direction "Color grading — Dynamic per-scene
 /// + mission mood".
 #[must_use]
@@ -164,7 +160,6 @@ pub fn grade_for_mood(mood: SceneMood) -> ColorGrade {
     }
 }
 
-/// **M12**: scene-mood state resource. cf-app pushes `current` from the
 /// mission/scenario phase change; the post-process pass reads
 /// [`ColorGradingState::current_grade`].
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
@@ -230,7 +225,6 @@ impl ColorGradingState {
     }
 }
 
-/// **M12**: grading plugin. cf-app wires this alongside [`crate::JuicePlugin`].
 pub struct ColorGradingPlugin;
 
 impl Plugin for ColorGradingPlugin {

@@ -158,7 +158,6 @@ impl AirField {
     /// average × `mix_ratio` + (1 - `mix_ratio`) × self. Cells with no
     /// neighbors (corners) just decay by `mix_ratio` toward zero delta.
     ///
-    /// Per spec § "When breach opens to vacuum: Then pressure equalizes
     /// via aperture flow" — the diffusion is the canonical aperture
     /// flow path. `mix_ratio = 0.10` is the tuned default for one CA
     /// tick at 60 Hz; mods can pass smaller values for slower decay.

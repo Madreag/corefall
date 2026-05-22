@@ -204,7 +204,6 @@ impl M0Engine {
                     break;
                 }
             }
-            // **M9**: timer projection for the HUD timer-warning widget.
             // Matches the `observe.mission.timer` color bands (green > 30s,
             // yellow 10-30s, red < 10s, none when expired or no timer).
             let total_ticks = mission.loss.time_limit_ticks;
@@ -239,7 +238,6 @@ impl M0Engine {
                 });
             }
         }
-        // **M9**: project the first reactor (M9 ships exactly one) into the
         // HUD snapshot. cf-app maps `pressure_state` to the sprite variant
         // + pressure-line tint; the armor pip layers drive the 3-armor-pip
         // band coloring under the HP bar.
@@ -273,7 +271,6 @@ impl M0Engine {
         snapshot
     }
 
-    /// **M2**: build the render-side terrain snapshot. Two-phase lock to
     /// avoid contending with cfctl `observe.once` polls (which take read
     /// locks at 15 ms cadence): phase 1 reads overlay mode + dig preview +
     /// anchor under a read lock and detects whether the dirty set is
@@ -368,7 +365,6 @@ impl M0Engine {
         }
     }
 
-    /// **M2**: render-only snapshot of cumulative debris counters. cf-app
     /// uses this to limit debris spawn requests + report perf health.
     pub fn terrain_render_counters(&self) -> (u64, u64, u64) {
         let state = self.state.read().expect("engine state poisoned");

@@ -143,7 +143,6 @@ pub fn derive_stance(inputs: StanceInputs) -> Stance {
 /// weapons. Cinematic stances (Slide/Vault/Climb/Dive/StealthAttack/
 /// KnifeThrow) lock the weapon trigger.
 ///
-/// **M14J** § "Mounted rider fires one-handed weapon at gallop" — mounted
 /// + zip-lining + rope-hanging + swim-surface allow firing (the rider /
 /// rope-bob / swimmer can still aim their free arm). Wall-jump locks fire
 /// during the 200 ms cinematic.
@@ -174,7 +173,6 @@ pub fn fire_allowed_in_stance(stance: Stance) -> bool {
 /// Returns true when the stance is one of the M6 cinematic transition
 /// states (animation-bound; can't be interrupted by ordinary movement).
 ///
-/// **M14J** § parkour cinematics — vault + wall-jump are 200ms cinematic
 /// windows that cannot be interrupted by ordinary input.
 #[must_use]
 pub fn is_cinematic(stance: Stance) -> bool {
@@ -202,7 +200,6 @@ pub fn is_cinematic(stance: Stance) -> bool {
 /// - Airborne / Prone-transition = 3.0×
 /// - Slide/Vault/Dive = cinematic transition penalties
 ///
-/// **M14 audit pass 3 (GAP-M1-01)**: bumped Running from 1.4× to 7.0× and
 /// Jetting from 3.0× to 7.0× to match the literal spec table; previously
 /// the implementation was internally consistent but visibly drifted from
 /// the spec's OpenSoldat-baseline values.
@@ -227,7 +224,6 @@ pub fn stance_bloom_factor(stance: Stance) -> f32 {
         Stance::Airborne => 3.0,
         Stance::Slide => 0.9,
         Stance::Dive | Stance::Vault => 2.5,
-        // **M14J**: rope-hang is slightly tighter than airborne; rope-swing is
         // less stable (still moving on a pendulum); zip-line trades tighter
         // grouping for forced glide; mount = 2.0× (a galloping critter is
         // less stable than standing); swim_surface = 2.0×; submerged dive
@@ -333,7 +329,6 @@ mod tests {
     }
 }
 
-/// **M9B**: collapse the 23-variant tactical [`Stance`] enum down to the
 /// three-state [`TrenchStance`] axis used by the cf-trench cover-state
 /// derivation. Crouch-variants → [`TrenchStance::Crouched`]; prone-variants
 /// → [`TrenchStance::Prone`]; everything else (Stand, Walking, Running,
@@ -349,7 +344,6 @@ pub fn trench_stance_for(stance: Stance) -> TrenchStance {
     }
 }
 
-/// **M9B**: collapse the per-actor posture intent + derived stance down
 /// to a single [`TrenchStance`] for cover-state derivation. Honours
 /// `prone_active` and `crouch_active` directly so cover updates the
 /// instant the player toggles the intent flag — even when `ActorState::stance()`
@@ -367,7 +361,6 @@ pub fn trench_stance_for_actor(actor: &ActorState) -> TrenchStance {
 }
 
 impl ActorState {
-    /// **M9B**: derive cover state for this actor against a trench-segment
     /// `world` lookup. The result equals
     /// `cf_trench::cover_state(trench_stance_for_actor(self),
     /// segment.variant)` when the actor stands inside a segment, and
@@ -375,7 +368,6 @@ impl ActorState {
     /// the value is **derived, not stored** — mutate stance and the next
     /// call observes the new cover.
     ///
-    /// **M9C** crewing override: while in `Stance::Crewing`
     /// `{ fortification_id }` the cover state is unconditionally
     /// [`TrenchCoverState::Full`], regardless of the underlying trench
     /// segment (the spec § "Crewing semantics" promises Full cover when
@@ -413,7 +405,6 @@ impl ActorState {
         }
     }
 
-    /// **M9C**: true when the actor is bound to a fortification via the
     /// `Stance::Crewing { fortification_id }` spec-shape (M9C § "Crewing
     /// semantics"). The bound fortification id lives on
     /// `crewing_fortification_id`; this returns true exactly when the
@@ -423,14 +414,12 @@ impl ActorState {
         self.crewing_fortification_id.is_some()
     }
 
-    /// **M9C**: bound fortification id, if any. Returns the spec-shape
     /// `Crewing { fortification_id }` payload as a plain `u32`.
     #[must_use]
     pub fn crewed_fortification_id(&self) -> Option<u32> {
         self.crewing_fortification_id
     }
 
-    /// **M9C**: enter the spec-shape `Stance::Crewing { fortification_id }`
     /// binding (M9C § "Crewing semantics"). The binding is 1:1
     /// actor→fortification; movement inputs are suspended at the cf-control
     /// dispatch boundary, primary fire is rebound to the fortification's
@@ -448,7 +437,6 @@ impl ActorState {
         self.jet_active = false;
     }
 
-    /// **M9C**: release the `Stance::Crewing { fortification_id }`
     /// binding. Caller emits the corresponding `mg_nest_uncrewed`
     /// replay event with the appropriate cause.
     pub fn uncrew_fortification(&mut self) -> Option<u32> {

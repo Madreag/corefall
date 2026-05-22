@@ -32,22 +32,17 @@ pub type MaterialId = String;
 /// Opaque origin identifier (mirrors `ActorState.origin_id`).
 pub type OriginId = String;
 
-/// **M6B § Tunable defaults**: baseline carry-capacity envelope in kg
 /// before the per-origin modifier (M17) scales it.
 pub const HUMAN_BASELINE_MAX_CARRY_KG: f32 = 50.0;
 
-/// **M6B § Tunable defaults**: baseline volume envelope in liters before
 /// the per-origin modifier scales it (Tarkov parity).
 pub const HUMAN_BASELINE_MAX_CARRY_VOLUME_L: f32 = 60.0;
 
-/// **M6B § Tunable defaults**: walk-speed multiplier at exactly 100% load
 /// (`total_carried_kg == max_carry_kg`).
 pub const WALK_SPEED_AT_FULL_CARRY: f32 = 0.5;
 
-/// **M6B § Tunable defaults**: walk-speed multiplier at exactly 0% load.
 pub const WALK_SPEED_AT_EMPTY_CARRY: f32 = 1.0;
 
-/// **M6B § Tunable defaults**: deepest container nesting allowed.
 /// Spec literal: "Container nesting allowed up to 2 levels
 /// (chest → crate → item; not deeper)."
 pub const MAX_CONTAINER_NEST_DEPTH: u8 = 2;
@@ -56,7 +51,6 @@ pub const MAX_CONTAINER_NEST_DEPTH: u8 = 2;
 /// nesting would exceed [`MAX_CONTAINER_NEST_DEPTH`].
 pub const MAX_DEPTH_EXCEEDED: &str = "max_depth_exceeded";
 
-/// **M6B § Tunable defaults**: backpack-tier grid dimensions.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -104,7 +98,6 @@ impl Default for BackpackTier {
     }
 }
 
-/// **M6B § ItemSpec schema**: grid footprint in tiles.
 ///
 /// Spec literal: `GridDim { w: u8, h: u8 }`.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -130,7 +123,6 @@ impl GridDim {
     }
 }
 
-/// **M6B § ItemSpec schema**: category discriminator. Drives loot tables,
 /// crafting outputs, container restrictions, and HUD icon selection.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
@@ -177,7 +169,6 @@ impl ItemCategory {
     }
 }
 
-/// **M6B § ItemSpec schema**: per-container holding capacity.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContainerCapacity {
     /// Internal grid dimensions of the container itself.
@@ -203,7 +194,6 @@ impl Default for ContainerCapacity {
     }
 }
 
-/// **M6B § ItemSpec schema**: locked at M6B per the spec literal block.
 ///
 /// ```text
 /// pub struct ItemSpec {
@@ -276,7 +266,6 @@ impl ItemSpec {
         self.quick_slot_eligible
     }
 
-    /// **M6B § Player-facing behavior**: stack mass formula.
     ///
     /// Spec literal: "Stack items declare `stack_mass = item_mass × count`".
     /// Non-stackable items: `count` is clamped to `[1, max_stack]` so the
@@ -291,7 +280,6 @@ impl ItemSpec {
         self.mass_kg * f32::from(clamped_count)
     }
 
-    /// **M6B § Player-facing behavior**: stack bulk formula. Same semantics
     /// as [`stack_mass`] but for bulk volume.
     pub fn stack_bulk_l(&self, count: u16) -> f32 {
         let clamped_count = if self.stackable {
@@ -303,7 +291,6 @@ impl ItemSpec {
     }
 }
 
-/// **M6B**: compute the effective mass of a liquid container when it
 /// holds `liters_filled` liters of water (density 1 kg/L). Returns
 /// `spec.mass_kg + liters_filled * 1.0`. When the spec is not a liquid
 /// container, returns `spec.mass_kg` unchanged.
@@ -321,7 +308,6 @@ pub fn liquid_fill_mass(spec: &ItemSpec, liters_filled: f32) -> f32 {
     }
 }
 
-/// **M6B**: container nesting depth check.
 ///
 /// `parent_depth` is the parent's current nesting depth (0 = root
 /// inventory, 1 = top-level container, 2 = nested container, ...). The
@@ -343,7 +329,6 @@ pub fn try_nest_depth(parent_depth: u8, parent_cap: u8, child_is_container: bool
     Ok(candidate)
 }
 
-/// **M6B § Tunable defaults**: per-origin carry-capacity multiplier.
 ///
 /// | origin           | multiplier |
 /// |------------------|-----------:|
@@ -363,21 +348,18 @@ pub fn carry_capacity_modifier(origin_id: &str) -> f32 {
     }
 }
 
-/// **M6B § Tunable defaults**: per-actor maximum carry mass for the given
 /// origin id, derived from [`HUMAN_BASELINE_MAX_CARRY_KG`] +
 /// [`carry_capacity_modifier`].
 pub fn max_carry_kg_for_origin(origin_id: &str) -> f32 {
     HUMAN_BASELINE_MAX_CARRY_KG * carry_capacity_modifier(origin_id)
 }
 
-/// **M6B § Tunable defaults**: per-actor maximum carry volume for the
 /// given origin id, derived from [`HUMAN_BASELINE_MAX_CARRY_VOLUME_L`] +
 /// [`carry_capacity_modifier`].
 pub fn max_carry_volume_l_for_origin(origin_id: &str) -> f32 {
     HUMAN_BASELINE_MAX_CARRY_VOLUME_L * carry_capacity_modifier(origin_id)
 }
 
-/// **M6B § Encumbrance penalty curve**: linear lerp between the
 /// [`WALK_SPEED_AT_EMPTY_CARRY`] (1.0) and [`WALK_SPEED_AT_FULL_CARRY`]
 /// (0.5) endpoints over `[0, max_carry_kg]`. Values above `max_carry_kg`
 /// clamp at `WALK_SPEED_AT_FULL_CARRY` (no negative speed); values below
@@ -438,7 +420,6 @@ pub fn encumbrance_band(total_carried_kg: f32, max_carry_kg: f32) -> Encumbrance
     }
 }
 
-/// **M6B**: hardcoded registry of canonical [`ItemSpec`]s. Lookups go
 /// through [`spec_for_id`]. The registry is the runtime source of
 /// truth; `content/equipment/items/manifest.ron` mirrors the id list
 /// for cf-mod validation.
@@ -750,7 +731,6 @@ fn build_registry() -> BTreeMap<ItemId, ItemSpec> {
     map
 }
 
-/// **M6C**: 81 new equipment SKUs registered with the M6B `ItemSpec`
 /// schema. See `specs/active/M6C.md § Player-facing behavior` for the
 /// per-category breakdown and tunables. Owned by M6C — `cf-mod` walks
 /// `content/equipment/<category>/*.ron` and validates every entry
@@ -769,7 +749,6 @@ pub fn m6c_entries() -> Vec<ItemSpec> {
     out
 }
 
-/// **M6C**: M6C entries grouped by per-category folder name. The folder
 /// name matches the path under `content/equipment/<folder>/` that
 /// cf-mod validates and the generator binary writes.
 pub fn m6c_entries_by_category() -> Vec<(&'static str, Vec<ItemSpec>)> {
@@ -957,7 +936,6 @@ fn m6c_survival_entries() -> Vec<ItemSpec> {
         entry("lighter_zippo", "Lighter (Zippo)", 0.1, 1, 1, 0.1, ItemCategory::Survival, &[("steel", 0.05), ("fuel", 0.05)], true, Some(300)),
         entry("compass_magnetic", "Magnetic Compass", 0.1, 1, 1, 0.1, ItemCategory::Survival, &[("polymer", 0.05), ("alloy", 0.05)], true, Some(400)),
         entry("binoculars_8x", "Binoculars (8x)", 0.7, 2, 2, 1.5, ItemCategory::Survival, &[("alloy", 0.5), ("polymer", 0.2)], true, Some(600)),
-        // **M6C-4 acceptance**: the flamethrower scenario pairs the weapon
         // with a `fuel_canister` in `tank_utility`. The canister itself is
         // a consumable tank-slot item that the flamethrower drains; the
         // SKU is required for the scenario to load even though the spec
@@ -1040,7 +1018,6 @@ pub fn registered_ids() -> Vec<ItemId> {
     })
 }
 
-/// **M6B § Player-facing behavior**: filter the registry down to items
 /// flagged `quick_slot_eligible = true`. Consumed by the M14A
 /// quick-action-bar — spec literal "Hot-swap M14A QAB items declare
 /// `quick_slot_eligible = true`". Result is sorted ascending by id for

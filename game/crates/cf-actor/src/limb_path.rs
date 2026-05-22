@@ -40,7 +40,6 @@ impl LimbPathSpeed {
     }
 }
 
-/// **M14A** § "LimbPath data type".
 ///
 /// One foot's stride trajectory: a list of waypoints (relative to the owning
 /// AtomGroup's local origin), per-tier travel speeds, and a push-force
@@ -202,12 +201,10 @@ impl LimbPath {
     }
 }
 
-/// **M14A** § "Per-stance limb-path registry" — one path per
 /// `(MoveState, side)`. Side = `fg` / `bg` matches CCCP's two-leg model;
 /// quadrupeds use FL/FR/RL/RR by routing through the FG/BG slots in a
 /// 2-pair gait.
 ///
-/// **M14J** extends the registry with per-stroke swim paths (keyed by
 /// [`crate::move_state::SwimKind`]) + parkour-specific vault + wall_jump
 /// paths. Existing serde bundles forward-compat via `#[serde(default)]`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -216,15 +213,12 @@ pub struct LimbPathRegistry {
     pub fg: BTreeMap<MoveState, LimbPath>,
     /// Background (left-side) per-state paths.
     pub bg: BTreeMap<MoveState, LimbPath>,
-    /// **M14J** § per-stroke swim limb paths (one per `SwimKind` variant).
     /// Defaults to empty for legacy bundles.
     #[serde(default)]
     pub swim: BTreeMap<crate::move_state::SwimKind, LimbPath>,
-    /// **M14J** § parkour vault cinematic path (used during the 200 ms
     /// `Stance::Vault` transition).
     #[serde(default)]
     pub parkour_vault: Option<LimbPath>,
-    /// **M14J** § parkour wall-jump cinematic path.
     #[serde(default)]
     pub parkour_wall_jump: Option<LimbPath>,
 }
@@ -256,17 +250,14 @@ impl LimbPathRegistry {
         }
     }
 
-    /// **M14J** § insert or replace a swim limb path keyed by `SwimKind`.
     pub fn insert_swim(&mut self, kind: crate::move_state::SwimKind, path: LimbPath) {
         self.swim.insert(kind, path);
     }
 
-    /// **M14J** § fetch a swim limb path by `SwimKind` (immutable).
     pub fn get_swim(&self, kind: crate::move_state::SwimKind) -> Option<&LimbPath> {
         self.swim.get(&kind)
     }
 
-    /// **M14J** § fetch a swim limb path by `SwimKind` (mutable).
     pub fn get_swim_mut(&mut self, kind: crate::move_state::SwimKind) -> Option<&mut LimbPath> {
         self.swim.get_mut(&kind)
     }
@@ -401,7 +392,6 @@ pub fn default_infantry_dislodge() -> LimbPath {
     p
 }
 
-/// **M14J** § "vault.path — 200 ms `Vault` stance whose limb path lifts the
 /// body over the obstacle". Mirrors `game/content/actors/paths/vault.path`.
 pub fn default_infantry_vault() -> LimbPath {
     let mut p = LimbPath::from_waypoints(&[
@@ -418,7 +408,6 @@ pub fn default_infantry_vault() -> LimbPath {
     p
 }
 
-/// **M14J** § "wall_jump.path — perpendicular kick off a vertical surface".
 pub fn default_infantry_wall_jump() -> LimbPath {
     let mut p = LimbPath::from_waypoints(&[
         [4.0, 0.0],
@@ -431,7 +420,6 @@ pub fn default_infantry_wall_jump() -> LimbPath {
     p
 }
 
-/// **M14J** § "swim_breast.path (4-stroke cycle) — surface breast stroke".
 pub fn default_infantry_swim_breast() -> LimbPath {
     let mut p = LimbPath::from_waypoints(&[
         [-4.0, 6.0],
@@ -445,7 +433,6 @@ pub fn default_infantry_swim_breast() -> LimbPath {
     p
 }
 
-/// **M14J** § "swim_freestyle.path — surface horizontal burst".
 pub fn default_infantry_swim_freestyle() -> LimbPath {
     let mut p = LimbPath::from_waypoints(&[
         [-3.0, 6.0],
@@ -458,7 +445,6 @@ pub fn default_infantry_swim_freestyle() -> LimbPath {
     p
 }
 
-/// **M14J** § "swim_dive.path — vertical-down submerged dive".
 pub fn default_infantry_swim_dive() -> LimbPath {
     let mut p = LimbPath::from_waypoints(&[
         [0.0, 4.0],
@@ -471,7 +457,6 @@ pub fn default_infantry_swim_dive() -> LimbPath {
     p
 }
 
-/// **M14J** § "swim_tread.path — idle keep-head-above stroke".
 pub fn default_infantry_swim_tread() -> LimbPath {
     let mut p = LimbPath::from_waypoints(&[
         [0.0, 4.0],
@@ -485,7 +470,6 @@ pub fn default_infantry_swim_tread() -> LimbPath {
     p
 }
 
-/// **M14A** § "Per-actor limb-path registry — RON-loadable" — load a single
 /// limb path from a RON string.
 pub fn load_path_from_ron(ron_str: &str) -> Result<LimbPathSpec, String> {
     ron::from_str::<LimbPathSpec>(ron_str).map_err(|e| format!("limb_path RON parse failed: {e}"))
@@ -528,7 +512,6 @@ impl LimbPathSpec {
 /// Default infantry limb-path registry covering every MoveState. Used by
 /// `ActorState` when no chassis-specific RON file is loaded.
 ///
-/// **M14J** extends the default registry with vault + wall_jump + 4 swim
 /// paths so M14J cinematics can dispatch off the actor's owned registry
 /// without external content lookups.
 pub fn default_infantry_registry() -> LimbPathRegistry {
@@ -547,7 +530,6 @@ pub fn default_infantry_registry() -> LimbPathRegistry {
     reg.insert(MoveState::Climb, PathSide::Bg, default_infantry_climb());
     reg.insert(MoveState::Jump, PathSide::Fg, default_infantry_jump());
     reg.insert(MoveState::Dislodge, PathSide::Fg, default_infantry_dislodge());
-    // **M14J** parkour + swim defaults.
     reg.parkour_vault = Some(default_infantry_vault());
     reg.parkour_wall_jump = Some(default_infantry_wall_jump());
     reg.insert_swim(crate::move_state::SwimKind::SurfaceBreast, default_infantry_swim_breast());

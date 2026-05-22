@@ -19,11 +19,9 @@ use std::sync::Arc;
 
 use cf_audio::{HrirIndex, HrirTable, SpatialEnvelope, HRTF_SAMPLES};
 
-/// **M12B** § Cross-fade window used when the listener crosses an HRIR
 /// bucket boundary. Avoids audible clicks when the player turns.
 pub const HRIR_FADE_MS: f32 = 25.0;
 
-/// **M12B** § A single playback frame produced by the convolution
 /// adapter. Owned `(left_taps, right_taps)` — `HRTF_SAMPLES` f32s each.
 /// The actual mixing into the bevy_audio output stream is the caller's
 /// responsibility; this struct is the deterministic descriptor passed
@@ -45,7 +43,6 @@ pub struct HrirConvolutionFrame {
 }
 
 impl HrirConvolutionFrame {
-    /// **M12B** § Empty (silent) frame. Used when the spatial envelope's
     /// `gain == 0` (vacuum, out-of-range, fully-occluded source).
     #[must_use]
     pub fn silent(hrir_index: HrirIndex) -> Self {
@@ -60,7 +57,6 @@ impl HrirConvolutionFrame {
     }
 }
 
-/// **M12B** § The cf-app adapter. Holds an `Arc<HrirTable>` shared
 /// across systems; every `resolve` call is `O(1)` index math + an
 /// HRIR slice clone (no allocation in steady state once the
 /// `Vec<f32>` capacity is reserved).
@@ -70,7 +66,6 @@ pub struct HrirConvolutionAdapter {
 }
 
 impl HrirConvolutionAdapter {
-    /// **M12B** § Construct an adapter from a shared HRIR table. cf-app
     /// loads the table once at startup from
     /// `game/content/audio/hrtf/mit_kemar_subset.bin`; the
     /// [`HrirTable::placeholder`] is the safe fallback when the
@@ -80,7 +75,6 @@ impl HrirConvolutionAdapter {
         Self { table }
     }
 
-    /// **M12B** § Resolve one [`HrirConvolutionFrame`] for a given
     /// [`SpatialEnvelope`]. Pure adapter logic — no allocation when
     /// `frame.left_taps`/`right_taps` are reused, no Bevy/rodio
     /// dependency, no `thread_rng`.

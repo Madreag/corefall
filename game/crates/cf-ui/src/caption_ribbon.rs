@@ -17,7 +17,6 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-/// **M12C** § "the M12A `caption_visible` predicate gates the subtitle
 /// ribbon; never silent without captions when `captions_enabled=true`."
 ///
 /// Pure helper computing whether the cinematic caption ribbon should be
@@ -31,7 +30,6 @@ use serde::{Deserialize, Serialize};
 /// Returns `true` when the cinematic caption ribbon should be drawn.
 #[must_use]
 pub fn caption_ribbon_visible(captions_enabled: bool, _reduce_motion: bool) -> bool {
-    // Per spec § Acceptance: "When captions_enabled = false / Then …
     // the caption ribbon is hidden". Reduce-motion does NOT hide the
     // ribbon — it only suppresses fade animations.
     captions_enabled
@@ -90,7 +88,6 @@ impl CaptionRibbonState {
         self.words = words;
     }
 
-    /// Per spec § "When captions_enabled = false / the caption ribbon
     /// is hidden". Returns `true` when the renderer should draw the
     /// ribbon.
     #[must_use]
@@ -128,7 +125,6 @@ impl CaptionRibbonState {
         s
     }
 
-    /// **M12C** § "the M12A `caption_visible` predicate gates the
     /// subtitle ribbon". Convenience setter that wires the visible flag
     /// to the predicate's output. cf-app's bridge calls this each frame
     /// from the live `Settings.captions` + `Settings.reduced_motion`.

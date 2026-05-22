@@ -56,7 +56,6 @@ use crate::common::FortificationId;
 
 /// Handle for a placed wire instance.
 ///
-/// Per spec § Notes for the implementer: per-actor crossing state lives
 /// on the actor as `crossing: Option<WireId>`. This newtype is what
 /// cf-actor pulls into [`cf_actor::ActorState`].
 #[repr(transparent)]
@@ -729,7 +728,6 @@ pub enum WireVehicleClass {
 }
 
 /// Minor track damage applied to a light vehicle that crosses wire
-/// (per spec § "light vehicles cross wire (taking minor track damage)").
 pub const LIGHT_VEHICLE_WIRE_TRACK_DAMAGE: u32 = 4;
 
 /// Result of a vehicle contacting a wire.
@@ -825,14 +823,12 @@ mod tests {
         }
     }
 
-    /// VAL-M9C-007: unknown enum values are rejected at parse time.
     #[test]
     fn unknown_wire_kind_rejected_at_parse() {
         let result: Result<WireKind, _> = ron::from_str("\"definitely_not_real_wire\"");
         assert!(result.is_err(), "unknown enum must reject");
     }
 
-    /// VAL-M9C-032: barbed wire applies -75% speed clamp, 0.5s snag,
     /// 1 dmg/tick.
     #[test]
     fn barbed_snag_bleed() {
@@ -862,7 +858,6 @@ mod tests {
         assert_eq!(forced.damage_per_tick, 8);
     }
 
-    /// VAL-M9C-035: razor wire applies -90% speed, 1.0s snag, 4
     /// dmg/tick, M16A laceration affliction.
     #[test]
     fn razor_laceration() {
@@ -938,7 +933,6 @@ mod tests {
         assert!(!outcome.applies_electrocution);
     }
 
-    /// VAL-M9C-037: destroying the power coupling fires
     /// `fence_depowered { cause: coupling_destroyed }` and collapses
     /// the fence to barbed_wire behavior.
     #[test]
@@ -992,7 +986,6 @@ mod tests {
         assert!(wire.is_electrified_active());
     }
 
-    /// VAL-M9C-033: wire_cutters cut barbed wire in 3 seconds at
     /// 60 Hz tick rate.
     #[test]
     fn wire_cutters_cut_barbed_in_three_seconds() {
@@ -1172,7 +1165,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9C-038: light tank entering powered electrified fence:
     /// fence_shocked_actor fires for the driver; wire_crushed_by_
     /// vehicle fires as the (heavy-class) tank destroys the fence.
     #[test]
@@ -1236,7 +1228,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9C-034: wire crossing state is stored per-actor, not
     /// per-wire. The kernel's [`Wire`] struct has zero per-actor
     /// fields; the per-actor state is owned by the actor crate (see
     /// `cf_actor::ActorState::crossing`).

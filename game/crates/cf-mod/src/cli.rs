@@ -20,7 +20,6 @@ pub(crate) enum Cmd {
         /// Files or directories to validate. If empty, defaults to `content/` (then `../content/`).
         paths: Vec<PathBuf>,
     },
-    /// **M1 Gap H2**: validate every event in a run-bundle's `events.jsonl`
     /// against the per-event JSON schemas under `cf-replay/schemas/event/`.
     /// Returns non-zero exit on any payload that fails the schema.
     ValidateBundle {
@@ -31,13 +30,11 @@ pub(crate) enum Cmd {
     Build { pkg_dir: PathBuf },
     /// Stubbed in M0.
     Inspect { cfpkg: PathBuf },
-    /// **M4A**: asset-ledger CLI. Append / list / verify / regenerate /
     /// summarize entries in `content/asset_ledger/ledger.jsonl`.
     Ledger {
         #[command(subcommand)]
         action: Box<LedgerAction>,
     },
-    /// **M9A**: invoke the Tier-1 SVG asset pipeline. Wraps
     /// `tools/asset_gen/build_placeholders.py` so engine-side tooling can
     /// trigger a bake without shelling out manually.
     #[command(name = "asset-gen")]
@@ -45,7 +42,6 @@ pub(crate) enum Cmd {
         #[command(subcommand)]
         action: Box<AssetGenAction>,
     },
-    /// **M12A**: invoke the Tier-1 SFX audio pipeline. Wraps
     /// `tools/audio_gen/generate_sfx.py` so engine-side tooling can
     /// trigger an audio bake without shelling out manually. Mirrors the
     /// `asset-gen` subcommand surface (run / check / report).
@@ -54,7 +50,6 @@ pub(crate) enum Cmd {
         #[command(subcommand)]
         action: Box<AudioGenAction>,
     },
-    /// **M4B § "cf-mod save validate"** — full schema + migration +
     /// checksum validation pass over a single `.cfsave` file.
     Save {
         #[command(subcommand)]
@@ -62,7 +57,6 @@ pub(crate) enum Cmd {
     },
 }
 
-/// **M4B** save subcommands.
 #[derive(Debug, Subcommand)]
 pub(crate) enum SaveAction {
     /// Run full validation: schema_version parsable, migration registry
@@ -71,7 +65,6 @@ pub(crate) enum SaveAction {
     Validate { path: PathBuf },
 }
 
-/// **M12A**: audio-gen subcommands. Per spec § Files:
 /// > `cf-mod` MODIFY — add `cf-mod audio-gen run` subcommand
 #[derive(Debug, Subcommand)]
 pub(crate) enum AudioGenAction {
@@ -100,7 +93,6 @@ pub(crate) enum AudioGenAction {
     },
 }
 
-/// **M9A**: asset-gen subcommands. Per spec § "Source / cf-mod Cargo.toml":
 /// > add `cf-mod asset-gen run` subcommand invoking the Python pipeline
 #[derive(Debug, Subcommand)]
 pub(crate) enum AssetGenAction {
@@ -128,7 +120,6 @@ pub(crate) enum AssetGenAction {
     },
 }
 
-/// **M4A** asset-ledger subcommands.
 #[derive(Debug, Subcommand)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum LedgerAction {
@@ -182,12 +173,10 @@ pub(crate) enum LedgerAction {
         human_edit_notes: Option<String>,
         #[arg(long = "regen-command")]
         regen_command: Option<String>,
-        /// **M4A determinism**: pin the entry's `generated_at_iso` field
         /// instead of using wall-clock time. Combined with the `freeze`
         /// snapshot this makes the ledger byte-reproducible across CI.
         #[arg(long = "generated-at-iso")]
         generated_at_iso: Option<String>,
-        /// **M4A determinism**: pin `generated_on_machine`. Defaults to
         /// `HOSTNAME` / `COMPUTERNAME` / `"unknown"` (or `"deterministic"`
         /// when `CF_DETERMINISTIC_LEDGER=1`).
         #[arg(long = "generated-on-machine")]
@@ -241,7 +230,6 @@ pub(crate) enum LedgerAction {
         strict_status: bool,
         #[arg(long)]
         ledger_path: Option<PathBuf>,
-        /// **M4B § "Ledger chain rejects tampered bundle"** — verify the
         /// per-event BLAKE3 chain in a run bundle (rather than the asset
         /// ledger). When set, ignores `id` / `all` and walks the bundle's
         /// `events.jsonl` against the manifest's `run_id` + `seed` +
@@ -280,7 +268,6 @@ pub(crate) enum LedgerAction {
         #[arg(long)]
         ledger_path: Option<PathBuf>,
     },
-    /// **M4A § "Mod pack integration"**: walk a mod package directory
     /// and auto-register every asset as a new ledger entry with
     /// `category = Mod_Custom` and `package_source = mod:<mod_id>`.
     /// Optionally writes a sidecar mod manifest that references the

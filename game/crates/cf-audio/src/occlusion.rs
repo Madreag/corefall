@@ -24,7 +24,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M12B** § Per-wall acoustic descriptor consumed by [`resolve_occlusion`].
 ///
 /// `transmission_loss_db` and `low_pass_cutoff_hz` come from
 /// `cf-material::registry` per the M12B per-material acoustic registry
@@ -40,7 +39,6 @@ pub struct WallAcoustics {
     pub low_pass_cutoff_hz: f32,
 }
 
-/// **M12B** § Resolved per-source occlusion descriptor.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct OcclusionEnvelope {
     /// Total transmission loss in dB across the path. Negative number
@@ -78,17 +76,14 @@ impl OcclusionEnvelope {
     }
 }
 
-/// **M12B** § Cap walls per ray (per spec § "Wall-traversal segmentation":
 /// "Cap at 8 walls per ray (rare; concrete-on-concrete fortifications get
 /// capped)").
 pub const MAX_WALLS_PER_RAY: usize = 8;
 
-/// **M12B** § Resolve the cumulative occlusion across a list of walls
 /// between source and listener. The wall list is produced by
 /// [`walls_between`] (Bresenham-style raster of the line segment against
 /// the wall registry).
 ///
-/// Per spec § Notes:
 /// > the cumulative transmission_loss_db across all walls is summed; the
 /// > effective low-pass cutoff is the minimum of every wall's cutoff (the
 /// > heaviest masking wall caps the audio bandwidth).
@@ -115,7 +110,6 @@ pub fn resolve_occlusion(walls: &[WallAcoustics]) -> OcclusionEnvelope {
     }
 }
 
-/// **M12B** § Bresenham-style raster of a 2D line segment against a wall
 /// registry. The caller supplies the wall registry as a closure that
 /// returns the material id at a given world cell — this keeps cf-audio
 /// independent of the M3B/M19G wall-registry shape.

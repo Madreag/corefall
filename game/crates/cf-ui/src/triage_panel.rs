@@ -27,7 +27,6 @@ pub struct TriagePanelState {
 }
 
 impl TriagePanelState {
-    /// **M14H** spec § "Click patient → opens Patient Detail (full wound
     /// list + per-wound Treat button)". Returns the per-wound Treat
     /// button label list for the currently-selected patient (empty when
     /// none selected).
@@ -105,7 +104,6 @@ mod tests {
         assert!(s.row_labels().is_empty());
     }
 
-    /// **M14H** Gherkin scenario 4: 4 squadmates listed sorted by TTD asc.
     #[test]
     fn four_squadmates_sorted_by_ttd() {
         let mut s = TriagePanelState::default();
@@ -141,7 +139,6 @@ mod tests {
         assert!(h.contains("(2 critical)"));
     }
 
-    /// **M14H** § "Patient Detail (full wound list + per-wound Treat
     /// button)" surfaces the per-wound treat button labels.
     #[test]
     fn patient_detail_panel_renders_treat_buttons() {

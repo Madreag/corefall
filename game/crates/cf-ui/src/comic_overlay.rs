@@ -23,7 +23,6 @@
 
 use bevy::prelude::*;
 
-/// **M12**: comic overlay enable mode — `full` / `subtle` (default) / `off`.
 #[derive(Resource, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
 pub enum ComicOverlayMode {
     /// Full opt-in — speech bubbles + onomatopoeia + boss panels + death
@@ -75,7 +74,6 @@ impl ComicOverlayMode {
     }
 }
 
-/// **M12**: comic surface taxonomy. Renderers query
 /// [`ComicOverlayMode::allows`] before drawing each.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum ComicSurface {
@@ -108,7 +106,6 @@ impl ComicSurface {
     }
 }
 
-/// **M12**: canonical onomatopoeia vocabulary. Renderers pick a stamp
 /// based on the event family (impact / shield / pickup / etc.).
 pub const ONOMATOPOEIA_VOCABULARY: &[&str] = &[
     "BOOM", "CRACK", "KCHK", "WHAM", "THUD", "ZAP", "CLANK", "SPLAT", "FWOOSH", "DING",
@@ -133,7 +130,6 @@ pub fn onomatopoeia_for(event_family: &str) -> &'static str {
     }
 }
 
-/// **M12**: live mode the renderer reads each frame. cf-app mirrors
 /// `settings.ux.comic_style_overlay` into this resource.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ComicOverlayState {
@@ -164,7 +160,6 @@ impl ComicOverlayState {
     }
 }
 
-/// **M12**: comic overlay plugin wiring [`ComicOverlayState`].
 pub struct ComicOverlayPlugin;
 
 impl Plugin for ComicOverlayPlugin {

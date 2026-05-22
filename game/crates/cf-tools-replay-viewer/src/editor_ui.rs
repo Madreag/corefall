@@ -59,7 +59,6 @@ mod tests {
         ]
     }
 
-    /// VAL-M10B-028: scrub-to produces a deterministic frame whose
     /// BLAKE3 matches the offline-render reference.
     #[test]
     fn editor_ui_scrub_to_produces_deterministic_frame() {
@@ -73,7 +72,6 @@ mod tests {
         assert!(result.latency.as_millis() <= SCRUB_LATENCY_BUDGET_MS as u128);
     }
 
-    /// VAL-M10B-029: set_in + set_out + export_selection trims
     /// frame-accurately.
     #[test]
     fn editor_ui_set_in_set_out_export_selection_is_frame_accurate() {

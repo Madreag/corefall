@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerRepairTrenchModuleParams",
-  "description": "**M9B-3 / VAL-M9B-MODULES-003 / VAL-M9B-CFCTL-001**:\n`act.player.repair_trench_module` — repair a damaged trench module.\nConsumes the declared per-module resources (wood / iron / sandbag)\nand emits `trench.module_repaired`.",
+  "description": "`act.player.repair_trench_module` — repair a damaged trench module.\nConsumes the declared per-module resources (wood / iron / sandbag)\nand emits `trench.module_repaired`.",
   "type": "object",
   "properties": {
     "module_id": {

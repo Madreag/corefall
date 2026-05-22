@@ -76,7 +76,6 @@ impl NarrativeEventId {
     }
 }
 
-/// **M14I** § canonical scar record.
 ///
 /// Produced whenever a wound's visible state closes via sutures /
 /// cauterize / surgery. Honors the spec's named contract fields exactly.
@@ -126,7 +125,6 @@ impl ScarRecord {
     }
 }
 
-/// **M14I** § per-actor scar timeline (ordered, append-only).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ScarTimeline {

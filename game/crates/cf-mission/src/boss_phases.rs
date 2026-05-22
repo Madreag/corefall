@@ -9,7 +9,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7**: boss phase enumeration. 1-3 indexed for the
 /// `boss.phase_changed.phase` payload field.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -34,7 +33,6 @@ impl BossPhase {
     }
 }
 
-/// **M7**: per-boss state tracker. The director ticks this each frame and
 /// emits `boss.phase_changed` on transitions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BossState {
@@ -102,7 +100,6 @@ impl BossState {
     }
 }
 
-/// **M7**: `boss.phase_changed` event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BossPhaseChangedEvent {
     pub actor_id: u64,
@@ -112,7 +109,6 @@ pub struct BossPhaseChangedEvent {
     pub tick: u64,
 }
 
-/// **M7**: `boss.special_ability_triggered` event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BossSpecialAbilityEvent {
     pub actor_id: u64,

@@ -5,7 +5,6 @@ use crate::{
 use super::common::make_zone;
 use super::infantry::infantry_body_graph;
 
-/// **M14A** § "Heavy Armor — `heavy_trooper_v1`" — tank-grade infantry chassis.
 ///
 /// Per-zone External HP, hardness, and `damage_multiplier` / `gib_impulse_limit`
 /// / `stagger_factor` are spec-locked so rifles glance + heavy never knocks down

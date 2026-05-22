@@ -12,7 +12,6 @@ use cf_ai::{
     squad_command_grammar::{builtin_registry, verb_family_label, VerbFamily, VerbRegistry},
 };
 
-/// **M7B**: one slice in the context wheel.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContextWheelSlice {
     pub verb_id: String,
@@ -21,7 +20,6 @@ pub struct ContextWheelSlice {
     pub valid_target: String,
 }
 
-/// **M7B**: a wheel section grouping one family's verbs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContextWheelSection {
     pub family: String,
@@ -29,7 +27,6 @@ pub struct ContextWheelSection {
     pub slices: Vec<ContextWheelSlice>,
 }
 
-/// **M7B**: full Q-hold context wheel state. cf-ui resource the engine
 /// populates from the cf-ai registry per session start.
 #[derive(Resource, Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ContextWheelState {
@@ -37,12 +34,10 @@ pub struct ContextWheelState {
 }
 
 impl ContextWheelState {
-    /// **M7B**: build the wheel from cf-ai's builtin registry.
     pub fn from_builtin() -> Self {
         Self::from_registry(&builtin_registry())
     }
 
-    /// **M7B**: build the wheel from a caller-supplied registry.
     pub fn from_registry(registry: &VerbRegistry) -> Self {
         let families: [VerbFamily; 5] = [
             VerbFamily::Movement,

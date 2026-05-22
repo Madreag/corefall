@@ -15,12 +15,10 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7-A**: how many recent labels per bot to retain. Spec § Smart
 /// commandable AI mandates "reason_label_recent" be a ring; M8A locks the
 /// depth.
 pub const REASON_LABEL_RING_DEPTH: usize = 8;
 
-/// **M7-A**: one structured reason label produced by the thinking stack.
 ///
 /// Re-runs from the same seed must produce byte-identical `format()` output;
 /// the producer guarantees this by quantizing floats + sorting candidate
@@ -117,7 +115,6 @@ fn quantize2(value: f32) -> f32 {
     (value * 100.0).round() / 100.0
 }
 
-/// **M7-A**: ring buffer storing the last `REASON_LABEL_RING_DEPTH` labels.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReasonLabelRing {
     entries: Vec<ReasonLabel>,

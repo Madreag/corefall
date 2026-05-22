@@ -16,7 +16,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14B** § gravity vector — magnitude in m/s² (or pixel units per the
 /// scenario's authored scale) + a unit-length direction vector.
 ///
 /// `Default` returns Earth-down 9.81 m/s² for callers that want a baseline
@@ -76,7 +75,6 @@ impl Default for GravityVec {
     }
 }
 
-/// **M14B** § gravity override kinds.
 ///
 /// Stacking order honoured by [`apply_overrides`] (last writer wins per
 /// the spec's "scenario-base → per-region → per-cell → per-actor" rule):
@@ -187,7 +185,6 @@ impl GravityOverride {
     }
 }
 
-/// **M14B** § Result of [`apply_overrides`] — the final gravity vector
 /// plus the ids of overrides that were active at the queried position.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OverrideResult {
@@ -196,7 +193,6 @@ pub struct OverrideResult {
     pub active_ids: Vec<u32>,
 }
 
-/// **M14B** § Apply the override list to `base` at `world_pos` for an
 /// optional `actor_id`.
 ///
 /// Stacking discipline (spec):
@@ -322,7 +318,6 @@ pub fn apply_overrides(
     }
 }
 
-/// **M14B** § Advance every [`GravityOverride::DamagedGrav`] entry in the
 /// slice by `dt_secs`. Each wave-front radius grows by
 /// `wave_front_growth_per_s × dt_secs`, clamped to the override's
 /// authored `radius`. Pure / deterministic.

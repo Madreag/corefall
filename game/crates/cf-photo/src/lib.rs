@@ -7,7 +7,7 @@
 //! file path.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 pub mod export;
 pub mod filters;

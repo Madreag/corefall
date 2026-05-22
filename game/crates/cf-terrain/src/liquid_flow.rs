@@ -35,11 +35,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::chunked::{ChunkedTerrain, MaterialId, CHUNK_SIZE};
 
-/// **M15B** § Material id for landed rain (water).
 pub const POST_LANDING_RAIN: MaterialId = 13; // water
-/// **M15B** § Material id for landed acid_droplet (acid).
 pub const POST_LANDING_ACID_DROPLET: MaterialId = 21; // acid
-/// **M15B** § Material ids that the flow pass migrates per tick. These
 /// stay distinct from cf-terrain::ca's general liquid pass because we
 /// want a deterministic single-pass redistribution that doesn't loop
 /// the entire CA (which would be O(scene) per tick).
@@ -50,7 +47,6 @@ pub const FLOWING_LIQUIDS: &[MaterialId] = &[
     88,                          // acid_droplet (in-flight)
 ];
 
-/// **M15B** § Per-tick report from the liquid-flow pass.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LiquidFlowReport {
     pub tick: u64,
@@ -59,7 +55,6 @@ pub struct LiquidFlowReport {
     pub dirty_chunks_touched: u32,
 }
 
-/// **M15B** § Drive one liquid-flow pass over the terrain.
 ///
 /// This is a Margolus-style single-pass deterministic redistribution.
 /// It does NOT replace the cf-terrain::ca general CA pass — it
@@ -69,7 +64,6 @@ pub struct LiquidFlowReport {
 ///    same row when those cells also rest on solid (i.e. pooling into
 ///    basins).
 ///
-/// Per spec § "puddles accumulate in low ground via cf-terrain
 /// liquid_flow". The sideways flow stops at the first solid wall so a
 /// "low ground" basin holds water without leaking.
 pub fn liquid_flow_step(terrain: &mut ChunkedTerrain, tick: u64) -> LiquidFlowReport {

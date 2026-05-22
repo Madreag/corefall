@@ -70,7 +70,6 @@ impl IceLiteAgent {
         self.local_srflx = Some(srflx);
     }
 
-    /// **M8B § Acceptance "ICE-lite + STUN punches a symmetric-NAT to
     /// symmetric-NAT pair"**: enumerate (local, remote) candidate pairs
     /// + run connectivity checks; return the chosen pair (or None when
     ///   every pair fails → caller falls back to TURN).

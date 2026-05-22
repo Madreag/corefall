@@ -89,7 +89,6 @@ impl Attachable {
     }
 }
 
-/// **M14**: apply damage to an attachable + return the damage propagated
 /// upward through its joint to the parent body's HP pool.
 ///
 /// Damage routing:

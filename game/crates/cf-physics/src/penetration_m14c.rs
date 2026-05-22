@@ -139,7 +139,6 @@ pub struct ApfsdsImpactOutcome {
     pub caption: Option<&'static str>,
 }
 
-/// **M14C / VAL-M14C-015**: HEAT standoff penetration curve.
 ///
 /// Returns the multiplicative penetration scalar in [0, 1]:
 ///   - < `min_standoff` → 0.5 (under-formed jet)
@@ -168,7 +167,6 @@ pub fn heat_standoff_scalar(standoff_m: f32, min_standoff_m: f32, optimum_m: f32
     taper.min(1.0)
 }
 
-/// **M14C / VAL-M14C-017**: HEAT cone-angle gate. Returns `true` when the
 /// impact ray is inside the cone half-angle (penetration), `false` when
 /// the hit is off-axis (glance).
 #[must_use]
@@ -176,7 +174,6 @@ pub fn heat_within_cone(impact_angle_deg: f32, cone_half_angle_deg: f32) -> bool
     impact_angle_deg.abs() <= cone_half_angle_deg.abs() + 1e-3
 }
 
-/// **M14C / VAL-M14C-025**: ERA HEAT-penetration reduction formula.
 ///
 /// `era_charge_kg × 0.7` per "Notes for the implementer". Returns the
 /// scalar applied to the remaining HEAT jet penetration (1.0 = no
@@ -188,7 +185,6 @@ pub fn era_penetration_reduction(era_charge_kg: f32) -> f32 {
     1.0 - drop
 }
 
-/// **M14C** § HEAT producer. Returns the ordered event tuple per
 /// the validation contract (ERA event strictly before traversal event).
 #[must_use]
 pub fn heat_impact_producer(input: &HeatImpactInput) -> HeatImpactOutcome {
@@ -253,7 +249,6 @@ pub fn heat_impact_producer(input: &HeatImpactInput) -> HeatImpactOutcome {
     outcome
 }
 
-/// **M14C** § APFSDS producer. Walks the rod through each module on the
 /// path, emitting per-module energy decay per `KE_in × (1 - absorption_ratio)`.
 #[must_use]
 pub fn apfsds_impact_producer(input: &ApfsdsImpactInput) -> ApfsdsImpactOutcome {
@@ -286,7 +281,6 @@ pub fn apfsds_impact_producer(input: &ApfsdsImpactInput) -> ApfsdsImpactOutcome 
     outcome
 }
 
-/// **M14C / VAL-M14C-016**: APFSDS over-penetration damage on unarmored
 /// infantry. Returns 30 (vs 40 for an autocannon round on the same
 /// target). Pure helper consumed by `cf-actor` when an APFSDS round hits
 /// an actor whose chassis has no positioned interior modules.
@@ -295,7 +289,6 @@ pub fn apfsds_overpenetration_infantry_damage() -> f32 {
     30.0
 }
 
-/// **M14C / VAL-M14C-016**: standard autocannon damage on unarmored
 /// infantry (baseline comparison).
 #[must_use]
 pub fn autocannon_infantry_damage() -> f32 {

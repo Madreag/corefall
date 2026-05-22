@@ -33,7 +33,6 @@ pub fn wind_force_for_actor(atm: &AtmosphereSample, actor_h_extent_x: f32) -> [f
     [force_x, force_y]
 }
 
-/// **M14A** § "Stationeers helmet breach math" — `inhaled_mol_per_tick =
 /// 0.0048 · BreathingRate · BreathingEfficiency`.
 pub fn suit_o2_drain_mol_per_tick(breathing_rate: f32, breathing_efficiency: f32) -> f32 {
     cf_atmos::INHALED_MOL_PER_TICK_BASE * breathing_rate.max(0.0) * breathing_efficiency.clamp(0.0, 2.0)

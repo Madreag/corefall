@@ -25,7 +25,6 @@
 //! dep), so any call site using them compiles whether profiling is
 //! enabled or not.
 
-/// **M8A**: profiling-zone scaffold macro. Expands to a no-op at M8A.
 /// M9+ wires the real `profiling::scope!` macro behind a feature flag.
 #[macro_export]
 macro_rules! cf_profiling_zone {
@@ -37,7 +36,6 @@ macro_rules! cf_profiling_zone {
     };
 }
 
-/// **M8A**: profiling-function scaffold attribute placeholder. At M8A
 /// callers should annotate tick-hot entry points using
 /// `cf_profiling_zone!("<name>")` at the function body; M9+ migrates to
 /// the proper `#[profiling::function]` attribute when the dep lands.

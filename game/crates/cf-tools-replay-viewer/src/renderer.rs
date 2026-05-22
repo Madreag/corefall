@@ -51,7 +51,6 @@ pub fn render_event_body(event: &Event) -> String {
             actor_label(p, "actor_id").unwrap_or_else(|| "an actor".into()),
             field_str(p, "action").unwrap_or_else(|| "action".into())
         ),
-        // **M14 audit fix** (pre-existing M3B bug): the plain-language
         // renderer must NOT surface raw payload tokens. The previous
         // rendering inlined the method literal (e.g. "act.player.fire")
         // which broke the cause-chain plain-language contract and tripped

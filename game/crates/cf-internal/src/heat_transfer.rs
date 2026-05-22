@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 /// per tick. Spec § Constants: 0.04 m² (≈ 20 cm²).
 pub const FOOT_CONTACT_AREA_M2: f32 = 0.04;
 
-/// **M14A** § "Heat-transfer at contact" — compute the per-tick body
 /// temperature delta from material contact.
 ///
 /// `material_conductivity` ∈ [0, 1]; 1 = perfect conductor (metal),
@@ -32,7 +31,6 @@ pub fn body_temp_delta_per_tick(
     temp_diff * conductivity * FOOT_CONTACT_AREA_M2 * dt_secs * 5.0
 }
 
-/// **M14A** § "Heat transfer through planted foot" — kind of thermal effect
 /// from the per-tick body temperature delta.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

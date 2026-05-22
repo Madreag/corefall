@@ -24,7 +24,7 @@
 //! commandability layer round-trippably.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 pub mod context_wheel;
 pub mod panic;

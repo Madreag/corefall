@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::producers::TreatmentKind;
 
-/// **M14H** § patient row status (triage band).
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -59,7 +58,6 @@ impl PatientStatus {
     }
 }
 
-/// **M14H** § a single patient row in the Patient Queue.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PatientRow {
     pub actor_id: u64,
@@ -70,7 +68,6 @@ pub struct PatientRow {
     pub status: PatientStatus,
 }
 
-/// **M14H** § per-wound entry on the Patient Detail panel.
 ///
 /// Each entry surfaces enough state for the HUD to render a row with a
 /// per-wound Treat button. The `recommended_treatment` is computed by
@@ -90,7 +87,6 @@ pub struct PatientDetailWound {
     pub recommended_treatment: Option<TreatmentKind>,
 }
 
-/// **M14H** § Patient Detail panel state (opened when the player clicks a
 /// Patient Queue row).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PatientDetail {
@@ -114,7 +110,6 @@ impl PatientDetail {
     }
 }
 
-/// **M14H** § Patient Queue panel state.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PatientQueue {
     pub rows: Vec<PatientRow>,
@@ -200,7 +195,6 @@ mod tests {
         }
     }
 
-    /// **M14H** Gherkin scenario 4: Triage UX surfaces compound TTD.
     /// Given 4 squadmates in various states of injury, when the player
     /// opens the Patient Queue, then the panel lists 4 rows sorted by
     /// compound_TTD ascending.
@@ -252,7 +246,6 @@ mod tests {
         assert!(q.selected.is_none());
     }
 
-    /// **M14H** spec § "Click patient → opens Patient Detail (full wound
     /// list + per-wound Treat button)" — PatientDetail surfaces all
     /// wound rows with per-wound treat button labels.
     #[test]

@@ -16,7 +16,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M8B § locked**: maximum payload size for FEC encoding. Larger
 /// payloads are handed off to QUIC stream retransmit per the spec.
 pub const FEC_MAX_PAYLOAD_BYTES: usize = 8 * 1024;
 

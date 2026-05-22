@@ -87,55 +87,46 @@ pub struct Scenario {
     /// chain reflects the actual milestone being proven.
     #[serde(default)]
     pub milestone_override: Option<String>,
-    /// **M1 / Seam S2**: scenario-wide tutorial-safety flag. When true the
     /// engine seeds INACTIVE for `controllable` actors during the script's
     /// onboarding window and refuses lethal damage transitions. M1 surfaces
     /// the flag through the manifest -> engine config -> actor.set_inactive
     /// path; M1.5+ tutorials act on it.
     #[serde(default)]
     pub tutorial_safety: bool,
-    /// **M7 director v0.5 (audit gap A12)**: opt-in 4-phase pacing for the
     /// mission director. When `Some`, the engine seeds `M7AiWorld.phase`
     /// at scenario start and emits `mission.phase_changed` per the
     /// configured second budgets. `None` means the scenario opts out of
     /// the v0.5 phase pacer.
     #[serde(default)]
     pub phase_state: Option<ScenarioPhaseState>,
-    /// **M7 director v0.5 (audit gap A15)**: opt-in reinforcement-wave
     /// declarations. Empty means no waves; the engine still ticks
     /// `try_spawn_reinforcement` but the registry produces no events.
     #[serde(default)]
     pub reinforcement_waves: Vec<ScenarioReinforcementWave>,
-    /// **M7 director v0.5 (audit gap A16/A17)**: opt-in mini-boss state.
     /// When `Some`, the engine seeds `M7AiWorld.boss` at scenario start
     /// and routes hits against `actor_id` into `apply_boss_damage`.
     #[serde(default)]
     pub boss_state: Option<ScenarioBossState>,
-    /// **M7 director v0.5 (audit gap A13/A14)**: opt-in v0.5 objective
     /// graph (DiGraph + branching points + optional/parallel objectives).
     /// When `Some`, the engine seeds `M7AiWorld.objective_graph` at
     /// scenario start and emits `mission.objective_branched` /
     /// `mission.optional_offered` per `drain_objective_graph_emissions`.
     #[serde(default)]
     pub objective_graph: Option<ScenarioObjectiveGraph>,
-    /// **M14B** § gravity field overrides — per-cell + per-region + per-actor
     /// modifiers stacked atop `gravity`. Empty by default; scenarios that
     /// declare gravity wells, low-g labs, magnetic boots, reverse-g rooms,
     /// or damaged generators populate this array.
     #[serde(default)]
     pub gravity_overrides: Vec<cf_mission::ScenarioGravityOverride>,
-    /// **M14B** § wind apertures — pressure-differential sources between
     /// authored atmosphere cells. Empty by default; scenarios that declare
     /// pipe ruptures, vent fans, or breaches populate this array.
     #[serde(default)]
     pub wind_sources: Vec<cf_mission::ScenarioWindSource>,
-    /// **M14B** § authored atmosphere cells — pressure + temperature + gas
     /// composition that feed the wind force + stratification producers.
     /// Empty by default; scenarios opt in by declaring cells (typically
     /// alongside `wind_sources`).
     #[serde(default)]
     pub atmosphere_cells: Vec<cf_mission::ScenarioAtmosCell>,
-    /// **M14C** § scripted director steps — per-tick intent overrides the
     /// engine injects into `pending_intent` before the actor sim runs.
     /// Mirrors what a human (or a cfctl runner) would type via
     /// `cfctl.act.player.{move,aim,fire,reload}` so headless cfctl drives
@@ -145,31 +136,26 @@ pub struct Scenario {
     /// (no scripted intent injection).
     #[serde(default)]
     pub scripted_steps: Vec<ScenarioScriptStep>,
-    /// **M14D** § projectile-pair pool authored by the scenario manifest.
     /// Drives the per-tick projectile-pair CCD pass
     /// (`cf_physics::run_projectile_pair_pass`) between the actor-collision
     /// pass and the terrain pass. Empty by default; only M14D scenarios
     /// (e.g., `m14d_projectile_intercept.ron`) populate it.
     #[serde(default)]
     pub m14d_projectile_pool: Vec<ScenarioM14dProjectile>,
-    /// **M14D § VAL-M14D-019** initial per-player `replay_intercepts`
     /// setting. Default false. Setting `true` opts the killcam back into
     /// surfacing `collision.projectile_pair_contact` events.
     #[serde(default)]
     pub m14d_replay_intercepts: bool,
-    /// **M14E** § per-tick collapse-check fixtures authored by the
     /// scenario manifest. Empty by default; M14E scenarios populate one
     /// or more ScenarioTunnelSpan rows so the integrity pass + cave-in
     /// roll fire against a known tunnel topology.
     #[serde(default)]
     pub m14e_tunnel_spans: Vec<ScenarioTunnelSpan>,
-    /// **M14E** § per-tick collapse-check seed offset. Scenarios that
     /// rely on cave-in determinism (`m14e_tunnel_collapse_drill.ron`)
     /// set this so the engine's cave-in RNG draw is reproducible. Default
     /// 0 falls back to the engine's `seed` field.
     #[serde(default)]
     pub m14e_cave_in_seed_offset: u64,
-    /// **M14F** § per-chunk lateral-wall fixtures authored by the
     /// scenario manifest. Empty by default; M14F scenarios populate
     /// one or more [`LateralWallSpan`] rows so the lateral integrity
     /// pass + bulging→crack_advanced→rupture cascade fires against a
@@ -179,7 +165,6 @@ pub struct Scenario {
     /// per VAL-CROSS-005).
     #[serde(default)]
     pub m14f_lateral_wall_spans: Vec<LateralWallSpan>,
-    /// **M14G § VAL-M14G-013/014/030**: thermal-contact zones authored
     /// by the scenario manifest. Each entry models one actor zone in
     /// sustained contact with a tile at a given temperature; the
     /// engine ticks the dwell counter every tick and runs the
@@ -189,7 +174,6 @@ pub struct Scenario {
     /// (cold) records.
     #[serde(default)]
     pub m14g_thermal_zones: Vec<ScenarioThermalZone>,
-    /// **M14G § VAL-M14G-029**: material-contact zones authored by the
     /// scenario manifest. Each entry models one actor zone in contact
     /// with a hazardous material; the engine ticks one
     /// [`cf_material::classify_reaction`] call per tick at the
@@ -200,7 +184,6 @@ pub struct Scenario {
     pub m14g_material_contacts: Vec<ScenarioMaterialContact>,
 }
 
-/// **M14D** § one scenario projectile entry feeding the pair-CCD pool.
 /// Mirrors [`cf_physics::ProjectileSnapshot`] but uses serde-friendly
 /// types for RON. The engine converts these to runtime snapshots at
 /// scenario load via `build_m14d_projectile_snapshot`.
@@ -234,7 +217,6 @@ fn default_m14d_mass_kg() -> f32 {
     0.01
 }
 
-/// **M14E** § One tunnel-span fixture authored by the scenario manifest.
 /// Drives the per-tick collapse-check pass on a single chunk per
 /// VAL-M14E-001..VAL-M14E-018.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -280,7 +262,6 @@ fn default_vibration_modifier() -> f32 {
     1.0
 }
 
-/// **M14F § VAL-M14F-002 / VAL-M14F-016**: One lateral-wall fixture
 /// authored by the scenario manifest. Drives the per-tick lateral
 /// integrity pass + the bulging → crack_advanced → rupture cascade.
 /// The chunk's integrity field is shared with the M14E ceiling pass
@@ -363,7 +344,6 @@ fn default_sealed_room_pressure() -> f32 {
     101.0
 }
 
-/// **M14G § VAL-M14G-013/014/030**: per-tick thermal contact fixture.
 /// Models an actor zone resting against a tile at a steady temperature
 /// so the engine can fire the burn / frostbite escalation ladder
 /// deterministically.
@@ -386,7 +366,6 @@ pub struct ScenarioThermalZone {
     pub end_tick: Option<u64>,
 }
 
-/// **M14G § VAL-M14G-029**: per-tick material-contact fixture. Models
 /// an actor zone touching a hazardous material (acid / refrigerant /
 /// ammonia / chlorine) at constant intensity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -413,7 +392,6 @@ fn default_material_intensity() -> f32 {
     0.5
 }
 
-/// **M14C** § one scripted director step. The engine compares the current
 /// tick against `tick`; on the matching tick it patches `pending_intent`
 /// on the player actor with the provided overrides (aim / fire /
 /// ammo_kind) before the actor sim runs.
@@ -446,7 +424,6 @@ pub struct ScenarioScriptStep {
 }
 
 impl ScenarioScriptStep {
-    /// **M14C** § resolve the `ammo_kind` string to a `cf_equipment::RoundKind`.
     /// Returns `None` for empty / unknown values so the engine falls back
     /// to the weapon's `RifleSpec::primary_round`.
     pub fn resolved_ammo_kind(&self) -> Option<cf_equipment::RoundKind> {
@@ -483,20 +460,16 @@ pub struct ScenarioActor {
     /// drives this actor through `cf-ai::ReactiveGuard`.
     #[serde(default)]
     pub enemy: Option<ScenarioEnemy>,
-    /// **M5**: optional chassis attachment (`infantry`, `powered_armor`,
     /// `light_mech` or a mod-supplied spec id).
     #[serde(default)]
     pub chassis: Option<ScenarioChassis>,
-    /// **M5**: optional origin tag (`human`, `robot`, `android`).
     #[serde(default)]
     pub origin_id: Option<String>,
-    /// **M6**: optional squad role. When set, the engine adds this actor to
     /// the [`cf_squad::Squad`] at scenario init and emits one
     /// `squad.member_added` event. Accepted values: `"leader"` /
     /// `"follower"`. `None` for non-squad actors (enemies, dummies).
     #[serde(default)]
     pub squad_role: Option<String>,
-    /// **M6**: optional friendly-AI hint surfaced by the engine for
     /// squad followers. Currently unused beyond influencing the bot's
     /// default `current_command` (FollowLeader); M7 expands to full
     /// archetypes. Free-form string tag (`"rifleman"` / `"medic"` /
@@ -505,14 +478,12 @@ pub struct ScenarioActor {
     pub squad_archetype: Option<String>,
 }
 
-/// **M5** scenario manifest entry for chassis attachment. Resolves to a
 /// runtime [`cf_chassis::ChassisState`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScenarioChassis {
     pub spec_id: String,
     #[serde(default)]
     pub tutorial_safety: bool,
-    /// **M14C** § optional extra modules bolted on top of the chassis
     /// spec. Each entry maps `kind` (snake_case `ModuleKind` discriminator
     /// — currently only `"era"` is honored) to a `BodyZone` + per-panel
     /// HP + ERA charge. Used by `m14c_heat_vs_era.ron` to bolt an ERA
@@ -533,7 +504,6 @@ impl ScenarioChassis {
     pub fn build_state(&self, tick_rate_hz: u32) -> Option<cf_chassis::ChassisState> {
         let mut state = cf_chassis::chassis_spec(&self.spec_id)
             .map(|spec| cf_chassis::ChassisState::from_spec(&spec, tick_rate_hz, self.tutorial_safety))?;
-        // **M14C** § scenario-driven extra modules. Currently only the
         // `era` kind is honored — the panel is bolted onto the configured
         // body zone with the requested HP + era_charge_kg + one-shot
         // consumable flag set true so HEAT impacts trigger ERA
@@ -567,7 +537,6 @@ impl ScenarioChassis {
     }
 }
 
-/// **M14C** § scenario-side declaration of an extra chassis module bolted
 /// on top of the base spec. M14C ships exactly one kind — `era` — for the
 /// HEAT-vs-ERA scenario.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -581,7 +550,6 @@ pub struct ScenarioExtraModule {
     /// Module HP at spawn time.
     #[serde(default = "default_extra_module_hp")]
     pub hp_max: f32,
-    /// **M14C** § ERA-only: charge mass in kg. Feeds the
     /// `era_charge_kg × 0.7` HEAT penetration reduction formula.
     #[serde(default)]
     pub era_charge_kg: Option<f32>,
@@ -670,7 +638,6 @@ pub struct ScenarioEnemy {
     pub reload_seconds: Option<f32>,
     pub muzzle_forward_offset: Option<f32>,
     pub muzzle_vertical_offset: Option<f32>,
-    /// **M9B audit GAP-2**: opt the actor into a per-tick AI cover-decision
     /// pipeline. The engine recognises `"AI-TRENCH-A-01"` (M9B trench
     /// garrison doctrine); other values are forward-compat placeholders
     /// and are ignored by the current engine.
@@ -896,7 +863,6 @@ impl ScenarioReactor {
             destroyed: false,
             ..Reactor::default()
         };
-        // **M9**: populate the 3-layer armor cascade at scenario load so the
         // engine never has to lazy-init it on the first projectile hit.
         r.ensure_armor_layers();
         r
@@ -962,7 +928,6 @@ impl ScenarioBreach {
     }
 }
 
-/// **M7 director v0.5 (audit gap A12)**: scenario-side declaration of
 /// the 4-phase pacing parameters consumed by `M7AiWorld.phase`. All
 /// three durations default to spec defaults (30s / 60s / 120s).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -997,7 +962,6 @@ impl ScenarioPhaseState {
     }
 }
 
-/// **M7 director v0.5 (audit gap A15)**: scenario-side declaration of
 /// one reinforcement wave. Waves trigger when the active phase + the
 /// cumulative kill count both match the wave's spec.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1027,7 +991,6 @@ impl ScenarioReinforcementWave {
     }
 }
 
-/// **M7 director v0.5**: wire-form mirror of `cf_mission::MissionPhase`
 /// so RON manifests can author phases without depending on cf-mission.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1049,7 +1012,6 @@ impl ScenarioMissionPhase {
     }
 }
 
-/// **M7 director v0.5 (audit gap A16/A17)**: scenario-side declaration
 /// of the mini-boss state. The engine seeds `M7AiWorld.boss` from this
 /// at scenario start and routes hits whose `target == actor_id` into
 /// `apply_boss_damage`.
@@ -1081,7 +1043,6 @@ impl ScenarioBossState {
     }
 }
 
-/// **M7 director v0.5 (audit gap A13/A14)**: scenario-side declaration
 /// of the v0.5 objective DiGraph. Nodes carry their `kind` + dependency
 /// list + optional/parallel/branch-label flags. Branching points are
 /// listed separately so the engine knows which `(branch_a, branch_b)`
@@ -1315,7 +1276,6 @@ impl ScenarioActor {
         self.build_state_with_tick_rate(60)
     }
 
-    /// **M5**: build the actor state including chassis attachment, using the
     /// engine's configured `tick_rate_hz` so the chassis eject window is
     /// real-time stable across 60 Hz / 120 Hz scenarios.
     pub fn build_state_with_tick_rate(&self, tick_rate_hz: u32) -> ActorState {
@@ -1428,7 +1388,6 @@ impl Scenario {
                     reactor_id: reactor.id.clone(),
                 });
             }
-            // Bugbot 3212274163 (Low): a reactor declared with hp <= 0
             // would start destroyed AND `reset()` would set hp = max_hp = 0
             // so the reactor stays destroyed forever (since
             // `is_destroyed` returns `destroyed || hp <= 0`). Reject at
@@ -1699,7 +1658,6 @@ mod tests {
 
     #[test]
     fn rejects_reactor_with_zero_or_negative_hp() {
-        // Bugbot 3212274163 (Low) regression: a reactor declared with
         // hp <= 0 would start destroyed AND can never be reset (since
         // max_hp = hp = 0 and `is_destroyed` returns `hp <= 0`). The
         // validator MUST reject the scenario at load.

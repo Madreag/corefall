@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerDropTrenchTemplateParams",
-  "description": "**M9B-2 / VAL-M9B-TEMPLATE-001..004 / VAL-M9B-CFCTL-001**:\n`act.player.drop_trench_template` — instantiate an authored trench\ntemplate at the supplied tile origin. `id` resolves to\n`content/trench_templates/<id>.trench.ron`; the cfctl handler\nhashes the template (`template_sha256`) + counts placed segments\n(`segment_count`) into the `trench.template_dropped` event.",
+  "description": "`act.player.drop_trench_template` — instantiate an authored trench\ntemplate at the supplied tile origin. `id` resolves to\n`content/trench_templates/<id>.trench.ron`; the cfctl handler\nhashes the template (`template_sha256`) + counts placed segments\n(`segment_count`) into the `trench.template_dropped` event.",
   "type": "object",
   "properties": {
     "id": {

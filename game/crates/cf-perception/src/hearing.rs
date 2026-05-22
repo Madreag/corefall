@@ -45,7 +45,6 @@ impl Default for HearingProbe {
 /// Returns true if the receiver reacts to the emission given their hearing
 /// range and any active deafen affliction.
 ///
-/// **M14 audit fix** (pre-existing M6 bug): occlusion attenuation is now
 /// non-linear. Heavy walls (occlusion ≈ 0.2) drop the signal far enough
 /// below the reaction threshold that a closed-door listener doesn't
 /// react to a gunshot the way an open-air listener does. The previous

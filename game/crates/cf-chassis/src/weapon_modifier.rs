@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::ChassisKind;
 
-/// **M13** § "Weapon modifier slots (Noita-style combinatorial)" — 30+ launch
 /// modifiers stackable on the same weapon. Discriminants are stable so the
 /// modifier registry remains deterministic across milestones.
 #[repr(u8)]
@@ -125,7 +124,6 @@ impl WeaponModifier {
     }
 }
 
-/// **M13** § "Weapon modifier slots" — per-weapon modifier set bounded by the
 /// chassis tier's slot count (see `ChassisKind::weapon_modifier_slot_count`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct WeaponModifierSet {

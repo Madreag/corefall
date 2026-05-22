@@ -108,7 +108,6 @@ pub struct ActPlayerFireParams {
     /// hold-to-fire weapons. M1's rifle is single-press; release is a no-op.
     #[serde(default = "default_true")]
     pub pressed: bool,
-    /// **M14C** § "Wire ammo-spec to engine.fire; surface in
     /// `cfctl.act.player.fire` ammo-kind" — optional snake_case ammo
     /// kind selector. Accepted values: `regular`, `tracer`, `high_explosive`,
     /// `pellet`, `heat`, `apfsds`. `None` = use the weapon's default
@@ -150,7 +149,6 @@ pub struct ActPlayerDigParams {
     pub target: Option<String>,
 }
 
-/// **M9B-3 / VAL-M9B-DIG-001..003 / VAL-M9B-CFCTL-001**:
 /// `act.player.dig_trench_segment` — request a trench carve at the
 /// player's current tile. `variant` is one of the 6 declared
 /// cross-section variants (`shallow_scrape` / `standard` / `deep` /
@@ -174,7 +172,6 @@ pub struct ActPlayerDigTrenchSegmentParams {
     pub strict: Option<bool>,
 }
 
-/// **M9B-3 / VAL-M9B-MODULES-002 / VAL-M9B-CFCTL-001**:
 /// `act.player.place_trench_module` — place an embedded trench module
 /// on a built segment. `module_id` is one of the 6 declared modules
 /// (`duckboard` / `fire_step` / `breastwork` / `drainage_sump` /
@@ -188,7 +185,6 @@ pub struct ActPlayerPlaceTrenchModuleParams {
     pub segment_id: u64,
 }
 
-/// **M9B-2 / VAL-M9B-TEMPLATE-001..004 / VAL-M9B-CFCTL-001**:
 /// `act.player.drop_trench_template` — instantiate an authored trench
 /// template at the supplied tile origin. `id` resolves to
 /// `content/trench_templates/<id>.trench.ron`; the cfctl handler
@@ -202,7 +198,6 @@ pub struct ActPlayerDropTrenchTemplateParams {
     pub origin: (i32, i32),
 }
 
-/// **M9B-3 / VAL-M9B-MODULES-003 / VAL-M9B-CFCTL-001**:
 /// `act.player.repair_trench_module` — repair a damaged trench module.
 /// Consumes the declared per-module resources (wood / iron / sandbag)
 /// and emits `trench.module_repaired`.
@@ -214,7 +209,6 @@ pub struct ActPlayerRepairTrenchModuleParams {
     pub segment_id: u64,
 }
 
-/// **M9B-3 / VAL-M9B-CFCTL-002**: `observe.actor.cover_state` — read
 /// the actor's current trench cover state. Returns
 /// `{ cover_state: "Exposed" | "Partial" | "Full" }`. `actor_id=None`
 /// resolves to the player.
@@ -226,7 +220,6 @@ pub struct ObserveActorCoverStateParams {
     pub actor_id: Option<u64>,
 }
 
-/// **M9B-3 / VAL-M9B-CFCTL-002**: `observe.trench_segment_at_pos` —
 /// read the trench segment at the supplied tile, or `null` for open
 /// ground.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -237,7 +230,6 @@ pub struct ObserveTrenchSegmentAtPosParams {
     pub y: i32,
 }
 
-/// **M3 re-open (2026-05-13)**: `act.player.anchor` — attempt to place a
 /// tether / anchor / rope-grapple at world-space `(x, y)`. The engine samples
 /// the material at the target and emits `terrain.anchor_material_result`:
 /// - `anchorable=true` (dirt, concrete, anchor) → `result="accepted"`
@@ -256,7 +248,6 @@ pub struct ActPlayerAnchorParams {
     pub tool_id: Option<String>,
 }
 
-/// **M5**: `act.player.crouch` — sticky crouch toggle.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerCrouchParams {
@@ -264,7 +255,6 @@ pub struct ActPlayerCrouchParams {
     pub active: bool,
 }
 
-/// **M5**: `act.player.climb` — sticky climb toggle (placeholder cue).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerClimbParams {
@@ -272,7 +262,6 @@ pub struct ActPlayerClimbParams {
     pub active: bool,
 }
 
-/// **M5**: `act.player.jet` — jet thrust toggle.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerJetParams {
@@ -280,14 +269,12 @@ pub struct ActPlayerJetParams {
     pub active: bool,
 }
 
-/// **M5**: `act.player.eject` — trigger pilot eject from a chassis.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerEjectParams {
     pub schema_version: u32,
 }
 
-/// **M14A**: `act.player.quick_action_slot` — instant slot invocation (keys 1-8).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerQuickActionSlotParams {
@@ -296,14 +283,12 @@ pub struct ActPlayerQuickActionSlotParams {
     pub slot: u8,
 }
 
-/// **M14A**: `act.player.quick_action_toggle` — invoke the last-used slot (tap-Q).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerQuickActionToggleParams {
     pub schema_version: u32,
 }
 
-/// **M14A**: `act.player.quick_action_radial` — open/close the radial picker.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerQuickActionRadialParams {
@@ -311,7 +296,6 @@ pub struct ActPlayerQuickActionRadialParams {
     pub active: bool,
 }
 
-/// **M14A**: `act.player.quick_action_slice` — commit a radial slice (1-8).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerQuickActionSliceParams {
@@ -319,7 +303,6 @@ pub struct ActPlayerQuickActionSliceParams {
     pub slice: u8,
 }
 
-/// **M14A**: `act.player.weapon_cycle` — mouse-wheel slot category cycle.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerWeaponCycleParams {
@@ -328,7 +311,6 @@ pub struct ActPlayerWeaponCycleParams {
     pub direction: i8,
 }
 
-/// **M5**: `act.chassis.repair` — repair a chassis zone or specific module.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActChassisRepairParams {
@@ -345,7 +327,6 @@ fn default_repair_reason() -> String {
     "field_kit".to_string()
 }
 
-/// **M5**: `act.chassis.salvage` — salvage modules from a wrecked chassis.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActChassisSalvageParams {
@@ -358,14 +339,12 @@ fn default_salvage_reason() -> String {
     "manual".to_string()
 }
 
-/// **M5**: `act.chassis.clear_jam` — manually clear a weapon jam.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActChassisClearJamParams {
     pub schema_version: u32,
 }
 
-/// **M1**: `act.player.sharp_aim` — sticky toggle for the sharp-aim hold
 /// (CCCP `AHuman.cpp:1779`). While `active=true` the sim builds
 /// `ActorState::sharp_aim_progress` toward 1.0 each tick as long as the
 /// actor is STABLE, grounded, slow, and equipped; invalidations snap it back
@@ -377,7 +356,6 @@ pub struct ActPlayerSharpAimParams {
     pub active: bool,
 }
 
-/// **M1**: `inspect.equipment` — return the full `RifleSpec` (firing profile +
 /// AI hints + tracer/particle metadata) for a preset id.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -386,7 +364,6 @@ pub struct InspectEquipmentParams {
     pub preset_id: String,
 }
 
-/// **M1**: `observe.actor` — return full `ActorView` (with M1 fields) for the
 /// player by default, or for `actor_id` when supplied.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -396,7 +373,6 @@ pub struct ObserveActorParams {
     pub actor_id: Option<u64>,
 }
 
-/// **M1**: `inspect.actor` — return the full `ActorView` plus the last 30
 /// `actor` events for the target. `target` is `"player"` for the controllable
 /// actor or an actor id rendered as a string. Empty target defaults to player.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -407,7 +383,6 @@ pub struct InspectActorParams {
     pub target: Option<String>,
 }
 
-/// **M13**: `inspect.chassis` — return the full body graph (15 zones + 14
 /// joints + 5 sockets) plus per-zone integrity, per-module state, pilot state
 /// and the eject window for an actor's chassis. `target` is `"player"` (or
 /// empty) for the controllable actor, or a stringified actor id.
@@ -419,7 +394,6 @@ pub struct InspectChassisParams {
     pub target: Option<String>,
 }
 
-/// **M13** § "Brain hopping" — `act.player.brain_hop { target_actor_id }`
 /// transfers control to a different friendly actor and updates the brain flag.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -428,7 +402,6 @@ pub struct ActPlayerBrainHopParams {
     pub target_actor_id: u64,
 }
 
-/// **M13** § "Chassis ability slots" — activate one of the chassis's
 /// ability slots.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -437,7 +410,6 @@ pub struct ActPlayerActivateAbilityParams {
     pub ability: String,
 }
 
-/// **M13** § "Cockpit camera anchor" — switch between third-person follow and
 /// first-person cockpit camera anchors.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -446,7 +418,6 @@ pub struct ActInputCameraAnchorParams {
     pub mode: String,
 }
 
-/// **M13** § "Drone allies" — switch the player's drone ally mode.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerSetDroneModeParams {
@@ -454,7 +425,6 @@ pub struct ActPlayerSetDroneModeParams {
     pub mode: String,
 }
 
-/// **M13** § "Weapon modifier slots" — attach a Noita-style weapon modifier.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerAttachModifierParams {
@@ -462,7 +432,6 @@ pub struct ActPlayerAttachModifierParams {
     pub modifier: String,
 }
 
-/// **M13** § "Weapon modifier slots" — detach an attached weapon modifier.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerDetachModifierParams {
@@ -470,7 +439,6 @@ pub struct ActPlayerDetachModifierParams {
     pub modifier: String,
 }
 
-/// **M13** § "Boarding / disembarking transitions" — start the 1500ms
 /// boarding transition into a chassis actor.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -479,7 +447,6 @@ pub struct ActPlayerBoardParams {
     pub chassis_actor_id: u64,
 }
 
-/// **M13** § "Boarding / disembarking transitions" — start the 1500ms
 /// disembarking transition.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -487,7 +454,6 @@ pub struct ActPlayerDisembarkParams {
     pub schema_version: u32,
 }
 
-/// **M13** § "Pilot-inside-chassis dual silhouette" — chassis silhouette
 /// projection (per-zone HP for the chassis side of the dual layer).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -497,7 +463,6 @@ pub struct ObserveChassisSilhouetteParams {
     pub actor_id: Option<u64>,
 }
 
-/// **M2 re-audit (2026-05-13)**: `observe.mission` — return the full
 /// `MissionState` projection. No params required.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -505,7 +470,6 @@ pub struct ObserveMissionParams {
     pub schema_version: u32,
 }
 
-/// **M2 re-audit (2026-05-13)**: `observe.ai` — return per-AI projection for
 /// `actor_id`. Includes guard state + perception summary + current target +
 /// reason vocabulary.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -515,7 +479,6 @@ pub struct ObserveAiParams {
     pub actor_id: u64,
 }
 
-/// **M6**: `observe.perception` — return per-actor perception projection
 /// (sight cone + hearing radius + stealth meter + last footstep loudness
 /// band + last occlusion factor). `actor_id=None` resolves to the player.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -526,7 +489,6 @@ pub struct ObservePerceptionParams {
     pub actor_id: Option<u64>,
 }
 
-/// **M2 re-audit (2026-05-13)**: `inspect.mission` — return the full
 /// `MissionState` + objectives[] + commander stub. No params required.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -534,7 +496,6 @@ pub struct InspectMissionParams {
     pub schema_version: u32,
 }
 
-/// **M2 re-audit (2026-05-13)**: `inspect.ai` — return per-AI perception
 /// state + memory grid contents + last 30 ai events.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -543,7 +504,6 @@ pub struct InspectAiParams {
     pub actor_id: u64,
 }
 
-/// **M1 / Gap S3 (M1.5 forward-compat seam)**: `act.player.abort` —
 /// stub at M1; flips to a real mission abort path at M1.5.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -551,7 +511,6 @@ pub struct ActPlayerAbortParams {
     pub schema_version: u32,
 }
 
-/// **M1.5**: `act.mission.pause` — suspend mission objective progress +
 /// timer accounting (tutorial-modal pause path). Idempotent: invoking
 /// twice in a row only emits one `mission.objective_paused` event.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
@@ -561,7 +520,6 @@ pub struct ActMissionPauseParams {
     pub schema_version: u32,
 }
 
-/// **M1.5**: `act.mission.resume` — lift the pause set by `act.mission.pause`.
 /// Idempotent: only emits `mission.objective_resumed` when actually paused.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -570,7 +528,6 @@ pub struct ActMissionResumeParams {
     pub schema_version: u32,
 }
 
-/// **M1 / Gap D1**: `act.input.capture_controls` — UI signals the engine
 /// that an overlay (settings panel, debrief prompt, future pause/menu) has
 /// captured input. `captured=true` raises the CONTROLS CAPTURED HUD badge
 /// and rejects subsequent `act.player.*` dispatches; `captured=false`
@@ -584,7 +541,6 @@ pub struct ActInputCaptureControlsParams {
     pub capturer: Option<String>,
 }
 
-/// **M2**: `act.player.toggle_material_overlay` — cycle / set the HUD
 /// material overlay mode. `mode = None` cycles through
 /// off → integrity → pathability → mobility → hazard → build_repair → off.
 /// `mode = Some("...")` sets explicitly. Emits `ux.overlay_mode_changed`.
@@ -597,7 +553,6 @@ pub struct ActToggleMaterialOverlayParams {
     pub mode: Option<String>,
 }
 
-/// **M2**: `inspect.terrain.chunk` — return the full chunk material grid
 /// plus dirty rect, last_modified_tick, and chunk_checksum for the
 /// requested chunk coord.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -608,7 +563,6 @@ pub struct InspectTerrainChunkParams {
     pub y: i32,
 }
 
-/// **M2**: `inspect.material.<id>` — return the full MaterialDef for the
 /// given id (resolved against the canonical launch set).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -617,7 +571,6 @@ pub struct InspectMaterialParams {
     pub id: u16,
 }
 
-/// **M9** (audit round-3 fix gap 3): `observe.terrain.material_at { x, y }`
 /// returns the MaterialInfo at world-space coordinates with the nine
 /// affordance flags (actor_passable, projectile_passable, diggable,
 /// anchorable, blocks_light, contact_damage, path_cost, produces_debris,
@@ -632,7 +585,6 @@ pub struct ObserveTerrainMaterialAtParams {
     pub y: f32,
 }
 
-/// **M7B**: `act.squad.issue` — issue a verb from the canonical squad
 /// command grammar to a squad. Spec § "50+ named squad verbs in a
 /// data-driven registry".
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -645,7 +597,6 @@ pub struct ActSquadIssueParams {
     pub args: Vec<serde_json::Value>,
 }
 
-/// **M7B**: `act.squad.set_formation` — switch the squad's active formation
 /// kind (Wedge / Diamond / Column / Line Abreast / Echelon-Left /
 /// Echelon-Right / Single-File / Stack (door) / Defensive Perimeter).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -656,7 +607,6 @@ pub struct ActSquadSetFormationParams {
     pub formation_kind: String,
 }
 
-/// **M7B**: `act.squad.assign_role` — assign a sticky role to a member
 /// (Pointman / Rifleman / Marksman / Heavy / Engineer / Medic /
 /// Squad Leader).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -668,7 +618,6 @@ pub struct ActSquadAssignRoleParams {
     pub role: String,
 }
 
-/// **M7B**: `srv.dump_squad_state` — return the full squad-state JSON
 /// view (verb registry + formation catalog + archetype-BT node counts +
 /// per-squad state row). Used by the M25 wheel + Tab overlay + assert
 /// the spec's "verb registry enumerates 50+ named squad commands"
@@ -681,7 +630,6 @@ pub struct SrvDumpSquadStateParams {
     pub squad_id: u64,
 }
 
-/// **M12C**: `act.player.skip_cinematic` — request a skip of the
 /// currently-playing cinematic. Per spec § "Skip / pause / replay UX",
 /// the dispatcher consults the seen-set + skip-confirm window before
 /// allowing the skip to fire.
@@ -692,8 +640,6 @@ pub struct ActPlayerSkipCinematicParams {
     pub schema_version: u32,
 }
 
-/// **M12C**: `act.player.pause_cinematic` — toggle the cinematic pause.
-/// Per spec § "Pause — `[P]`. Pauses the cinematic clock; camera
 /// frozen; voice-over paused at boundary; subtitle frozen. Resume with
 /// `[P]` again." Idempotent: the dispatcher inspects the current
 /// phase to decide whether to fire `cinematic.paused` or
@@ -705,7 +651,6 @@ pub struct ActPlayerPauseCinematicParams {
     pub schema_version: u32,
 }
 
-/// **M12C**: `act.player.replay_cinematic { id }` — replay a watched
 /// cinematic from `Codex → Cinematics`. Per spec § "Replay — any
 /// cinematic the player has watched is unlocked / Replay runs the
 /// script identically (replay-deterministic) without affecting save
@@ -718,7 +663,6 @@ pub struct ActPlayerReplayCinematicParams {
     pub id: String,
 }
 
-/// **M12C**: `srv.dump_cinematic_state` — return the full
 /// `CinematicState` JSON view (cinematic id + source + phase +
 /// playhead + duration + color grade + active word + camera offset).
 /// Used by the Codex tab + cinematic editor + tests.
@@ -749,7 +693,6 @@ pub struct SystemShutdownParams {
     pub write_run_bundle: Option<bool>,
 }
 
-/// **M14H** § `act.player.treat` — apply a treatment producer.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerTreatParams {
@@ -760,7 +703,6 @@ pub struct ActPlayerTreatParams {
     pub target_actor_id: u64,
 }
 
-/// **M14H** § `act.player.scan` — start a 30s Medical Scanner read.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerScanParams {
@@ -768,7 +710,6 @@ pub struct ActPlayerScanParams {
     pub target_actor_id: u64,
 }
 
-/// **M14H** § `act.player.cpr_round` — apply one CPR round.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerCprRoundParams {
@@ -776,7 +717,6 @@ pub struct ActPlayerCprRoundParams {
     pub target_actor_id: u64,
 }
 
-/// **M14H** § `act.player.defib` — deliver a defibrillator shock.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerDefibParams {
@@ -784,7 +724,6 @@ pub struct ActPlayerDefibParams {
     pub target_actor_id: u64,
 }
 
-/// **M14H** § `act.player.surgery_start` — begin a 5-phase surgery on a target.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerSurgeryStartParams {
@@ -799,7 +738,6 @@ pub struct ActPlayerSurgeryStartParams {
     pub seed: Option<u64>,
 }
 
-/// **M14H** § `act.player.triage_select` — open Patient Detail panel for one
 /// patient. `target_actor_id = None` clears the selection.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -809,7 +747,6 @@ pub struct ActPlayerTriageSelectParams {
     pub target_actor_id: Option<u64>,
 }
 
-/// **M14I** § `act.player.install_prosthetic` — install one prosthetic on
 /// a target actor. Requires medic_t2 + surgery table; runs the 60s install
 /// sequence inline + emits `prosthetic.installed` on completion.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -824,7 +761,6 @@ pub struct ActPlayerInstallProstheticParams {
     pub zone: String,
 }
 
-/// **M14I** § `act.player.maintain_prosthetic` — run a maintenance pass
 /// on an installed prosthetic. Resets wear_pct to 0 + clears the
 /// malfunction flag.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -835,7 +771,6 @@ pub struct ActPlayerMaintainProstheticParams {
     pub zone: String,
 }
 
-/// **M14I** § `act.player.retire_veteran` — commit an actor's retirement.
 /// Only valid once `age.retirement_offered` has fired and the actor is at
 /// least `retirement_age + 5`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -845,7 +780,6 @@ pub struct ActPlayerRetireVeteranParams {
     pub target_actor_id: u64,
 }
 
-/// **M14J** § `act.player.vault` — manual vault override; auto-vault is
 /// detect-driven. Enters Stance::Vault for `VAULT_DURATION_MS` ms and
 /// emits `actor.vaulted`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -854,7 +788,6 @@ pub struct ActPlayerVaultParams {
     pub schema_version: u32,
 }
 
-/// **M14J** § `act.player.wall_jump` — invoke a wall-jump within
 /// `WALL_CONTACT_GRACE_MS` of wall contact. Chain limit is 3 before
 /// next ground contact.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -863,7 +796,6 @@ pub struct ActPlayerWallJumpParams {
     pub schema_version: u32,
 }
 
-/// **M14J** § `act.player.fire_grapple { target_x, target_y }` — fire the
 /// grappling-hook gun at a world-space point. On hit the rope embeds + a
 /// verlet rope spawns in cf-physics::rope.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -874,7 +806,6 @@ pub struct ActPlayerFireGrappleParams {
     pub target_y: f32,
 }
 
-/// **M14J** § `act.player.rope_input { climb: -1..1, swing: -1..1 }` —
 /// pull rope hand-over-hand or rappel + add tangential swing input at
 /// the bob.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -888,7 +819,6 @@ pub struct ActPlayerRopeInputParams {
     pub swing: f32,
 }
 
-/// **M14J** § `act.player.release_rope` — release the embedded grapple
 /// rope; actor inherits the pendulum velocity at the instant of release.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -896,7 +826,6 @@ pub struct ActPlayerReleaseRopeParams {
     pub schema_version: u32,
 }
 
-/// **M14J** § `act.player.zipline_clip { line_id }` — clip onto a
 /// deployed zip line at its high end.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -905,7 +834,6 @@ pub struct ActPlayerZiplineClipParams {
     pub line_id: u64,
 }
 
-/// **M14J** § `act.player.zipline_brake { engaged: bool }` — engage or
 /// release the zip-line brake.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -914,7 +842,6 @@ pub struct ActPlayerZiplineBrakeParams {
     pub engaged: bool,
 }
 
-/// **M14J** § `act.player.mount { critter_id }` — mount a tamed saddled
 /// critter. Enters Stance::Mounted; combined mass is rider + critter.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -923,7 +850,6 @@ pub struct ActPlayerMountParams {
     pub critter_id: u64,
 }
 
-/// **M14J** § `act.player.dismount` — dismount from a critter. Instant
 /// when stationary; 200ms stagger + 70% velocity inherit when mid-motion.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -971,7 +897,6 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerResetParams>("act_player_reset_params"),
         entry::<ActPlayerDigParams>("act_player_dig_params"),
         entry::<ActPlayerAnchorParams>("act_player_anchor_params"),
-        // **M9B-3**: trench player actions + observes (new methods).
         entry::<ActPlayerDigTrenchSegmentParams>("act_player_dig_trench_segment_params"),
         entry::<ActPlayerPlaceTrenchModuleParams>("act_player_place_trench_module_params"),
         entry::<ActPlayerRepairTrenchModuleParams>("act_player_repair_trench_module_params"),
@@ -1024,33 +949,27 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ObserveFrame>("observe_frame"),
         entry::<ObserveSettings>("observe_settings"),
         entry::<crate::state::ActorView>("actor_view"),
-        // **M7B**: deep squad command grammar surface.
         entry::<ActSquadIssueParams>("act_squad_issue_params"),
         entry::<ActSquadSetFormationParams>("act_squad_set_formation_params"),
         entry::<ActSquadAssignRoleParams>("act_squad_assign_role_params"),
         entry::<SrvDumpSquadStateParams>("srv_dump_squad_state_params"),
-        // **M8B**: net admin / observe surface (observe.net.* + admin.net.*).
         entry::<crate::m8b_net_admin::ObserveNetSessionTransportParams>("observe_net_session_transport_params"),
         entry::<crate::m8b_net_admin::ObserveNetRollbackStatsParams>("observe_net_rollback_stats_params"),
         entry::<crate::m8b_net_admin::ObserveNetLossRecoveryParams>("observe_net_loss_recovery_params"),
         entry::<crate::m8b_net_admin::AdminNetForceRelayParams>("admin_net_force_relay_params"),
-        // **M12C**: in-engine cinematic playback cfctl surface.
         entry::<ActPlayerSkipCinematicParams>("act_player_skip_cinematic_params"),
         entry::<ActPlayerPauseCinematicParams>("act_player_pause_cinematic_params"),
         entry::<ActPlayerReplayCinematicParams>("act_player_replay_cinematic_params"),
         entry::<SrvDumpCinematicStateParams>("srv_dump_cinematic_state_params"),
-        // **M14H**: field-medic workflow + surgery + defib + triage cfctl surface.
         entry::<ActPlayerTreatParams>("act_player_treat_params"),
         entry::<ActPlayerScanParams>("act_player_scan_params"),
         entry::<ActPlayerCprRoundParams>("act_player_cpr_round_params"),
         entry::<ActPlayerDefibParams>("act_player_defib_params"),
         entry::<ActPlayerSurgeryStartParams>("act_player_surgery_start_params"),
         entry::<ActPlayerTriageSelectParams>("act_player_triage_select_params"),
-        // **M14I**: long-term-consequence cfctl surface.
         entry::<ActPlayerInstallProstheticParams>("act_player_install_prosthetic_params"),
         entry::<ActPlayerMaintainProstheticParams>("act_player_maintain_prosthetic_params"),
         entry::<ActPlayerRetireVeteranParams>("act_player_retire_veteran_params"),
-        // **M14J**: actor advanced mobility — vault / wall_jump / grapple
         // gun / rope / zip line / mount cfctl surface.
         entry::<ActPlayerVaultParams>("act_player_vault_params"),
         entry::<ActPlayerWallJumpParams>("act_player_wall_jump_params"),

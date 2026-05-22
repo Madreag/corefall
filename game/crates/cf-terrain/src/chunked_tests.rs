@@ -12,7 +12,6 @@ fn small_world() -> ChunkedTerrain {
     t
 }
 
-/// VAL-M14E-010: support_beam material has id=8, integrity (hardness) = 200,
 /// anchorable=true, piling=false. The piling=false invariant is asserted
 /// by cf-material's MaterialDef accessor; here we verify the cf-terrain
 /// affordance row.
@@ -317,7 +316,6 @@ fn val_m15b_hazardous_materials_damage_actors() {
 #[test]
 fn dirt_to_concrete_hardness_ratio_matches_spec() {
     // Spec: concrete carves in 5-10x dirt time (hardness=50 vs hardness=10).
-    // M3 audit pass 7 (2026-05-13): concrete bumped to 50 so the ratio
     // hits the 5x lower bound exactly.
     let dirt = material_affordance(MATERIAL_DIRT).unwrap();
     let concrete = material_affordance(MATERIAL_CONCRETE).unwrap();
@@ -333,7 +331,6 @@ fn launch_set_baseline_hardness_matches_spec() {
         (MATERIAL_AIR, 0.0_f32),
         (MATERIAL_DIRT, 10.0),
         (MATERIAL_LOOSE_FILL, 5.0),
-        // M3 audit pass 7 (2026-05-13): concrete bumped to 50 so the
         // 5x dirt-ratio spec floor is satisfied exactly.
         (MATERIAL_CONCRETE, 50.0),
         (MATERIAL_METAL_NOHOOK, 100.0),

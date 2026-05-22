@@ -25,7 +25,6 @@ use bevy::prelude::*;
 
 pub use cf_cinematic::{CinematicTakeoverSnapshot, ColorGradeSnapshot};
 
-/// **M12C** § "Cinematic-owned camera state stack". The renderer reads
 /// this resource first when `active == true` and falls back to the
 /// gameplay camera otherwise.
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]

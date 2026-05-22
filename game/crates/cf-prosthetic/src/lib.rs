@@ -58,7 +58,6 @@ use serde::{Deserialize, Serialize};
 
 use cf_wound::registry::{OriginId, ZoneId};
 
-/// **M14I** § prosthetic tier.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -88,7 +87,6 @@ impl ProstheticTier {
     }
 }
 
-/// **M14I** § canonical prosthetic ids (launch catalog: 10 items).
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -161,7 +159,6 @@ impl ProstheticKind {
     }
 }
 
-/// **M14I** § per-prosthetic contract spec record (modder data).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProstheticSpec {
     pub kind: ProstheticKind,
@@ -240,7 +237,6 @@ fn catalog_compatibility(kind: ProstheticKind) -> (Vec<ZoneId>, Vec<OriginId>) {
     }
 }
 
-/// **M14I** § canonical prosthetic catalog. Baked defaults loaded from
 /// `content/prosthetics/*.ron` at runtime.
 #[must_use]
 pub fn prosthetic_catalog() -> Vec<ProstheticSpec> {
@@ -251,13 +247,11 @@ pub fn prosthetic_catalog() -> Vec<ProstheticSpec> {
         .collect()
 }
 
-/// **M14I** § look up the canonical spec for a kind.
 #[must_use]
 pub fn prosthetic_spec(kind: ProstheticKind) -> ProstheticSpec {
     ProstheticSpec::defaults_for(kind)
 }
 
-/// **M14I** § registry loaded from `content/prosthetics/*.ron`.
 #[derive(Debug, Clone, Default)]
 pub struct ProstheticSpecRegistry {
     pub by_kind: BTreeMap<ProstheticKind, ProstheticSpec>,

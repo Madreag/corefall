@@ -13,7 +13,6 @@
 
 use bevy::prelude::*;
 
-/// **M12**: which slideshow slot is playing. Distinct slots route different
 /// asset sets + different exit destinations.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum SlideshowSlot {
@@ -50,7 +49,6 @@ impl SlideshowSlot {
     }
 }
 
-/// **M12**: one slide. Each slide pairs a painted asset (LoadingBg ledger
 /// entry) with subtitle text + a duration. Subtitle text fades in over
 /// `SUBTITLE_FADE_IN_MS`, holds for the dwell, and fades out over
 /// `SUBTITLE_FADE_OUT_MS`. Asset id is the canonical name in the asset
@@ -146,7 +144,6 @@ pub fn slideshow_duration_ms(slides: &[SlideshowSlide]) -> u32 {
     slides.iter().map(|s| s.duration_ms).sum()
 }
 
-/// **M12**: phase of the slideshow lifecycle.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum SlideshowPhase {
     /// Idle — no slideshow playing.
@@ -179,7 +176,6 @@ impl SlideshowPhase {
     }
 }
 
-/// **M12**: subtitle alpha (`[0.0, 1.0]`) at `elapsed_ms` within a slide
 /// whose total dwell is `slide_ms`. Fades in over [`SUBTITLE_FADE_IN_MS`],
 /// holds, fades out over [`SUBTITLE_FADE_OUT_MS`]. When `slide_ms` is
 /// smaller than the combined fades, the fade durations clamp evenly.
@@ -202,7 +198,6 @@ pub fn subtitle_alpha(elapsed_ms: u32, slide_ms: u32) -> f32 {
     1.0
 }
 
-/// **M12**: live slideshow state. Owned by [`cf_shell`] / cf-app via the
 /// `SlideshowState` resource; this struct stores the playing slot, the
 /// queued slides, and the current playback cursor. cf-app's bridge ticks
 /// the cursor each frame via [`SlideshowState::tick`].

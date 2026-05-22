@@ -32,7 +32,6 @@ use cf_wound::WoundKind;
 
 use crate::MaterialId;
 
-/// **M14G** material-reaction typed wound emit candidate. Severity is
 /// derived from the contact intensity (per-tick dwell × material reactivity).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReactionWoundEmit {
@@ -58,7 +57,6 @@ pub fn classify_reaction(material_name: &str, zone: ZoneId, intensity: f32) -> O
     })
 }
 
-/// **M15** § per-material reaction definition.
 ///
 /// Mirrors the spec literal:
 /// ```ignore
@@ -190,7 +188,6 @@ impl MaterialReaction {
     }
 }
 
-/// **M15** § the per-run reaction registry. The launch set has 30+
 /// entries via [`default_reaction_registry`]; M15D extends this without
 /// reorganizing the schema.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -282,7 +279,6 @@ impl ReactionRegistry {
     }
 }
 
-/// **M15 Perf** § Precomputed reaction lookup table for the hot path.
 /// Built once via [`ReactionRegistry::build_lookup`] and reused per
 /// tick. Provides O(1) average-case matching for `(input_a, input_b)`
 /// pairs.
@@ -342,7 +338,6 @@ impl ReactionLookup {
 }
 
 impl ReactionRegistry {
-    /// **M15B** § Load a `ReactionRegistry` from a JSON file. This is
     /// the canonical content-driven path: modders + tuners edit
     /// `content/materials/reaction_registry.json` (or a custom path) to
     /// add new reactions, tweak rates, change emissions — without
@@ -388,7 +383,6 @@ impl ReactionRegistry {
         Ok(registry)
     }
 
-    /// **M15B** § Resolve the canonical reaction registry path. The
     /// engine + cf-mod tools call this to find
     /// `content/materials/reaction_registry.json` regardless of cwd.
     /// Returns `None` if the file isn't present (caller falls back to
@@ -407,7 +401,6 @@ impl ReactionRegistry {
         None
     }
 
-    /// **M15B** § Load the canonical registry from the default JSON
     /// path, or fall back to the hardcoded `default_reaction_registry`
     /// when the file isn't present. The default path-then-fallback
     /// pattern lets `cargo test` work without content/ on the path
@@ -437,7 +430,6 @@ impl ReactionRegistry {
     }
 }
 
-/// **M15B** § Errors from [`ReactionRegistry::load_from_file`].
 #[derive(Debug, thiserror::Error)]
 pub enum ReactionRegistryLoadError {
     #[error("failed to read reaction registry at {}: {source}", path.display())]
@@ -482,7 +474,6 @@ pub fn evaluate_reaction_pair(
     registry.evaluate(a, b, temperature_k)
 }
 
-/// **M15** § the canonical launch reaction registry. Returns 30+ entries
 /// spanning corrosion / combustion / phase / neutralization / explosion
 /// / dissolution / ignition categories. IDs match the M15D matrix where
 /// they overlap so consumers see the same canonical reaction id whether
@@ -1188,7 +1179,6 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             violent: true,
             flash_color_hex: Some("88DDFF".to_string()),
         },
-        // **M15B** § 33a. Extinguish (water-gas shift): rain (input_a) +
         // fire (input_b) → steam (output) + hydrogen (byproduct) at
         // high temperature. Mirrors `rxn.extinguish.water_fire_water_gas_shift`
         // for the droplet form of water — rain on a metal/magnesium fire
@@ -1210,7 +1200,6 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             violent: false,
             flash_color_hex: None,
         },
-        // **M15B** § 33b. Extinguish (standard): rain (input_a) + fire
         // (input_b) → steam (output) + smoke (byproduct). Per real
         // chemistry: incomplete-combustion residue + ash escapes as
         // smoke when the fire dies. Per spec § "rain may extinguish
@@ -1232,7 +1221,6 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             violent: false,
             flash_color_hex: None,
         },
-        // **M15B** § 34. Corrosion: metal_nohook (input_a) + acid_droplet (input_b) →
         // rust (output) + hydrogen (byproduct). Per spec § acceptance scenario 5:
         // "contact with metal_nohook triggers acid+iron→rust reaction per M15".
         // metal_nohook = id 3; reuses the canonical acid_iron output path.
@@ -1253,7 +1241,6 @@ pub fn default_reaction_registry() -> ReactionRegistry {
             violent: false,
             flash_color_hex: None,
         },
-        // **M15B** § 35. Corrosion: iron (input_a) + acid_droplet → rust
         // (output) + hydrogen (byproduct). Same as acid+iron via
         // dropletized acid (the acid_droplet variant of rxn.corrosion.acid_iron).
         MaterialReaction {
@@ -1277,7 +1264,6 @@ pub fn default_reaction_registry() -> ReactionRegistry {
     ReactionRegistry::new(raw.to_vec())
 }
 
-/// **M15** § per-tick reaction event emitted by the CA stepper.
 ///
 /// One of these is emitted on every reaction trigger (per spec):
 /// > Events: `material.reaction_triggered { material_a, material_b, output,
@@ -1290,12 +1276,10 @@ pub struct ReactionTriggeredEvent {
     pub output: MaterialId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub byproduct: Option<MaterialId>,
-    /// **M15B** § Materials spawned into adjacent air cells when the
     /// reaction fired. Mirrors [`MaterialReaction::emissions`]. Empty
     /// for reactions with no tertiary outputs.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub emissions: Vec<MaterialId>,
-    /// **M15B** § The world-space positions where the emission pixels
     /// were actually placed. Same length as `emissions`. Empty entries
     /// (e.g. `[i32::MIN, i32::MIN]`) indicate the emission was
     /// dropped because no adjacent air cell was available.
@@ -1311,7 +1295,6 @@ pub struct ReactionTriggeredEvent {
     pub flash_color_hex: Option<String>,
 }
 
-/// **M15** § build a [`ReactionTriggeredEvent`] from a matched reaction.
 /// Note: this does NOT populate `emission_positions` — the kernel
 /// orchestrator fills that field after it places the emission pixels
 /// in adjacent air cells (since it knows the actual world coords).
@@ -1359,7 +1342,6 @@ pub fn reaction_event_with_emissions(
     }
 }
 
-/// **M15B** § Sentinel position used in `emission_positions` when an
 /// emission's adjacent-air-cell search failed. Consumers filter on
 /// `pos == [EMISSION_DROPPED, EMISSION_DROPPED]` to detect dropped
 /// emissions.
@@ -1369,7 +1351,6 @@ pub const EMISSION_DROPPED: i32 = i32::MIN;
 mod tests {
     use super::*;
 
-    /// VAL-M14G-029: acid → AcidBurn, refrigerant → ChemicalBurn.
     #[test]
     fn acid_and_refrigerant_wound_kinds() {
         let acid = classify_reaction("acid", ZoneId::from("hand_left"), 0.6).unwrap();
@@ -1384,7 +1365,6 @@ mod tests {
         assert!(classify_reaction("dirt", ZoneId::from("foot_left"), 1.0).is_none());
     }
 
-    /// VAL-M15-001: default reaction registry has at least 30 entries
     /// per spec § "30+ launch reactions".
     #[test]
     fn default_registry_has_30_plus_reactions() {
@@ -1396,7 +1376,6 @@ mod tests {
         );
     }
 
-    /// VAL-M15-002: acid + iron → rust reaction. Per the M15 spec gherkin
     /// "the iron pixel transforms", iron is `input_a` (transforms to
     /// `output=rust`); acid is `input_b` (becomes `byproduct=H2`).
     #[test]
@@ -1410,7 +1389,6 @@ mod tests {
         assert!((rxn.rate_per_s - 0.5).abs() < 1e-6);
     }
 
-    /// VAL-M15-003: water + fire extinguish reaction is symmetric (a/b
     /// pair lookup works regardless of order).
     #[test]
     fn water_fire_reaction_is_symmetric() {
@@ -1421,7 +1399,6 @@ mod tests {
         assert_eq!(a.output, 50, "steam");
     }
 
-    /// VAL-M15-004: lava + water → steam + obsidian.
     #[test]
     fn lava_water_phase_reaction() {
         let r = default_reaction_registry();
@@ -1431,7 +1408,6 @@ mod tests {
         assert!(rxn.min_temperature_k.unwrap() >= 1373.0);
     }
 
-    /// VAL-M15-005: gunpowder + fire is an explosive (high energy + high rate)
     #[test]
     fn gunpowder_fire_is_explosive() {
         let r = default_reaction_registry();
@@ -1442,7 +1418,6 @@ mod tests {
         assert!(rxn.auto_ignite);
     }
 
-    /// VAL-M15-006: acid + alkali neutralizes (no exothermic cascade)
     #[test]
     fn acid_alkali_neutralizes() {
         let r = default_reaction_registry();
@@ -1451,7 +1426,6 @@ mod tests {
         assert_eq!(rxn.output, 67, "neutralized_brine id");
     }
 
-    /// VAL-M15-007: min_temperature_k gate suppresses below-threshold matches.
     #[test]
     fn temperature_gate_blocks_under_threshold() {
         let r = default_reaction_registry();
@@ -1460,7 +1434,6 @@ mod tests {
         assert!(r.evaluate(55, 51, 800.0).is_some());
     }
 
-    /// VAL-M15-008: reactions register a stable id; round-trips via serde.
     #[test]
     fn reaction_registry_round_trips_via_serde() {
         let r = default_reaction_registry();
@@ -1469,7 +1442,6 @@ mod tests {
         assert_eq!(back.len(), r.len());
     }
 
-    /// VAL-M15-009: reaction_event produces a stable event payload.
     #[test]
     fn reaction_event_constructs_payload() {
         let r = default_reaction_registry();
@@ -1480,7 +1452,6 @@ mod tests {
         assert_eq!(evt.output, 50);
     }
 
-    /// VAL-M15-010: lookup by id returns canonical entry.
     #[test]
     fn lookup_by_id_works() {
         let r = default_reaction_registry();

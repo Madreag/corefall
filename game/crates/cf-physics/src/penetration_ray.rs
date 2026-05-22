@@ -47,7 +47,6 @@ pub struct PenetrationRayResult {
     pub exited_backstop: bool,
 }
 
-/// **M14**: traverse a projectile's ray through the chassis interior per
 /// spec § "Full penetration ray flow". Modules must be supplied
 /// pre-sorted by `distance_along_ray` ascending (the engine does this
 /// from the M13 module table).
@@ -109,7 +108,6 @@ pub fn traverse_ray(
     }
 }
 
-/// **M14**: spalling fragment count + damage per fragment per CCCP `MOSRotating::AddWound`.
 /// Spalling threshold is the armor-damage value above which fragments
 /// spawn (per the schema). Each fragment carries 0.2-0.5 of the original
 /// damage; M14 picks 1-3 fragments in a 30° forward cone.
@@ -131,7 +129,6 @@ pub fn spalling_fragment_count(damage_to_armor: f32, spalling_threshold: f32, rn
     }
 }
 
-/// **M14**: deterministic per-fragment damage scalar in [0.2, 0.5]. Returns
 /// the fraction of the original damage each spalling fragment carries.
 /// `index` is the 0-based fragment within the batch; `count` is the total.
 #[must_use]
@@ -149,7 +146,6 @@ pub fn spalling_fragment_damage_fraction(index: u32, count: u32, _rng_roll: f32)
 
 // ---------------------- HE overpressure ----------------------
 
-/// **M14**: HE round overpressure wave per spec § "HE round overpressure
 /// model".
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HeWave {
@@ -174,7 +170,6 @@ pub fn he_damage_at_distance(wave: &HeWave, distance: f32) -> f32 {
     wave.damage_at_zero_distance * frac * frac
 }
 
-/// **M14**: HEAT jet penetration depth per spec § "HEAT round model".
 /// Returns the count of modules the jet penetrates given a depth budget
 /// in mm + a slice of modules pre-sorted by distance from impact.
 #[must_use]
@@ -201,7 +196,6 @@ pub fn heat_jet_modules_penetrated(jet_depth_mm: f32, modules: &[InteriorModule]
     hits
 }
 
-/// **M14**: HEAT jet ERA pre-detonation check per spec § "Spaced Armor +
 /// Schurzen + Reactive Armor counter HEAT (pre-detonation + standoff
 /// distance)". Returns true when the ERA panel pre-detonates and
 /// neutralizes the jet.
@@ -215,7 +209,6 @@ pub fn era_pre_detonates_heat(era_consumable: bool) -> bool {
 
 // ---------------------- APFSDS ----------------------
 
-/// **M14**: APFSDS long-rod penetrator per spec § "APFSDS (long-rod
 /// penetrator) model". Returns the energy passed through a single module
 /// + remaining energy after.
 #[must_use]

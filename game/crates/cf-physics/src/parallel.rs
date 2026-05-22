@@ -14,7 +14,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M8A**: per-projectile ECS component scaffold. cf-physics's actual
 /// projectile pool lives in cf-control's engine.rs (M1 era); M8A's
 /// component is the shape used by the parallel sweep.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
@@ -28,7 +27,6 @@ pub struct ProjectileComponent {
     pub alive: bool,
 }
 
-/// **M8A**: par_iter scaffold for the projectile sweep.
 ///
 /// Reads previous-tick state from `projectiles_in`; writes to
 /// `projectiles_out` (per-projectile isolated). Pre-rolled RNG passed in

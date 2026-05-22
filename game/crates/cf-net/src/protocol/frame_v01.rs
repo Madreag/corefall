@@ -31,15 +31,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::loss_recovery::redundant_input::RedundantInputTail;
 
-/// **M8B § locked**: per-frame max size (Ethernet MTU minus IP+UDP+QUIC
 /// headers). Inherits from M8A. Avoids IP fragmentation.
 pub const NET_FRAME_V01_MAX_SIZE_BYTES: usize = 1450;
 
-/// **M8B § Scenario "Unreliable datagram carries per-tick input"**:
 /// payload size for a minimal InputCommand alone MUST be ≤ 96 bytes.
 pub const INPUT_COMMAND_PAYLOAD_MAX_BYTES: usize = 96;
 
-/// **M8B § Frame v0.1**: discriminant for every NetPayloadV01 variant.
 /// LOCKED — never reorder, never drop, never reuse a removed slot.
 /// Adding a new variant means: append a new u32 at the end + bump
 /// PROTOCOL_SEMVER minor + add a fixture.
@@ -55,16 +52,12 @@ pub enum PayloadKind {
     Ping = 6,
     Pong = 7,
     Disconnect = 8,
-    /// **M8B**: redundant-input piggyback (last-N inputs encoded on each
     /// datagram). See `loss_recovery::redundant_input`.
     InputCommandRedundant = 9,
-    /// **M8B**: Reed-Solomon FEC parity shard for reliable payloads
     /// < 8 kB. See `loss_recovery::fec`.
     FecShard = 10,
-    /// **M8B**: NAT-traversal outcome notification to the peer + lobby.
     /// See `nat::*`.
     NatTraversalOutcome = 11,
-    /// **M8B**: rollback resimulate window notification (for cfctl
     /// observability + replay record). See `rollback::resimulate`.
     RollbackWindow = 12,
 }
@@ -208,7 +201,6 @@ pub enum FrameV01Error {
 
 pub type FrameV01Result<T> = Result<T, FrameV01Error>;
 
-/// **M8B § Notes "use bincode 2.x with a fixed-int + little-endian
 /// options"**: the LOCKED encoder config. Any code path that wants to
 /// produce or consume the v0.1 wire bytes MUST use this exact config.
 const fn bincode_v01_config() -> Configuration<LittleEndian, Fixint, Limit<{ NET_FRAME_V01_MAX_SIZE_BYTES }>> {
@@ -296,7 +288,6 @@ mod tests {
 
     #[test]
     fn input_command_minimal_fits_within_96_byte_payload_budget() {
-        // **M8B Acceptance §**: payload size for InputCommand alone ≤ 96 bytes.
         let payload = NetPayloadV01::InputCommand {
             tick: 612,
             intent_event_id: "m1_r:612:0".to_string(),

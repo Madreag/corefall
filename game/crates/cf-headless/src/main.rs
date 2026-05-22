@@ -55,7 +55,6 @@ enum Cmd {
         /// recorded in `run_manifest.json.scene.source_path`.
         #[arg(long)]
         scenario_path: Option<PathBuf>,
-        /// **M4 § Replay throughput benchmark**: emit performance counters
         /// (`throughput_ticks_per_sec`, `wall_time_ms`, `peak_memory_mb`)
         /// alongside the result envelope. Implies `--no-verify-checksums`
         /// because throughput measurements are orthogonal to determinism
@@ -63,13 +62,11 @@ enum Cmd {
         /// checksum when timing the replay).
         #[arg(long, value_enum)]
         measure: Option<MeasureMode>,
-        /// **M4 § Replay verifier safety**: maximum consecutive no-advance
         /// retries before the verifier bails on a stalled engine. Default
         /// 3 per spec. Lower values fail-fast on corrupt bundles; higher
         /// values give the verifier more rope in unusual cfctl scripts.
         #[arg(long, default_value_t = 3)]
         max_no_advance_retries: u32,
-        /// **M4A § "Run bundle references ledger entries"**: cross-check
         /// every event with an `asset_ref` field against the canonical
         /// `content/asset_ledger/ledger.jsonl`. Fails the replay when a
         /// referenced ledger entry is missing, drifted, failed, or stale.
@@ -77,20 +74,17 @@ enum Cmd {
         /// to opt out (consistent with `--no-verify-checksums`).
         #[arg(long, default_value_t = false)]
         no_verify_asset_refs: bool,
-        /// **M4A**: optional override path for the canonical asset ledger.
         /// Defaults to the same three candidate paths the cf-control
         /// `observe.assets.ledger_summary` surface searches. Useful for
         /// tests that bake against a sandbox ledger.
         #[arg(long)]
         asset_ledger_path: Option<PathBuf>,
-        /// **M4B § "Ledger chain rejects tampered bundle"** — verify the
         /// per-event BLAKE3 chain anchored at `RunManifest.ledger_chain_anchor`.
         /// Default ON for tournament-mode bundles; pass `--skip-chain-verify`
         /// to opt out in dev workflows.
         #[arg(long, default_value_t = false)]
         skip_chain_verify: bool,
     },
-    /// **M4B § "cf-headless save migrate"** — standalone migrator binary path.
     /// Read `<path>/quicksave.cfsave`, walk the migration registry up to the
     /// current build's schema, write back.
     #[command(name = "save")]
@@ -142,7 +136,6 @@ enum SaveAction {
         #[arg(long)]
         to: Option<String>,
     },
-    /// **M4B § "cf-headless save inspect"** — print schema_version + delta
     /// chain depth + ledger anchor for `<dir>/quicksave.cfsave` (and the
     /// optional `<dir>/events.jsonl` sibling for chain audit).
     Inspect { dir: PathBuf },
@@ -221,7 +214,6 @@ struct ReplayArgs<'a> {
     max_no_advance_retries: u32,
     verify_asset_refs: bool,
     asset_ledger_path: Option<PathBuf>,
-    /// **M4B § "cf-headless replay <bundle> runs ledger chain verification
     /// before sim playback"** — when true (default for tournament bundles)
     /// walks the BLAKE3 chain over `events.jsonl` BEFORE replaying any
     /// tick. On break, returns non-zero immediately.
@@ -259,7 +251,6 @@ fn replay(args: ReplayArgs<'_>) -> Result<()> {
         .and_then(Value::as_u64)
         .map(|n| n as u32)
         .unwrap_or(60);
-    // **M4 § Per-scenario checksum cadence**: the verifier must use the
     // SAME cadence the bundle was produced with. Read it from
     // `run_manifest.json.checksum.cadence_ticks` and pass it into the
     // engine config so per-tick checksum events line up.
@@ -339,7 +330,6 @@ fn replay(args: ReplayArgs<'_>) -> Result<()> {
     }
     let recorded_commands = collect_commands(&events_text)?;
 
-    // **M4A § "Run bundle references ledger entries"**: collect every event
     // whose envelope-level `asset_ref` field is set so we can cross-check
     // them against the canonical asset ledger AFTER the deterministic
     // replay loop completes.
@@ -369,7 +359,6 @@ fn replay(args: ReplayArgs<'_>) -> Result<()> {
         let mut chk_idx: usize = 0;
         let mut cmd_idx: usize = 0;
         let mut divergences: Vec<(u64, String, String)> = Vec::new();
-        // Bugbot 2ce56d7e: bound the pause-recovery retry path so a permanently
         // stalled engine (e.g., shutdown_requested set + drive_tick keeps
         // returning None despite RunForTicks dispatches) cannot spin forever.
         // Three consecutive None advances at the same tick is the recovery
@@ -442,7 +431,6 @@ fn replay(args: ReplayArgs<'_>) -> Result<()> {
 
         let live_state = engine_state(&engine).await;
 
-        // **M4A § "Run bundle references ledger entries"**: cross-check
         // every event with `asset_ref` against the canonical ledger.
         // Surfaces missing/drifted/failed ledger entries as a structured
         // result the same way determinism.first_divergence is surfaced.
@@ -646,16 +634,13 @@ fn parse_command(payload: &Value) -> Option<ControlCommand> {
         "act.player.eject" => Some(ControlCommand::ActPlayerEject {
             source: IntentSource::Replay,
         }),
-        // **M1 Gap I1**: replay arm for the sharp-aim toggle.
         "act.player.sharp_aim" => Some(ControlCommand::ActPlayerSharpAim {
             active: payload.get("active").and_then(Value::as_bool).unwrap_or(false),
             source: IntentSource::Replay,
         }),
-        // **M1 Gap S3**: replay arm for the abort stub (currently rejects).
         "act.player.abort" => Some(ControlCommand::ActPlayerAbort {
             source: IntentSource::Replay,
         }),
-        // **M1 Gap D1**: replay arm for the controls-capture toggle.
         "act.input.capture_controls" => Some(ControlCommand::ActInputCaptureControls {
             captured: payload.get("captured").and_then(Value::as_bool).unwrap_or(false),
             capturer: payload.get("capturer").and_then(Value::as_str).map(str::to_string),
@@ -708,7 +693,6 @@ fn parse_command(payload: &Value) -> Option<ControlCommand> {
     }
 }
 
-/// **M4 § Replay throughput benchmark**: best-effort peak resident-set-size
 /// reporter. On macOS uses `mach_task_basic_info::resident_size_max`; on
 /// Linux uses `/proc/self/status`'s `VmHWM`; on Windows uses
 /// `GetProcessMemoryInfo`. Falls back to 0.0 if the platform probe fails;
@@ -815,7 +799,6 @@ fn collect_checksums(events_text: &str) -> Vec<(u64, String)> {
 // M4A asset-ledger cross-check
 // ---------------------------------------------------------------------------
 
-/// **M4A § "Run bundle references ledger entries"** — every envelope-level
 /// `asset_ref` collected for ledger cross-check. Keeping `event_id` and
 /// `tick` lets the failure report point operators at the exact event.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -1039,7 +1022,6 @@ mod tests {
         }
     }
 
-    /// **M4A § "Run bundle references ledger entries"**: collect_asset_refs
     /// walks events.jsonl and surfaces every envelope-level `asset_ref`
     /// (cosmetic events included).
     #[test]
@@ -1056,7 +1038,6 @@ mod tests {
         assert_eq!(refs[0].event_type, "capture_grid_screenshot");
     }
 
-    /// **M4A § "Run bundle references ledger entries"**: the verifier
     /// surfaces failures when an event's asset_ref doesn't match any
     /// live ledger entry.
     #[test]

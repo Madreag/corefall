@@ -49,7 +49,6 @@ impl M0Engine {
         let tick_dt_ms = 1000.0 / f64::from(config.tick_rate_hz.max(1));
         let (actor_state, player_actor) = if let Some(initial) = &config.initial_actor_world {
             let mut world = initial.world.clone();
-            // **M5**: ensure chassis eject windows are sized for the engine's
             // configured tick_rate_hz so 60 Hz vs 120 Hz produce identical
             // real-time eject windows. The InitialActorWorld is built at
             // 60 Hz default; we adjust each chassis's ticks_total here when
@@ -86,7 +85,6 @@ impl M0Engine {
         };
         let mut reactive_guards = BTreeMap::new();
         let mut m9b_trench_doctrine_actors = std::collections::BTreeSet::<ActorId>::new();
-        // **M1.5 G6**: when the scenario carries a difficulty_preset id,
         // overlay the preset onto each guard's params at spawn time so the
         // preset's miss_chance / aim_settle / hearing_radius / etc. are
         // already active by the first AI tick. The preset gracefully
@@ -128,7 +126,6 @@ impl M0Engine {
                 config.mission_loss.unwrap_or_default(),
             ))
         };
-        // **M6**: instantiate the squad-of-two from the scenario manifest.
         // One leader + N followers; the engine emits `squad.member_added`
         // for each member at run start (see `emit_initial_snapshots`).
         let mut squad = cf_squad::Squad::default();
@@ -144,11 +141,9 @@ impl M0Engine {
             }
         }
 
-        // **M7-A**: seed the M7-A AI world with a `BotState` for every
         // reactive guard the scenario declared so the 5-layer thinking
         // stack ticks alongside the M2 FSM from tick 0. Built before the
         // EngineMutable move below so the borrow checker is happy.
-        // **M7 director v0.5 (audit gaps A12-A17)**: seed phase / waves /
         // boss / graph from the scenario manifest fields plumbed via
         // `M0EngineConfig::initial_*`. None means the scenario opts
         // out of v0.5 (the M2 single-vec objective list stays the
@@ -161,7 +156,6 @@ impl M0Engine {
             if let Some(phase) = config.initial_phase_state.clone() {
                 world.phase = Some(phase);
             } else if !config.initial_reactors.is_empty() {
-                // **M9** (audit fix gap 3): when the scenario carries a
                 // reactor world but no explicit phase_state, default-init
                 // the 7-phase reactor-defense pacer so guards spawn at
                 // tick ~300 + cfctl `observe.mission.director` has a real
@@ -190,7 +184,6 @@ impl M0Engine {
             }
         });
 
-        // **M14B**: snapshot the producer-side authored state before moving
         // `config` into the engine struct. The engine's mutable side owns
         // its own copy so per-tick mutations (e.g. `DamagedGrav` wave-front
         // growth, stratification deltas) don't bleed back into the config.
@@ -241,7 +234,6 @@ impl M0Engine {
                 },
             );
         }
-        // **M14F § VAL-M14F-002 / VAL-M14F-016**: build the per-chunk
         // lateral-wall state from the scenario's
         // `m14f_lateral_wall_spans[]` rows. Each row gets a fresh
         // pristine `IntegrityField` in the shared `m14e_chunks` map
@@ -335,7 +327,6 @@ impl M0Engine {
         }
         let m14g_thermal_zones_init = config.initial_m14g_thermal_zones.clone();
         let m14g_material_contacts_init = config.initial_m14g_material_contacts.clone();
-        // **M15 § Active material kernel** — compute the per-tick
         // state inputs from `config` BEFORE the Self construction
         // moves `config` into `Self.config`.
         let m15_initial_heat = build_heat_field_from_atmosphere(&config.initial_atmosphere_cells);
@@ -364,7 +355,6 @@ impl M0Engine {
                 hud_captions: VecDeque::new(),
                 hud_tool_validity: crate::state::ToolValidityView::default(),
                 hud_last_status: BTreeMap::new(),
-                // **M14 audit pass 2 (GAP-M4-02)**: track whether the run
                 // was aborted via act.player.abort so record_run_finished
                 // emits outcome="abort" per M4 spec.
                 run_aborted: false,
@@ -431,14 +421,12 @@ impl M0Engine {
                     .unwrap_or_else(|_| cf_localization::LocalizationTable::new("en")),
                 game_speed_accumulator: 0,
                 multiplayer_session: false,
-                // **M4B § "Delta baseline cadence is enforced"** —
                 // snapshot emitter state is empty until the first
                 // baseline fires at tick 0 (or `delta_baseline_cadence_ticks
                 // == 0` disables emission entirely).
                 m4b_previous_snapshot: None,
                 m4b_last_baseline_event_id: None,
                 m4b_last_baseline_tick: None,
-                // **M9B**: empty trench-world index. Mutated as the
                 // player digs segments + places modules; observe
                 // surfaces project the live state.
                 trench_world: cf_trench::segment::InMemorySegments::new(),
@@ -498,7 +486,6 @@ impl M0Engine {
                 m14j_next_rope_id: 1,
                 m14j_zipline_ropes: std::collections::BTreeSet::new(),
                 m14j_zipline_speed_by_rider: BTreeMap::new(),
-                // **M15 § Active material kernel** wiring. Loaders fall
                 // back to hardcoded defaults when the content JSON
                 // files aren't present (e.g., headless replay-verifier
                 // without content/ on the path).
@@ -518,7 +505,6 @@ impl M0Engine {
             audio_plugin: std::sync::Mutex::new(Box::new(cf_audio::NullAudioPlugin)),
             last_save_cache: Arc::new(crate::m4b_save::LastSaveCache::new()),
         };
-        // **M4B § "Tournament-mode chain anchor"** — enable chain mode on
         // the recorder when the config opts in. Must happen AFTER the
         // recorder is constructed but BEFORE any tick fires so the very
         // first event in the bundle gets a chain hash.

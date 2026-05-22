@@ -214,7 +214,6 @@ mod tests {
     use super::*;
     use cf_wound::registry::WoundSpecRegistry;
 
-    /// VAL-M14G-011: through-and-through emits entry + exit pair.
     #[test]
     fn through_and_through_emits_entry_exit() {
         let pair = classify_gunshot(
@@ -261,7 +260,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14G-016: fall-impulse fracture-kind decision table.
     #[test]
     fn fall_impulse_fracture_kind_table() {
         let zone = ZoneId::from("leg_left");
@@ -278,7 +276,6 @@ mod tests {
         assert_eq!(cm.kind, WoundKind::FractureComminuted);
     }
 
-    /// VAL-M14G-028: fracture decision tree per impulse value.
     #[test]
     fn fracture_decision_tree() {
         let zone = ZoneId::from("leg_left");
@@ -297,7 +294,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14G-017: FractureCompound initializes dirt_pct=0.3.
     #[test]
     fn fracture_compound_dirt_pct_init() {
         let e = classify_fall_fracture(ZoneId::from("leg_left"), 900.0, 1000.0).unwrap();
@@ -305,7 +301,6 @@ mod tests {
         assert!((w.dirt_pct - 0.3).abs() < 1e-6);
     }
 
-    /// VAL-M14G-018: 3 shrapnel hits produce 3 ShrapnelEmbedded records.
     #[test]
     fn shrapnel_embedded_fragment_count() {
         let zone = ZoneId::from("torso_front");
@@ -318,7 +313,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14G-022: HEAT cluster = 3× Burn3rd (per module) + 1× GunshotThrough
     /// (crew torso).
     #[test]
     fn heat_round_cluster_wounds() {
@@ -336,7 +330,6 @@ mod tests {
         assert!(emits.iter().any(|e| e.zone.as_str() == "crew_torso" && e.kind == WoundKind::GunshotThrough));
     }
 
-    /// VAL-CROSS-021: HEAT cluster shrinks under sub-optimal standoff. Burn3rd
     /// count equals `module_zones.len()`.
     #[test]
     fn heat_cluster_shrinks_with_module_path_length() {
@@ -348,7 +341,6 @@ mod tests {
         assert_eq!(through, 0);
     }
 
-    /// VAL-M14G-023: blunt face hit above the tooth threshold emits
     /// DentalDamage at severity 0.6.
     #[test]
     fn blunt_face_hit_emits_dental_damage() {
@@ -358,7 +350,6 @@ mod tests {
         assert_eq!(e.zone.as_str(), "head_front");
     }
 
-    /// VAL-M14G-021: per-origin substitution swaps LacerationLight for
     /// CrushLimb on robot actors.
     #[test]
     fn origin_substitution_swaps_laceration_for_crush_limb_on_robots() {

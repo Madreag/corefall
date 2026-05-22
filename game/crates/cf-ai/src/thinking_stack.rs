@@ -22,7 +22,6 @@ use crate::reason_label::{ReasonLabel, ReasonLabelRing};
 use crate::task::TaskType;
 use crate::utility::{ScoredTask, UtilityLayer};
 
-/// **M7-A**: identifier for one of the 5 layers (logging / event surface).
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -50,7 +49,6 @@ impl LayerKind {
     }
 }
 
-/// **M7-A**: output of any single layer's `tick_layer`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LayerOutput {
     /// Override task this layer wants the stack to commit to (or `None`
@@ -61,7 +59,6 @@ pub struct LayerOutput {
     pub reason: &'static str,
 }
 
-/// **M7-A**: per-tick context shared across layers. The engine fills this
 /// snapshot once per AI tick; layers mutate the trail/result fields as they
 /// go but NEVER mutate the world snapshot fields.
 ///
@@ -170,13 +167,11 @@ impl<'a> ThinkingContext<'a> {
     }
 }
 
-/// **M7-A**: layer trait. Every layer carries its own state + tick function.
 pub trait Layer {
     fn kind(&self) -> LayerKind;
     fn tick_layer(&mut self, ctx: &mut ThinkingContext<'_>) -> LayerOutput;
 }
 
-/// **M7-A**: AI tick output the engine consumes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AiTickOutput {
     pub actor_id: u64,
@@ -191,7 +186,6 @@ pub struct AiTickOutput {
     pub reactive_override: bool,
 }
 
-/// **M7-A**: the 5-layer stack instance per bot.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThinkingStack {
     pub archetype: Archetype,
@@ -226,7 +220,6 @@ impl ThinkingStack {
         }
     }
 
-    /// **M7-A**: apply a new role template (e.g. when the engine assigns
     /// a different archetype mid-mission). Keeps utility scorer in sync.
     pub fn apply_archetype(&mut self, archetype: Archetype) {
         self.archetype = archetype;
@@ -234,7 +227,6 @@ impl ThinkingStack {
         self.utility.priority = self.priority;
     }
 
-    /// **M7-A**: drive all 5 layers in dependency order.
     ///
     /// Order per spec:
     /// 1. Layer 1 (Reactive)

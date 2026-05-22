@@ -35,7 +35,6 @@ impl StunClient {
         }
     }
 
-    /// **M8B § ICE-lite**: discover the server-reflexive candidate via
     /// STUN. The callback simulates the response (production swaps it
     /// for a real UDP exchange).
     pub fn discover<F>(&self, tx_id: StunTransactionId, mut respond_with: F) -> StunBindingResponse

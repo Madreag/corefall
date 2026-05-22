@@ -39,7 +39,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14E** § Read-only accessor for the M14E render-side cones.
     pub fn m14e_drain_falling_debris_cones(&self) -> Vec<cf_render_2d::tunnel_collapse::FallingDebrisCone> {
         match self.state.write() {
             Ok(mut s) => s.m14e_tunnel_collapse_queue.drain_cones(),
@@ -47,7 +46,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14E** § Read-only snapshot of the HUD banner queue. Used by
     /// the VAL-M14E-002 / VAL-M14E-015 tests to assert verbatim banner
     /// strings.
     pub fn hud_banners_snapshot(&self) -> Vec<crate::state::HudBannerView> {
@@ -58,17 +56,14 @@ impl M0Engine {
             .unwrap_or_default()
     }
 
-    /// **M14E** § Cumulative count of `TunnelCreak` audio cues fired.
     pub fn m14e_tunnel_creak_count(&self) -> u32 {
         self.state.read().map(|s| s.m14e_tunnel_creak_count).unwrap_or(0)
     }
 
-    /// **M14E** § Cumulative count of `CaveInThunder` audio cues fired.
     pub fn m14e_cave_in_thunder_count(&self) -> u32 {
         self.state.read().map(|s| s.m14e_cave_in_thunder_count).unwrap_or(0)
     }
 
-    /// **M14E** § Per-actor delta on a crafting resource since engine
     /// boot. Returns 0 when the actor has not touched the resource.
     pub fn m14e_actor_resource_delta(&self, actor_id: u64, resource: &str) -> i64 {
         self.state
@@ -82,7 +77,6 @@ impl M0Engine {
             .unwrap_or(0)
     }
 
-    /// **M14E** § Force-pass deadline accessor for a chunk. Used by
     /// the runtime tests to verify VAL-M14E-013 cadence fidelity.
     pub fn m14e_force_pass_deadline(&self, chunk_id: (i32, i32)) -> Option<u64> {
         self.state
@@ -91,7 +85,6 @@ impl M0Engine {
             .and_then(|s| s.m14e_chunks.get(&chunk_id).and_then(|c| c.force_integrity_pass_deadline))
     }
 
-    /// **M14E** § Mark the plasma-cutter as active for an actor + emit the
     /// "VIBRATION ACCUMULATING" HUD banner per VAL-M14E-015. The banner
     /// is sticky-by-id so repeated calls do not re-stack it.
     pub fn m14e_plasma_cutter_use(&self, actor_id: u64) {
@@ -112,7 +105,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14F § VAL-M14F-004**: Place a brace strut at the actor-supplied
     /// world position. Emits `terrain.brace_strut_placed`, debits the
     /// per-tier crafting cost from the actor's inventory, and locks the
     /// lateral integrity field ±N px around the placement (N scales by
@@ -123,7 +115,6 @@ impl M0Engine {
         tier: cf_equipment::BraceStrutTier,
         world_pos: (f32, f32),
     ) -> bool {
-        // **M14F § Cluster 3 fix (chunk_id)**: derive the chunk coord
         // from world_pos (not hard-coded). The chunk is 256-pixel-wide;
         // negative world coords still land in their correct (cx, cy).
         let spec = cf_equipment::brace_strut_for_tier(tier);
@@ -132,12 +123,10 @@ impl M0Engine {
             (world_pos.0 / chunk_size).floor() as i32,
             (world_pos.1 / chunk_size).floor() as i32,
         );
-        // **M14F § Cluster 3 fix (radius_cells)**: lock_radius_px / 2
         // rounded to nearest, min=1. T1 lock_radius_px=8 → 4 cells;
         // T2=12 → 6 cells; T3=16 → 8 cells. Mirrors VAL-M14F-031's
         // strict tier differentiation: T1/T2/T3 lock distinct widths.
         let radius_cells = (spec.lock_radius_px.saturating_add(1) / 2).max(1) as usize;
-        // **M14F § Cluster 3 fix (lock center)**: lock center is
         // computed from the world_pos's local pixel within the chunk
         // (NOT hard-coded (8,8)).
         let chunk_local_px_x = (world_pos.0 - (chunk_id.0 as f32) * chunk_size).floor() as i32;
@@ -158,7 +147,6 @@ impl M0Engine {
             for (k, v) in &spec.cost_per_unit {
                 *resources.entry(k.clone()).or_insert(0) -= i64::from(*v);
             }
-            // **M14F § Cluster 3 fix (lock_strength + no anchored)**:
             // promote the lock_radius cells to the tier's lock_strength
             // value (200/350/500) on the IntegrityField. `lock_to_beam`
             // already sets the locked flag; we additionally write the
@@ -210,7 +198,6 @@ impl M0Engine {
         placed
     }
 
-    /// **M14F § VAL-M14F-005**: read the cell-level locked flag at a
     /// chunk-local cell. Used by the runtime tests to verify the lock
     /// window matches the tier's radius_cells.
     pub fn m14f_is_cell_locked(&self, chunk_id: (i32, i32), lx: usize, ly: usize) -> bool {
@@ -221,7 +208,6 @@ impl M0Engine {
             .unwrap_or(false)
     }
 
-    /// **M14F § VAL-M14F-005**: read the effective integrity (u16) at
     /// a chunk-local cell — `INTEGRITY_BEAM_LOCKED` (500) when the
     /// cell is locked, else the raw u8 cell value.
     pub fn m14f_effective_integrity(&self, chunk_id: (i32, i32), lx: usize, ly: usize) -> u16 {
@@ -232,41 +218,35 @@ impl M0Engine {
             .unwrap_or(0)
     }
 
-    /// **M14F § VAL-M14F-016**: lateral integrity-pass invocation
     /// count. Equal to `floor(T / 15)` after T ticks.
     pub fn m14f_lateral_pass_invocations(&self) -> u64 {
         self.state.read().map(|s| s.m14f_lateral_pass_invocations).unwrap_or(0)
     }
 
-    /// **M14F § VAL-M14F-009**: per-actor submerged-after-flood flag.
     /// Returns the tick at which the actor was first registered as
     /// submerged, or `None` if they have not been flooded yet.
     pub fn m14f_actor_submerged_at(&self, actor_id: u64) -> Option<u64> {
         self.state.read().ok().and_then(|s| s.m14f_actor_submerged_tick.get(&actor_id).copied())
     }
 
-    /// **M14F § VAL-M14F-011**: per-actor vacuum-exposure tick.
     /// Returns the tick at which the actor was first registered as
     /// exposed to vacuum after a sealed-room rupture.
     pub fn m14f_actor_vacuum_at(&self, actor_id: u64) -> Option<u64> {
         self.state.read().ok().and_then(|s| s.m14f_actor_vacuum_tick.get(&actor_id).copied())
     }
 
-    /// **M14F § VAL-M14F-007**: cumulative fluid-mass that propagated
     /// through the breach per dam chunk. Increments each tick after
     /// rupture as M15 fluid flows.
     pub fn m14f_breach_fluid_mass(&self, chunk_id: (i32, i32)) -> u64 {
         self.state.read().ok().and_then(|s| s.m14f_breach_fluid_mass.get(&chunk_id).copied()).unwrap_or(0)
     }
 
-    /// **M14F § VAL-M14F-008**: current pressure samples (room-side,
     /// vacuum-side) on a sealed-room chunk. Returns `(0.0, 0.0)` when
     /// no equalization has started.
     pub fn m14f_breach_pressure(&self, chunk_id: (i32, i32)) -> (f32, f32) {
         self.state.read().ok().and_then(|s| s.m14f_breach_pressure_kpa.get(&chunk_id).copied()).unwrap_or((0.0, 0.0))
     }
 
-    /// **M14F § VAL-M14F-002 / VAL-M14F-003**: emit a `terrain.wall_bulging`
     /// event with the L1 sidewall crack-decal level + HUD banner
     /// `MINESHAFT WALL UNSTABLE`. Used by the engine's lateral pass when
     /// integrity drops below the L1 threshold.
@@ -320,7 +300,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14F § VAL-M14F-012 / VAL-M14F-025**: emit a
     /// `terrain.wall_crack_advanced` (L2) escalation event between
     /// bulging and rupture on the same chunk.
     pub fn m14f_emit_wall_crack_advanced(
@@ -360,7 +339,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14F § VAL-M14F-006 / VAL-M14F-027**: emit a
     /// `terrain.wall_rupture` (L3) event with the required
     /// chunk_id + bbox + falling_debris_count payload.
     pub fn m14f_emit_wall_rupture(
@@ -409,7 +387,6 @@ impl M0Engine {
                 bbox_max_f,
                 payload.falling_debris_count,
             );
-            // **M14F § VAL-M14F-003**: carve the breach bbox into the
             // chunked-terrain pixel buffer so VAL-M14F-003's runtime
             // assertion ("breach bbox reads MATERIAL_AIR at tick 600")
             // holds whether the rupture fires via the engine lateral

@@ -8,7 +8,6 @@ use super::common::make_zone;
 
 /// Build the canonical Infantry body graph (no chassis, just the body).
 pub(crate) fn infantry_body_graph() -> BodyGraph {
-    // **M13** preserves the M5 15-zone humanoid contract — quadruped + drone
     // zones do NOT appear in the humanoid body graph (they belong to the
     // crab_body_graph / drone_body_graph functions instead).
     let zones: Vec<BodyZone> = BodyZone::all()

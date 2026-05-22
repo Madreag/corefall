@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActToggleMaterialOverlayParams",
-  "description": "**M2**: `act.player.toggle_material_overlay` — cycle / set the HUD\nmaterial overlay mode. `mode = None` cycles through\noff → integrity → pathability → mobility → hazard → build_repair → off.\n`mode = Some(\"...\")` sets explicitly. Emits `ux.overlay_mode_changed`.",
+  "description": "material overlay mode. `mode = None` cycles through\noff → integrity → pathability → mobility → hazard → build_repair → off.\n`mode = Some(\"...\")` sets explicitly. Emits `ux.overlay_mode_changed`.",
   "type": "object",
   "properties": {
     "mode": {

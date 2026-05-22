@@ -14,13 +14,12 @@
       "minItems": 2
     },
     "bloom_factor": {
-      "description": "**M1**: most-recent reticle bloom factor (`Soldat Sprites.pas:4870`).",
       "type": "number",
       "format": "float",
       "default": 1.0
     },
     "body_silhouette": {
-      "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n**M5**: `placeholder=false` when sourced from a real chassis body graph;\n`placeholder=true` for legacy actors without a chassis.",
+      "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n`placeholder=true` for legacy actors without a chassis.",
       "$ref": "#/$defs/BodySilhouetteView",
       "default": {
         "arm_left_hp_pct": 1.0,
@@ -33,7 +32,7 @@
       }
     },
     "chassis": {
-      "description": "**M5**: full chassis projection (per-zone integrity, modules, stage,\npilot state, eject window). `None` for legacy actors without a chassis.",
+      "description": "pilot state, eject window). `None` for legacy actors without a chassis.",
       "anyOf": [
         {
           "$ref": "#/$defs/ChassisView"
@@ -51,17 +50,15 @@
       "type": "boolean"
     },
     "cover_state": {
-      "description": "**M9B**: trench cover state derived from (stance × current\ntrench segment variant) per VAL-M9B-CFCTL-003 + VAL-M9B-COVERMATRIX-001.\nOne of `Exposed | Partial | Full`. Defaults to `Exposed` for actors\non open ground (no trench segment under foot).",
+      "description": "trench segment variant) per VAL-M9B-CFCTL-003 + VAL-M9B-COVERMATRIX-001.\nOne of `Exposed | Partial | Full`. Defaults to `Exposed` for actors\non open ground (no trench segment under foot).",
       "type": "string",
       "default": "Exposed"
     },
     "crouch_active": {
-      "description": "**M5**: per-tick movement-intent flags surfaced to AI / HUD.",
       "type": "boolean",
       "default": false
     },
     "dying_dwell_ticks_remaining": {
-      "description": "**M1**: DYING dwell ticks remaining (CCCP `Actor.cpp:1229`).",
       "type": "integer",
       "format": "uint32",
       "default": 0,
@@ -81,7 +78,7 @@
       "minimum": 0
     },
     "inventory": {
-      "description": "**M1 re-audit (2026-05-13)**: full inventory contents as labels in\nslot order (4 entries for M1; \"empty\" for unset slots). Mirrors\n`cf_actor::ActorObservation.inventory` so consumers reading\n`observe.frame.actors[]` see the same payload as `observe.actor`.",
+      "description": "slot order (4 entries for M1; \"empty\" for unset slots). Mirrors\n`cf_actor::ActorObservation.inventory` so consumers reading\n`observe.frame.actors[]` see the same payload as `observe.actor`.",
       "type": "array",
       "default": [],
       "items": {
@@ -93,20 +90,17 @@
       "default": false
     },
     "knockdown_ticks_remaining": {
-      "description": "**M1**: knockdown recovery ticks remaining (0 when not stunned).",
       "type": "integer",
       "format": "uint32",
       "default": 0,
       "minimum": 0
     },
     "mass_kg": {
-      "description": "**M1**: physical mass (kg). Drives mass_factor in physics + stability cost.",
       "type": "number",
       "format": "float",
       "default": 80.0
     },
     "mission_critical": {
-      "description": "**M1**: mission_critical flag (caps damage at DOWNED when true).",
       "type": "boolean",
       "default": false
     },
@@ -122,7 +116,6 @@
       "type": "boolean"
     },
     "origin_id": {
-      "description": "**M5**: actor origin tag (`human`, `robot`, `android`).",
       "type": "string",
       "default": "human"
     },
@@ -136,7 +129,6 @@
       "minItems": 2
     },
     "recoil_accumulator": {
-      "description": "**M1**: alternating-recoil accumulator value (CCCP `HDFirearm.cpp:891`).",
       "type": "number",
       "format": "float",
       "default": 0.0
@@ -190,19 +182,16 @@
       "minimum": 0
     },
     "sharp_aim_progress": {
-      "description": "**M1**: sharp-aim progress (0..1).",
       "type": "number",
       "format": "float",
       "default": 0.0
     },
     "stability": {
-      "description": "**M1**: stability scalar (0.0 = disrupted, 1.0 = solid).",
       "type": "number",
       "format": "float",
       "default": 1.0
     },
     "stability_recovery_rate": {
-      "description": "**M1**: per-tick stability recovery rate.",
       "type": "number",
       "format": "float",
       "default": 0.019999999552965164
@@ -318,11 +307,10 @@
       ]
     },
     "ChassisView": {
-      "description": "**M5**: chassis projection for `cfctl observe` / `inspect`.",
       "type": "object",
       "properties": {
         "bleed_rate_per_sec": {
-          "description": "**M14**: total per-second bleed rate (sum across all bleeding zones)\nfor the actor. Drives the HUD bleeding indicator.",
+          "description": "for the actor. Drives the HUD bleeding indicator.",
           "type": "number",
           "format": "float",
           "default": 0.0
@@ -351,7 +339,7 @@
           "type": "string"
         },
         "limb_states": {
-          "description": "**M14**: per-zone limb-loss state machine projection. One entry per\nchassis zone with the current [`cf_physics::ZoneState`] label, plus\nthe bleed_rate per-second derived from the zone's state.",
+          "description": "chassis zone with the current [`cf_physics::ZoneState`] label, plus\nthe bleed_rate per-second derived from the zone's state.",
           "type": "array",
           "default": [],
           "items": {
@@ -372,7 +360,7 @@
           "type": "string"
         },
         "ragdoll_state": {
-          "description": "**M14**: ragdoll authority state for the actor (`animated` /\n`activating` / `active` / `static_collapse`). Mirrors\n[`cf_physics::RagdollState`].",
+          "description": "`activating` / `active` / `static_collapse`). Mirrors\n[`cf_physics::RagdollState`].",
           "type": "string",
           "default": "animated"
         },
@@ -459,7 +447,6 @@
       ]
     },
     "LimbStateView": {
-      "description": "**M14**: per-zone limb state for `cfctl inspect chassis`.",
       "type": "object",
       "properties": {
         "bleed_multiplier": {

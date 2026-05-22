@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use crate::report::ValidationReport;
 
-/// **M6**: shared shape for one entry in a M6 equipment registry RON.
 /// Every entry MUST declare a non-empty `id` and a non-empty `kind` (or
 /// `class` for weapons). Display name is optional in this minimal contract.
 #[derive(Debug, serde::Deserialize)]

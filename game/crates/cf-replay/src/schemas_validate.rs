@@ -33,13 +33,11 @@ struct PropConstraint {
     minimum: Option<f64>,
     #[serde(default)]
     maximum: Option<f64>,
-    /// **M5-A1**: `oneOf` lets a property accept one of several alternative
     /// type/enum branches (e.g. `origin_id` accepts either an integer OR a
     /// canonical Origin-enum string). The minimal validator walks each
     /// branch and passes if ANY branch accepts the value.
     #[serde(default, rename = "oneOf")]
     one_of: Option<Vec<Value>>,
-    /// **M5-A2**: `items` lets an array property constrain its items'
     /// type + enum (e.g. `applied_afflictions: array<affliction-kind-string>`).
     /// Only the simple form `items: { type, enum }` is honored — tuple form
     /// `items: [...]` is left unenforced (the projectile-spawned schemas
@@ -47,7 +45,6 @@ struct PropConstraint {
     /// by `minItems`/`maxItems`).
     #[serde(default)]
     items: Option<Value>,
-    /// **M5-A2**: `properties` + `required` on a nested object property
     /// (e.g. `signal: { properties: { schema_version, active_hazards }, required: [...] }`).
     /// The validator recurses into the nested object and enforces both.
     #[serde(default)]
@@ -206,7 +203,6 @@ pub fn validate_event_payload(category: &str, event_type: &str, payload: &Value)
     Ok(())
 }
 
-/// **M5-A2**: validate one element of an array against the schema's
 /// `items` constraint. Supports `type` (string or array union) and `enum`.
 fn check_array_item(
     category: &str,
@@ -233,7 +229,6 @@ fn check_array_item(
     Ok(())
 }
 
-/// **M5-A2**: validate a single nested-object property as a mini-schema
 /// (type + enum + minimum + maximum). Used for sub-structs like
 /// environment.signal_aggregated.signal.{schema_version,active_hazards}.
 /// Supports recursion one level deep.
@@ -289,7 +284,6 @@ fn check_nested_property(
     Ok(())
 }
 
-/// **M5-A1**: validate a single `oneOf` branch as a mini-schema (type +
 /// enum). Returns `Ok` if the value satisfies the branch. The minimal
 /// validator only supports `type` and `enum` constraints inside `oneOf`
 /// branches; richer JSON-Schema features inside `oneOf` are not needed by

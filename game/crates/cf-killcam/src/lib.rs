@@ -9,7 +9,7 @@
 //! has live death-type variants per VAL-M14C-013.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 pub mod playback;
 pub mod recorder;

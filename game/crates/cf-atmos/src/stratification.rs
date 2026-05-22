@@ -21,7 +21,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14B** § gas species tracked by the stratification kernel. The
 /// `molar_mass_g_per_mol()` method returns Stationeers-grade molar
 /// masses; lighter-than-air gases rise + heavier sink.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -92,7 +91,6 @@ impl Gas {
 /// "neutral" point for the rise/sink decision.
 pub const AIR_MOLAR_MASS_G_PER_MOL: f32 = 28.97;
 
-/// **M14B** § per-cell gas composition with vertical position. The
 /// stratification kernel needs (a) the cell's vertical band so it can
 /// match cells in the same column, (b) the cell's relative height
 /// (lower = floor, higher = ceiling), (c) the fraction of each gas
@@ -137,7 +135,6 @@ impl StratCell {
     }
 }
 
-/// **M14B** § event payload emitted on each stratification step.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StratificationDelta {
     pub cell_id: u32,
@@ -145,7 +142,6 @@ pub struct StratificationDelta {
     pub fraction_delta: f32,
 }
 
-/// **M14B** § run one stratification step on `cells`. Returns the list
 /// of per-cell deltas (one per gas that moved) so the caller can emit
 /// `atmos.gas_stratified` events.
 ///
@@ -256,11 +252,9 @@ pub fn stratify(cells: &mut [StratCell], local_g_m_s2: f32) -> Vec<Stratificatio
     deltas
 }
 
-/// **M14B** § convenience: run stratification only when `tick % 4 == 0`.
 /// Returns an empty `Vec` on the gating ticks; otherwise behaves like
 /// [`stratify`].
 ///
-/// Per the spec's "## Notes for the implementer":
 ///
 /// > Stratification step runs at 1/4 the atmospherics tick rate (every
 /// > 4th tick) to amortize the per-cell reorder cost; checksum still

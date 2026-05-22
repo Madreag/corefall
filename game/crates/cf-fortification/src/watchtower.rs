@@ -760,7 +760,6 @@ mod tests {
         assert_eq!(t2.integrated_repeater, None);
     }
 
-    /// VAL-M9C-019: T3 destruction emits the watchtower_destroyed
     /// event + fall_impulse damage to actors within the 5-tile radius
     /// + drops the integrated radio repeater.
     #[test]
@@ -922,7 +921,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9C-020: faction squad-radio range drops by 100 tiles
     /// immediately on repeater destruction (both embedded + standalone).
     #[test]
     fn radio_range_drops_by_100_on_repeater_destruction_embedded() {
@@ -984,7 +982,6 @@ mod tests {
         Spotlight::new(FortificationId(10), Some(FortificationId(1)), (50, 50), 0.0)
     }
 
-    /// VAL-M9C-023: spotlight illuminates a target in cone.
     #[test]
     fn spotlight_cone_reveals_concealed_actor() {
         let spotlight = online_spotlight();
@@ -1030,7 +1027,6 @@ mod tests {
         assert!(spotlight_illuminates(spotlight, in_range_edge));
     }
 
-    /// VAL-M9C-024: flashbang dazzles spotlight for exactly 12 s ±1 tick.
     #[test]
     fn spotlight_flashbang_12s_dazzle() {
         let tick_rate_hz = 60u32;

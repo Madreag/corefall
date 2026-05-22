@@ -90,7 +90,6 @@ impl Ragdoll {
     }
 }
 
-/// **M14**: ragdoll integration step. Applies gravity + clamps to the
 /// floor in the same way `cf_physics::step_kinematics` does for the active
 /// actor, but without the user-controlled jump/move impulses. Pure helper;
 /// returns the new state.
@@ -136,7 +135,6 @@ pub fn step_ragdoll(
     }
 }
 
-/// **M14E** § Outcome of a cave-in falling-debris impulse landing on an
 /// actor underneath a collapsing tunnel ceiling. Carries both the damage
 /// to apply (per joint, via the existing M14 `fall_impulse_chain`) and
 /// the stance transition (KnockedDown). VAL-M14E-005 + VAL-M14E-027 +
@@ -162,7 +160,6 @@ pub struct CaveInImpulseOutcome {
     pub debris_impulse: f32,
 }
 
-/// **M14E** § Cave-in falling-debris impulse → ragdoll + fall-damage chain.
 /// Drives `fall_impulse_chain` (per M14) over the actor's joint stack and
 /// then forces a KnockedDown transition on the actor regardless of joint
 /// outcomes (cave-in debris always knocks the actor down per spec literal).
@@ -195,7 +192,6 @@ pub fn cave_in_fall_impulse_chain(
     }
 }
 
-/// **M14E** § Single-joint cave-in impulse path. Used when callers want
 /// to evaluate a focused-zone hit (e.g. the actor's torso) without
 /// running the full chain. Always reports `knockdown = true` (cave-in
 /// debris is destabilizing by spec).
@@ -283,7 +279,6 @@ mod tests {
         assert!(outcome.debris_impulse > 0.0);
     }
 
-    /// VAL-M14E-005: an empty joint stack still records knockdown so the
     /// caller can route the damage path even when no chassis data is
     /// available.
     #[test]

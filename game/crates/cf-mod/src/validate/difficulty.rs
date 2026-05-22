@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use crate::report::ValidationReport;
 
-/// **M1.5 (baseline) + M7 (extension)**: cf-mod validator for
 /// `content/ai/difficulty.json`. Two registry shapes are accepted:
 ///
 /// 1. **M2 baseline shape** — entries carry the three legacy ids

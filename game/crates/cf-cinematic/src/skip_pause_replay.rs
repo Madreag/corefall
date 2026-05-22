@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::script::CinematicId;
 
-/// Per spec § "Skip is disabled in the first 3 seconds of any never-
 /// before-seen cinematic".
 pub const SKIP_CONFIRM_WINDOW_MS: u32 = 3_000;
 
@@ -50,7 +49,6 @@ impl SkipReason {
     }
 }
 
-/// Per spec § Notes: "Codex unlock state lives in
 /// `save.cinematic_seen_set: HashSet<CinematicId>`; persisted via M41
 /// save format." Wraps a `BTreeSet` so iteration order is deterministic.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,7 +104,6 @@ pub fn skip_allowed_at(seen: &SeenSet, id: &str, playhead_ms: u32) -> bool {
     playhead_ms >= SKIP_CONFIRM_WINDOW_MS
 }
 
-/// Per spec § "Skip / pause / replay UX" + § Notes for the implementer.
 /// Bundles every policy knob the scheduler reads each tick to decide
 /// whether to fire `cinematic.skipped`, `cinematic.paused`, or
 /// `cinematic.resumed`.

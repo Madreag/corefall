@@ -289,7 +289,6 @@ impl BreachWorld {
         self.strips.iter().map(|(k, v)| (k.clone(), v.is_broken())).collect()
     }
 
-    /// **M1.5**: map of `strip_id -> carve_progress` in `[0.0, 1.0]`. Used by
     /// `cf-mission` to emit `mission.objective_updated` at 25/50/75/100%
     /// progress milestones for `BreachBarrier` objectives. Strips with
     /// `max_hp == 0` report `1.0` (immediate-broken).

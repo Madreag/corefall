@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerCrouchParams",
-  "description": "**M5**: `act.player.crouch` — sticky crouch toggle.",
   "type": "object",
   "properties": {
     "active": {

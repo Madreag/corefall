@@ -6,7 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7-A**: kind of friendly-fire-avoidance trigger.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FriendlyFireKind {
@@ -23,7 +22,6 @@ impl FriendlyFireKind {
     }
 }
 
-/// **M7-A**: friendly-fire-avoidance event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FriendlyFireAvoidanceEvent {
     pub actor_id: u64,
@@ -31,7 +29,6 @@ pub struct FriendlyFireAvoidanceEvent {
     pub kind: FriendlyFireKind,
 }
 
-/// **M7-A**: pure helper — given the firing bot's position + aim vector +
 /// the friendly's position, decide whether the friendly sits in the line
 /// of fire. Uses a 1-unit lateral tolerance.
 pub fn is_friendly_in_line_of_fire(

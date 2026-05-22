@@ -14,7 +14,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7B**: per-hop transition state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommanderHopState {
     /// Tick the hop was initiated.
@@ -40,7 +39,6 @@ impl CommanderHopState {
     }
 }
 
-/// **M7B**: result of resolving a hop. Surfaced as `squad.brain_hop`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HopResult {
     pub from_actor_id: u64,
@@ -55,7 +53,6 @@ pub struct HopResult {
     pub same_squad: bool,
 }
 
-/// **M7B**: validate + finalize a brain-hop.
 ///
 /// Inputs come from the engine's resolved world state. The function is
 /// pure: it does not mutate any cf-ai state; the engine commits the
@@ -84,7 +81,6 @@ pub fn finalize_hop(
     })
 }
 
-/// **M7B**: hop validation errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HopError {
     SameActor,
@@ -100,7 +96,6 @@ impl HopError {
     }
 }
 
-/// **M7B**: one candidate row produced by [`build_los_radial`]. The UI
 /// renders these in a wheel around the held actor; the bearing drives the
 /// wheel slot, the distance drives the inner / outer ring.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -111,7 +106,6 @@ pub struct LosRadialCandidate {
     pub has_los: bool,
 }
 
-/// **M7B**: build the LOS-radial selector candidate list per spec
 /// § "surfaces a LOS-radial list of squad members". The caller supplies
 /// the held actor's world position + the candidate `(actor_id, position,
 /// has_los)` rows; the helper computes bearing + distance and emits a

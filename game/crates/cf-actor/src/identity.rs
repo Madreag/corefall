@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::Vec2;
 
-/// **M6**: side-view facing direction. Updated when the player aims; the
 /// sprite renderer flips horizontally on change. M13 chassis adds armor
 /// zone visibility per facing direction (spec § "Side-view facing direction
 /// + limb-loss action restrictions (M13 forward-compat)").
@@ -51,7 +50,6 @@ impl FacingDirection {
     }
 }
 
-/// **M6 (M13 forward-compat)**: per-limb loss tracking. M6 only sets these
 /// flags via scenario seed / debug commands so the action-rejection surface
 /// can be tested before M13 chassis ships full limb damage routing. Each
 /// flag rejects a specific action category per spec § "Limb-loss action

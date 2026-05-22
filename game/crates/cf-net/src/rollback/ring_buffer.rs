@@ -5,7 +5,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M8B § locked**: rollback window in frames. The spec's locked
 /// 6-frame budget.
 pub const ROLLBACK_WINDOW_FRAMES: usize = 6;
 

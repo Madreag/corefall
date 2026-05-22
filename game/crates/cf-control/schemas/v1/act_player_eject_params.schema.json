@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerEjectParams",
-  "description": "**M5**: `act.player.eject` — trigger pilot eject from a chassis.",
   "type": "object",
   "properties": {
     "schema_version": {

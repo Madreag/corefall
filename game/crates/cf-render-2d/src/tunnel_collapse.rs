@@ -162,7 +162,6 @@ mod tests {
         assert_eq!(CrackLevel::parse_str("garbage"), None);
     }
 
-    /// VAL-M14E-007: L1 → L2 → L3 decal progression.
     #[test]
     fn enqueue_crack_decal_progresses_in_authored_order() {
         let mut q = TunnelCollapseQueue::new();
@@ -176,7 +175,6 @@ mod tests {
         assert_eq!(decals[2].level, CrackLevel::L3);
     }
 
-    /// VAL-M14E-025: cave-in enqueues a falling-debris cone whose origin
     /// is at the ceiling bbox top edge + whose direction is +Y down.
     #[test]
     fn enqueue_cave_in_emits_l3_decal_and_falling_cone_aligned_down() {

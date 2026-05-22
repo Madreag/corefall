@@ -47,7 +47,6 @@ pub fn run_migrate(dir: &Path, target_version: Option<&str>) -> Result<()> {
 }
 
 pub fn run_inspect(dir: &Path) -> Result<()> {
-    // **M4B § "cf-headless save inspect"** — works on both `.cfsave` save
     // directories AND run-bundle directories. Save-dir contents take
     // priority when both are present.
     let save_path = dir.join(cf_save::quicksave::QUICKSAVE_FILE);
@@ -210,7 +209,6 @@ struct SnapshotChainSummary {
     pub delta_chain_depth: u64,
     pub baseline_count: u64,
     pub last_baseline_tick: Option<u64>,
-    /// **M4B § "Delta baseline cadence is enforced"** — the ticks at which
     /// every `snapshot.baseline_emitted` event fired, in order. The
     /// Gherkin's "exactly 7 ... at ticks 0, 600, 1200, 1800, 2400, 3000,
     /// 3600" assertion reads off this list.

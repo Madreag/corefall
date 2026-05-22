@@ -4,7 +4,6 @@
 //! cue id for the planted-foot stride. Falls back to `footstep_generic` when
 //! no per-material cue is authored.
 
-/// **M14A** § "Per-material footstep cue lookup".
 ///
 /// Resolves the per-material + per-origin footstep cue id. The cue id format
 /// is `footstep_<material>_<origin_class>` where:

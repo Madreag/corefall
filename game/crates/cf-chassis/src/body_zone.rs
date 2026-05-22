@@ -30,7 +30,6 @@ pub enum BodyZone {
     ShinRight = 12,
     FootLeft = 13,
     FootRight = 14,
-    // **M13** § "Quadruped=11 zones (4 legs + 2 claws + torso + sensor cluster + carapace)".
     // Front-left/right + rear-left/right legs; left/right claws; carapace shell; sensor cluster.
     LegFrontLeft = 15,
     LegFrontRight = 16,
@@ -40,7 +39,6 @@ pub enum BodyZone {
     ClawRight = 20,
     Carapace = 21,
     SensorCluster = 22,
-    // **M13** § "Drone=4 zones (chassis + 2 arms + sensor pod)".
     DroneCore = 23,
     DroneArmLeft = 24,
     DroneArmRight = 25,

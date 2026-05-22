@@ -188,7 +188,6 @@ impl BombDisposalRobotState {
 mod tests {
     use super::*;
 
-    /// VAL-M9C-055: bomb_disposal_robot deployable is registered and
     /// declares the M44C chassis grammar.
     #[test]
     fn bomb_disposal_robot_registered() {
@@ -203,7 +202,6 @@ mod tests {
         assert_eq!(spec.mechanical_arm_disarm_seconds, 4);
     }
 
-    /// VAL-M9C-042: 120 J pressure mine → reactive armor absorbs
     /// 80% → robot survives with HP ~960 (strict math gives 1176;
     /// the scenario allows ±tolerance which the impl satisfies by
     /// keeping the robot alive + mobile after the blast).
@@ -230,7 +228,6 @@ mod tests {
         assert_eq!(robot.status, BombDisposalRobotStatus::Destroyed);
     }
 
-    /// VAL-M9C-043: mechanical-arm disarm takes 4 seconds (per
     /// configured tick rate). Status transitions Active → Disarming →
     /// Active on completion edge.
     #[test]

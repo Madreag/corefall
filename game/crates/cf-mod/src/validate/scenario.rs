@@ -23,7 +23,6 @@ pub(crate) fn validate_scenario(path: &Path, report: &mut ValidationReport) {
             if scenario.expected_tests.is_empty() {
                 messages.push("scenario.expected_tests must reference at least one acceptance test id".to_string());
             }
-            // **M9** § cf-mod validate micro_reactor_defense — extra rules per
             // spec § "When `cargo run -p cf-mod -- validate content/scenarios/`
             // runs Then the validator confirms: 1 reactor with mission_critical=true
             // + hp>0 + AABB defined, 1 player spawn, 1 guard slot, timer in

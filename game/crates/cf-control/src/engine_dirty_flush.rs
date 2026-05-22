@@ -159,7 +159,6 @@ impl M0Engine {
         // source event (typically `tool_action_started.<id>` chain). Replay
         // viewers walk source_event_ids[] for the full causal fan-in.
         let parent_event_id = source_event_ids.first().cloned();
-        // M3 audit pass 7 (2026-05-13): compute bbox-of-bboxes and bump
         // the path-invalidation version BEFORE emitting the batch, so the
         // subsequent terrain.path_invalidated event carries the right
         // version_old/_new. Only fires when out_rects[] is non-empty.
@@ -208,7 +207,6 @@ impl M0Engine {
             }),
             parent_event_id.clone(),
         );
-        // **M8A audit pass (GAP-M8A-01 HIGH fix)**: emit one
         // `terrain.chunk_mutated` semantic event per merged dirty chunk
         // with the post-state blake3 checksum. Per M8A § "Semantic
         // terrain event protocol": "Every terrain mutation emits a
@@ -239,7 +237,6 @@ impl M0Engine {
                 }
             }
         }
-        // M3 audit pass 7 (2026-05-13): emit terrain.path_invalidated for
         // M22+ pathfinder consumers. Placeholder event per spec ledger.
         if let Some((bbox_min, bbox_max)) = path_bbox {
             let terrain_path_id = self.recorder.record(
@@ -255,7 +252,6 @@ impl M0Engine {
                 }),
                 parent_event_id,
             );
-            // **M9** § Reactive guard targeting + path reaction:
             // when the dirty-region bbox intersects a guard's planned
             // pursuit line (guard → target), the AI's path is
             // invalidated. Emit `ai.path_invalidated` (category=ai) per
@@ -288,7 +284,6 @@ impl M0Engine {
         }
     }
 
-    /// **M9** § Reactive guard targeting + path reaction: emit
     /// `ai.path_invalidated` (category=ai) + `ai.recovery_action` per
     /// guard whose planned pursuit line crosses the freshly-carved bbox.
     /// The recovery action is computed by

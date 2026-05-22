@@ -11,7 +11,6 @@
 /// `to`/`from` fields. The engine emits the snake_case names verbatim so
 /// downstream consumers can match on a known set.
 ///
-/// **M1**: animation = controlled by the actor controller (intent-driven).
 /// ragdoll = post-knockdown / death physical state.
 /// explosion = M5.5+ overrides (gibbing, large-impulse displacement).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

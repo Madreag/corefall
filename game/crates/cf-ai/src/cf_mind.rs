@@ -28,7 +28,6 @@ use crate::archetype::Archetype;
 use crate::autonomy::{AutonomyMode, DoctrineMode};
 use crate::task::TaskType;
 
-/// **M7-B**: structured doctrine produced by an `LlmMind`. M7 ships only
 /// the interface — `label` carries the doctrine string the 5-layer stack
 /// caches via `ctx.doctrine`. M23's cf-mind adds optional metadata
 /// (confidence, alternates, justification) without breaking the contract;
@@ -61,7 +60,6 @@ impl Doctrine {
     }
 }
 
-/// **M7-B**: read-only context the engine hands to `LlmMind::query`. The
 /// mind producer inspects this snapshot to choose a doctrine — but MUST
 /// NOT mutate the world.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -105,7 +103,6 @@ impl MindContext {
     }
 }
 
-/// **M7-B**: LLM mind producer trait. M23's cf-mind crate ships the real
 /// impl; M7 ships only the interface signature so the 5-layer stack can
 /// route through this trait without a runtime dependency.
 ///
@@ -126,7 +123,6 @@ pub trait LlmMind: Send + Sync {
     fn query(&self, prompt: &str, context: &MindContext, deadline_ticks: u32) -> Option<Doctrine>;
 }
 
-/// **M7-B**: null mind. Always returns `None`. This is the M7 default —
 /// every bot's Layer 5 falls back to the cached "defensive" prior.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct NullLlmMind;

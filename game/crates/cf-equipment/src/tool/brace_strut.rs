@@ -93,7 +93,6 @@ impl BraceStrutTier {
     }
 }
 
-/// **M14F** § One T1/T2/T3 brace-strut spec. Carries the per-tier
 /// crafting cost + placement geometry. Same cost class as the M14E
 /// support-beam placer (VAL-M14F-022).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -223,7 +222,6 @@ impl std::fmt::Display for BraceStrutSpecLoadError {
 
 impl std::error::Error for BraceStrutSpecLoadError {}
 
-/// **M14F § VAL-M14F-017**: parse a [`BraceStrutSpec`] from RON text
 /// and validate that the spec carries a non-empty id + cost map +
 /// monotone non-zero lock radius. Used by [`brace_strut_for_tier`] +
 /// [`find_brace_strut`] so content authors can tune the tier specs by
@@ -305,7 +303,6 @@ pub fn brace_strut_catalog() -> [BraceStrutSpec; 3] {
 mod tests {
     use super::*;
 
-    /// VAL-M14F-017: all three tiers ship as registered equipment items.
     #[test]
     fn brace_strut_tiers_t1_t2_t3_register() {
         assert!(find_brace_strut(BRACE_STRUT_T1_ID).is_some());
@@ -319,7 +316,6 @@ mod tests {
         assert_eq!(catalog[2].tier, BraceStrutTier::T3);
     }
 
-    /// VAL-M14F-017: tier discriminator round-trips through `from_str_snake`.
     #[test]
     fn tier_round_trips_through_str() {
         for t in [BraceStrutTier::T1, BraceStrutTier::T2, BraceStrutTier::T3] {
@@ -329,7 +325,6 @@ mod tests {
         assert_eq!(BraceStrutTier::from_str_snake("t4"), None);
     }
 
-    /// VAL-M14F-022: T1 cost mirrors the M14E support-beam placer
     /// (2 iron + 1 wood). T2/T3 are ≥ element-wise per "same cost class
     /// with monotone-non-decreasing scaling".
     #[test]
@@ -343,7 +338,6 @@ mod tests {
         assert!(t3.cost_ge(&t1));
     }
 
-    /// VAL-M14F-031: T1/T2/T3 produce behaviorally distinct lock radii
     /// (8 / 12 / 16 px) — radius monotonically increases with tier.
     #[test]
     fn tier_lock_radii_strictly_increase_t1_t2_t3() {
@@ -357,7 +351,6 @@ mod tests {
         assert_eq!(brace_strut_t3_default().lock_radius_px, t3);
     }
 
-    /// VAL-M14F-031: T1/T2/T3 lock strength also scales (200 / 350 / 500).
     /// Provides a second axis of differentiation beyond lock radius so
     /// the assertion holds even if a renderer collapses radius display.
     #[test]
@@ -371,7 +364,6 @@ mod tests {
         assert_eq!(brace_strut_t3_default().lock_strength, t3);
     }
 
-    /// VAL-M14F-031: behavioural test — a 48-px unsupported span is
     /// covered by T3's ±16 lock but NOT by T1's ±8 lock.
     #[test]
     fn t3_locks_wider_span_than_t1() {
@@ -386,7 +378,6 @@ mod tests {
         assert!(t1 == 16);
     }
 
-    /// VAL-CROSS-023: brace-strut canonical ids do not collide with the
     /// M14E support-beam placer canonical id.
     #[test]
     fn brace_strut_ids_do_not_collide_with_support_beam_placer() {
@@ -396,7 +387,6 @@ mod tests {
         assert_ne!(BRACE_STRUT_T3_ID, placer_id);
     }
 
-    /// **M14F § Cluster 8**: the embedded RON content for each tier
     /// parses + validates without invariant errors, so the runtime
     /// loader resolves to the content-authored spec (not the
     /// hard-coded default).
@@ -413,7 +403,6 @@ mod tests {
         assert_eq!(t3.tier, BraceStrutTier::T3);
     }
 
-    /// **M14F § Cluster 8**: `brace_strut_for_tier` returns a spec
     /// whose fields match the content RON (not the hard-coded default
     /// path).
     #[test]
@@ -426,7 +415,6 @@ mod tests {
         assert_eq!(t3, parsed_t3);
     }
 
-    /// **M14F § Cluster 8**: malformed RON yields a typed `Parse` error
     /// (and `find_brace_strut` falls back to the default so callers
     /// never panic on bad content).
     #[test]
@@ -437,7 +425,6 @@ mod tests {
         assert!(matches!(err2, Err(BraceStrutSpecLoadError::Invariant(_))));
     }
 
-    /// **M14F § Cluster 8**: the tier struct surface and the loaded RON
     /// values agree on lock_radius_px and lock_strength so the engine's
     /// brace-strut placement reads identical values from either path.
     #[test]

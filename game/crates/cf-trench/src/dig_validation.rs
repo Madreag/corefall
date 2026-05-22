@@ -23,7 +23,6 @@
 
 use crate::segment::SegmentVariant;
 
-/// VAL-M9B-DIG-003: substrate hardness threshold for the `deep`
 /// variant. Spec §"Notes": `deep` requires `parent_material.hardness < 0.5`.
 pub const DEEP_HARDNESS_THRESHOLD: f32 = 0.5;
 
@@ -193,7 +192,6 @@ mod tests {
         }
     }
 
-    /// VAL-M9B-DIG-003: `deep` on hardness ≥ 0.5 either falls back or
     /// rejects — the spec explicitly says "fall back OR hard error", so
     /// both paths are valid.
     #[test]

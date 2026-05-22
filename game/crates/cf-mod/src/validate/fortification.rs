@@ -101,7 +101,6 @@ mod tests {
         write_tmp(name, contents)
     }
 
-    /// VAL-M9C-005: every authored `content/fortifications/*.ron`
     /// file loads cleanly through `validate_fortification`. The fast
     /// way to assert this is to walk the manifest dir + validate each.
     #[test]

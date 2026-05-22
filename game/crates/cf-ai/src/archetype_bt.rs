@@ -26,7 +26,6 @@ pub mod rifleman;
 pub mod sniper;
 pub mod spotter;
 
-/// **M7B**: the 6 archetype BT kinds. Distinct from the `Archetype` enum
 /// because Medic uses the rifleman BT at M7B; Heavy is M7B-only and not in
 /// the M7 Archetype enum.
 #[repr(u8)]
@@ -62,7 +61,6 @@ impl ArchetypeBtKind {
     }
 }
 
-/// **M7B**: enumerate every leaf node id for an archetype's BT. Used for
 /// the acceptance criterion that asserts ≥30 nodes per archetype.
 pub fn node_ids_for(kind: ArchetypeBtKind) -> &'static [&'static str] {
     match kind {
@@ -75,7 +73,6 @@ pub fn node_ids_for(kind: ArchetypeBtKind) -> &'static [&'static str] {
     }
 }
 
-/// **M7B**: build the BT root for a given archetype + chosen task. Each
 /// archetype's submodule supplies a `bt_for_task(task)` returning a
 /// canonical `BtNode` so the engine can use the M7B archetype-specific
 /// expansion instead of the shared M7-A fallback.
@@ -90,7 +87,6 @@ pub fn bt_for(kind: ArchetypeBtKind, task: TaskType) -> BtNode {
     }
 }
 
-/// **M7B**: build the BT root for a player-issued squad verb. Distinct
 /// from `bt_for(task)` because squad verbs span the BT graph in ways the
 /// 22-task TaskType lattice cannot — `Suppress (window)` vs `Overwatch
 /// (sector)` vs `Cover Me` all collapse to "engage / hold cover" under
@@ -107,7 +103,6 @@ pub fn bt_for_squad_verb(kind: ArchetypeBtKind, verb_id: &str) -> Option<BtNode>
     }
 }
 
-/// **M7B**: RON-friendly node format. Mirrors `BtNode` 1:1 but uses
 /// tuple-variant enum encoding so `game/content/ai/archetype_bts/*.ron`
 /// reads naturally.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -149,14 +144,12 @@ impl BtNodeSpec {
     }
 }
 
-/// **M7B**: one task-specific subtree slot inside an archetype BT.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskSubtree {
     pub task: String,
     pub root: BtNodeSpec,
 }
 
-/// **M7B**: one squad-verb-specific subtree slot inside an archetype BT.
 /// Surfaces `Suppress (window)` / `Overwatch (sector)` / `Cover Me` as
 /// distinct subtrees per spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -165,7 +158,6 @@ pub struct SquadVerbSubtree {
     pub root: BtNodeSpec,
 }
 
-/// **M7B**: full archetype BT definition serialized as RON. Mirrors the
 /// Rust-side `node_ids_for` + `bt_for_task` + `bt_for_squad_verb` per
 /// archetype.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -227,7 +219,6 @@ impl ArchetypeBtDef {
     }
 }
 
-/// **M7B**: the canonical list of squad-verb subtrees each archetype
 /// should expose. Sourced from the per-archetype submodule so a verb id
 /// drift can be caught at compile time by the round-trip test.
 pub fn squad_verbs_for(kind: ArchetypeBtKind) -> Vec<String> {

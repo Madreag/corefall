@@ -208,7 +208,6 @@ mod tests {
         CameraScript::from_ron_str(text).expect("script parses")
     }
 
-    /// VAL-M10B-024: per-tick router maps every tick in `[start, end)`
     /// to its declared camera kind.
     #[test]
     fn camera_director_routing_matches_script_ranges() {
@@ -242,7 +241,6 @@ mod tests {
         );
     }
 
-    /// VAL-M10B-025: per-tick pose at cut boundaries (600, 1800)
     /// matches declared pose within < 1 px.
     #[test]
     fn camera_pose_boundary_matches_declared_within_1_px() {

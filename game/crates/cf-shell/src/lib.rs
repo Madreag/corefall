@@ -62,7 +62,6 @@ use bevy::prelude::*;
 /// and provides systems for splash → title → main_menu → pause →
 /// save_load → settings_tree → credits → loading_screen flows.
 ///
-/// **M12**: the plugin also exposes the `act.shell.OpenIntroSlideshow`
 /// command surface for cfctl + cf-shell::main_menu's "Replay Intro"
 /// quick action.
 pub struct ShellPlugin;

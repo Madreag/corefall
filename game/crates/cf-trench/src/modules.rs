@@ -143,7 +143,6 @@ mod tests {
         assert_eq!(m.build_time_seconds, 6);
     }
 
-    /// VAL-M9B-MODULES-001: every module's authored RON round-trips
     /// cleanly through `ron`.
     #[test]
     fn module_ron_load_round_trip_all() {

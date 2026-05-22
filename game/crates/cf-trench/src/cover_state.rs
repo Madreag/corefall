@@ -177,7 +177,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9B-COVER-001: the derivation function recomputes the value
     /// on each call. Mutating stance mid-tick must be visible on the
     /// next read with no caching layer interposed.
     #[test]
@@ -204,7 +203,6 @@ mod tests {
         derivation_is_not_cached_across_stance_change();
     }
 
-    /// VAL-M9B-COVERMATRIX-001: every (stance × variant) cell matches
     /// the spec table. 6 base variants × 3 stances = 18 cells; the
     /// `fire_step` row uses on-step semantics per the table reading.
     #[test]

@@ -73,7 +73,6 @@ pub(crate) struct Cli {
     /// desktop cannot inject player/focus commands into the control script.
     #[arg(long)]
     pub(crate) disable_local_input: bool,
-    /// **M1 R2 / Blocker 3b**: when set, cf-app's drive_engine_tick advances
     /// as many sim ticks per Bevy frame as the engine's clock budget allows
     /// (capped at 1024 per frame). cf-e2e passes this for cfctl scripts whose
     /// total sim ticks exceed the wall-clock window cf-e2e's default 180s
@@ -94,14 +93,12 @@ pub(crate) struct Cli {
     /// Default: 60. Set 0 to disable checksums.
     #[arg(long)]
     pub(crate) checksum_cadence_ticks: Option<u64>,
-    /// **M4B § "Delta baseline cadence is enforced"** — ticks between
     /// `snapshot.baseline_emitted` events. Default 600 (10 s @ 60 Hz);
     /// 0 disables snapshot emission entirely. Lower values give more
     /// frequent baselines (faster reconstruction, larger bundle); higher
     /// values amortize over deltas (smaller bundle, slower reconstruction).
     #[arg(long)]
     pub(crate) delta_baseline_cadence_ticks: Option<u64>,
-    /// **M4B § "Tamper-evident competitive replays"** — when set, the
     /// recorder runs in chain mode: every event carries `prev_event_hash`
     /// + `chained_hash_hex`, and `RunManifest.ledger_chain_anchor` is the
     /// BLAKE3 chain anchor of the final event. Tournament organizers
@@ -133,14 +130,12 @@ pub(crate) struct Cli {
     /// Use windowed-hidden mode (default) for now.
     #[arg(long)]
     pub(crate) headless_capture: bool,
-    /// **M1.5**: AI debug overlay. When set, cf-ui draws a floating
     /// intent label above every reactive guard's world position with the
     /// guard's current state + tactic ("ALERT: heard_shot", "ENGAGED",
     /// "RELOADING"). The label updates every tick. Without the flag the
     /// overlay is hidden. Acceptance criterion 'AI debug labels'.
     #[arg(long)]
     pub(crate) ai_debug: bool,
-    /// **M4 § Expected outcome contract**: declare the lifecycle outcome
     /// the caller expects from this run. The canonical run-bundle checker
     /// (`prototype_run_check.py`) verifies that the actual outcome matches
     /// (`clean` requires exactly one `system.run_finished` + zero

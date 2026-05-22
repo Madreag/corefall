@@ -73,45 +73,37 @@ pub struct ObserveFrame {
     /// palette active, captions visible, focusable nodes in z-order).
     #[serde(default)]
     pub accessibility: AccessibilityView,
-    /// **M1 / Gap D3**: controls-capture surface. When `captured=true`
     /// cf-ui renders the CAPTURED zone and cf-app suppresses keyboard/mouse
     /// dispatch.
     #[serde(default)]
     pub controls_capture: ControlsCaptureView,
-    /// **M9B / VAL-M9B-CFCTL-003**: optional projection of the trench
     /// segment at a queried tile position. `None` when no segment has
     /// been queried OR the queried tile is open ground. Populated on
     /// demand by `observe.trench_segment_at_pos` callers; the standard
     /// observe stream leaves this empty so the frame stays cheap.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trench_segment_at_pos: Option<TrenchSegmentView>,
-    /// **M14B § "Surface in observe.frame.cells"** — per-cell atmosphere
     /// projection (pressure + temperature + gas composition). Empty for
     /// scenarios that don't declare `atmosphere_cells` in the manifest.
     #[serde(default)]
     pub cells: Vec<AtmosphericCellView>,
-    /// **M14B** § per-actor gravity vector projection. Reports the
     /// scenario-base gravity plus stacked overrides as observed at the
     /// actor's position this tick. Empty for scenarios with no actors.
     #[serde(default)]
     pub gravity_vectors: Vec<ActorGravityView>,
-    /// **M14J § cf-control::observe — observe.rope list** — every embedded
     /// grapple rope + zip-line cable currently in the world. Pulled from
     /// `EngineMutable::m14j_ropes`; consumers read endpoints + tautness.
     #[serde(default)]
     pub ropes: Vec<RopeView>,
-    /// **M14J § cf-control::observe — observe.zipline list** — subset of
     /// `ropes` that are deployed zip-line cables (canonical high/low ends
     /// + active rider count).
     #[serde(default)]
     pub ziplines: Vec<ZiplineView>,
-    /// **M14J § cf-control::observe — observe.mount_link list** — every
     /// active rider/critter pairing (rider_id + critter_id + combined_mass).
     #[serde(default)]
     pub mount_links: Vec<MountLinkView>,
 }
 
-/// **M14J § "observe.rope list"** — projection of one embedded verlet
 /// rope + its endpoints + tautness state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct RopeView {
@@ -128,7 +120,6 @@ pub struct RopeView {
     pub is_zipline: bool,
 }
 
-/// **M14J § "observe.zipline list"** — projection of one deployed zip-line
 /// cable in canonical (high_end, low_end) orientation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ZiplineView {
@@ -142,7 +133,6 @@ pub struct ZiplineView {
     pub rider_count: u32,
 }
 
-/// **M14J § "observe.mount_link list"** — projection of one rider/critter
 /// pairing.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct MountLinkView {
@@ -154,7 +144,6 @@ pub struct MountLinkView {
     pub firing_during_motion: bool,
 }
 
-/// **M14B** § per-cell atmosphere projection for `observe.frame.cells`.
 /// Authored by the scenario manifest and mutated by the M14B
 /// stratification kernel each step.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -168,14 +157,12 @@ pub struct AtmosphericCellView {
     pub gases: Vec<AtmosphericCellGasView>,
 }
 
-/// **M14B** § per-gas projection inside [`AtmosphericCellView`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct AtmosphericCellGasView {
     pub gas: String,
     pub fraction: f32,
 }
 
-/// **M14B** § per-actor gravity vector projection for `observe.frame.gravity_vectors`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ActorGravityView {
     pub actor_id: u64,
@@ -184,7 +171,6 @@ pub struct ActorGravityView {
     pub active_override_ids: Vec<u32>,
 }
 
-/// **M9B / VAL-M9B-CFCTL-003**: typed projection of one trench segment
 /// returned by `observe.trench_segment_at_pos`. The shape mirrors
 /// `cf_trench::TrenchSegment` so cfctl callers get a stable JSON view.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -222,7 +208,6 @@ impl From<&cf_trench::TrenchSegment> for TrenchSegmentView {
     }
 }
 
-/// **M1 / Gap D3**: minimal HUD projection for the CONTROLS CAPTURED badge.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ControlsCaptureView {
     pub captured: bool,
@@ -242,11 +227,9 @@ pub struct MissionView {
     pub objectives: Vec<ObjectiveView>,
     pub last_event_tick: u64,
     pub last_event_label: String,
-    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor surfaced
     /// for the mission-resolved modal.
     #[serde(default)]
     pub show_me_why_event_id: Option<String>,
-    /// **M1.5**: cf-ui modal flag — render the "Show me why" CTA when
     /// `true`.
     #[serde(default)]
     pub show_replay_cta: bool,
@@ -282,25 +265,20 @@ pub struct TerrainView {
     pub refusal_count: u64,
     pub dirty_chunk_count: u32,
     pub allocated_chunk_count: u32,
-    /// **M3 audit pass 5 (2026-05-13)**: spec-literal alias for
     /// `allocated_chunk_count`. Same value, different field name so
     /// consumers can read either.
     pub chunk_count: u32,
     pub material_counts: std::collections::BTreeMap<String, u64>,
-    /// **M3 audit pass 5 (2026-05-13)**: spec-literal `material_distribution
     /// {id: pixel_count}` keyed by material id (u8). Same data as
     /// `material_counts` but with id keys instead of name keys.
     #[serde(default)]
     pub material_distribution: std::collections::BTreeMap<u16, u64>,
-    /// **M2**: active material-overlay mode ("off" by default). Cycled via
     /// `act.player.toggle_material_overlay`. One of `off`, `integrity`,
     /// `pathability`, `mobility`, `hazard`, `build_repair`.
     #[serde(default = "default_overlay_mode")]
     pub current_overlay_mode: String,
-    /// **M2**: cumulative carve event count emitted this run.
     #[serde(default)]
     pub total_carve_events: u64,
-    /// **M2**: cumulative debris pixels spawned this run.
     #[serde(default)]
     pub total_debris_spawned: u64,
 }
@@ -346,12 +324,10 @@ pub struct EnemyView {
     pub aim_settle_remaining_ticks: u32,
     pub alert_dwell_remaining_ticks: u32,
     pub aim: [f32; 2],
-    /// **M1.5**: guard's last-known world position, copied from the actor
     /// world so the `--ai-debug` floating intent label can anchor at the
     /// sprite. Optional (None when the actor world isn't loaded).
     #[serde(default)]
     pub position: Option<[f32; 2]>,
-    /// **M1.5**: human-readable intent label combining guard state + last
     /// tactic ("ALERT: heard_shot", "ENGAGED", "RELOADING", "STUCK:
     /// blocked"). cf-ui surfaces this above the guard sprite when
     /// `Settings.ai_debug == true`.
@@ -376,7 +352,6 @@ pub struct ActorView {
     pub hp_max: f32,
     pub selected_slot: u32,
     pub selected_item: String,
-    /// **M1 re-audit (2026-05-13)**: full inventory contents as labels in
     /// slot order (4 entries for M1; "empty" for unset slots). Mirrors
     /// `cf_actor::ActorObservation.inventory` so consumers reading
     /// `observe.frame.actors[]` see the same payload as `observe.actor`.
@@ -392,7 +367,6 @@ pub struct ActorView {
     #[serde(default = "default_stance")]
     pub stance: String,
     /// M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).
-    /// **M5**: `placeholder=false` when sourced from a real chassis body graph;
     /// `placeholder=true` for legacy actors without a chassis.
     #[serde(default)]
     pub body_silhouette: BodySilhouetteView,
@@ -401,48 +375,35 @@ pub struct ActorView {
     /// derivation.
     #[serde(default)]
     pub module_strip: ModuleStripView,
-    /// **M5**: full chassis projection (per-zone integrity, modules, stage,
     /// pilot state, eject window). `None` for legacy actors without a chassis.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chassis: Option<ChassisView>,
-    /// **M5**: actor origin tag (`human`, `robot`, `android`).
     #[serde(default = "default_origin_id")]
     pub origin_id: String,
-    /// **M5**: per-tick movement-intent flags surfaced to AI / HUD.
     #[serde(default)]
     pub crouch_active: bool,
     #[serde(default)]
     pub climb_active: bool,
     #[serde(default)]
     pub jet_active: bool,
-    /// **M1**: stability scalar (0.0 = disrupted, 1.0 = solid).
     #[serde(default = "default_stability")]
     pub stability: f32,
-    /// **M1**: per-tick stability recovery rate.
     #[serde(default = "default_stability_recovery_rate")]
     pub stability_recovery_rate: f32,
-    /// **M1**: sharp-aim progress (0..1).
     #[serde(default)]
     pub sharp_aim_progress: f32,
-    /// **M1**: alternating-recoil accumulator value (CCCP `HDFirearm.cpp:891`).
     #[serde(default)]
     pub recoil_accumulator: f32,
-    /// **M1**: knockdown recovery ticks remaining (0 when not stunned).
     #[serde(default)]
     pub knockdown_ticks_remaining: u32,
-    /// **M1**: DYING dwell ticks remaining (CCCP `Actor.cpp:1229`).
     #[serde(default)]
     pub dying_dwell_ticks_remaining: u32,
-    /// **M1**: mission_critical flag (caps damage at DOWNED when true).
     #[serde(default)]
     pub mission_critical: bool,
-    /// **M1**: most-recent reticle bloom factor (`Soldat Sprites.pas:4870`).
     #[serde(default = "default_bloom_factor")]
     pub bloom_factor: f32,
-    /// **M1**: physical mass (kg). Drives mass_factor in physics + stability cost.
     #[serde(default = "default_mass_kg")]
     pub mass_kg: f32,
-    /// **M9B**: trench cover state derived from (stance × current
     /// trench segment variant) per VAL-M9B-CFCTL-003 + VAL-M9B-COVERMATRIX-001.
     /// One of `Exposed | Partial | Full`. Defaults to `Exposed` for actors
     /// on open ground (no trench segment under foot).
@@ -471,7 +432,6 @@ fn default_origin_id() -> String {
     "human".to_string()
 }
 
-/// **M5**: chassis projection for `cfctl observe` / `inspect`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ChassisView {
     pub spec_id: String,
@@ -488,16 +448,13 @@ pub struct ChassisView {
     pub eject_ticks_total: u32,
     pub destroyed_zones: Vec<String>,
     pub salvaged_module_ids: Vec<String>,
-    /// **M14**: per-zone limb-loss state machine projection. One entry per
     /// chassis zone with the current [`cf_physics::ZoneState`] label, plus
     /// the bleed_rate per-second derived from the zone's state.
     #[serde(default)]
     pub limb_states: Vec<LimbStateView>,
-    /// **M14**: total per-second bleed rate (sum across all bleeding zones)
     /// for the actor. Drives the HUD bleeding indicator.
     #[serde(default)]
     pub bleed_rate_per_sec: f32,
-    /// **M14**: ragdoll authority state for the actor (`animated` /
     /// `activating` / `active` / `static_collapse`). Mirrors
     /// [`cf_physics::RagdollState`].
     #[serde(default = "default_ragdoll_state")]
@@ -508,7 +465,6 @@ fn default_ragdoll_state() -> String {
     "animated".to_string()
 }
 
-/// **M14**: per-zone limb state for `cfctl inspect chassis`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct LimbStateView {
     pub zone: String,
@@ -520,7 +476,6 @@ pub struct LimbStateView {
 
 impl From<&cf_actor::ChassisView> for ChassisView {
     fn from(v: &cf_actor::ChassisView) -> Self {
-        // **M14**: derive limb_states from zones + destroyed_zones.
         let destroyed_set: std::collections::BTreeSet<&str> =
             v.destroyed_zones.iter().map(|s| s.as_str()).collect();
         let limb_states: Vec<LimbStateView> = v

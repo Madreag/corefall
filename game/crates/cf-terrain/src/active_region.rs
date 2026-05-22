@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::constants::CHUNK_SLEEP_IDLE_THRESHOLD_TICKS;
 
-/// **M8A**: chunk wake state. Determines whether the chunk participates
 /// in the per-tick CA stepping (M15+) and whether the chunk's mutation
 /// path is included in the dirty-chunk batch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -26,7 +25,6 @@ pub enum ActiveRegionState {
     Awake,
 }
 
-/// **M8A**: wake-on-edit state transition record. Recorded as a
 /// `terrain.chunk_active_region_changed` event for replay determinism.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActiveRegionTransition {
@@ -36,7 +34,6 @@ pub struct ActiveRegionTransition {
     pub tick: u64,
 }
 
-/// **M8A**: wake the chunk at `(cx, cy)` and its 1-chunk-radius
 /// neighbors. Returns the transitions that occurred (each emitted as a
 /// `terrain.chunk_active_region_changed` event by the caller).
 ///
@@ -74,7 +71,6 @@ where
     transitions
 }
 
-/// **M8A**: transition any chunk that has been idle for more than
 /// `CHUNK_SLEEP_IDLE_THRESHOLD_TICKS` ticks to `Sleeping`. Returns the
 /// resulting transitions.
 pub fn sleep_idle_chunks<F, G, H>(

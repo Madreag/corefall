@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActSquadAssignRoleParams",
-  "description": "**M7B**: `act.squad.assign_role` — assign a sticky role to a member\n(Pointman / Rifleman / Marksman / Heavy / Engineer / Medic /\nSquad Leader).",
+  "description": "(Pointman / Rifleman / Marksman / Heavy / Engineer / Medic /\nSquad Leader).",
   "type": "object",
   "properties": {
     "member_actor_id": {

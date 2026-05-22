@@ -78,7 +78,6 @@ pub struct InventorySlotComponent {
     pub item_id: u32,
 }
 
-/// **M8A**: composite ECS bundle for an actor entity. M9+ engine-host
 /// integration wraps this with Bevy's `#[derive(Bundle)]`; M8A keeps the
 /// crate determinism-locked by exposing a plain Rust struct.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]

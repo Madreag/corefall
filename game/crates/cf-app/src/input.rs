@@ -420,7 +420,6 @@ where
     }
 }
 
-/// **M4B § "F5 / F9 hotkeys"** — quicksave / quickload + autosave timer.
 /// The deterministic state machine lives in [`crate::quicksave`]; this
 /// system is the Bevy adapter.
 pub(crate) fn ingest_quicksave_input(
@@ -589,7 +588,6 @@ pub(crate) fn keyboard_focus_direction(
     None
 }
 
-/// DR-012 ACC-A-04 contract: Escape clears HUD focus when a focus ring is
 /// active; only when there is NO focused node does Escape exit the app.
 pub(crate) fn esc_or_close_to_exit(
     keys: Res<ButtonInput<KeyCode>>,
@@ -622,7 +620,6 @@ pub(crate) fn esc_or_close_to_exit(
     }
 }
 
-/// **M1 / Gap D4**: react to window-focus events by toggling the engine's
 /// `controls_captured_by` flag.
 pub(crate) fn handle_window_focus_capture(
     holder: Res<EngineHolder>,

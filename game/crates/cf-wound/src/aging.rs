@@ -31,7 +31,6 @@ pub const BANDAGE_SOAK_THROUGH_TICKS_DEFAULT: u64 = 180;
 /// (30 in-game minutes = 30 × 60 × 60 ticks at 60 Hz).
 pub const FROSTBITE3RD_TO_NECROSIS_TICKS_DEFAULT: u64 = 30 * 60 * 60;
 
-/// **M14G** aging event types — surfaced into the replay log by the engine.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum AgingEvent {
@@ -237,7 +236,6 @@ mod tests {
     use crate::registry::ZoneId;
     use crate::Wound;
 
-    /// VAL-M14G-025: aging cadence — check every tick, mutate every 5 ticks.
     #[test]
     fn aging_cadence_check1_mutate5() {
         let mut list = ActorWoundList::new();
@@ -256,7 +254,6 @@ mod tests {
         assert_eq!(w.age_ticks, 4);
     }
 
-    /// VAL-M14G-033: age_ticks increments every tick.
     #[test]
     fn age_ticks_per_tick_increment() {
         let mut list = ActorWoundList::new();
@@ -273,7 +270,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14G-019: bandage soak-through after 180 ticks.
     #[test]
     fn bandage_soak_through_180_ticks() {
         let mut list = ActorWoundList::new();
@@ -301,7 +297,6 @@ mod tests {
         assert_eq!(w.visible_state, WoundVisibleState::BandageSoaked);
     }
 
-    /// VAL-M14G-034: clean LacerationLight scabs at tick 60.
     #[test]
     fn laceration_light_scabs_at_60s() {
         let mut list = ActorWoundList::new();
@@ -331,7 +326,6 @@ mod tests {
         assert!(rate.abs() < 1e-6, "scabbed wound should not bleed");
     }
 
-    /// VAL-M14G-035: wound.scarred only fires for kinds with closes_to_scar=true.
     ///
     /// The aging pass uses each spec's `heal_time_at_band(severity_band)` to
     /// gate scar emission. To keep the test runtime sane we shrink the
@@ -380,7 +374,6 @@ mod tests {
         );
     }
 
-    /// VAL-M14G-041: dirt_pct escalates for unscabbed, unbandaged wounds.
     #[test]
     fn dirt_pct_escalates_when_unscabbed_unbandaged() {
         let mut list = ActorWoundList::new();
@@ -404,7 +397,6 @@ mod tests {
         assert!(samples[1] > samples[0]);
     }
 
-    /// VAL-M14G-015: Frostbite3rd untreated 30 min drives the zone necrotic.
     #[test]
     fn frostbite3rd_to_necrosis_30min_untreated() {
         let mut list = ActorWoundList::new();

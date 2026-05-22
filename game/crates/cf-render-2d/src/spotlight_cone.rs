@@ -129,7 +129,6 @@ mod tests {
         assert!(!cone.contains_tile((0, 10)));
     }
 
-    /// VAL-M9C-024: a dazzled spotlight does not light any tile.
     #[test]
     fn spotlight_cone_dazzled_lights_nothing() {
         let mut cone = SpotlightCone::new_default((0, 0), 0.0);

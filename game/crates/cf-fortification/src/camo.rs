@@ -185,7 +185,6 @@ pub fn camo_concealed(inputs: CamoConcealmentInputs) -> CamoConcealment {
 mod tests {
     use super::*;
 
-    /// VAL-M9C-CAMO-BASELINE-HOLDS: baseline returns concealed=true.
     #[test]
     fn camo_baseline_concealment_holds() {
         let result = camo_concealed(CamoConcealmentInputs::baseline());
@@ -201,7 +200,6 @@ mod tests {
         camo_baseline_concealment_holds();
     }
 
-    /// VAL-M9C-048: thermal scope (ARV) bypasses concealment.
     #[test]
     fn camo_bypass_thermal_scope() {
         let inputs = CamoConcealmentInputs {

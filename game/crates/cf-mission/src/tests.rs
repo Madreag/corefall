@@ -103,7 +103,6 @@ fn first_objective_starts_pending_then_activates_on_first_step() {
 
 #[test]
 fn pause_suspends_step_and_timer_resume_restores() {
-    // **M1.5**: while paused, step() is a no-op AND the timer freezes.
     let mut state = build_state();
     let actors = mk_actors(player_at(120.0, 32.0), false);
     // Tick 1: activate breach.
@@ -181,7 +180,6 @@ fn pause_resume_skip_when_terminal_or_double_called() {
 
 #[test]
 fn breach_progress_milestones_emit_objective_updated() {
-    // **M1.5**: `mission.objective_updated` fires at 25/50/75/100%
     // carve milestones for the active `BreachBarrier` objective.
     let mut state = build_state();
     let actors = mk_actors(player_at(120.0, 32.0), false);
@@ -380,7 +378,6 @@ fn player_dead_loses_immediately() {
     assert!(report.final_result.is_some());
 }
 
-/// **M13** § "Brain hopping" — `LossReason::BrainDestroyed` fires when
 /// the actor flagged `is_brain == true` is dead, regardless of which
 /// actor is currently being puppeted by the player pointer.
 #[test]
@@ -548,7 +545,6 @@ fn defend_reactor_loses_when_reactor_destroyed() {
 
 #[test]
 fn pending_defend_reactor_loses_when_reactor_destroyed_before_objective_activates() {
-    // Bugbot 3212230553 (Low) regression: a `DefendReactor` queued
     // behind an earlier objective (Pending status) MUST detect its
     // reactor being destroyed and resolve the mission as
     // `Lost { ReactorDestroyed }`. Pre-fix the destruction was
@@ -681,7 +677,6 @@ fn defend_reactor_with_outstanding_objective_loses_at_timer_even_with_reactor_al
 
 #[test]
 fn timer_expires_on_first_step_with_reachzone_first_defendreactor_pending_yields_timer_loss() {
-    // Bugbot 3212591651 regression: when a multi-objective scenario has
     // ReachZone listed first (so Phase 0 activates ReachZone, not the
     // DefendReactor) and the timer happens to be already expired on the
     // first step() call, the mission must resolve as `Lost { TimerExpired }`
@@ -744,7 +739,6 @@ fn timer_expires_on_first_step_with_reachzone_first_defendreactor_pending_yields
     ));
     // Phase 0 still ran first — ReachZone activated.
     assert_eq!(report.objective_started, vec!["reach".to_string()]);
-    // M2 audit pass 5 (2026-05-13): spec literal — active objectives
     // are flipped to Failed on timer-expired loss so the engine emits
     // `mission.objective_failed { reason: "timer_expired" }` before
     // `mission.mission_resolved`. The ReachZone just got Activated this
@@ -780,7 +774,6 @@ fn defend_reactor_wins_when_timer_expires_with_reactor_alive() {
 
 #[test]
 fn reactor_apply_damage_two_partial_hits_then_kill_in_separate_calls() {
-    // Bugbot 2ce56d7e regression cover: simulate two partial hits + one
     // kill hit with the per-hit hp captured at each step. The cf-control
     // engine emits per-hit state captured at apply_damage time, not the
     // post-loop final state, so each event reflects the truthful hp.
@@ -989,7 +982,6 @@ fn objective_failed_emitted_on_reactor_destroyed() {
     assert!(report_after.objective_failed.is_empty(), "terminal step must be empty");
 }
 
-/// **M9** (audit fix gap 6): `tutorial_safety = true` blocks reactor
 /// destruction by capping HP at 1 and forcing pressure_state=Critical.
 #[test]
 fn reactor_tutorial_safety_caps_hp_at_one() {
@@ -1019,7 +1011,6 @@ fn reactor_tutorial_safety_caps_hp_at_one() {
     );
 }
 
-/// **M9** (audit fix gap 6): when `tutorial_safety = false`, the
 /// cascade still destroys the reactor on lethal damage (back-compat
 /// with the legacy `apply_damage_cascade` signature).
 #[test]

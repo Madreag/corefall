@@ -22,22 +22,18 @@ use crate::squad_command_grammar::{
     VerbRegistry,
 };
 
-/// **M7B**: spec § "Slot solver runs at issue + every 2s while moving" —
 /// the cadence in seconds. The engine converts this to ticks via the
 /// configured tick rate.
 pub const SLOT_RESLOT_CADENCE_SECONDS: f32 = 2.0;
 
-/// **M7B**: distance threshold (world units) past which an actor is
 /// considered to have "lost the slot position" and the engine emits a
 /// `squad.formation_slot_broken`. Re-solve happens next 2s tick.
 pub const SLOT_BROKEN_THRESHOLD_UNITS: f32 = 12.0;
 
-/// **M7B**: identifies one squad inside the world. Owned by cf-control
 /// (mission roster), exposed here as an opaque u64 so cf-ai stays free of
 /// the cf-squad type graph.
 pub type SquadId = u64;
 
-/// **M7B**: per-squad state owned by cf-ai. Mutated through `apply_*`
 /// helpers that emit replay events.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SquadState {
@@ -79,7 +75,6 @@ impl SquadState {
         }
     }
 
-    /// **M7B**: assign a sticky role to a member.
     pub fn assign_role(&mut self, actor_id: u64, role: SquadRoleHint) -> RoleAssignmentResult {
         let prev = self.role_assignments.insert(actor_id, role);
         match prev {
@@ -89,7 +84,6 @@ impl SquadState {
         }
     }
 
-    /// **M7B**: try to issue a verb. On `Accepted`, commit; on `Vetoed`,
     /// stash the reason label without mutating `current_command`; on
     /// `Rejected`, return the parse error label.
     pub fn try_issue(
@@ -138,14 +132,12 @@ impl SquadState {
         self.try_issue(&reg, &mat, verb_id, args, issuer_actor_id, issued_tick)
     }
 
-    /// **M7B**: re-set the formation kind. Returns the previous kind.
     pub fn set_formation(&mut self, kind: FormationKind) -> FormationKind {
         let prev = self.formation_kind;
         self.formation_kind = kind;
         prev
     }
 
-    /// **M7B**: produce a fresh set of slot assignments via the solver +
     /// commit them back into the squad state. The roster is built from
     /// `role_assignments`; the caller passes the commander pose + the
     /// current tick. Returns the new assignments.
@@ -177,13 +169,11 @@ impl SquadState {
         a
     }
 
-    /// **M7B**: register member death. Returns true when the role was
     /// removed (the engine then triggers a reslot).
     pub fn on_member_kia(&mut self, actor_id: u64) -> bool {
         self.role_assignments.remove(&actor_id).is_some()
     }
 
-    /// **M7B**: true when the squad is due for its periodic 2s reslot.
     /// `now_tick` is the engine tick; `tick_rate_hz` is the configured
     /// tick rate (never hardcoded to 60 per AGENTS.md). The engine
     /// short-circuits when the squad is idle (no current command).
@@ -197,7 +187,6 @@ impl SquadState {
         now_tick.saturating_sub(self.last_solve_tick) >= cadence_ticks
     }
 
-    /// **M7B**: per-member slot-broken detection. Returns the set of
     /// `(member_actor_id, slot_id)` pairs that have wandered past
     /// `SLOT_BROKEN_THRESHOLD_UNITS` from their assigned world anchor.
     /// The engine emits one `squad.formation_slot_broken` event per pair
@@ -226,7 +215,6 @@ impl SquadState {
         out
     }
 
-    /// **M7B**: open a breach chain (Stack → Breach → Frag → Advance).
     pub fn start_breach_chain(&mut self, door_id: u64, side: &str, tick: u64) {
         self.breach_chain = Some(BreachChainState {
             door_id,
@@ -236,7 +224,6 @@ impl SquadState {
         });
     }
 
-    /// **M7B**: advance the breach chain one step. Returns the step the
     /// chain entered, or `None` when the chain has completed.
     pub fn advance_breach_chain(&mut self, tick: u64) -> Option<BreachChainStep> {
         let _ = tick;
@@ -250,7 +237,6 @@ impl SquadState {
         }
     }
 
-    /// **M7B**: open a bounding-retreat sequence (alternating cover + 30u
     /// rearward steps).
     pub fn start_bounding(&mut self, rally: [f32; 2], tick: u64) {
         self.bounding = Some(BoundingState {
@@ -261,7 +247,6 @@ impl SquadState {
         });
     }
 
-    /// **M7B**: tick the bounding sequence. Returns the resulting event
     /// payload when a swap occurs.
     pub fn tick_bounding(&mut self) -> Option<BoundingEvent> {
         let state = self.bounding.as_mut()?;
@@ -276,7 +261,6 @@ impl SquadState {
     }
 }
 
-/// **M7B**: outcome of `assign_role`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RoleAssignmentResult {
     Assigned,
@@ -284,7 +268,6 @@ pub enum RoleAssignmentResult {
     Changed { previous: SquadRoleHint },
 }
 
-/// **M7B**: breach-chain step ladder.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -327,7 +310,6 @@ pub struct BreachChainState {
     pub current_step: BreachChainStep,
 }
 
-/// **M7B**: bounding-retreat alternating phase.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -368,7 +350,6 @@ pub struct BoundingEvent {
     pub new_phase: BoundingPhase,
 }
 
-/// **M7B**: one slot-broken detection produced by [`SquadState::detect_broken_slots`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct SlotBrokenReport {
     pub member_actor_id: u64,

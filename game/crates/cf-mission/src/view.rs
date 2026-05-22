@@ -12,41 +12,33 @@ use crate::state::MissionState;
 /// envelope. M1.5 keeps it tiny; M4 will wire the comic-noir HUD on top.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MissionView {
-    /// **M2 audit pass 7 (2026-05-13)**: spec literal field name is
     /// `status`. `result` retained as alias because the wire was stable
     /// across the M1-M3 era.
     #[serde(rename = "status")]
     pub result: String,
     pub loss_reason: Option<String>,
     pub elapsed_ticks: u64,
-    /// **M2 audit pass 7 (2026-05-13)**: spec literal field name is
     /// `timer_total_ticks`. `time_limit_ticks` retained as alias.
     #[serde(rename = "timer_total_ticks")]
     pub time_limit_ticks: u64,
-    /// **M2 audit pass 7 (2026-05-13)**: spec literal field name is
     /// `timer_ticks_remaining`.
     #[serde(rename = "timer_ticks_remaining")]
     pub ticks_remaining: Option<u64>,
-    /// **M2 audit pass 7 (2026-05-13)**: spec literal field name is
     /// `current_objective_id`.
     #[serde(rename = "current_objective_id")]
     pub active_objective: Option<String>,
-    /// **M2 audit pass 7 (2026-05-13)**: spec-literal `completed_objectives[]`
     /// — list of objective ids in completion order.
     #[serde(default)]
     pub completed_objectives: Vec<String>,
-    /// **M2 audit pass 7 (2026-05-13)**: spec-literal `failed_objectives[]`.
     #[serde(default)]
     pub failed_objectives: Vec<String>,
     pub objectives: Vec<ObjectiveView>,
     pub last_event_tick: u64,
     pub last_event_label: String,
-    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor. Populated
     /// when the mission resolves as Lost; cf-ui renders the CTA button
     /// when this field is `Some`.
     #[serde(default)]
     pub show_me_why_event_id: Option<String>,
-    /// **M1.5**: cf-ui modal flag — render the "Show me why" CTA when
     /// `true`.
     #[serde(default)]
     pub show_replay_cta: bool,
@@ -102,7 +94,6 @@ impl MissionView {
                 },
             })
             .collect();
-        // M2 audit pass 7 (2026-05-13): populate completed_objectives[] +
         // failed_objectives[] arrays so observe.mission carries them in
         // the JSON, per spec MissionState surface.
         let completed_objectives = state

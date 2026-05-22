@@ -35,7 +35,6 @@ impl M0Engine {
         let mut state = self.state.write().expect("engine state poisoned");
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
-        // **M12C** § "Player gameplay input is blocked (only skip / pause
         // accepted)" while a cinematic is playing. Mirror of the
         // `controls_captured_by` gate below — keyed off the cinematic
         // kernel rather than the overlay capture flag. Squad/camera/UI
@@ -125,12 +124,10 @@ impl M0Engine {
                 ControlCommand::ActM6 { action, .. } => Some(action.method_name()),
                 ControlCommand::ActSquadIssueCommand { .. } => Some("act.squad.issue_command"),
                 ControlCommand::ActSquadCancelCommand { .. } => Some("act.squad.cancel_command"),
-                // **M7B**: squad-command grammar surface — observable in
                 // capture mode so the player still hears the rejection.
                 ControlCommand::ActSquadIssue { .. } => Some("act.squad.issue"),
                 ControlCommand::ActSquadSetFormation { .. } => Some("act.squad.set_formation"),
                 ControlCommand::ActSquadAssignRole { .. } => Some("act.squad.assign_role"),
-                // **M13** chassis-grade methods rejected during input capture.
                 ControlCommand::ActPlayerBrainHop { .. } => Some("act.player.brain_hop"),
                 ControlCommand::ActPlayerActivateAbility { .. } => Some("act.player.activate_ability"),
                 ControlCommand::ActInputCameraAnchor { .. } => Some("act.input.camera_anchor"),
@@ -158,14 +155,12 @@ impl M0Engine {
                 return CommandResult::rejected("controls_captured", tick.0);
             }
         }
-        // **M13** § "Boarding / disembarking transitions" — "Input rejected
         // during transition". When the player's chassis is mid-transition,
         // every act.player.* (except board/disembark/eject) is rejected with
         // `chassis_in_transition`. This mirrors the M1 controls-capture gate
         // above but keyed off chassis state rather than overlay capture.
         // Uses the already-held `state` write lock to avoid deadlock — DO
         // NOT call self.state.read() here, this function owns the write lock.
-        // **M14 audit pass 4 (Finding 1)**: also include the player-side
         // boarding timer in the input-lock gate. A foot soldier mid-board
         // has no chassis yet, so a chassis-only gate would let them
         // continue moving / firing during the 1500ms transition.
@@ -626,7 +621,6 @@ impl M0Engine {
                     } else {
                         state.pending_intent.fire_held = false;
                     }
-                    // **M14C** § propagate the per-shot ammo-kind override
                     // from cfctl `act.player.fire { ammo_kind: ... }` into
                     // the actor's pending intent so cf-actor::sim picks the
                     // correct `RoundKind` when the magazine pops next. The
@@ -754,7 +748,6 @@ impl M0Engine {
                 }
             }
             ControlCommand::ActPlayerAbort { source } => {
-                // **M1.5 G9**: player-initiated forfeit. Marks the mission
                 // (if any) as Aborted and emits mission.mission_resolved.
                 // Idempotent: a second abort while the mission is already
                 // terminal is rejected with `mission_already_terminal`.
@@ -786,7 +779,6 @@ impl M0Engine {
                     // "String-literal loss reasons: DR-002 stable-vocabulary
                     // contract. Use the typed enum's `as_str()`."
                     mission.loss_reason_label = Some(cf_mission::LossReason::Aborted.as_str().to_string());
-                    // **M14 audit pass 2 (GAP-M4-02)**: latch the run-aborted
                     // flag so record_run_finished emits outcome="abort".
                     state.run_aborted = true;
                     drop(state);
@@ -805,7 +797,6 @@ impl M0Engine {
                         "mission_resolved",
                         json!({
                             "result": "aborted",
-                            // M2 audit pass 7 (2026-05-13): route through
                             // the typed enum's as_str() (DR-002 stable
                             // vocabulary contract) — never a raw literal.
                             "loss_reason": cf_mission::LossReason::Aborted.as_str(),
@@ -830,7 +821,6 @@ impl M0Engine {
                 CommandResult::rejected("no_mission_in_scenario", tick.0)
             }
             ControlCommand::ActMissionPause { source } => {
-                // **M1.5**: tutorial-modal pause. Suspends mission objective
                 // progress + timer; emits mission.objective_paused. No-ops
                 // when no mission, already paused, or mission is terminal.
                 let _ = source;
@@ -891,7 +881,6 @@ impl M0Engine {
                 CommandResult::accepted(tick.0)
             }
             ControlCommand::ActMissionResume { source } => {
-                // **M1.5**: lift the pause. No-op if not paused.
                 let _ = source;
                 let Some(mission) = state.mission.as_mut() else {
                     drop(state);
@@ -1061,7 +1050,6 @@ impl M0Engine {
                 if state.player_actor.is_none() {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.dig");
                 }
-                // M1 audit pass 5 (2026-05-13): spec literal — "during
                 // knockdown ALL input is rejected: move, aim, fire, reload,
                 // jump, dig, select_item are no-ops". The sim-side
                 // accepts_input gate covers move/aim/jump/fire/reload/select_item
@@ -1162,7 +1150,6 @@ impl M0Engine {
                     None,
                 );
 
-                // M3 audit pass 5 (2026-05-13): refuse reason is the stable
                 // spec vocabulary `material_not_anchorable`; the specific
                 // material is exposed on the `material` payload field.
                 let (result, reason) = if anchorable {
@@ -1246,7 +1233,6 @@ impl M0Engine {
                     }),
                     None,
                 );
-                // **M11 § DR-012 closure**: emit `ux.focus_moved` paired
                 // with the control event so the replay viewer can render
                 // the focus traversal as a first-class HUD event.
                 let from_node = prev_idx.map(|i| HUD_FOCUSABLE_NODES[i].to_string()).unwrap_or_default();
@@ -1331,7 +1317,6 @@ impl M0Engine {
                 );
                 CommandResult::accepted(tick.0)
             }
-            // **M11 audit pass (GAP-M11-01 HIGH fix)**: keyed action press
             // dispatch for the BP3 self-play floor + pause-overlay cycling.
             // Translates a UI-bound action into the corresponding settings
             // mutation or overlay toggle. Emits `control.command_accepted`
@@ -1833,7 +1818,6 @@ impl M0Engine {
                 let mut zone_result: Option<cf_chassis::RepairOutcome> = None;
                 let mut module_result: Option<cf_chassis::ModuleTransition> = None;
                 let mut reject_reason: Option<String> = None;
-                // **M5**: `act.chassis.repair` is idempotent — a repair on an already-Nominal
                 // module/zone returns None (no transition) but the COMMAND succeeds. Only an
                 // unknown zone string or an unknown module id rejects; calling repair on a
                 // healthy chassis is a no-op accept.
@@ -2016,7 +2000,6 @@ impl M0Engine {
                 }
                 CommandResult::accepted(tick.0)
             }
-            // **M13** § "Brain hopping / multi-actor control".
             ControlCommand::ActPlayerBrainHop {
                 target_actor_id,
                 source,
@@ -2036,7 +2019,6 @@ impl M0Engine {
                     } else if prior == Some(target) {
                         reject = Some("brain_hop_same_actor");
                     } else if prior.is_none() {
-                        // **M14 audit pass 4 (Finding 9)**: surface the
                         // "no prior actor to hop from" case with its own
                         // reason instead of misreporting as not_friendly
                         // (which the team-match branch would otherwise
@@ -2110,7 +2092,6 @@ impl M0Engine {
                     json!({"from_actor": prior_id, "target_actor": target_actor_id, "transition_ms": 200}),
                     None,
                 );
-                // **M7B** § "Cortex-Command-style commander hopping" —
                 // emit `squad.brain_hop` so consumers can join the hop
                 // with the squad's preserved doctrine + formation row.
                 // The hop never mutates `m7b_squad` state — that's the
@@ -2133,7 +2114,6 @@ impl M0Engine {
                 if let Some(p) = squad_hop_payload {
                     self.recorder.record(tick, sim_time_ms, "squad", "brain_hop", p, None);
                 }
-                // **M13** § "Brain hopping" — caption "Switched to <actor name>".
                 if let Ok(mut s) = self.state.write() {
                     let caption_label = format!("Switched to actor {target_actor_id}");
                     s.hud_captions.push_back(crate::state::CaptionView {
@@ -2145,7 +2125,6 @@ impl M0Engine {
                 }
                 CommandResult::accepted(tick.0)
             }
-            // **M13** § "Chassis ability slots".
             ControlCommand::ActPlayerActivateAbility { ability, source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.activate_ability");
@@ -2217,7 +2196,6 @@ impl M0Engine {
                     }
                 }
             }
-            // **M13** § "Cockpit camera anchor".
             ControlCommand::ActInputCameraAnchor { mode, source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.input.camera_anchor");
@@ -2296,7 +2274,6 @@ impl M0Engine {
                 }
                 CommandResult::accepted(tick.0)
             }
-            // **M13** § "Drone allies — 4 modes".
             ControlCommand::ActPlayerSetDroneMode { mode, source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.set_drone_mode");
@@ -2367,7 +2344,6 @@ impl M0Engine {
                 );
                 CommandResult::accepted(tick.0)
             }
-            // **M13** § "Weapon modifier slots".
             ControlCommand::ActPlayerAttachModifier { modifier, source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.attach_modifier");
@@ -2462,7 +2438,6 @@ impl M0Engine {
                     }
                 }
                 drop(state);
-                // **M14 audit pass 3 (Finding 2)**: previous implementation
                 // always returned accepted even when nothing detached. Now:
                 // reject with reason `no_chassis` when the player has no
                 // chassis; reject with `modifier_not_attached` when the
@@ -2499,7 +2474,6 @@ impl M0Engine {
                 );
                 CommandResult::accepted(tick.0)
             }
-            // **M13** § "Boarding / disembarking transitions".
             ControlCommand::ActPlayerBoard {
                 chassis_actor_id,
                 source,
@@ -2509,7 +2483,6 @@ impl M0Engine {
                 }
                 let _ = source;
                 let player_id = state.player_actor.expect("player actor present");
-                // **M14 audit pass 4 (Finding 1)**: the boarding timer +
                 // pending-target now live on the PLAYER actor, not on the
                 // target chassis. This makes input lock, HUD banner, and
                 // concurrent-board rejection trivially correct: a single
@@ -2551,7 +2524,6 @@ impl M0Engine {
                     );
                     return CommandResult::rejected(reason, tick.0);
                 }
-                // **M14 audit pass 4 (Finding 1)**: latch the timer on the
                 // player + also mark the target chassis as in-transition
                 // so a second player attempting to board the same chassis
                 // is rejected (target_chassis_busy).
@@ -2651,11 +2623,9 @@ impl M0Engine {
                 }
                 let prev_settings = state.settings.clone();
                 let changed = apply_settings_patch(&mut state.settings, &changes);
-                // **M1.5 G6**: when ai_difficulty changed, re-apply the
                 // preset to every live ReactiveGuard so the new params take
                 // effect on the next AI tick.
                 //
-                // M2 audit pass 7 (2026-05-13): also propagate the preset's
                 // `hp` into every reactive guard's actor state so the spec
                 // literal "guard's hp=120" round-trip holds.
                 if changed.iter().any(|f| f == "ai_difficulty") {
@@ -2666,7 +2636,6 @@ impl M0Engine {
                         for guard in state.reactive_guards.values_mut() {
                             preset.apply_to(&mut guard.params, tick_rate_hz);
                         }
-                        // M2 audit pass 7 (2026-05-13): also write preset.hp
                         // into each reactive guard's actor state so the
                         // round-trip "guard's hp=120" holds. Borrow guard_ids
                         // before the actor_state mutable borrow to avoid an
@@ -2681,7 +2650,6 @@ impl M0Engine {
                         }
                     }
                 }
-                // M1 audit pass 7 (2026-05-13): propagate `gravity` setting
                 // into the live actor world so subsequent ticks use the new
                 // value (settings.gravity is the magnitude; world.gravity
                 // is signed-negative).
@@ -2757,7 +2725,6 @@ impl M0Engine {
                         None,
                     );
                 }
-                // **M11 § DR-012 closure**: when `ui_scale` changed, emit a
                 // dedicated `accessibility.ui_scale_applied` event so the
                 // replay viewer + cf-app's UiScale binding agree on when the
                 // HUD reflowed.
@@ -2771,7 +2738,6 @@ impl M0Engine {
                         None,
                     );
                 }
-                // **M8 game_speed_assist consumer (Round-3 fix):** when the
                 // game_speed_assist value transitioned (Off ↔ Slowdown75 ↔
                 // Slowdown25 ↔ FullPause), surface the change as a dedicated
                 // `ux.game_speed_assist_changed` event so replay tooling can

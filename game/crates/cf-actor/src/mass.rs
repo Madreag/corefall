@@ -8,7 +8,6 @@ pub use crate::mass_aggregator::{breakdown, mass_factor, total_mass, MassBreakdo
 
 use crate::ActorState;
 
-/// **M14A** § "Live recalculation hooks" — every event that should mark the
 /// cached mass dirty.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MassDirtyReason {
@@ -39,25 +38,21 @@ impl MassDirtyReason {
     }
 }
 
-/// **M14A** § "Live recalculation hooks" — invalidate the cached mass and
 /// surface the reason for replay events.
 pub fn invalidate_mass(actor: &mut ActorState, _reason: MassDirtyReason) {
     actor.mark_mass_dirty();
 }
 
-/// **M14A** § "Wound mass from lodged pixels" — add a single lodged pixel's
 /// mass to the actor's wound mass pool. Marks mass dirty.
 pub fn add_wound_pixel(actor: &mut ActorState) {
     actor.wound_mass_kg += crate::m14a_constants::WOUND_PIXEL_MASS_KG;
     invalidate_mass(actor, MassDirtyReason::WoundAdded);
 }
 
-/// **M14A** § "Mass × everything matrix" — mass-aware jump impulse scaling.
 pub fn jump_velocity_from_impulse(jump_impulse_n_s: f32, total_mass_kg: f32) -> f32 {
     jump_impulse_n_s / total_mass_kg.max(1e-3)
 }
 
-/// **M14A** § "Mass × everything matrix" — mass-aware fall damage.
 pub fn fall_damage(total_mass_kg: f32, impact_velocity_m_per_s: f32) -> f32 {
     0.5 * total_mass_kg.max(0.0) * impact_velocity_m_per_s * impact_velocity_m_per_s
 }

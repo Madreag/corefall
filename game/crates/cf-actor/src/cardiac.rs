@@ -12,7 +12,6 @@ pub use cf_treatment::{
     DEFIB_CPR_BOOST_PER_ROUND, DEFIB_CHARGES_DEFAULT,
 };
 
-/// **M14H** § per-actor cardiac component. Persists between ticks.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActorCardiacComponent {
     /// True if the actor is currently in cardiac arrest.
@@ -116,7 +115,6 @@ mod tests {
         assert!(c.chest_bruised);
     }
 
-    /// **M14H** Gherkin scenario 2 (math check): 2 CPR rounds → 70% defib
     /// success probability.
     #[test]
     fn defib_success_70_after_2_cpr() {

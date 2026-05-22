@@ -24,7 +24,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::positional::AudioDirection;
 
-/// **M12A** § One audio event scheduled for replay-deterministic
 /// playback. Mirrors the `cf-replay::event::audio.event_played` JSON
 /// schema field-for-field.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -68,7 +67,6 @@ impl AudioPlaybackEvent {
     }
 }
 
-/// **M12A** § Replay queue. cf-control's engine pushes events here when
 /// the sim emits an audio cue; cf-app's bevy-audio adapter drains the
 /// queue per frame and dispatches each event in order.
 #[derive(Debug, Default, Clone)]
@@ -129,7 +127,6 @@ impl AudioReplayQueue {
     }
 }
 
-/// **M12A** § Spec acceptance — "Per-tick checksum unchanged" for
 /// cosmetic events. This helper filters the SIM event stream so the
 /// determinism checksum only hashes non-cosmetic events. cf-control's
 /// existing `cosmetic` flag on the M4 envelope already does this; the
@@ -139,7 +136,6 @@ pub fn is_cosmetic_audio_event(category: &str) -> bool {
     matches!(category, "audio")
 }
 
-/// **M12B** § Per spec § Notes for the implementer:
 ///
 /// > the 4 new replay events MUST register in
 /// > `cf-audio::deterministic_replay::is_cosmetic_audio_event`. Treating
@@ -157,7 +153,6 @@ pub const M12B_COSMETIC_EVENT_TYPES: &[&str] = &[
     "doppler_shifted",
 ];
 
-/// **M12B** § Two-argument cosmetic-event classifier. Returns `true` for
 /// the existing `audio.event_played` event AND each of the 4 new M12B
 /// replay event types so they're always excluded from the determinism
 /// checksum.

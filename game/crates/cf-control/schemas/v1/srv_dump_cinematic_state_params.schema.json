@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "SrvDumpCinematicStateParams",
-  "description": "**M12C**: `srv.dump_cinematic_state` — return the full\n`CinematicState` JSON view (cinematic id + source + phase +\nplayhead + duration + color grade + active word + camera offset).\nUsed by the Codex tab + cinematic editor + tests.",
+  "description": "`CinematicState` JSON view (cinematic id + source + phase +\nplayhead + duration + color grade + active word + camera offset).\nUsed by the Codex tab + cinematic editor + tests.",
   "type": "object",
   "properties": {
     "schema_version": {

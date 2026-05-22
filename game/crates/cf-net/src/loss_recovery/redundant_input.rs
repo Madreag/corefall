@@ -19,7 +19,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M8B § Notes**: default redundant-input window in ticks.
 pub const REDUNDANT_INPUT_DEFAULT_WINDOW: u8 = 3;
 
 /// One entry in the redundant-input tail.
@@ -67,7 +66,6 @@ impl Default for RedundantInputTail {
     }
 }
 
-/// **M8B § server side**: the per-client tick ledger that detects which
 /// ticks the server has already ingested + which ticks would otherwise
 /// have stalled but are recovered from the redundant tail.
 #[derive(Debug, Clone, Default)]
@@ -102,7 +100,6 @@ impl RedundantInputLedger {
         newly_recovered
     }
 
-    /// **M8B § Acceptance "redundant-input recovers from single
     /// datagram loss"**: returns true if the supplied tick was missed
     /// in the head but recovered from a tail.
     pub fn was_recovered(&self, tick: u64) -> bool {
@@ -169,7 +166,6 @@ mod tests {
 
     #[test]
     fn five_percent_loss_recovery_at_60hz() {
-        // **M8B § Acceptance "Lossy networks stay smooth"**: simulate a 60Hz
         // stream of 1100 input frames; drop every 20th packet (5% loss).
         // Each surviving packet carries a 3-tick redundant tail. The server
         // must end up with every tick in the first 1000 ingested (later

@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use crate::report::ValidationReport;
 
-/// **M4A**: minimal structural mirror of `content/asset_ledger/regen_manifest.ron`,
 /// kept in this binary so the validator does not pull a serde dep into
 /// `cf-asset-ledger` itself. Matches the locked v1.0.0 schema at
 /// `cf-asset-ledger/schemas/v1/regen_manifest.schema.json`.
@@ -27,7 +26,6 @@ pub(crate) struct RegenPipelineEntry {
     pub(crate) notes: String,
 }
 
-/// **M11**: minimal structural check for `content/balance/ttd_floors_interim.ron`.
 /// Verifies the file is RON-parseable, declares `schema_version: "1.0.0"`,
 /// and has at least one floor entry. The canonical M17 loader will replace
 /// this with a strict validator once M17 ships.
@@ -119,7 +117,6 @@ pub(crate) fn validate_ttd_floors_interim(path: &Path, report: &mut ValidationRe
     }
 }
 
-/// **M14H § VAL-M14H-001**: validate one `content/treatments/<id>.ron`
 /// file against the [`cf_treatment::TreatmentSpec`] schema. Rejects
 /// files that reference an unknown `TreatmentKind`, omit any required
 /// field, or carry a non-finite apply window.
@@ -168,7 +165,6 @@ pub(crate) fn validate_treatment_spec_ron(path: &Path, report: &mut ValidationRe
     }
 }
 
-/// **M14I § VAL-M14I-PROSTHETIC**: validate one
 /// `content/prosthetics/<name>.ron` file against the
 /// [`cf_prosthetic::ProstheticSpec`] schema. Rejects files that reference
 /// an unknown `ProstheticKind`, leave `target_zones` empty, or carry an
@@ -222,7 +218,6 @@ pub(crate) fn validate_prosthetic_spec_ron(path: &Path, report: &mut ValidationR
     }
 }
 
-/// **M14G § VAL-M14G-008 / VAL-CROSS-012 / VAL-CROSS-028**: validate one
 /// `content/wound_specs/<name>.ron` file against the
 /// [`cf_wound::WoundSpec`] schema. Rejects files that reference an unknown
 /// `WoundKind`, omit any of the 11 required fields, or carry an

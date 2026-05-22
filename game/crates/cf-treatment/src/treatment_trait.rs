@@ -16,7 +16,6 @@ use crate::producers::{
     treatment_spec, RiskKind, SkillRequirement, ToolRequirement, TreatmentKind, TreatmentSpec,
 };
 
-/// **M14H** § canonical Treatment trait. Every producer implements this
 /// uniformly; the catalog ([`TreatmentRegistry`]) exposes them as a
 /// single map.
 pub trait Treatment: Send + Sync + std::fmt::Debug {
@@ -50,7 +49,6 @@ pub trait Treatment: Send + Sync + std::fmt::Debug {
     }
 }
 
-/// **M14H** § default trait impl backed by [`TreatmentSpec`].
 #[derive(Debug, Clone)]
 pub struct SpecTreatment {
     spec: TreatmentSpec,
@@ -96,7 +94,6 @@ impl Treatment for SpecTreatment {
     }
 }
 
-/// **M14H** § registry of `Treatment` trait objects, keyed by
 /// [`TreatmentKind`]. Equivalent to [`crate::TreatmentSpecRegistry`] but
 /// exposes the trait surface instead of the raw spec record.
 pub struct TreatmentRegistry {

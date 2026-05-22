@@ -573,7 +573,6 @@ mod tests {
         assert!(results.iter().all(|r| r.ok));
     }
 
-    /// **M4A spec § "Upstream asset dependency graph"** contract:
     /// "When the Tier 1 entry is regenerated, then dependents (Tier 2,
     /// Tier 3) are marked Stale." This test pins the auto-stale-marking
     /// behaviour of `regenerate_entry_with_handle` so future refactors

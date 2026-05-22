@@ -74,7 +74,6 @@ impl Stamina {
         self.sprinting = false;
     }
 
-    /// **M14J** § "stroke rate consumes M16 swim-stamina" — drain `amount`
     /// from the pool. Clamps to `[0, max]`.
     pub fn consume(&mut self, amount: f32) {
         if !amount.is_finite() || amount <= 0.0 {

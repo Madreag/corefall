@@ -19,7 +19,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M12B** § Canonical decay-band tilt labels per spec table.
 ///
 /// - `bright` — high-frequency-favored (concrete, rock).
 /// - `bright_ringing` — bright + sustained sustained ring (steel).
@@ -95,7 +94,6 @@ impl DecayBand {
     }
 }
 
-/// **M12B** § Per-material echo response — first-reflection amplitude +
 /// spectral tilt. Returned by [`echo_response_for`] given a material's
 /// canonical acoustic fields.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -120,7 +118,6 @@ impl EchoResponse {
     }
 }
 
-/// **M12B** § Resolve the per-material echo response.
 ///
 /// `echo_coefficient` and `decay_band` come from `cf-material::registry`
 /// (defaults to the "dirt" row if missing). Returns a fully populated
@@ -145,12 +142,10 @@ pub fn echo_response_for(echo_coefficient: f32, decay_band: &str) -> EchoRespons
     }
 }
 
-/// **M12B** § Surface-area-weighted echo coefficient. Used by the
 /// reverb-profile derivation: the room's reflective character is the
 /// weighted mean of every wall surface's echo coefficient, where the
 /// weight is the surface area of that wall.
 ///
-/// Per spec § "Per-room reverb profile derivation":
 ///
 /// ```text
 /// decay_coefficient: weighted_mean(wall_material.echo_coefficient, by_surface_area)
@@ -171,7 +166,6 @@ pub fn weighted_mean_coefficient(samples: &[(f32, f32)]) -> f32 {
     (weighted / total_area).clamp(0.0, 1.0)
 }
 
-/// **M12B** § Dominant decay-band across multiple wall surfaces. Picks the
 /// band that owns the largest weighted surface area. Ties resolve in the
 /// canonical-tilt order: `bright_ringing > bright > bright_short > warm_mid >
 /// warm_low > dampened > anechoic` so two runs with identical inputs pick

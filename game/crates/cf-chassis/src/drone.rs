@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// **M13** § "Drone allies — 4 modes + autonomous behavior".
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -33,7 +32,6 @@ impl DroneMode {
     }
 }
 
-/// **M13** § "Drone allies — Drone has limited fuel + battery (drains while
 /// active; ~5 minutes per full charge)". Runtime drone ally state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DroneAllyState {

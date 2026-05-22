@@ -20,7 +20,6 @@ pub struct MissionTickInputs<'a> {
     pub breaches_broken: &'a BTreeMap<String, bool>,
     /// Map of `reactor_id -> destroyed?`. `true` once hp <= 0. Defaults empty.
     pub reactors_destroyed: &'a BTreeMap<String, bool>,
-    /// **M1.5**: map of `breach_id -> carve_progress` in `[0.0, 1.0]`. Drives
     /// `mission.objective_updated` events at 25/50/75/100% milestones for
     /// `BreachBarrier` objectives. May be left empty; missing ids default to
     /// `0.0` (no progress yet).
@@ -34,7 +33,6 @@ pub struct MissionTickReport {
     pub objective_started: Vec<String>,
     pub objective_completed: Vec<String>,
     pub objective_failed: Vec<String>,
-    /// **M1.5**: progress milestone crossings. One entry per (objective_id,
     /// quartile) crossed on this tick. `progress` is the milestone value
     /// (0.25, 0.5, 0.75, or 1.0). The engine emits one `mission.objective_updated`
     /// event per entry.
@@ -43,7 +41,6 @@ pub struct MissionTickReport {
     pub final_result: Option<MissionResult>,
 }
 
-/// **M1.5**: one milestone-crossing entry surfaced on `MissionTickReport`.
 /// The engine turns each into a `mission.objective_updated` event with a
 /// payload of `{ objective_id, progress }`.
 #[derive(Debug, Clone, PartialEq)]

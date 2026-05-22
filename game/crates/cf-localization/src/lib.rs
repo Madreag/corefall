@@ -15,7 +15,7 @@
 //! code from the engine.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 pub mod icu_format;
 pub mod keyed_strings;

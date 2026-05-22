@@ -3,7 +3,6 @@
 //! Owned by `docs/plan/spec/perf-budget-contract.md`. Downstream
 //! milestones must not re-tune.
 
-/// **M8A**: per-tick terrain mutation + dirty batch p99 latency budget
 /// (milliseconds).
 ///
 /// Covers per-chunk parallel mutation (`par_iter_mut` over the dirty
@@ -12,7 +11,6 @@
 /// firehose density.
 pub const TERRAIN_MUTATION_P99_BUDGET_MS: f32 = 2.5;
 
-/// **M8A**: chunks idle this many ticks without an edit transition to
 /// `active_region = false`. Wake-on-edit flips it back to true (and
 /// wakes neighbors within 1-chunk radius). Forward-compat for the M15 CA
 /// chemistry kernel.

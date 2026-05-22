@@ -28,7 +28,6 @@ pub use wind::{
     WindForceOutcome, WindSource, BUOYANCY_FORCE_PER_K_DELTA,
 };
 
-/// **M14A** § "Atmosphere overlay" — Stationeers-grade atmospheric constants.
 pub const IDEAL_GAS_CONSTANT_R: f32 = 8314.46;
 pub const MIN_O2_PARTIAL_KPA: f32 = 16.0;
 pub const CRITICAL_O2_PARTIAL_KPA: f32 = 12.0;
@@ -51,7 +50,6 @@ pub const WIND_FORCE_PER_KPA_DIFFERENTIAL: f32 = 2.0;
 pub const PIPE_GAS_RUPTURE_KPA: f32 = 60_795.0;
 pub const PIPE_LIQUID_RUPTURE_KPA: f32 = 6_079.0;
 
-/// **M14A** § "Per-cell atmospheric overlay" — DTO returned by [`sample_cell`].
 ///
 /// Stationeers-grade direction (DR-037): pressure / temperature / partial
 /// pressures + wind vector + local gravity. Today the [`sample_cell`] stub
@@ -161,7 +159,6 @@ impl Default for AtmosphereSample {
     }
 }
 
-/// **M14A** § "cf-atmos integration" — sample the local atmosphere at a
 /// world-space position. Today returns Earth-ambient defaults; M5.9 swaps
 /// in the real PV=nRT kernel without changing this signature.
 ///
@@ -182,13 +179,11 @@ where
     probe(pos)
 }
 
-/// **M12B** § Per-tile medium probe. M19F humidity + condensation and
 /// M19G room ↔ tile bridge populate the live atmospheric medium; until
 /// those land cf-atmos returns [`Medium::Air`] for every position. The
 /// spatial-resolve pipeline calls this at the midpoint of (source,
 /// listener) per spec § HRTF resolution.
 ///
-/// Per spec § Notes:
 ///
 /// > Atmosphere-corrected speed of sound: read from
 /// > `cf-atmos::medium_at(pos).speed_of_sound_m_per_s`. Default = 343
@@ -203,7 +198,6 @@ pub fn medium_at(_pos: [f32; 2]) -> MediumFilter {
     MediumFilter::for_medium(Medium::Air)
 }
 
-/// **M12B** § Override-friendly variant of [`medium_at`] for test
 /// scenarios. The closure receives the world position and returns the
 /// medium; useful for headless unit tests of underwater + vacuum
 /// scenarios before M19F lands.

@@ -12,7 +12,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-/// **M8**: slow-motion accessibility (`game_speed_assist`). Spec §
 /// Camera + game feel — Off / Slowdown75 / Slowdown25 / FullPause.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
@@ -66,7 +65,6 @@ impl GameSpeedAssist {
     }
 }
 
-/// **M8**: color blind / contrast palette mode (`color_cue_mode`). Spec §
 /// Accessibility extras — Default / ColorblindSafe / Protanopia /
 /// Deuteranopia / Tritanopia / MonochromeTest.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
@@ -115,7 +113,6 @@ impl ColorCueMode {
     }
 }
 
-/// **M8**: aim assist mode (`aim_assist`). Spec § Accessibility extras —
 /// off / steady_aim / auto_aim_with_damage_penalty.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
@@ -151,7 +148,6 @@ impl AimAssist {
     }
 }
 
-/// **M8 / M11**: HUD density preset (`ui_density`). Spec § Accessibility tab —
 /// Compact / Comfortable / Spacious. M11 added `Comfortable` as the canonical
 /// default-density name (was `Normal` under M8 — accepted as an alias).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
@@ -189,7 +185,6 @@ impl UiDensity {
     }
 }
 
-/// **M11**: contrast palette mode for the ACC-A floor. Replaces the legacy
 /// `high_contrast: bool` with a tri-state enum (Standard / HighContrastDark /
 /// HighContrastLight) per spec § Settings tree.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
@@ -224,7 +219,6 @@ impl ContrastMode {
     }
 }
 
-/// **M11**: captions verbosity mode. Filters which event categories surface
 /// as captions in the HUD strip.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
@@ -262,7 +256,6 @@ impl CaptionMode {
     }
 }
 
-/// **M11**: primary input profile (drives default HUD focus path).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum InputProfile {
@@ -299,7 +292,6 @@ impl InputProfile {
     }
 }
 
-/// **M11**: hold-behavior variant for the ACC-A floor (replaces tap-only).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum HoldBehavior {
@@ -332,7 +324,6 @@ impl HoldBehavior {
     }
 }
 
-/// **M11**: camera-motion granularity (paired with `reduced_motion` for
 /// finer follow-camera control).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
@@ -362,7 +353,6 @@ impl CameraMotion {
     }
 }
 
-/// **M11**: objective-help verbosity (tutorial / mission text density).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ObjectiveHelp {
@@ -392,7 +382,6 @@ impl ObjectiveHelp {
     }
 }
 
-/// **M11**: debug-explainer verbosity (for the death recap + AI debug overlays).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum DebugExplainerLevel {
@@ -425,16 +414,13 @@ impl DebugExplainerLevel {
     }
 }
 
-/// **M11**: ACC-A floor caption category vocabulary. Caption_categories may
 /// be any subset of this list. Default is `[combat, ai, mission, accessibility]`.
 pub const SUPPORTED_CAPTION_CATEGORIES: &[&str] = &["combat", "ai", "terrain", "mission", "system", "accessibility"];
 
-/// **M11**: ACC-A floor key-remap groups. Restricts which UI subsystems
 /// surface their rebindable actions in the remap editor. Default is
 /// `[Gameplay]`.
 pub const SUPPORTED_REMAP_GROUPS: &[&str] = &["gameplay", "ui", "replay", "workbench", "accessibility"];
 
-/// **M11**: default caption-category subset (4 of 6 categories on).
 pub fn default_caption_categories() -> BTreeSet<String> {
     let mut s = BTreeSet::new();
     s.insert("combat".to_string());
@@ -444,7 +430,6 @@ pub fn default_caption_categories() -> BTreeSet<String> {
     s
 }
 
-/// **M11**: default remap-group subset (gameplay-only on by default).
 pub fn default_remap_groups() -> BTreeSet<String> {
     let mut s = BTreeSet::new();
     s.insert("gameplay".to_string());
@@ -500,7 +485,6 @@ pub const SUPPORTED_KEY_BINDING_ACTIONS: &[&str] = &[
     // M11: sharp_aim (ADS) added to the discrete action set so the remap
     // surface covers ACC-A's full 18+ action floor.
     "sharp_aim",
-    // **M4B § "F5 / F9 hotkeys are reserved by cf-shell::keybinds"** —
     // register the save subsystem actions in the remap surface so cf-app
     // honors player overrides via `Settings.key_bindings`.
     "save.quicksave",
@@ -567,7 +551,6 @@ pub const SUPPORTED_KEY_CODE_NAMES: &[&str] = &[
     "Numpad7",
     "Numpad8",
     "Numpad9",
-    // **M4B § "F5 / F9 hotkeys are reserved by cf-shell::keybinds"** —
     // the reserved save subsystem function keys. The full function-key
     // row is registered so the player can remap quicksave/quickload onto
     // any F-key, and so future shell hotkeys (e.g. F1 help, F12 photo
@@ -623,51 +606,40 @@ pub struct Settings {
     /// at the control boundary instead of silently falling back in cf-app.
     #[serde(default)]
     pub key_bindings: BTreeMap<String, String>,
-    /// **M1 / DR-055**: accessibility floor — camera shake magnitude is
     /// multiplied by `(1.0 - reduce_camera_shake_pct)`. 0.0 = full shake,
     /// 1.0 = no shake. Clamped to `[0, 1]` by `apply_settings_patch`.
     #[serde(default)]
     pub reduce_camera_shake_pct: f32,
-    /// **M1**: tick-rate observable. Mirrors the engine's
     /// `tick_rate_hz` so cfctl `observe.settings` round-trips a single
     /// authoritative value. Defaults to 60.
     #[serde(default = "default_tick_rate_hz")]
     pub tick_rate_hz: u32,
-    /// **M1 Gap F1**: ground acceleration (units / s²). Default 1500.0
     /// mirrors `cf-actor::sim::ActorTuning::default().ground_acceleration`.
     #[serde(default = "default_accel")]
     pub accel: f32,
-    /// **M1 Gap F1**: ground friction (units / s²). Default 1200.0 mirrors
     /// `cf-actor::sim::ActorTuning::default().ground_friction`.
     #[serde(default = "default_friction")]
     pub friction: f32,
-    /// **M1 Gap F1**: gravity acceleration applied to the actor in
     /// `cf-physics` (units / s²; negative pulls toward the floor). Default
     /// `-980.0`.
     #[serde(default = "default_gravity")]
     pub gravity: f32,
-    /// **M1 Gap F1**: jump impulse (units / s). Default `420.0` mirrors
     /// `cf-actor::sim::ActorTuning::default().jump_impulse`.
     #[serde(default = "default_jump_force")]
     pub jump_force: f32,
-    /// **M1 Gap F1**: per-tick decay of `recoil_accumulator` toward zero
     /// (CCCP `HDFirearm.cpp:891`). Default `0.05`.
     #[serde(default = "default_recoil_decay_per_tick")]
     pub recoil_decay_per_tick: f32,
-    /// **M1 Gap F1**: ticks to fully build sharp aim from 0 -> 1.0 (CCCP
     /// `AHuman.cpp:1779`). Default `30` (~0.5s at 60Hz).
     #[serde(default = "default_sharp_aim_build_ticks")]
     pub sharp_aim_build_ticks: u32,
-    /// **M1 Gap F1**: horizontal-speed threshold (units / s) below which the
     /// actor counts as "slow enough" to keep building sharp aim. Default 1.5.
     #[serde(default = "default_walk_threshold")]
     pub walk_threshold: f32,
-    /// **M1.5 G6**: active AI difficulty preset id. Engine applies the
     /// matching `cf-ai::DifficultyPreset` to every `ReactiveGuard` whenever
     /// this changes.
     #[serde(default = "default_ai_difficulty")]
     pub ai_difficulty: String,
-    /// **M1.5**: when true, cf-ui renders a floating intent label above
     /// every reactive guard ("ALERT: heard_shot", "ENGAGED", "RELOADING").
     /// Toggled via `--ai-debug` CLI flag on cf-app and `act.settings.set
     /// { ai_debug: true }` through cfctl.
@@ -675,152 +647,112 @@ pub struct Settings {
     pub ai_debug: bool,
 
     // === M8 accessibility / camera / debug / locale extensions ===
-    /// **M8**: slow-motion accessibility (Off / Slowdown75 / Slowdown25 /
     /// FullPause). Cosmetic per M4; replay-deterministic.
     #[serde(default)]
     pub game_speed_assist: GameSpeedAssist,
-    /// **M8**: color blind / contrast palette mode.
     #[serde(default)]
     pub color_cue_mode: ColorCueMode,
-    /// **M8**: aim assist mode (off / steady / auto).
     #[serde(default)]
     pub aim_assist: AimAssist,
-    /// **M8**: damage numbers cosmetic (floating "+15" text on hit).
     #[serde(default)]
     pub damage_numbers: bool,
-    /// **M8**: killcam toggle (on by default per spec § Killcam).
     #[serde(default = "default_true")]
     pub killcam_enabled: bool,
-    /// **M8**: hit-stop pulse on impactful hits.
     #[serde(default = "default_true")]
     pub hit_stop_enabled: bool,
-    /// **M8**: cinematic kill cam on boss final blow.
     #[serde(default = "default_true")]
     pub cinematic_kills: bool,
-    /// **M8**: master mini-map enable toggle (Settings.no_minimap inverts).
     #[serde(default = "default_true")]
     pub mini_map_enabled: bool,
-    /// **M8**: master compass enable toggle.
     #[serde(default = "default_true")]
     pub compass_enabled: bool,
-    /// **M8**: damage direction indicator enable toggle.
     #[serde(default = "default_true")]
     pub damage_direction_enabled: bool,
-    /// **M8**: mini-map zoom (clamped 0.25..=4.0).
     #[serde(default = "default_mini_map_zoom")]
     pub mini_map_zoom: f32,
-    /// **M8**: scope ADS FOV in degrees (clamped 5..=90).
     #[serde(default = "default_scope_zoom_fov")]
     pub scope_zoom_fov: f32,
-    /// **M8**: text scale (mirrors ui_scale; some HUD widgets honour this
     /// distinct field per spec § Settings menu Accessibility tab).
     #[serde(default = "default_text_scale")]
     pub text_scale: f32,
-    /// **M8**: HUD density preset.
     #[serde(default)]
     pub ui_density: UiDensity,
-    /// **M8**: active language code (en baseline; Tier-A 11 reserved for
     /// T-ACC-PLUS BP9+).
     #[serde(default = "default_language")]
     pub language: String,
-    /// **M8**: speedrun mode (HUD shows persistent timer + segment
     /// markers; mission resolves immediately on objectives).
     #[serde(default)]
     pub speedrun_mode: bool,
     // === M8 difficulty modifiers (granular per scenario) ===
-    /// **M8**: permadeath modifier.
     #[serde(default)]
     pub permadeath: bool,
-    /// **M8**: no-respawn modifier.
     #[serde(default)]
     pub no_respawn: bool,
-    /// **M8**: fog-of-war on (default true per spec § Difficulty modifiers).
     #[serde(default = "default_true")]
     pub fog_of_war_on: bool,
-    /// **M8**: limited-ammo modifier.
     #[serde(default)]
     pub limited_ammo: bool,
-    /// **M8**: time-limit modifier (mission has a hard timer).
     #[serde(default)]
     pub time_limit: bool,
-    /// **M8**: hide the mini-map (overrides `mini_map_enabled` when true).
     #[serde(default)]
     pub no_minimap: bool,
-    /// **M8**: hardcore mode (composite of multiple modifiers).
     #[serde(default)]
     pub hardcore_mode: bool,
-    /// **M8**: friendly fire on.
     #[serde(default)]
     pub friendly_fire_on: bool,
-    /// **M8**: master debug-overlay enable gate. In production builds the
     /// 7 cf-debug overlays only render when `debug_enabled = true`. Dev
     /// builds bypass the gate.
     #[serde(default)]
     pub debug_enabled: bool,
-    /// **M8**: set of currently-enabled cf-debug overlays (snake_case ids
     /// per `cf_debug::DebugOverlay::as_str`). Mirrors the cf-debug
     /// `DebugOverlayState` so cfctl `observe.debug.overlays` round-trips.
     #[serde(default = "default_debug_overlays")]
     pub debug_overlays: BTreeSet<String>,
 
     // === M11 accessibility (DR-003 + DR-012 closure) extensions ===
-    /// **M11**: contrast palette mode. Tri-state replacing the legacy
     /// `high_contrast: bool`. Standard / HighContrastDark / HighContrastLight.
     #[serde(default)]
     pub contrast_mode: ContrastMode,
-    /// **M11**: captions verbosity mode (Off / CriticalOnly / Standard /
     /// Expanded). Filters which events surface as captions.
     #[serde(default)]
     pub caption_mode: CaptionMode,
-    /// **M11**: caption background opacity (0.0..=1.0; default 0.8).
     #[serde(default = "default_caption_background_opacity")]
     pub caption_background_opacity: f32,
-    /// **M11**: caption category subset (subset of
     /// [`SUPPORTED_CAPTION_CATEGORIES`]). Default 4 of 6.
     #[serde(default = "default_caption_categories")]
     pub caption_categories: BTreeSet<String>,
-    /// **M11**: input profile (default keyboard+mouse).
     #[serde(default)]
     pub input_profile: InputProfile,
-    /// **M11**: remap-action group subset (subset of
     /// [`SUPPORTED_REMAP_GROUPS`]). Default `[gameplay]`.
     #[serde(default = "default_remap_groups")]
     pub remap_groups: BTreeSet<String>,
-    /// **M11**: hold-behavior variant (default Hold).
     #[serde(default)]
     pub hold_behavior: HoldBehavior,
-    /// **M11**: screen-shake scale (0.0..=1.0; default 1.0 = full shake;
     /// 0.0 = no shake). Multiplicative on camera punch + recoil shake.
     /// Replaces the inverse-sense `reduce_camera_shake_pct`; the legacy
     /// field is preserved for back-compat (mirror updated whenever this
     /// changes via `apply_settings_patch`).
     #[serde(default = "default_screen_shake_scale")]
     pub screen_shake_scale: f32,
-    /// **M11**: camera-motion granularity (Reduced / Standard).
     #[serde(default)]
     pub camera_motion: CameraMotion,
-    /// **M11**: objective-help verbosity (Minimal / Standard / Verbose).
     #[serde(default)]
     pub objective_help: ObjectiveHelp,
-    /// **M11**: debug-explainer level (Player / Designer / Raw).
     #[serde(default)]
     pub debug_explainer_level: DebugExplainerLevel,
 
     // === M12 cinematic story beats + optional comic overlay ===
-    /// **M12**: comic-style overlay mode (`full | subtle | off`). Drives
     /// speech bubbles, onomatopoeia stamps, comic-panel boss intros, and
     /// the comic death-recap availability. Default is `Subtle` per spec
     /// § Comic-style framing — opt-in juice, not core identity.
     #[serde(default)]
     pub comic_style_overlay: ComicStyleOverlay,
-    /// **M12**: when `true`, the death recap renders as a 4-panel comic-style
     /// cause chain. When `false` (default), the M10 replay viewer +
     /// cause-chain walker is used. Gated by `comic_style_overlay != Off`.
     #[serde(default)]
     pub comic_death_recap: bool,
 
     // === M12C in-engine cinematic surface ===
-    /// **M12C**: active storyteller id matching `cf-cinematic::StorytellerId`
     /// (`cassandra_classic` | `phoebe_chillax` | `randy_random` |
     /// `ironman` | `sandbox`). Forward-compat with M25's director-driven
     /// storyteller selection. cf-shell + cfctl set this via
@@ -829,7 +761,6 @@ pub struct Settings {
     /// from M25 director state and applies its profile globally."
     #[serde(default = "default_storyteller")]
     pub storyteller: String,
-    /// **M12C**: captions-enabled mirror for the cinematic caption
     /// ribbon. Defaults to `captions` (M11 mode) but exposed as a
     /// separate flag so cfctl tests can toggle the cinematic surface
     /// independently of the gameplay caption strip. Per spec § "the
@@ -844,7 +775,6 @@ pub fn default_storyteller() -> String {
     "cassandra_classic".to_string()
 }
 
-/// **M12**: comic-style overlay mode mirror — `full | subtle | off`.
 /// Drives `cf-ui::comic_overlay::ComicOverlayMode` at runtime.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
@@ -883,12 +813,10 @@ impl ComicStyleOverlay {
     }
 }
 
-/// **M11**: default caption background opacity per spec.
 pub fn default_caption_background_opacity() -> f32 {
     0.8
 }
 
-/// **M11**: default screen-shake scale (full shake = 1.0).
 pub fn default_screen_shake_scale() -> f32 {
     1.0
 }
@@ -985,7 +913,6 @@ pub fn default_key_bindings() -> BTreeMap<String, String> {
     // M11: sharp_aim (ADS) — right-click typically, but we wire a keyboard
     // fallback so KeyboardOnly profile can still ADS.
     m.insert("sharp_aim".into(), "ShiftLeft".into());
-    // **M4B § "F5 / F9 hotkeys are reserved by cf-shell::keybinds"** —
     // wire the spec's reserved defaults into the remap surface so the
     // settings UI shows them and the player can override them. cf-app's
     // ingest_quicksave_input reads these via key_for_action.

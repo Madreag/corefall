@@ -16,7 +16,6 @@
 
 use crate::components::GuardComponent;
 
-/// **M8A**: deterministic pre-rolled RNG for the AI tick.
 ///
 /// Per M8A rule 2: RNG calls outside par_iter closures. Workers index by
 /// stable guard id; same seed → same `Vec<u64>` → same per-guard rolls.
@@ -39,7 +38,6 @@ impl AiPreRolledRng {
     }
 }
 
-/// **M8A**: AI tick entry that the M9+ engine scheduler runs per-tick.
 ///
 /// Stage 1 (Reactive) updates each guard's `alive` flag based on the
 /// shadow-state previous tick; pre-rolled RNG keyed by stable guard id;

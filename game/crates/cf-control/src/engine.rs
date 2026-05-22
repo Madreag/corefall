@@ -14,7 +14,6 @@ pub(crate) const M4A_CAPTION_BUFFER: usize = 8;
 pub(crate) const M4A_STATUS_BANNER_EXPIRY_TICKS: u64 = 180;
 pub(crate) const M4A_CAPTION_EXPIRY_TICKS: u64 = 120;
 
-/// **M4A canonical focusable HUD node list** (DR-012 ACC-A-04). This is the
 /// single source of truth: cf-control's `observe.accessibility.focusable_nodes`,
 /// cf-app's keyboard focus traversal, cf-e2e's `--verify-focus`, the live-WS
 /// acceptance tests, and any future cfctl `ui assert` tooling all read from
@@ -75,7 +74,6 @@ pub struct M0EngineConfig {
     pub control_api_enabled: bool,
     pub debug_capabilities: Vec<String>,
     pub tick_rate_hz: u32,
-    /// **M4A**: source-truthful `capture_config` flag. cf-app sets this when
     /// `--capture-grid` is on so the run manifest reports
     /// `capture_config.{events:true, screenshots:true, captures:true}` instead
     /// of the historical `screenshots:false / captures:false` lie. Default:
@@ -109,7 +107,6 @@ pub struct M0EngineConfig {
     pub linked_specs: Vec<String>,
     pub assumptions_tested: Vec<String>,
     pub expected_tests: Vec<String>,
-    /// **M1 / Seam S2**: scenario tutorial_safety flag. When true the
     /// engine flags `ActorState::set_inactive(true)` for every controllable
     /// actor on scene-load until the manifest's tutorial-controller flips
     /// it off (M1.5 owns the tutorial controller; M1 just plumbs the flag).
@@ -143,93 +140,72 @@ pub struct M0EngineConfig {
     pub initial_chunked_terrain: Option<cf_terrain::ChunkedTerrain>,
     /// M2.5: optional ordered list of reactor world entries.
     pub initial_reactors: Vec<cf_mission::Reactor>,
-    /// **M6**: initial squad roster built from `ScenarioActor.squad_role`.
     /// Each entry pairs (actor_id, SquadRole, display_name). Empty for
     /// scenarios with no squad declarations.
     pub initial_squad_members: Vec<InitialSquadMember>,
     /// M3A: configurable checksum cadence. 0 = disabled. Default from
     /// `ChecksumConfig::m0_default().cadence_ticks` (60).
     pub checksum_cadence_ticks: u64,
-    /// **M1.5 G6**: optional difficulty preset id from the scenario
     /// manifest. Applied to each reactive guard at engine construction.
     /// `None` keeps each guard's params as authored.
     pub difficulty_preset: Option<String>,
-    /// **M4 § Expected outcome contract**: when `Some(...)`, overrides the
     /// inferred default in `build_manifest`. `None` lets the engine derive
     /// the outcome (Panic if `debug_inject_panic_at_tick` is set, else
     /// Clean).
     pub expected_outcome_override: Option<cf_replay::ExpectedOutcome>,
-    /// **M7 director v0.5 (audit gap A12)**: optional 4-phase pacing
     /// state seeded from the scenario manifest. `None` opts out — the
     /// engine still ticks `advance_phase` but it returns None until
     /// `init_phase` is called.
     pub initial_phase_state: Option<cf_mission::PhaseState>,
-    /// **M7 director v0.5 (audit gap A15)**: opt-in reinforcement wave
     /// declarations the engine flattens into `M7AiWorld.reinforcements`.
     pub initial_reinforcement_waves: Vec<cf_mission::ReinforcementWave>,
-    /// **M7 director v0.5 (audit gap A16)**: optional mini-boss state
     /// seeded into `M7AiWorld.boss`. `None` opts out — `apply_boss_damage`
     /// returns None and no `boss.*` events fire.
     pub initial_boss_state: Option<cf_mission::BossState>,
-    /// **M7 director v0.5 (audit gap A13/A14)**: optional v0.5 objective
     /// graph seeded into `M7AiWorld.objective_graph`. `None` opts out —
     /// the M2 single-vec objective list keeps working unchanged.
     pub initial_objective_graph: Option<cf_mission::ObjectiveGraph>,
-    /// **M4B § "Delta baseline cadence is enforced"** — ticks between
     /// `snapshot.baseline_emitted` events. Default 600 (10 s @ 60 Hz);
     /// 0 disables snapshot emission entirely.
     pub delta_baseline_cadence_ticks: u64,
-    /// **M4B § "Tamper-evident competitive replays"** — when true, the
     /// recorder runs in chain mode (per-event BLAKE3 keyed hash + final
     /// anchor in `RunManifest.ledger_chain_anchor`). Default false.
     pub ledger_chain_enabled: bool,
-    /// **M14B** § gravity field overrides authored by the scenario manifest.
     /// Empty by default; producer-side `cf_physics::apply_overrides` reads
     /// this list each tick.
     pub initial_gravity_overrides: Vec<cf_physics::GravityOverride>,
-    /// **M14B** § wind apertures authored by the scenario manifest.
     pub initial_wind_sources: Vec<cf_atmos::WindSource>,
-    /// **M14B** § authored atmosphere cells (pressure + temperature). Drives
     /// the wind force kernel + stratification.
     pub initial_atmosphere_cells: Vec<cf_atmos::AtmosCell>,
-    /// **M14B** § per-column gas composition for stratification (parallel
     /// to `initial_atmosphere_cells` by `cell_id`). Empty = pure-air default.
     pub initial_stratification_cells: Vec<cf_atmos::StratCell>,
-    /// **M14C** § scripted director steps from the scenario manifest.
     /// `drive_tick` reads this each tick and injects matching intents into
     /// `pending_intent` before the actor sim runs. Empty by default.
     pub initial_scripted_steps: Vec<crate::scenario::ScenarioScriptStep>,
-    /// **M14D** § initial projectile-pair pool authored by the scenario
     /// manifest's `m14d_projectile_pool[]` field. Drives the per-tick
     /// projectile-pair CCD pass (`cf_physics::run_projectile_pair_pass`).
     /// Empty by default — pre-M14D scenarios behave identically.
     pub initial_m14d_projectile_pool: Vec<cf_physics::ProjectileSnapshot>,
-    /// **M14D § VAL-M14D-019** initial per-player `replay_intercepts`
     /// setting. Default false — killcam excludes
     /// `collision.projectile_pair_contact` events unless the player
     /// opts in via this setting.
     pub initial_replay_intercepts: bool,
-    /// **M14E** § initial tunnel-span fixtures from the scenario manifest.
     /// Empty by default; M14E scenarios populate one or more spans for
     /// the per-tick collapse-check pass.
     pub initial_m14e_tunnel_spans: Vec<crate::scenario::ScenarioTunnelSpan>,
-    /// **M14E** § seed offset for the cave-in roll RNG. Added to the
     /// engine's `seed` to derive the cave-in RNG state.
     pub initial_m14e_cave_in_seed_offset: u64,
-    /// **M14F § VAL-M14F-016**: initial lateral-wall fixtures from the
     /// scenario manifest. Empty by default; M14F scenarios populate
     /// one or more rows so the lateral integrity pass + bulging →
     /// crack_advanced → rupture cascade fires against a known sidewall
     /// topology. Shares the same per-chunk `IntegrityField` buffer as
     /// the ceiling pass per VAL-CROSS-005.
     pub initial_m14f_lateral_wall_spans: Vec<crate::scenario::LateralWallSpan>,
-    /// **M14G § VAL-M14G-013/014/030**: initial thermal-contact zones
     /// from the scenario manifest. The engine ticks each zone's dwell
     /// counter every tick and runs
     /// [`cf_environment::classify_tile_thermal`] to emit typed burn /
     /// frostbite wounds.
     pub initial_m14g_thermal_zones: Vec<crate::scenario::ScenarioThermalZone>,
-    /// **M14G § VAL-M14G-029**: initial material-contact entries from
     /// the scenario manifest. Each entry fires one
     /// [`cf_material::classify_reaction`] call at its `fire_tick`.
     pub initial_m14g_material_contacts: Vec<crate::scenario::ScenarioMaterialContact>,
@@ -246,7 +222,6 @@ pub struct InitialBreachWorld {
 pub struct InitialGuard {
     pub actor: ActorId,
     pub params: cf_ai::ReactiveGuardParams,
-    /// **M9B audit GAP-2**: optional doctrine id that opts the actor
     /// into a per-tick AI cover-decision pipeline. Currently only
     /// `"AI-TRENCH-A-01"` is recognised (the M9B trench garrison
     /// doctrine); unknown values are ignored.
@@ -254,7 +229,6 @@ pub struct InitialGuard {
     pub doctrine: Option<String>,
 }
 
-/// **M6**: initial squad member built from a scenario actor entry.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InitialSquadMember {
     pub actor: ActorId,
@@ -279,7 +253,6 @@ impl InitialActorWorld {
         Self::from_scenario_with_tick_rate(scenario, 60)
     }
 
-    /// **M5**: build initial actor world with chassis attachment using the
     /// engine's configured tick_rate_hz so chassis eject windows are real-time
     /// stable.
     pub fn from_scenario_with_tick_rate(scenario: &Scenario, tick_rate_hz: u32) -> Self {
@@ -319,7 +292,6 @@ pub(crate) use crate::engine_helpers::{
     ToolValidityUpdate, M14_SAVE_EXTENSION_KEY,
 };
 
-/// **M14B** § per-actor snapshot consumed by `tick_m14b` to compute
 /// gravity + wind force corrections without holding the read lock.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct M14bActorSnapshot {
@@ -331,7 +303,6 @@ pub(crate) struct M14bActorSnapshot {
     pub(crate) velocity: [f32; 2],
 }
 
-/// **M15B § AmbientWorld inference** — derive the precipitation cycle's
 pub(crate) use crate::engine_m15::{
     build_heat_field_from_atmosphere, infer_ambient_world_from_scenario_id,
     inject_thermal_sources_and_diffuse, u16_slice_to_bytes,
@@ -406,14 +377,11 @@ impl M0EngineConfig {
             initial_reinforcement_waves: Vec::new(),
             initial_boss_state: None,
             initial_objective_graph: None,
-            // **M4B § "Delta baseline cadence is enforced"** — default 600
             // ticks (10 s @ 60 Hz) per spec.
             delta_baseline_cadence_ticks: cf_save::delta::DEFAULT_BASELINE_CADENCE_TICKS,
-            // **M4B § "Tamper-evident competitive replays"** — chain mode is
             // OFF by default for dev runs. Tournament mode opts in via cf-app
             // / cfctl `--ledger-chain` / `--tournament-mode`.
             ledger_chain_enabled: false,
-            // **M14B** § empty by default; scenarios opt in by declaring
             // gravity_overrides / wind_sources / atmosphere_cells in the
             // manifest.
             initial_gravity_overrides: Vec::new(),
@@ -421,19 +389,15 @@ impl M0EngineConfig {
             initial_atmosphere_cells: Vec::new(),
             initial_stratification_cells: Vec::new(),
             initial_scripted_steps: Vec::new(),
-            // **M14D** § empty by default; scenarios opt in by declaring
             // `m14d_projectile_pool[]` / `m14d_replay_intercepts` in the
             // manifest.
             initial_m14d_projectile_pool: Vec::new(),
             initial_replay_intercepts: false,
-            // **M14E** § empty by default; scenarios opt in by declaring
             // `m14e_tunnel_spans[]` and (optionally) `m14e_cave_in_seed_offset`.
             initial_m14e_tunnel_spans: Vec::new(),
             initial_m14e_cave_in_seed_offset: 0,
-            // **M14F § VAL-M14F-016**: empty by default; the M14F
             // scenarios declare `m14f_lateral_wall_spans[]`.
             initial_m14f_lateral_wall_spans: Vec::new(),
-            // **M14G § VAL-M14G-013/014/029/030**: empty by default;
             // scenarios opt in by declaring `m14g_thermal_zones[]`
             // and `m14g_material_contacts[]`.
             initial_m14g_thermal_zones: Vec::new(),
@@ -450,7 +414,6 @@ impl M0EngineConfig {
         cfg.duration_ticks = scenario.duration_ticks.unwrap_or(0);
         // M1 Seam S2: forward scenario.tutorial_safety into the engine config.
         cfg.tutorial_safety = scenario.tutorial_safety;
-        // **M1.5 G6**: forward the scenario's difficulty preset id into the
         // engine config so the engine can apply the preset at spawn time.
         cfg.difficulty_preset = scenario.difficulty_preset.clone();
         cfg.expected_tests = if scenario.expected_tests.is_empty() {
@@ -487,7 +450,6 @@ impl M0EngineConfig {
                 });
             }
         }
-        // **M6**: build initial squad roster from `ScenarioActor.squad_role`.
         for actor in &scenario.actors {
             if let Some(role_str) = actor.squad_role.as_deref() {
                 let role = match role_str.to_ascii_lowercase().as_str() {
@@ -553,7 +515,6 @@ impl M0EngineConfig {
             cfg.initial_reactors = scenario.reactors.iter().map(|r| r.build_reactor()).collect();
             cfg.milestone = "m2.5".to_string();
         }
-        // **M5**: any actor with a chassis attached bumps the milestone tag to m5
         // so run bundles produced by chassis scenarios route into the m5_* slot
         // under prototype_runs/native/.
         if scenario.actors.iter().any(|a| a.chassis.is_some()) {
@@ -568,7 +529,6 @@ impl M0EngineConfig {
                 cfg.milestone = trimmed.to_lowercase();
             }
         }
-        // **M7 director v0.5 (audit gaps A12-A17)**: propagate the v0.5
         // mission director fields from the scenario manifest into the
         // engine config so `M0Engine::new` can seed `M7AiWorld` with
         // phase pacing + reinforcement waves + boss state + objective
@@ -584,7 +544,6 @@ impl M0EngineConfig {
         if let Some(graph) = &scenario.objective_graph {
             cfg.initial_objective_graph = Some(graph.build_graph());
         }
-        // **M14B** § gravity field + wind force + atmosphere cells. Build
         // cf-physics + cf-atmos types from the scenario manifest's
         // `gravity_overrides[]` / `wind_sources[]` / `atmosphere_cells[]`
         // arrays. Empty arrays = pass-through (no overrides).
@@ -592,9 +551,7 @@ impl M0EngineConfig {
         cfg.initial_wind_sources = scenario.wind_sources.iter().map(build_wind_source).collect();
         cfg.initial_atmosphere_cells = scenario.atmosphere_cells.iter().map(build_atmos_cell).collect();
         cfg.initial_stratification_cells = scenario.atmosphere_cells.iter().map(build_strat_cell).collect();
-        // **M14C** § propagate the scenario's scripted director steps.
         cfg.initial_scripted_steps = scenario.scripted_steps.clone();
-        // **M14D** § propagate the scenario's projectile-pair pool +
         // replay_intercepts setting.
         cfg.initial_m14d_projectile_pool = scenario
             .m14d_projectile_pool
@@ -602,12 +559,10 @@ impl M0EngineConfig {
             .map(build_m14d_projectile_snapshot)
             .collect();
         cfg.initial_replay_intercepts = scenario.m14d_replay_intercepts;
-        // **M14E** § propagate the scenario's tunnel spans + cave-in seed
         // offset so the per-tick collapse-check pass seeds correctly.
         cfg.initial_m14e_tunnel_spans = scenario.m14e_tunnel_spans.clone();
         cfg.initial_m14e_cave_in_seed_offset = scenario.m14e_cave_in_seed_offset;
         cfg.initial_m14f_lateral_wall_spans = scenario.m14f_lateral_wall_spans.clone();
-        // **M14G § VAL-M14G-013/014/029/030**: propagate the scenario's
         // thermal-contact + material-contact fixtures so the engine's
         // per-tick environmental + chemistry passes have something to
         // chew on.
@@ -759,11 +714,9 @@ pub struct M0Engine {
     pub(crate) started_at: DateTime<Utc>,
     pub(crate) started_instant: Instant,
     pub(crate) run_bundle_dir: PathBuf,
-    /// **M1 R2**: pluggable audio backend. M1 default is `NullAudioPlugin`
     /// (no-op + tracing). cf-app or cf-tools-replay-viewer install their own
     /// implementation via `set_audio_plugin` to play real sound.
     pub(crate) audio_plugin: std::sync::Mutex<Box<dyn cf_audio::AudioPlugin>>,
-    /// **M4B § "observe.save.last returns last save metadata"** — shared
     /// snapshot of the last quicksave / quickload / migrate operation.
     /// Updated by the cf-app F5/F9 path + `cfctl save quicksave/quickload`.
     pub(crate) last_save_cache: Arc<crate::m4b_save::LastSaveCache>,
@@ -815,14 +768,11 @@ pub(crate) struct EngineMutable {
     /// raised_at_tick FIFO. Replay events are NOT re-derived from the queue;
     /// they live in `events.jsonl`.
     pub(crate) hud_banners: VecDeque<crate::state::HudBannerView>,
-    /// **M4B § "Delta baseline cadence is enforced"** — last snapshot we
     /// captured (used as the diff base for the next delta).
     pub(crate) m4b_previous_snapshot: Option<serde_json::Value>,
-    /// **M4B**: event_id of the most recent `snapshot.baseline_emitted`.
     /// Stamped onto each subsequent `snapshot.delta_emitted` so the
     /// reconstructor can chain them back.
     pub(crate) m4b_last_baseline_event_id: Option<String>,
-    /// **M4B**: tick at which the most recent baseline was emitted.
     pub(crate) m4b_last_baseline_tick: Option<u64>,
     /// M4A: captions queue (audio-bound events surfaced as text). Drains FIFO
     /// at `M4A_CAPTION_BUFFER`. The HUD draws the most recent N entries when
@@ -837,16 +787,13 @@ pub(crate) struct EngineMutable {
     /// M4A: previous tick's mission result, used to detect mission_resolved
     /// transitions for banner emission.
     pub(crate) hud_last_mission_result: Option<String>,
-    /// **M1 / Gap D**: controls-captured state. `Some(capturer)` while an
     /// overlay holds input; the CONTROLS CAPTURED HUD zone renders and all
     /// `act.player.*` dispatches reject with reason `controls_captured`.
     pub(crate) controls_captured_by: Option<String>,
-    /// **M14 audit pass 2 (GAP-M4-02 HIGH fix)**: latched true when
     /// `act.player.abort` succeeds. `record_run_finished` reads this to
     /// emit `system.run_finished.outcome="abort"` per M4 § Expected
     /// outcome + system events (previously hardcoded clean/panic only).
     pub(crate) run_aborted: bool,
-    /// **M1 / Gap C2**: projectile_id -> spawn_event_id map persisted across
     /// ticks so when a projectile hits N ticks after spawn, the
     /// `combat.projectile_hit` event can parent to its originating
     /// `combat.projectile_spawned` event (closing the cause chain back to
@@ -854,7 +801,6 @@ pub(crate) struct EngineMutable {
     /// pruned when the projectile reaches `combat.projectile_hit` or
     /// `combat.projectile_expired` to keep the map bounded.
     pub(crate) projectile_spawn_event_ids: BTreeMap<u64, String>,
-    /// **M14C** § per-projectile round-kind discriminator. Populated at
     /// `combat.projectile_spawned` time (from
     /// `cf_actor::sim::SpawnedProjectile::round_kind`) and read by the
     /// `emit_m14_penetration_ray` helper to route HEAT / APFSDS impacts
@@ -863,17 +809,14 @@ pub(crate) struct EngineMutable {
     /// Pruned alongside `projectile_spawn_event_ids` after the projectile
     /// is resolved.
     pub(crate) projectile_round_kinds: BTreeMap<u64, cf_equipment::RoundKind>,
-    /// **M1.5 forward-hook (Seam S1)**: latched by damage events so the
     /// next ReactiveGuard tick treats the damaged actor as a perception
     /// trigger. No consumer at M1; M1.5 ai layer reads it.
     #[allow(dead_code)]
     pub(crate) force_ai_update_this_tick: bool,
-    /// **M1.5 G2 (hearing)**: alarms collected during the previous tick's
     /// actor step. The current tick's AI loop consumes these so guard
     /// hearing reacts ≤1 tick after the player's `equipment.alarm_registered`
     /// fires. Cleared after each AI loop.
     pub(crate) pending_alarms: Vec<cf_ai::AlarmInput>,
-    /// **M1.5 G2 (hearing) staging**: alarms produced by THIS tick's actor
     /// step; promoted to `pending_alarms` at end-of-tick so they're
     /// available to the next tick's AI loop. Two-stage so AI never reads
     /// half-collected alarms mid-tick.
@@ -883,205 +826,155 @@ pub(crate) struct EngineMutable {
     /// `HUD_FOCUSABLE_NODES` list; observe.accessibility surfaces it.
     pub(crate) hud_focus_index: Option<usize>,
     pub(crate) hud_focus_cycle: u64,
-    /// **M9**: timer-warning thresholds already emitted this mission run
     /// (de-duplicated; each threshold fires exactly once per
     /// `TIMER_WARNING_THRESHOLDS_S`). Cleared on scenario reset.
     pub(crate) m9_timer_warnings_emitted: BTreeMap<u32, bool>,
-    /// **M9**: per-actor concussion dose accumulator (0..=100) for the
     /// concussion band machine. Applied by combat hits + explosions.
     /// Decay/recovery happens via `m9_tick_concussion_recovery`.
     pub(crate) m9_concussion_dose: BTreeMap<ActorId, f32>,
-    /// **M9**: per-actor last-seen concussion band so band crossings emit
     /// exactly once per transition.
     pub(crate) m9_concussion_band: BTreeMap<ActorId, &'static str>,
-    /// **M9**: per-actor concussion recovery countdown (ticks). Reset on
     /// every dose application; ticks down to zero before recovery starts.
     pub(crate) m9_concussion_recovery_lockout_ticks: BTreeMap<ActorId, u32>,
-    /// **M5**: previous tick's chassis stage on the player actor (used to
     /// raise stage-change banners without scanning the event log).
     pub(crate) hud_last_chassis_stage: Option<cf_chassis::ChassisStage>,
-    /// **M5**: previous tick's pilot state.
     pub(crate) hud_last_pilot_state: Option<cf_chassis::PilotState>,
-    /// **M1.5**: latest `input.intent_received` event_id from the player.
     /// Used as the `show_me_why_event_id` anchor on
     /// `mission.mission_resolved` when result=lost (DR-023 onboarding
     /// handoff — M3B viewer rewinds to this tick).
     pub(crate) last_player_input_event_id: Option<String>,
-    /// **M2 re-audit pass 4 (2026-05-13)**: most-recent
     /// `actor.actor_status_changed` event id for the player actor. Used as
     /// `parent_event_id` on `mission.mission_resolved` when the loss path
     /// is `PlayerDead` so M10's cause-chain walker can hop
     /// `mission_resolved → actor_status_changed(player DYING) → projectile_hit → ...`.
     /// None until the first player status_changed fires.
     pub(crate) last_player_status_event_id: Option<String>,
-    /// **M2**: current material-overlay mode for the HUD legend + render
     /// layer. One of "off" | "integrity" | "pathability" | "mobility" |
     /// "hazard" | "build_repair". Default "off".
     pub(crate) material_overlay_mode: String,
-    /// **M2**: total debris pixels spawned (cumulative across the run).
     /// Surfaced via `observe.terrain.total_debris_spawned`.
     pub(crate) total_debris_spawned: u64,
-    /// **M2**: total carve events emitted (cumulative). Distinct from
     /// `chunked_terrain.carve_count` (which counts terrain-state carves —
     /// `total_carve_events` counts every emitted carve event including
     /// strip + chunked).
     pub(crate) total_carve_events: u64,
-    /// **M2**: last hazard contact tick per actor — used to debounce the
     /// per-tick hazard damage event to one per actor.
     pub(crate) hazard_last_contact_tick: BTreeMap<ActorId, u64>,
-    /// **M2 re-audit (2026-05-13)**: id of the latest `mission.mission_started`
     /// event, used as parent for the first batch of `mission.objective_started`
     /// emissions per spec line 558 ("every event carries parent_event_id").
     pub(crate) mission_started_event_id: Option<String>,
-    /// **M2 re-audit (2026-05-13)**: per-objective `mission.objective_started`
     /// event id keyed by objective id. Used as parent for
     /// `mission.objective_updated`, `mission.objective_completed`,
     /// `mission.objective_failed` so the cause chain walks back to the
     /// origination event.
     pub(crate) mission_objective_started_event_ids: BTreeMap<String, String>,
-    /// **M4 § Parent-event-id cause chains**: most-recent `mission.*` event
     /// id, used as `parent_event_id` for snapshot re-emits at objective
     /// transitions (per spec literal "every event in {... snapshot_*} has
     /// parent_event_id"). Updated whenever any mission.* event fires.
     pub(crate) last_mission_event_id: Option<String>,
-    /// **M4 § ai cause chains**: per-actor most-recent `ai.state_changed`
     /// event id. Used as parent for `ai.tactic_chosen` events emitted when
     /// no fresh perception_signal fired this tick.
     pub(crate) last_ai_state_changed_by_actor: BTreeMap<ActorId, String>,
-    /// **M4 § system events**: most-recent `system.run_started` event id.
     /// Used as a fallback root parent when no other cause exists (per spec
     /// "the cause chain ... walks back to an `input.intent_received` or
     /// `system.run_started` root").
     pub(crate) run_started_event_id: Option<String>,
-    /// **M4 § system.critical_drop**: last reported gameplay drop count so
     /// the engine only emits a `system.critical_drop` event for the delta
     /// (not the full cumulative total) each tick.
     pub(crate) last_reported_dropped_gameplay: u64,
-    /// **M1 re-audit pass 4 (2026-05-13)**: per-actor `equipment.weapon_reload_started`
     /// event id, used as `parent_event_id` on the subsequent
     /// `equipment.weapon_reload_completed` so M10 viewers can walk the
     /// reload chain cleanly. Entry is inserted on reload_started and removed
     /// on reload_completed (so a cancelled reload doesn't strand a stale id).
     pub(crate) reload_started_event_id_by_actor: BTreeMap<ActorId, String>,
-    /// **M3 re-open (2026-05-13)**: per-tick coalesced dirty-region accumulator.
     /// Carve events push their dirty rects + source event ids here; the engine
     /// flushes ONE `terrain.terrain_dirty_region_batch` per tick at end of
     /// `drive_tick` with the merged rect list + all contributing source ids.
     /// See `specs/active/M3.md` § Re-opened gaps.
     pub(crate) pending_dirty_rects: Vec<PendingDirtyRect>,
-    /// **M3 re-open**: rolling counter of ticks where `unupdated_areas > 0`,
     /// used to trigger `terrain.forced_refresh_requested` after sustained
     /// load. Reset on any tick with `unupdated_areas == 0`.
     pub(crate) sustained_unupdated_ticks: u32,
-    /// **M3 audit pass 7 (2026-05-13)**: monotonic path-invalidation version
     /// counter. Bumped every time `flush_pending_dirty_batch` produces a
     /// non-empty `out_rects[]`. Carried on `terrain.path_invalidated`
     /// events so M22+ pathfinder consumers can detect cache invalidation.
     pub(crate) path_invalidation_version: u64,
-    /// **M3 re-open**: cumulative coalesce cost samples (ticks where a batch
     /// was emitted). Surfaced via `summary.json.perf.terrain` at run close.
     pub(crate) perf_coalesce_samples: Vec<u32>,
     pub(crate) perf_coalesce_rects_in_total: u64,
     pub(crate) perf_coalesce_rects_out_total: u64,
-    /// **M6**: squad-of-two state surfaced by `observe.squad`. Empty by
     /// default — populated by scenarios that declare a friendly bot. See
     /// `cf_squad::Squad` for the canonical shape.
     pub(crate) squad: cf_squad::Squad,
-    /// **M6**: per-actor in-flight weapon swap state. A swap starts on
     /// `act.player.weapon_swap` and ticks here until completion, when the
     /// engine emits `equipment.weapon_swap_completed` and removes the entry.
     pub(crate) weapon_swap_state: BTreeMap<ActorId, cf_equipment::WeaponSwap>,
-    /// **M6**: last-emitted stamina value per actor for change-detection
     /// throttling. Stamina is only re-emitted when the value moves by more
     /// than `M6_STAMINA_EMIT_DELTA` to keep replay volume bounded.
     pub(crate) m6_last_stamina_emit: BTreeMap<ActorId, f32>,
-    /// **M6**: last-emitted stealth-meter value per actor. Stealth meter is
     /// only re-emitted when the band (Hidden / Risky / Spotted) changes.
     pub(crate) m6_last_stealth_band: BTreeMap<ActorId, u8>,
-    /// **M6**: last-emitted weight-bucket per actor (0 = under threshold,
     /// 1 = above). Toggling emits an `inventory.weight_changed` event.
     pub(crate) m6_last_weight_bucket: BTreeMap<ActorId, bool>,
-    /// **M6B**: last-emitted discrete encumbrance band per actor
     /// (`None` / `Light` / `Moderate` / `Heavy`). Transitions emit
     /// `inventory.encumbrance_threshold_crossed`.
     pub(crate) m6b_last_encumbrance_band: BTreeMap<ActorId, cf_equipment::EncumbranceBand>,
-    /// **M6**: per-actor footstep cadence accumulator (ticks since last
     /// emitted `perception.footstep_emitted`). Prevents replay spam.
     pub(crate) m6_footstep_cooldown: BTreeMap<ActorId, u32>,
-    /// **M6**: in-flight grenade projectiles thrown via
     /// `act.player.throw_grenade`. The tick scheduler advances each one
     /// under gravity + collision and emits
     /// `equipment.grenade_detonated` at fuse=0.
     pub(crate) grenade_projectiles: Vec<GrenadeProjectile>,
-    /// **M6**: in-flight knife projectiles thrown via
     /// `act.player.knife_throw`. The tick scheduler advances each one
     /// under physics and emits `combat.knife_throw_landed` on collision.
     pub(crate) knife_projectiles: Vec<cf_equipment::KnifeProjectile>,
-    /// **M6**: latched-per-actor previous `FacingDirection`, used by the
     /// engine to emit `actor.facing_changed` only on flips (not every tick).
     pub(crate) m6_last_facing: BTreeMap<ActorId, cf_actor::FacingDirection>,
-    /// **M6**: persistent map markers dropped via the Beacon tool. Each
     /// entry is (owner_id, position). Surfaced via observe.squad for the
     /// HUD; consumed by future M7 mission director when waypoints route
     /// AI.
     pub(crate) m6_beacons: Vec<(ActorId, cf_actor::Vec2)>,
-    /// **M6**: physically-dropped items in the world. Created by
     /// `act.player.drop_item`, consumed by `act.player.pickup`. Each item
     /// carries the actor that dropped it, the item id (rifle preset or
     /// material id), the position, and the slot the dropping inventory
     /// originally held it in.
     pub(crate) m6_dropped_items: Vec<DroppedItem>,
-    /// **M6**: monotonic id counter for dropped items.
     pub(crate) m6_next_dropped_item_id: u64,
-    /// **M6**: per-actor latch consumed by `emit_actor_events` so a Charge-mode
     /// release whose `charge_fraction < SNIPER_MISFIRE_BELOW` annotates the
     /// `equipment.weapon_fired` event with `misfire=true`. Drained each tick
     /// after the recorder reads it.
     pub(crate) m6_charge_misfires: BTreeMap<ActorId, ChargeFireInfo>,
-    /// **M7-A**: smart commandable AI surface — per-actor BotState
     /// (Archetype + 5-layer ThinkingStack + auto-triage/auto-repair
     /// missions), faction registry, 4-phase mission director, reinforcement
     /// registry, mini-boss state. Co-resident with M2 `reactive_guards`:
     /// the M2 guard FSM still drives projectile / fire behavior; M7-A
     /// adds the reason-label + role-template surface on top.
     pub(crate) m7_ai_world: crate::m7_ai::M7AiWorld,
-    /// **M7B**: deep squad-command grammar surface — per-squad
     /// `SquadState` (current verb + formation + role assignments +
     /// breach-chain progress + bounding-step state) + verb registry +
     /// doctrine-compatibility matrix. Lives on the squad NOT on the held
     /// actor so brain-hop preserves doctrine.
     pub(crate) m7b_squad: crate::m7b_squad::M7BSquadWorld,
-    /// **M8**: smooth-follow + hit-stop + scope + free-look camera state.
     pub(crate) camera_state: cf_camera::CameraState,
-    /// **M8**: photo mode (basic stub) state machine + filter + free camera.
     pub(crate) photo_mode: cf_photo::PhotoModeState,
-    /// **M8**: replay-scrubber 30s window + bookmarks.
     pub(crate) replay_scrub: cf_replay_scrub::ReplayScrubState,
-    /// **M8**: killcam state machine (Idle / Recording / Playing / Done) +
     /// 1.5s slow-mo cinematic variant.
     pub(crate) killcam: cf_killcam::KillcamState,
-    /// **M8**: cf-debug overlay registry (which of the 7 overlays are
     /// currently rendered).
     pub(crate) debug_state: cf_debug::DebugOverlayState,
-    /// **M8**: Tab tactical overlay state (open + sim-speed cap +
     /// focused actor + open count).
     pub(crate) tactical_overlay: cf_squad_ui::TacticalOverlayState,
-    /// **M8**: per-bot tactical plan queue (Plan Composer).
     pub(crate) plans: BTreeMap<ActorId, cf_squad_ui::Plan>,
-    /// **M8**: MMB tag state — tagged target ids + per-tag TTL + +0.5
     /// utility weight bonus.
     pub(crate) tag_state: cf_squad_ui::TagState,
-    /// **M8**: T-key pie menu state — 8-slice radial action wheel for
     /// the player's own 8 actor actions (Pickup / Drop / SwitchWeapon /
     /// ThrowGrenade / MeleeBash / DeployBipod / SignalSquad / UseMedkit)
     /// with target context + 6 disabled-slice reason labels + sim
     /// slowdown gate (single-player 20%, multiplayer 100%).
     pub(crate) pie_menu: cf_squad_ui::PieMenuState,
-    /// **M8**: en localization table loaded once from the bundled
     /// `content/localization/en.json` baseline. Re-loaded if `Settings.
     /// language` changes (only `en` ships at M8).
     pub(crate) localization: cf_localization::LocalizationTable,
-    /// **M8 game_speed_assist consumer**: deterministic tick-skip
     /// accumulator. Each [`M0Engine::drive_tick`] call adds the
     /// effective sim-speed percentage (0..=100) to this counter; the
     /// sim advances only when the counter reaches 100, then 100 is
@@ -1094,7 +987,6 @@ pub(crate) struct EngineMutable {
     /// "the pie menu can stack with game_speed_assist; whichever is
     /// more restrictive wins").
     pub(crate) game_speed_accumulator: u16,
-    /// **M8 game_speed_assist consumer**: true when the engine is
     /// hosting a networked multiplayer session (M36+). `game_speed_
     /// assist` is single-player-only per spec, so the per-tick
     /// scheduler treats this flag as a kill-switch: multiplayer
@@ -1103,19 +995,16 @@ pub(crate) struct EngineMutable {
     /// exist yet); the persistent setter is reserved for the M36+
     /// scenario loader.
     pub(crate) multiplayer_session: bool,
-    /// **M9B**: live trench-segment placement index. Mutated by
     /// `act.player.dig_trench_segment`, `act.player.place_trench_module`,
     /// and `act.player.drop_trench_template`; consumed by
     /// `compute_actor_cover_state` + `compute_trench_segment_at_pos`
     /// so the observe surfaces project real per-segment state instead
     /// of always-empty placeholders.
     pub(crate) trench_world: cf_trench::segment::InMemorySegments,
-    /// **M9B**: monotonic id counter for placed trench segments.
     /// Replay events reference segments via this id so the cause
     /// chain stays linear across dig → place_module → repair_module
     /// → breach → collapse.
     pub(crate) trench_next_segment_id: u64,
-    /// **M9B audit GAP-1**: per-actor latched cover state + segment
     /// variant. Used by `tick_m9b_cover_state_changes` to detect
     /// per-tick transitions and emit `trench.cover_state_changed`.
     /// The stored tuple is `(prev_cover_state, prev_segment_variant,
@@ -1130,261 +1019,199 @@ pub(crate) struct EngineMutable {
             cf_trench::TrenchStance,
         ),
     >,
-    /// **M9B audit GAP-2**: per-actor exposure tick counter for the
     /// `AI-TRENCH-A-01` doctrine. Increments while the actor remains
     /// in `CoverState::Exposed`; resets on any other cover state. The
     /// doctrine reads this to enforce the spec's "no AI remains
     /// Exposed continuously > 1.5 seconds" invariant.
     pub(crate) m9b_trench_doctrine_exposure_ticks: BTreeMap<ActorId, u32>,
-    /// **M9B audit GAP-2**: opt-in set of actor ids the engine drives
     /// through the trench doctrine each tick. Currently populated by
     /// the scenario loader when a reactive_guard entry carries
     /// `doctrine: Some("AI-TRENCH-A-01")` in its scenario RON; the
     /// scenario `m9b_ai_in_trench_doctrine` opts in its three
     /// defenders.
     pub(crate) m9b_trench_doctrine_actors: std::collections::BTreeSet<ActorId>,
-    /// **M12C**: in-engine cinematic playback kernel. `Some` while a
     /// cinematic is playing (opening / between-mission / ending);
     /// `None` when the gameplay camera + input are in normal control.
     /// cfctl `act.player.skip_cinematic`, `act.player.pause_cinematic`,
     /// `act.player.replay_cinematic`, and `srv.dump_cinematic_state`
     /// operate on this slot.
     pub(crate) cinematic_kernel: Option<cf_cinematic::CinematicKernel>,
-    /// **M12C**: persisted seen-set of cinematics the player has
     /// watched (or skipped past the 3-second confirm window). Lives
     /// here at M12C; M41 save format will persist it to `save.cinematic_seen_set`.
     pub(crate) cinematic_seen_set: cf_cinematic::SeenSet,
-    /// **M12C**: LUFS-aware narration/music/SFX duck mixer. Engaged
     /// when a cinematic kernel boots; releases at `cinematic.ended`.
-    /// Per spec § "Cinematic mixer ducks music under narration".
     pub(crate) cinematic_mixer: cf_audio::CinematicMixer,
-    /// **M12C**: snapshot of the renderer-side camera takeover state
     /// (mirrors the cinematic kernel's composed offset). cf-app's
     /// bridge polls this via `engine.cinematic_takeover_snapshot()`.
     pub(crate) cinematic_takeover: cf_cinematic::CinematicTakeoverSnapshot,
-    /// **M12C**: `cinematic.rival_taunt` 40% deterministic gate per
     /// spec § Between-mission cinematic. Drained per between-mission
     /// engage; the M25 hook will fold real rival-alive state into this
     /// roll when it ships.
     pub(crate) cinematic_rival_taunt_roll: u8,
-    /// **M14B** § gravity field producer state. Authored by the scenario
     /// manifest's `gravity_overrides[]` array; consumed by per-tick
     /// `cf_physics::apply_overrides` calls.
     pub(crate) m14b_gravity_overrides: Vec<cf_physics::GravityOverride>,
-    /// **M14B** § wind force producer apertures.
     pub(crate) m14b_wind_sources: Vec<cf_atmos::WindSource>,
-    /// **M14B** § authored atmosphere cells (pressure + temperature). Drives
     /// the wind force kernel + observe.frame.cells projection.
     pub(crate) m14b_atmos_cells: Vec<cf_atmos::AtmosCell>,
-    /// **M14B** § gas-stratification cells (per-column composition). Runs
     /// every 4th tick per the spec.
     pub(crate) m14b_strat_cells: Vec<cf_atmos::StratCell>,
-    /// **M14C** § scripted director steps loaded from the scenario manifest's
     /// `scripted_steps` array. `drive_tick` injects matching intents into
     /// `pending_intent` before the actor sim runs so headless cfctl drives
     /// of `m14c_heat_vs_era.ron` / `m14c_apfsds_vs_heavy.ron` actually fire
     /// the HEAT / APFSDS round at a deterministic tick (rather than no-op).
     pub(crate) m14c_scripted_steps: Vec<crate::scenario::ScenarioScriptStep>,
-    /// **M14D** § projectile-pair pool consumed by
     /// `cf_physics::run_projectile_pair_pass` between the actor-collision
     /// pass and the terrain pass. Authored at scenario load + advanced
     /// each tick. Empty by default (pre-M14D scenarios behave identically).
     pub(crate) m14d_projectile_pair_pool: Vec<cf_physics::ProjectileSnapshot>,
-    /// **M14D § VAL-M14D-020** per-tick projectile-pair pass invocation
     /// counter. Incremented once per call to
     /// [`M0Engine::tick_m14d_projectile_pair`]. Exposed via the
     /// schedule-trace accessor for the `pass_called_once_per_tick` test.
     pub(crate) m14d_pair_pass_invocations: u64,
-    /// **M14D § VAL-M14D-008/009/010** rolling trace of the per-tick pair
     /// pass timing + candidate counts surfaced to perf tests.
     pub(crate) m14d_last_pair_pass_trace: cf_physics::ProjectilePairPassTrace,
-    /// **M14D § VAL-M14D-019** per-player `replay_intercepts` setting.
     /// Default false — killcam excludes `collision.projectile_pair_contact`
     /// events unless the player opts in.
     pub(crate) m14d_replay_intercepts: bool,
-    /// **M14D § VAL-M14D-006** C-RAM cooldown latches keyed by APS
     /// laser `owner_actor_id`. Engaged on every
     /// `collision.projectile_pair_contact{outcome="aps_intercept"}`
     /// event and decayed by [`cf_equipment::Cram::tick`] each
     /// projectile-pair pass. Empty by default; an entry materialises
     /// the first time a given owner fires an intercept.
     pub(crate) m14d_cram_cooldowns: BTreeMap<u64, cf_equipment::Cram>,
-    /// **M14D § VAL-M14D-020** schedule-trace ordered window. Records
     /// each pass entry ("actor_collision_start", "projectile_pair_start",
     /// "terrain_start", ...) for the most recent N ticks so the engine
     /// integration test can assert ordering. Capped at 120 entries.
     pub(crate) m14d_schedule_trace: std::collections::VecDeque<&'static str>,
-    /// **M14B** § per-(actor, override) activation latch. Used by the
     /// per-tick step to emit `gravity.override_activated` only on entry +
     /// `gravity.override_deactivated` only on exit. The inner BTreeSet
     /// holds the override ids currently active for the actor; the outer
     /// map is keyed by actor id.
     pub(crate) m14b_active_overrides: BTreeMap<ActorId, std::collections::BTreeSet<u32>>,
-    /// **M14B** § per-WindSource remaining TTL in ticks. Used for
     /// transient apertures (pipe ruptures) spawned via
     /// [`Self::inject_pipe_rupture`]. Each tick the value decrements; on
     /// reaching zero the WindSource + its synthetic atmosphere cells are
     /// removed.
     pub(crate) m14b_transient_wind_ttl: BTreeMap<u32, u32>,
-    /// **M14B** § synthetic atmosphere-cell ids that were spawned by
     /// transient wind sources (pipe ruptures). Used to clean up the
     /// atmosphere cell list when the parent WindSource expires.
     pub(crate) m14b_transient_cells: Vec<u32>,
-    /// **M14E** § per-chunk integrity-field state authored by the
     /// scenario manifest's `m14e_tunnel_spans[]` array. Indexed by chunk
     /// coordinate; each entry tracks the current integrity field + the
     /// cached span_px + anchored flag the per-tick pass consumes.
     pub(crate) m14e_chunks: BTreeMap<(i32, i32), M14eChunkState>,
-    /// **M14E** § integrity-pass invocation count (incremented exactly
     /// once per N-tick boundary). Exposed via the schedule-trace
     /// accessor for the `compute_integrity_pass_runs_every_15_ticks`
     /// VAL-M14E-019 test.
     pub(crate) m14e_pass_invocations: u64,
-    /// **M14E** § deterministic RNG cursor for the cave-in roll. Seeded
     /// from `scenario.seed + m14e_cave_in_seed_offset`; advances on every
     /// cave-in roll regardless of outcome so the draw sequence is stable
     /// across same-seed runs.
     pub(crate) m14e_rng_state: u64,
-    /// **M14E** § knockdown latch keyed by actor id. Set when a cave-in
     /// debris impulse routes through `cf_physics::cave_in_fall_impulse_chain`
     /// and forces the actor into KnockedDown.
     pub(crate) m14e_actor_knockdown: BTreeMap<u64, bool>,
-    /// **M14E** § last-tick at which a chunk fired
     /// `terrain.cave_in_triggered`. Drives the 15-tick cascade window
     /// per VAL-M14E-018.
     pub(crate) m14e_last_cave_in_tick: BTreeMap<(i32, i32), u64>,
-    /// **M14E** § total cumulative number of `terrain.cave_in_triggered`
     /// events emitted (used for replay summary + cross-tick assertions).
     pub(crate) m14e_total_cave_ins: u32,
-    /// **M14E** § cumulative `terrain.support_beam_placed` event count.
     pub(crate) m14e_total_beams_placed: u32,
-    /// **M14E** § cumulative `terrain.support_beam_destroyed` event count.
     pub(crate) m14e_total_beams_destroyed: u32,
-    /// **M14E** § render-side queue mirroring the L1/L2/L3 crack decals +
     /// falling-debris cones the per-tick collapse-check pass produces.
     /// `cf-app` drains this every frame; headless runs let it grow up to a
     /// soft cap (see `drain_*`).
     pub(crate) m14e_tunnel_collapse_queue: cf_render_2d::tunnel_collapse::TunnelCollapseQueue,
-    /// **M14E** § total `cf-audio::AudioCue::TunnelCreak` cues enqueued
     /// (the engine surfaces these via `emit_audio_cue` already; we still
     /// keep a counter for cross-tick test assertions).
     pub(crate) m14e_tunnel_creak_count: u32,
-    /// **M14E** § total `cf-audio::AudioCue::CaveInThunder` cues enqueued.
     pub(crate) m14e_cave_in_thunder_count: u32,
-    /// **M14E** § per-actor crafting resource ledger (iron, wood, etc.).
     /// Used by the support-beam placer's inventory-debit path so VAL-M14E-009
     /// can assert the post-placement delta.
     pub(crate) m14e_actor_resources: BTreeMap<u64, BTreeMap<String, i64>>,
-    /// **M14E** § per-actor plasma-cutter use flag (drives the
     /// "VIBRATION ACCUMULATING" HUD banner per VAL-M14E-015).
     pub(crate) m14e_plasma_cutter_active: BTreeMap<u64, bool>,
-    /// **M14F** § per-chunk lateral-wall runtime state keyed by chunk
     /// coord. Authored by `m14f_lateral_wall_spans[]` in the scenario
     /// manifest. The per-chunk `IntegrityField` is borrowed from the
     /// shared `m14e_chunks` map per VAL-CROSS-005 — this map only
     /// tracks the lateral-axis metadata + per-tier emission flags.
     pub(crate) m14f_lateral_chunks: BTreeMap<(i32, i32), M14fLateralChunkState>,
-    /// **M14F § VAL-M14F-016**: lateral integrity pass invocation
     /// count. Equal to `floor(T / 15)` after T ticks.
     pub(crate) m14f_lateral_pass_invocations: u64,
-    /// **M14G § VAL-M14G-046**: total invocations of the wound-aging
     /// pass. Equal to the number of engine ticks since boot (one
     /// invocation per tick).
     pub(crate) m14g_wound_aging_invocations: u64,
-    /// **M14G**: per-engine WoundSpec registry, populated lazily from the
     /// baked defaults on first use so cf-control does not need to read
     /// content files at engine boot.
     pub(crate) m14g_wound_registry: Option<cf_wound::WoundSpecRegistry>,
-    /// **M14G § VAL-M14G-013/014/030**: thermal-contact zones authored
     /// by the scenario manifest. The engine ticks the dwell counter
     /// per `(actor_id, zone)` every tick.
     pub(crate) m14g_thermal_zones: Vec<crate::scenario::ScenarioThermalZone>,
-    /// **M14G**: per-`(actor_id, zone)` dwell-tick counter for the
     /// thermal pass.
     pub(crate) m14g_thermal_dwell_ticks: BTreeMap<(u64, String), u64>,
-    /// **M14G**: latch the most-recently emitted burn/frostbite degree
     /// per `(actor_id, zone)` so the producer fires escalation events
     /// only when the degree actually changes.
     pub(crate) m14g_thermal_emitted_kind: BTreeMap<(u64, String), cf_wound::WoundKind>,
-    /// **M14G § VAL-M14G-029**: material-contact entries authored by
     /// the scenario manifest. Each entry fires one `wound.created`
     /// event on its `fire_tick`.
     pub(crate) m14g_material_contacts: Vec<crate::scenario::ScenarioMaterialContact>,
-    /// **M14G**: indices of `m14g_material_contacts` already fired,
     /// so the engine never emits the same contact twice.
     pub(crate) m14g_material_contacts_fired: std::collections::BTreeSet<usize>,
-    /// **M14I**: persistent veteran roster (cf-veteran). Snapshots the
     /// per-actor `LongTermState` for downstream M41 consumers (roster
     /// UI, narrative tab).
     pub(crate) m14i_veteran_roster: cf_veteran::VeteranRoster,
-    /// **M14I**: registry of pending retirement narratives. Populated
     /// when `act.player.retire_veteran` fires. M48 storyteller consumes
     /// the canonical `narrative.veteran_retired` event ids registered
     /// here.
     pub(crate) m14i_retirement_narratives:
         cf_storyteller::retirement_event::RetirementNarrativeRegistry,
-    /// **M14F § VAL-M14F-009**: per-actor flood-contact flag. Tick at
     /// which the actor was first registered as submerged / damp after
     /// a dam rupture.
     pub(crate) m14f_actor_submerged_tick: BTreeMap<u64, u64>,
-    /// **M14F § VAL-M14F-011**: per-actor vacuum-exposure tick. Tick
     /// at which the actor was first registered as exposed to vacuum
     /// after a sealed-room rupture.
     pub(crate) m14f_actor_vacuum_tick: BTreeMap<u64, u64>,
-    /// **M14F § VAL-M14F-007**: cumulative fluid-mass that propagated
     /// through the breach bbox per dam chunk. Increments each tick
     /// after rupture until the volume depletes.
     pub(crate) m14f_breach_fluid_mass: BTreeMap<(i32, i32), u64>,
-    /// **M14F § VAL-M14F-008**: pressure samples (room-side, vacuum-
     /// side) per sealed-room chunk. Updated each tick after rupture
     /// so the delta monotonically decreases toward equilibrium.
     pub(crate) m14f_breach_pressure_kpa: BTreeMap<(i32, i32), (f32, f32)>,
-    /// **M14J § verlet-rope world** — every embedded grapple line + zip-line
     /// cable in the scene, keyed by [`cf_physics::RopeId`]. The engine
     /// advances each rope each tick via `cf_physics::rope::Rope::step`.
     pub(crate) m14j_ropes: BTreeMap<cf_physics::RopeId, cf_physics::Rope>,
-    /// **M14J § rope-id allocator**. Bumped on every grapple embed +
     /// zip-kit deploy.
     pub(crate) m14j_next_rope_id: u64,
-    /// **M14J § zipline kind tag** — true entry means this rope is a
     /// deployed zip-line (not a grapple rope). The slide engine consults
     /// this to apply gravity-along-cable + brake-deceleration.
     pub(crate) m14j_zipline_ropes: std::collections::BTreeSet<cf_physics::RopeId>,
-    /// **M14J § zipline rider slide speed** — per-rider current speed
     /// along the cable (m/s, positive = toward low end).
     pub(crate) m14j_zipline_speed_by_rider: BTreeMap<u64, f32>,
-    /// **M15 § active material kernel** — per-tick orchestrator for
     /// the M15+M15B chemistry. When `chunked_terrain` is present, the
     /// engine calls `cf_material::kernel_step` each tick to drive
     /// per-pixel reactions, phase transitions, and CA movement. State
     /// lives here so the Margolus stepper parity persists across ticks.
     pub(crate) material_kernel: cf_material::MaterialKernel,
-    /// **M15 § reaction registry**. Loaded from
     /// `content/materials/reaction_registry.json` at engine init, or
     /// falls back to the hardcoded `default_reaction_registry` when
     /// the file isn't present.
     pub(crate) reaction_registry: cf_material::ReactionRegistry,
-    /// **M15 § phase-transition registry**. Loaded from
     /// `content/materials/phase_registry.json` at engine init.
     pub(crate) phase_registry: cf_material::PhaseRegistry,
-    /// **M15 § per-cell heat field**. Stub-initialized at ambient
     /// (293.15 K Earth baseline) until M19 atmospherics wires per-cell
     /// thermal sources. The kernel uses this for reaction temperature
     /// gating + phase-transition threshold crossing.
     pub(crate) heat_field: cf_terrain::HeatField,
-    /// **M15 § previous-tick heat snapshot**. Used to detect threshold
     /// crossings for phase transitions. `None` on the first tick.
     pub(crate) prev_heat_field: Option<cf_terrain::HeatField>,
-    /// **M15B § precipitation cycle**. Tracks per-cell cloud
     /// saturation, fires nucleation + precipitation events as steam
     /// pixels climb above the altitude/temperature gates.
     pub(crate) precipitation_cycle: cf_material::PrecipitationCycle,
-    /// **M15B § precipitation tuning config**. Loaded from
     /// `content/materials/precipitation_config.json` at engine init.
     pub(crate) precipitation_config: cf_material::PrecipitationConfig,
 }
 
-/// **M14F** § Per-chunk lateral-wall runtime state. Lives on
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the
 /// per-tier emission edges + the topology hook (mineshaft / dam /
 /// sealed_room) the lateral pass consumes on rupture.
@@ -1424,7 +1251,6 @@ pub(crate) struct M14fLateralChunkState {
     pub m14e_composite_cascade_allowed: bool,
 }
 
-/// **M14E** § Per-chunk integrity-field runtime state. Lives on
 /// `EngineState.m14e_chunks` keyed by chunk coord.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct M14eChunkState {
@@ -1477,7 +1303,6 @@ pub(crate) struct M14eChunkState {
     pub structural_warning_banner_emitted: bool,
 }
 
-/// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
 /// hook to `emit_actor_events`. `charge_fraction` is the latched accumulator
 /// at trigger release; `misfire` is true iff the fraction was below
 /// [`cf_equipment::SNIPER_MISFIRE_BELOW`].
@@ -1487,7 +1312,6 @@ pub(crate) struct ChargeFireInfo {
     pub misfire: bool,
 }
 
-/// **M6**: a physical item entity in the world. Spawned by
 /// `act.player.drop_item`; despawned by `act.player.pickup`.
 #[derive(Debug, Clone)]
 pub(crate) struct DroppedItem {
@@ -1501,7 +1325,6 @@ pub(crate) struct DroppedItem {
     pub original_slot: u8,
 }
 
-/// **M6**: one in-flight grenade projectile. Owned by the engine's
 /// `grenade_projectiles` vector and advanced each tick under gravity +
 /// collision. On fuse=0 the engine emits `equipment.grenade_detonated`
 /// and applies type-specific effects (Frag radius damage, Smoke hazard
@@ -1522,7 +1345,6 @@ pub(crate) struct GrenadeProjectile {
     pub stuck: bool,
 }
 
-/// **M6**: scratch struct passed from cfctl dispatch to the post-dispatch
 /// emission phase so the engine can spawn a thrown grenade after the
 /// write-guard is released.
 #[derive(Debug, Clone)]
@@ -1539,7 +1361,6 @@ pub(crate) struct PendingGrenadeSpawn {
     pub(crate) vision_disrupt: bool,
 }
 
-/// **M6**: scratch struct that captures the parameters of a melee strike
 /// from the cfctl dispatch site so the engine can scan for hit actors +
 /// roll knockdown + emit the hit event in a separate, post-dispatch phase.
 #[derive(Debug, Clone)]
@@ -1550,7 +1371,6 @@ pub(crate) struct PendingMeleeResolve {
     pub(crate) actor_position: cf_actor::Vec2,
 }
 
-/// **M6**: scratch struct that captures the parameters of a knife throw
 /// from the cfctl dispatch site so the engine can spawn the
 /// [`cf_equipment::KnifeProjectile`] after releasing the write-guard.
 #[derive(Debug, Clone)]
@@ -1561,7 +1381,6 @@ pub(crate) struct PendingKnifeSpawn {
     pub(crate) base_damage: f32,
 }
 
-/// **M6**: scratch struct that captures the parameters of a stealth-kill
 /// attempt from the cfctl dispatch site so the engine can find the target
 /// (behind + within reach) + apply instant-kill damage + emit
 /// `combat.stealth_kill_executed` after releasing the write-guard.
@@ -1572,7 +1391,6 @@ pub(crate) struct StealthKillAttempt {
     pub(crate) attacker_facing_x: f32,
 }
 
-/// **M6**: per-tool effect kind dispatched after the actor write-guard is
 /// released. The dispatcher captures the tool kind + origin/aim; the
 /// post-dispatch resolver applies the side-effect (terrain carve/fill, reveal
 /// hostile actors, drop beacon, etc).
@@ -1597,7 +1415,6 @@ pub(crate) struct ToolEffect {
     pub(crate) actor_id: ActorId,
 }
 
-/// **M6**: resolved melee hit data, captured for emission in the
 /// post-dispatch phase. Distinct from the dispatch's
 /// [`PendingMeleeResolve`] so the resolver can do the actor scan + the
 /// emitter can do only the recorder write.
@@ -1620,7 +1437,6 @@ pub(crate) struct PendingDig {
     pub(crate) source: IntentSource,
 }
 
-/// **M3 re-open (2026-05-13)**: a single dirty-region entry pushed by a carve
 /// during the tick. The engine flushes a coalesced batch at end-of-tick.
 /// See `specs/active/M3.md` § Re-opened gaps, scenarios 2-4.
 #[derive(Debug, Clone)]
@@ -1632,7 +1448,6 @@ pub(crate) struct PendingDirtyRect {
     pub max: [i64; 2],
 }
 
-/// **M3 re-open (2026-05-13)**: helper struct for the end-of-tick coalesce
 /// pass. Holds the merged AABB after union operations.
 #[derive(Debug, Clone)]
 pub(crate) struct MergedDirtyRect {
@@ -1642,7 +1457,6 @@ pub(crate) struct MergedDirtyRect {
     pub(crate) max: [i64; 2],
 }
 
-/// **M3 re-open**: two rects "touch or overlap" if they share at least one
 /// edge or interior. Used by the greedy coalesce pass. Adjacent chunks
 /// (e.g. (0,0) at [0,0..256] + (1,0) at [256,0..512]) satisfy
 /// `a.max[0] == b.min[0]` so the inclusive `>=`/`<=` comparison captures
@@ -1653,7 +1467,6 @@ pub(crate) fn rects_touch_or_overlap(a_min: [i64; 2], a_max: [i64; 2], b_min: [i
     x_overlap && y_overlap
 }
 
-/// **M6B**: walk the inventory grid tree to find the nesting depth of the
 /// placement identified by `instance_id`. Depth is **1-indexed** to match
 /// the spec § Acceptance criteria scenario ("chest (level 1) containing a
 /// crate (level 2)") and `cf_actor::inventory::find_container_depth`:
@@ -1752,7 +1565,6 @@ impl M0Engine {
                 "run_mode": self.config.run_mode,
                 "control_api": self.config.control_api_enabled,
                 "protocol_version": crate::SCHEMA_VERSION,
-                // **M4 § system.run_started carries protocol_version +
                 // manifest_hash + build_id**. The manifest hash mirrors
                 // `run_manifest.json.config_hash` (blake3 of effective
                 // settings + scenario id) so an offline reviewer can pin
@@ -1765,7 +1577,6 @@ impl M0Engine {
             }),
             None,
         );
-        // **M4**: stash the run_started event id so downstream events that
         // have no other cause (e.g. ai.tactic_chosen with no fresh
         // perception signal) can chain to it as a root.
         if let Ok(mut s) = self.state.write() {
@@ -1773,12 +1584,10 @@ impl M0Engine {
         }
         self.emit_initial_snapshots(tick, sim_time_ms, Some(&started_id));
         self.emit_category_baseline(tick, sim_time_ms, &started_id);
-        // **M4B § "Delta baseline cadence is enforced"** — emit the tick-0
         // baseline as part of run_started so the cadence is anchored from
         // the very first tick. drive_tick() advances starts at tick 1, so
         // tick 0 itself never goes through emit_m4b_snapshot_for_tick.
         self.emit_m4b_snapshot_for_tick(tick);
-        // **M4 § ux first_event_type**: emit one `ux.banner_raised` at run
         // start so the baseline's `first_event_type` for the ux category
         // is reachable. Banners are cosmetic per the determinism-island
         // contract so this is flagged cosmetic.

@@ -72,14 +72,12 @@ pub struct AddArgs {
     pub human_edit_notes: Option<String>,
     pub regen_command: Option<String>,
     pub freeze: bool,
-    /// **M4A determinism**: override the entry's `generated_at_iso` field.
     /// When unset, the builder picks `chrono::Utc::now().to_rfc3339()`
     /// (or a deterministic placeholder when `CF_DETERMINISTIC_LEDGER=1`).
     /// Pipeline tools that want byte-reproducible ledger.jsonl across
     /// machines should set this to the source-content's commit time OR
     /// to a per-asset stable string.
     pub generated_at_iso: Option<String>,
-    /// **M4A determinism**: override `generated_on_machine`. Defaults to
     /// `HOSTNAME` / `COMPUTERNAME` / `"unknown"` (or `"deterministic"`
     /// when the env flag is set).
     pub generated_on_machine: Option<String>,
@@ -340,7 +338,6 @@ pub fn cmd_regenerate(
             .find(&asset_id)
             .context("read")?
             .ok_or_else(|| anyhow!("entry not found: {id}"))?;
-        // **M4A spec contract**: single-entry regen auto-marks dependents
         // Stale. Use `_with_handle` so the caller (cf-mod CLI) doesn't have
         // to remember to follow up with mark_dependents_stale.
         let outcome = regenerate_entry_with_handle(&handle, &entry, &paths.base_dir, None).map_err(map_regen_err)?;
@@ -1012,7 +1009,6 @@ mod tests {
         assert!(msg.contains("does not exist"), "got: {msg}");
     }
 
-    /// **M4A § Gherkin "Per-category + per-tier filtering"** — the
     /// third clause of the scenario asks that `--status Drifted`
     /// filters the list. This test exercises the status filter
     /// end-to-end via cmd_list.
@@ -1068,7 +1064,6 @@ mod tests {
         assert_eq!(list[0].regen_status, RegenStatus::Drifted);
     }
 
-    /// **M4A § Gherkin "Ledger size bounded under regen churn"** — the
     /// `--before <date>` cutoff filters by lexical RFC 3339 timestamp.
     /// Validate the path end-to-end via cmd_compact.
     #[test]
@@ -1118,7 +1113,6 @@ mod tests {
         assert_eq!(remaining[0].canonical_name, "new_y");
     }
 
-    /// **M4A § cmd_compact validation**: malformed `--before` strings
     /// must surface a clear error rather than silently lexically
     /// dropping/keeping entries.
     #[test]

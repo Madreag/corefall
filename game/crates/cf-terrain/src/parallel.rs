@@ -13,7 +13,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M8A**: per-chunk mutation record. Drives the `terrain.chunk_mutated`
 /// semantic event with `post_state_checksum`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChunkMutation {
@@ -45,7 +44,6 @@ pub enum TerrainCause {
     HazardBurn,
 }
 
-/// **M8A**: apply a batch of per-chunk mutations in deterministic sort
 /// order. The actual per-chunk mutation in the engine runs in
 /// `par_iter_mut` (no shared writes); this function provides the
 /// canonical sort order for the inter-chunk boundary post-pass.

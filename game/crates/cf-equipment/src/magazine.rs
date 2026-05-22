@@ -28,9 +28,7 @@ pub enum RoundKind {
     Tracer = 1,
     HighExplosive = 2,
     Pellet = 3,
-    /// **M14C** § Tank-grade HEAT round.
     Heat = 4,
-    /// **M14C** § Tank-grade APFSDS round.
     Apfsds = 5,
 }
 
@@ -46,7 +44,6 @@ impl RoundKind {
         }
     }
 
-    /// **M14C** § parse the canonical snake_case ammo-kind id (used by
     /// `cfctl.act.player.fire ammo_kind=...`). Returns `None` for unknown
     /// labels.
     pub fn from_str_snake(s: &str) -> Option<Self> {

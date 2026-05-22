@@ -42,7 +42,6 @@ pub const NODES: &[&str] = &[
     "engineer_track_mover",
 ];
 
-/// **M7B**: squad verbs the Engineer exposes as distinct BT subtrees.
 pub const SQUAD_VERB_IDS: &[&str] = &[
     "suppress_window",
     "suppress_target",

@@ -114,7 +114,6 @@ pub const fn category_subdir(category: &str) -> &'static str {
     }
 }
 
-/// **M9A § "Modder authoring"** + "loads SVG → texture atlases at startup":
 /// load the ledger row indices into `AssetIndex` so render code can look up
 /// canonical-name → path without re-reading the ledger.jsonl every frame.
 ///

@@ -22,14 +22,11 @@ pub use ring_buffer::{InputFrame, RollbackRingBuffer, ROLLBACK_WINDOW_FRAMES};
 
 use serde::{Deserialize, Serialize};
 
-/// **M8A § locked**: rollback budget in frames (M8B inherits).
 pub const ROLLBACK_BUDGET_FRAMES: u32 = ROLLBACK_WINDOW_FRAMES as u32;
 
-/// **M8A § locked**: total resimulation budget at p99 (milliseconds)
 /// — M8B preserves this from M8A.
 pub const ROLLBACK_RESIM_BUDGET_MS: f32 = 8.0;
 
-/// **M8B § rollback**: descriptor for a rollback resimulation request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RollbackRequest {
     pub from_tick: u64,
@@ -42,7 +39,6 @@ impl RollbackRequest {
         self.to_tick.saturating_sub(self.from_tick)
     }
 
-    /// **M8A § acceptance**: rollbacks larger than the locked budget
     /// trigger a full snapshot resync (Gaffer pattern).
     pub fn within_budget(&self) -> bool {
         self.span_frames() <= u64::from(ROLLBACK_BUDGET_FRAMES)

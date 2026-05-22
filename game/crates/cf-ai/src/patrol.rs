@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::constants::{seconds_to_ticks_for, PATROL_IDLE_MAX_SECONDS, PATROL_IDLE_MIN_SECONDS};
 
-/// **M7-A**: one patrol route (list of waypoints + cursor).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PatrolRoute {
     pub waypoints: Vec<[f32; 2]>,
@@ -48,7 +47,6 @@ impl PatrolRoute {
     }
 }
 
-/// **M7-A**: emitted when a bot reaches a patrol waypoint.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PatrolWaypointReachedEvent {
     pub actor_id: u64,

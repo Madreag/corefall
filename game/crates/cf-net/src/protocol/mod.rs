@@ -20,20 +20,16 @@ pub mod byte_pinning_tests;
 pub mod frame_v01;
 pub mod semver;
 
-/// **M8A § locked**: protocol_version stays at 1 for v0.1 (legacy
 /// scaffold field). M8B introduces the byte-pinned `semver_packed` u16
 /// in `NetFrameV01` for the canonical wire.
 pub const PROTOCOL_VERSION: u16 = 1;
 
-/// **M8A § locked**: per-frame max size (Ethernet MTU minus IP+UDP+QUIC
 /// headers). Avoids fragmentation.
 pub const NET_FRAME_MAX_SIZE_BYTES: usize = 1450;
 
-/// **M8A § locked**: snapshot delta-base cadence (configurable via
 /// `cfctl srv.set_cvar net.snapshot.cadence_ticks <n>`).
 pub const SNAPSHOT_CADENCE_TICKS: u64 = 64;
 
-/// **M8A § locked**: per-cadence determinism checksum probe.
 pub const CHECKSUM_PROBE_CADENCE_TICKS: u64 = 64;
 
 /// Server-initiated handshake response: accept or reject. Reject reasons
@@ -112,7 +108,6 @@ pub enum NetPayload {
     },
 }
 
-/// **M8A § handshake**: server verifies the client's protocol version
 /// before any sim frame.
 pub fn verify_handshake_version(client_version: u16) -> crate::NetResult<()> {
     if client_version != PROTOCOL_VERSION {

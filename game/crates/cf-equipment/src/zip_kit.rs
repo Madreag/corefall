@@ -10,26 +10,20 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14J** § T2 equipment id for the zip kit.
 pub const ZIP_KIT_T2_ID: &str = "zip_kit_t2";
 
-/// **M14J** § "slides toward the low end at gravity-driven speed capped
 /// at 12 m/s". Spec literal.
 pub const ZIPLINE_MAX_SPEED_M_PER_S: f32 = 12.0;
 
-/// **M14J** § "act.player.zipline_brake { engaged: true } applies -3 m/s²
 /// deceleration". Spec literal.
 pub const ZIPLINE_BRAKE_DECEL_M_PER_S2: f32 = 3.0;
 
-/// **M14J** § zip-line minimum height delta — refuse to deploy a flat
 /// cable (no slide).
 pub const ZIPLINE_MIN_HEIGHT_DELTA_M: f32 = 0.5;
 
-/// **M14J** § zip-line maximum span — beyond this the cable sags too
 /// hard. Soft cap at 60 m.
 pub const ZIPLINE_MAX_SPAN_M: f32 = 60.0;
 
-/// **M14J** § zip-line deployment result.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ZipKitDeployOutcome {
     Deployed {
@@ -43,7 +37,6 @@ pub enum ZipKitDeployOutcome {
     },
 }
 
-/// **M14J** § "anchors zip_kit between two embedded grapple hooks 25 m
 /// apart at 5 m height delta". Deploys a zip line between `anchor_a` and
 /// `anchor_b`. Returns the canonical (high_end, low_end) orientation so
 /// the slide direction is unambiguous.
@@ -86,7 +79,6 @@ pub fn deploy_zip_kit(anchor_a: [f32; 2], anchor_b: [f32; 2]) -> ZipKitDeployOut
     }
 }
 
-/// **M14J** § "slides toward the low end at gravity-driven speed capped
 /// at 12 m/s" — advance the zip-line slide speed one tick.
 ///
 /// `speed_m_s` is the current speed along the cable (positive = toward

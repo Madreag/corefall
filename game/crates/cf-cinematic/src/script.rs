@@ -45,13 +45,11 @@ pub struct ChapterMarker {
     pub at_ms: u32,
 }
 
-/// Per spec § "Live actors play scripted poses": one author-declared
 /// actor pose ID for a shot. Pose IDs resolve against the M9A animation
 /// frame catalog (e.g. `"squad_low_ready"`, `"chassis_idle"`). The
 /// cinematic kernel emits these as `cinematic.chapter_marker` payload
 /// metadata so cf-app's animation bridge can swap the actor's frame.
 ///
-/// Per spec § Out of scope: "Per-cinematic motion-captured pose data
 /// (never — actors use M9A animation frames + scripted pose IDs)."
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActorPose {
@@ -80,7 +78,6 @@ pub struct Shot {
     /// Move-stack — Pan / Dolly / Zoom / Orbit / Shake primitives. Per
     /// spec § "Camera primitives compose into a per-shot move-stack".
     pub moves: Vec<ShotMove>,
-    /// Per spec § "Live actors play scripted poses — squad members
     /// enter their pre-mission stance (chassis idle + weapon at
     /// low-ready + storyteller-specific body language)". Authored
     /// actor pose declarations the cinematic bridge applies to the
@@ -157,7 +154,6 @@ impl ScriptSource {
         }
     }
 
-    /// Per spec § "the cinematic duration is between 30000 and 60000 ms"
     /// (opening) / "15-30s" (between) / "between 120000 and 300000 ms"
     /// (ending). Returns `(min_ms, max_ms)`.
     #[must_use]
@@ -186,7 +182,6 @@ impl CinematicScript {
     /// Parse a script from RON source bytes, fill the BLAKE3 hash, and
     /// run schema-level validation.
     ///
-    /// Per spec § "if missing, skips silently — never block mission
     /// boot on a missing cinematic file": the caller decides what to do
     /// on filesystem-missing errors; this function only handles
     /// supplied bytes.

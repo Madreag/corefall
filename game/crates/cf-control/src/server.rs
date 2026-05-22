@@ -178,16 +178,13 @@ pub struct SettingsPatch {
     /// table is preserved.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key_bindings: Option<std::collections::BTreeMap<String, String>>,
-    /// **M1 / DR-055**: camera shake reduction. Clamped to `[0, 1]`.
     /// `1.0` = no shake (accessibility floor).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reduce_camera_shake_pct: Option<f32>,
-    /// **M1**: tick-rate observable. Clamped to `>= 1`. The engine does not
     /// live-retick on patch; this mirrors the engine's configured tick rate
     /// so cfctl `observe.settings` is round-trippable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tick_rate_hz: Option<u32>,
-    /// **M1 Gap F1**: configurable feel cvars. All values must be finite
     /// and (where applicable) positive; `apply_settings_patch` rejects
     /// invalid patches via `validation_error`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -204,146 +201,106 @@ pub struct SettingsPatch {
     pub sharp_aim_build_ticks: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub walk_threshold: Option<f32>,
-    /// **M1.5 G6**: AI difficulty preset id. Valid values:
     /// `"cakewalk" | "tough_crowd" | "veteran"`. The engine looks up the
     /// preset in `cf-ai::DifficultyPreset::builtin(id)` and applies it to
     /// every `ReactiveGuard` in the world.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_difficulty: Option<String>,
-    /// **M1.5**: AI debug overlay. `true` raises the floating intent label
     /// above every reactive guard; `false` hides it. Defaults to current
     /// state when omitted (Option-based settings patch).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_debug: Option<bool>,
 
     // === M8 accessibility / camera / debug / locale extensions ===
-    /// **M8**: slow-motion accessibility mode (snake_case wire form
     /// `off | slowdown_75 | slowdown_25 | full_pause`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub game_speed_assist: Option<String>,
-    /// **M8**: color blind / contrast palette mode (snake_case wire form
     /// `default | colorblind_safe | protanopia | deuteranopia | tritanopia
     /// | monochrome_test`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color_cue_mode: Option<String>,
-    /// **M8**: aim assist mode (`off | steady_aim |
     /// auto_aim_with_damage_penalty`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aim_assist: Option<String>,
-    /// **M8**: damage numbers cosmetic toggle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub damage_numbers: Option<bool>,
-    /// **M8**: killcam toggle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub killcam_enabled: Option<bool>,
-    /// **M8**: hit-stop toggle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hit_stop_enabled: Option<bool>,
-    /// **M8**: cinematic kill cam toggle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cinematic_kills: Option<bool>,
-    /// **M8**: master mini-map enable toggle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mini_map_enabled: Option<bool>,
-    /// **M8**: compass enable toggle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compass_enabled: Option<bool>,
-    /// **M8**: damage-direction indicator enable toggle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub damage_direction_enabled: Option<bool>,
-    /// **M8**: mini-map zoom (0.25..=4.0).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mini_map_zoom: Option<f32>,
-    /// **M8**: scope ADS FOV in degrees (5..=90).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope_zoom_fov: Option<f32>,
-    /// **M8**: text scale (0.5..=4.0; mirrors `ui_scale`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_scale: Option<f32>,
-    /// **M8**: HUD density preset (`compact | normal | spacious`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ui_density: Option<String>,
-    /// **M8**: language code (`en` baseline; Tier-A 11 reserved for
     /// T-ACC-PLUS BP9+).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
-    /// **M8**: speedrun mode toggle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speedrun_mode: Option<bool>,
-    /// **M8**: permadeath modifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permadeath: Option<bool>,
-    /// **M8**: no-respawn modifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub no_respawn: Option<bool>,
-    /// **M8**: fog-of-war on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fog_of_war_on: Option<bool>,
-    /// **M8**: limited-ammo modifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limited_ammo: Option<bool>,
-    /// **M8**: time-limit modifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub time_limit: Option<bool>,
-    /// **M8**: hide the mini-map (overrides `mini_map_enabled`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub no_minimap: Option<bool>,
-    /// **M8**: hardcore composite mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hardcore_mode: Option<bool>,
-    /// **M8**: friendly fire on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub friendly_fire_on: Option<bool>,
-    /// **M8**: master debug-overlay gate (production builds).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub debug_enabled: Option<bool>,
 
     // === M11 ACC-A floor extensions ===
-    /// **M11**: contrast palette mode (snake_case wire form
     /// `standard | high_contrast_dark | high_contrast_light`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contrast_mode: Option<String>,
-    /// **M11**: captions verbosity mode (snake_case wire form
     /// `off | critical_only | standard | expanded`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub caption_mode: Option<String>,
-    /// **M11**: caption background opacity (0.0..=1.0).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub caption_background_opacity: Option<f32>,
-    /// **M11**: caption category subset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub caption_categories: Option<std::collections::BTreeSet<String>>,
-    /// **M11**: input profile (snake_case wire form
     /// `keyboard_mouse | controller | keyboard_only | custom`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_profile: Option<String>,
-    /// **M11**: remap-action group subset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub remap_groups: Option<std::collections::BTreeSet<String>>,
-    /// **M11**: hold-behavior variant (`hold | toggle | press_to_cycle`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hold_behavior: Option<String>,
-    /// **M11**: screen-shake scale (0.0..=1.0; multiplicative).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_shake_scale: Option<f32>,
-    /// **M11**: camera-motion granularity (`reduced | standard`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub camera_motion: Option<String>,
-    /// **M11**: objective-help verbosity (`minimal | standard | verbose`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub objective_help: Option<String>,
-    /// **M11**: debug-explainer level (`player | designer | raw`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub debug_explainer_level: Option<String>,
 
     // === M12 cinematic story beats + optional comic overlay ===
-    /// **M12**: comic-style overlay mode (`full | subtle | off`). Defaults to
     /// `subtle` in `Settings`; the patch lets the player drop to `off` or
     /// escalate to `full` from the settings UI. Per spec § Comic-style
     /// framing — opt-in juice, not core identity.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub comic_style_overlay: Option<String>,
-    /// **M12**: comic death-recap toggle. When `true`, the death recap
     /// renders as a 4-panel comic-style cause chain; when `false` (default),
     /// the M10 replay viewer + cause-chain walker is used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -597,7 +554,6 @@ impl SettingsPatch {
 
 
 
-/// **M4A**: default ledger-summary projection. Reads
 /// `content/asset_ledger/ledger.jsonl` from the current working directory
 /// (or the parent, when invoked from inside a crate sub-directory). Engines
 /// can override `EngineHandle::observe_assets_ledger_summary` to point at a
@@ -674,7 +630,6 @@ impl ControlServer {
     /// holds a `ShutdownSignal` clone that never fires after a programmatic
     /// shutdown returns), which is benign in a single-shot main() but adds
     /// up if `serve()` is called repeatedly within one tokio runtime
-    /// (PR #26 review Devin Info).
     pub async fn serve<E: EngineHandle>(self, engine: Arc<E>) -> std::io::Result<()> {
         let (shutdown_tx, shutdown_rx) = shutdown_signal();
         let serve_fut = self.serve_with_shutdown(engine, shutdown_rx);
@@ -891,7 +846,6 @@ pub(crate) fn spawn_observation_loop<E: EngineHandle>(
             // Sticky shutdown check: even if the signal fired mid-iteration
             // while we were awaiting a snapshot or a send below, the watch
             // sees it on the very next poll. This is the fix for the
-            // PR #26 review's 🔴 finding — `Notify::notify_waiters()` would
             // silently drop the signal if no `.notified().await` was active
             // at notify time, leaving this loop spinning forever.
             if *shutdown.borrow() {
@@ -1052,7 +1006,6 @@ pub(crate) fn missing_param_error(id: JsonRpcId, reason: &str) -> String {
     )
 }
 
-/// **M8**: shared validator for `act.ui.set_hud_layout` (and any future
 /// helper that takes an `(x, y)` point) — rejects NaN/Inf coordinates at
 /// the cfctl boundary.
 pub(crate) fn x_y_finite(x: f32, y: f32) -> bool {
@@ -1101,7 +1054,6 @@ pub(crate) fn decode_m6_action(method: &str, params: serde_json::Value) -> Resul
                 .get("slot")
                 .and_then(serde_json::Value::as_u64)
                 .ok_or_else(|| "missing_slot".to_string())?;
-            // **M6**: 1-8 hotbar keys target the 8 active slots (indices
             // 0..=7). Tank slots (9-11 / indices 8..=10) reject with the
             // spec-locked reason `tank_slot_locked_at_m2_2a` so the M17
             // unlock has a stable contract to clear.

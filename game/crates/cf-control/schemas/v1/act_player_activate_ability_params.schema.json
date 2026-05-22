@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerActivateAbilityParams",
-  "description": "**M13** § \"Chassis ability slots\" — activate one of the chassis's\nability slots.",
+  "description": "ability slots.",
   "type": "object",
   "properties": {
     "ability": {

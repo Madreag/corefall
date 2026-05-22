@@ -33,7 +33,6 @@ use crate::{Settings, SCHEMA_VERSION};
 
 #[async_trait]
 impl EngineHandle for M0Engine {
-    /// **M4B § "observe.save.last"** — return the live LastSaveMetadata
     /// snapshot the engine has tracked since startup. Updated by F5/F9 +
     /// cfctl save subcommands via [`crate::m4b_save::LastSaveCache`].
     async fn observe_save_last(&self) -> serde_json::Value {
@@ -62,7 +61,6 @@ impl EngineHandle for M0Engine {
                         None
                     };
                     let silhouette = a.body_silhouette();
-                    // **M5**: when a chassis is attached, the module strip comes
                     // straight from the chassis (placeholder=false). Without a
                     // chassis we fall back to the M4A weapon-mount derivation.
                     let module_strip = match a.chassis_module_strip() {
@@ -83,7 +81,6 @@ impl EngineHandle for M0Engine {
                     };
                     let mut chassis_view = a.chassis_view().as_ref().map(crate::state::ChassisView::from);
                     if let Some(cv) = chassis_view.as_mut() {
-                        // **M14**: fill the per-actor ragdoll state from the
                         // actor's status. Settings.reduced_motion is read
                         // from the engine state at snapshot time.
                         cv.ragdoll_state = match a.status {
@@ -143,7 +140,6 @@ impl EngineHandle for M0Engine {
                         mission_critical: a.mission_critical,
                         bloom_factor: a.bloom_factor,
                         mass_kg: a.mass_kg,
-                        // **M9B / m9b-4**: trench cover state derived
                         // against the live engine trench-world index. On
                         // open ground the value is "Exposed" per
                         // VAL-M9B-COVERMATRIX-001; standing in a placed
@@ -219,7 +215,6 @@ impl EngineHandle for M0Engine {
             refusal_count: t.refusal_count,
             dirty_chunk_count: t.dirty_chunk_count() as u32,
             allocated_chunk_count: t.allocated_chunk_count() as u32,
-            // M3 audit pass 5 (2026-05-13): spec-literal aliases.
             chunk_count: t.allocated_chunk_count() as u32,
             material_counts: t.material_counts(),
             material_distribution: t
@@ -278,7 +273,6 @@ impl EngineHandle for M0Engine {
             focused_node: state.hud_focus_index.map(|i| HUD_FOCUSABLE_NODES[i].to_string()),
             focus_cycle: state.hud_focus_cycle,
         };
-        // **M14B § "Surface in observe.frame.cells"** — per-cell
         // atmosphere projection (pressure + temperature + per-gas
         // mole fractions). Empty for scenarios that don't declare
         // `atmosphere_cells` in the manifest.
@@ -310,7 +304,6 @@ impl EngineHandle for M0Engine {
                 }
             })
             .collect();
-        // **M14B** § per-actor gravity vector projection.
         let gravity_vectors: Vec<crate::state::ActorGravityView> = state
             .actor_state
             .as_ref()
@@ -337,7 +330,6 @@ impl EngineHandle for M0Engine {
                     .collect()
             })
             .unwrap_or_default();
-        // **M14J § "observe.rope / observe.zipline / observe.mount_link"**
         // project the live rope world + mount pairings.
         let ropes_view: Vec<crate::state::RopeView> = state
             .m14j_ropes
@@ -422,7 +414,6 @@ impl EngineHandle for M0Engine {
             run_status: observed_run_status(&state),
             scenario: self.config.scenario_id.clone(),
             events_since: self.recorder.snapshot_events().len() as u64,
-            // **M1 R2 / Gap G3 support**: surface the full recorded event
             // stream so cf-e2e's events.<cat>.<type>.{count,first,last}
             // expectation grammar can drill into it. Heavy runs (≥18000
             // ticks) produce O(50K) events; the snapshot allocs a Vec
@@ -505,7 +496,6 @@ impl EngineHandle for M0Engine {
         let rifle = sim.rifles.get(&ActorId(target_id));
         let observation = cf_actor::ActorObservation::from_actor_and_rifle(actor, rifle);
         let mut payload = serde_json::to_value(observation).ok()?;
-        // **M14A** § "HUD mass surface" — surface mass breakdown + walking
         // sim state + atmosphere snapshot.
         let mass_breakdown = cf_actor::mass_breakdown(actor);
         let mass_total = mass_breakdown.total();
@@ -598,7 +588,6 @@ impl EngineHandle for M0Engine {
         Some(payload)
     }
 
-    /// **M14A** § "observe.quick_action projection".
     async fn observe_quick_action(&self, actor_id: Option<u64>) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         let sim = state.actor_state.as_ref()?;
@@ -634,10 +623,8 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M2 re-audit (2026-05-13)**: full MissionState projection. Returns
     /// `None` when no mission is loaded (e.g. m0_blank scenario).
     ///
-    /// M2 audit pass 7 (2026-05-13): returns the `MissionView` projection
     /// (with spec-literal field names — `status`, `timer_total_ticks`,
     /// `timer_ticks_remaining`, `current_objective_id`,
     /// `completed_objectives`, `failed_objectives`) instead of the raw
@@ -651,7 +638,6 @@ impl EngineHandle for M0Engine {
         serde_json::to_value(view).ok()
     }
 
-    /// **M9** § cfctl `observe.mission.reactor` — returns the first
     /// reactor in the reactor world (M9 ships single-reactor scenarios; M25+
     /// command-core may surface multiple). `None` when no reactor is loaded.
     async fn observe_mission_reactor(&self) -> Option<serde_json::Value> {
@@ -688,7 +674,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M9** § cfctl `observe.mission.timer` — returns the live mission
     /// timer projection. `color_state` follows the HUD rule from the spec:
     /// green > 30s, yellow 10-30s, red < 10s, "none" once expired/no timer.
     async fn observe_mission_timer(&self) -> Option<serde_json::Value> {
@@ -724,7 +709,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M9** (audit fix gap 2): cfctl `observe.mission.director` —
     /// returns the M9 director projection per spec § Director state
     /// surface. Spawn-budget and intensity ladder to M25+; at M9 they
     /// are stable scalars (0.0 and 0 respectively) so the surface is
@@ -763,7 +747,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M9** (audit fix gap 1): cfctl `inspect.actor.reactor` —
     /// returns the reactor projection plus the last `last_n_events`
     /// actor-category events. The reactor's id is a string (e.g.
     /// `"core_reactor"`), unlike inspect.actor which keys on u64.
@@ -809,7 +792,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// M3 audit pass 7 (2026-05-13): dedicated `observe.terrain` cfctl
     /// method per spec literal. Returns the live `TerrainView` projection.
     async fn observe_terrain(&self) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
@@ -839,10 +821,8 @@ impl EngineHandle for M0Engine {
         serde_json::to_value(view).ok()
     }
 
-    /// **M2 re-audit (2026-05-13)**: per-AI projection for `actor_id`.
     /// Returns guard state + perception summary + current target + reason.
     ///
-    /// M2 audit pass 7 (2026-05-13): also enriches the response with the
     /// guard actor's `hp` + `hp_max` from the actor world so the
     /// difficulty preset round-trip ("guard's hp=120") can be verified
     /// without a separate observe.actor call.
@@ -861,7 +841,6 @@ impl EngineHandle for M0Engine {
         Some(v)
     }
 
-    /// **M6**: per-actor perception projection — sight cone + hearing radius
     /// + stealth_meter + last footstep loudness band + last occlusion
     /// factor + spotted flag. `actor_id=None` resolves to the player.
     /// Returns `None` when no actor world is loaded.
@@ -911,7 +890,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M6**: squad-of-two projection — leader id + members[] each with
     /// per-member current_command + hp + waypoint. Returns `None` when no
     /// actor world is loaded.
     async fn observe_squad(&self) -> Option<serde_json::Value> {
@@ -940,7 +918,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M7-B**: per-actor PriorityTable projection — 22-task weight grid
     /// + role + personality modifier. Returns `None` if the actor has no
     /// `BotState`.
     async fn observe_priority_table(&self, actor_id: u64) -> Option<serde_json::Value> {
@@ -948,20 +925,17 @@ impl EngineHandle for M0Engine {
         state.m7_ai_world.priority_table_view(cf_actor::ActorId(actor_id))
     }
 
-    /// **M7-B**: per-actor autonomy projection — mode + auto_action_cap +
     /// doctrine_mode. Returns `None` if the actor has no `BotState`.
     async fn observe_autonomy(&self, actor_id: u64) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         state.m7_ai_world.autonomy_view(cf_actor::ActorId(actor_id))
     }
 
-    /// **M7B**: dump the full squad-state JSON view for `srv.dump_squad_state`.
     async fn dump_squad_state(&self, squad_id: u64) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         Some(state.m7b_squad.dump_state_view(squad_id))
     }
 
-    /// **M12C**: `srv.dump_cinematic_state` — return the full
     /// `CinematicState` projection. Returns `None` when no cinematic is
     /// active (callers fall back to a 'no cinematic' sentinel).
     async fn dump_cinematic_state(&self) -> serde_json::Value {
@@ -1015,7 +989,6 @@ impl EngineHandle for M0Engine {
         }
     }
 
-    /// **M12C**: `act.player.skip_cinematic` — request a skip of the
     /// currently-playing cinematic. Returns `Ok(())` on success or an
     /// error reason when the skip is rejected.
     async fn act_player_skip_cinematic(&self) -> Result<u32, String> {
@@ -1048,7 +1021,6 @@ impl EngineHandle for M0Engine {
         Ok(skipped_ms)
     }
 
-    /// **M12C**: `act.player.pause_cinematic` — toggle pause state.
     /// Returns the (paused, ms) tuple after the toggle.
     async fn act_player_pause_cinematic(&self) -> Result<(bool, u32), String> {
         let mut state = self.state.write().expect("engine state poisoned");
@@ -1077,7 +1049,6 @@ impl EngineHandle for M0Engine {
         Ok((paused, ms))
     }
 
-    /// **M12C**: `act.player.replay_cinematic { id }` — replay a watched
     /// cinematic from `Codex → Cinematics`. The dispatcher loads the
     /// script from `content/cinematics/**/<id>.cinematic.ron`, narration
     /// track (if any), and the active storyteller profile, then engages
@@ -1133,32 +1104,26 @@ impl EngineHandle for M0Engine {
         Ok(tick.0)
     }
 
-    /// **M8**: live `cf_camera::CameraState` projection.
     async fn observe_camera(&self) -> serde_json::Value {
         self.snapshot_camera_state()
     }
 
-    /// **M8**: active language code + key count.
     async fn observe_localization_current_language(&self) -> serde_json::Value {
         self.snapshot_localization_language()
     }
 
-    /// **M8**: cf-debug overlay registry.
     async fn observe_debug_overlays(&self) -> serde_json::Value {
         self.snapshot_debug_overlays()
     }
 
-    /// **M8**: Tab tactical overlay state.
     async fn observe_tactical_overlay(&self) -> serde_json::Value {
         self.snapshot_tactical_overlay()
     }
 
-    /// **M8**: active MMB tag list.
     async fn observe_tags(&self) -> serde_json::Value {
         self.snapshot_tags()
     }
 
-    /// **M11 / DR-012 closure**: full ACC-A surface projection.
     async fn observe_accessibility(&self) -> serde_json::Value {
         let settings = self.current_settings();
         let s = self.state.read().expect("engine state poisoned");
@@ -1212,7 +1177,6 @@ impl EngineHandle for M0Engine {
         })
     }
 
-    /// **M11**: dedicated caption queue projection for cfctl observers.
     async fn observe_captions(&self) -> serde_json::Value {
         let s = self.state.read().expect("engine state poisoned");
         let queue: Vec<serde_json::Value> = s
@@ -1230,7 +1194,6 @@ impl EngineHandle for M0Engine {
         json!({ "schema_version": SCHEMA_VERSION, "queue": queue })
     }
 
-    /// **M11**: dedicated banner stack projection for cfctl observers.
     async fn observe_accessibility_banners(&self) -> serde_json::Value {
         let s = self.state.read().expect("engine state poisoned");
         let banners: Vec<serde_json::Value> = s
@@ -1250,7 +1213,6 @@ impl EngineHandle for M0Engine {
         json!({ "schema_version": SCHEMA_VERSION, "banners": banners })
     }
 
-    /// **M11**: dedicated body-silhouette projection.
     async fn observe_actor_silhouette(&self, actor_id: Option<u64>) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         let sim = state.actor_state.as_ref()?;
@@ -1270,7 +1232,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M11**: dedicated module-strip projection.
     async fn observe_actor_module_strip(&self, actor_id: Option<u64>) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         let sim = state.actor_state.as_ref()?;
@@ -1301,7 +1262,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M11**: HUD assertion harness used by cfctl scripts + cf-e2e.
     /// Predicate forms supported:
     ///   - `severity=<critical|warning|info>` (matches against `hud.banners.*`)
     ///   - `text~=<substring>` (case-insensitive contains)
@@ -1356,7 +1316,6 @@ impl EngineHandle for M0Engine {
         })
     }
 
-    /// **M9B / VAL-M9B-CFCTL-002**: derive `cover_state` for the named
     /// actor against the engine's trench-segment world. Pre-segment
     /// placement the world is empty + cover defaults to `Exposed`. The
     /// m9b_trench dispatcher module owns the live wiring.
@@ -1364,13 +1323,11 @@ impl EngineHandle for M0Engine {
         self.compute_actor_cover_state(actor_id)
     }
 
-    /// **M9B / VAL-M9B-CFCTL-002**: project the trench segment at the
     /// supplied tile, or `null` when the tile is open ground.
     async fn observe_trench_segment_at_pos(&self, x: i32, y: i32) -> serde_json::Value {
         self.compute_trench_segment_at_pos(x, y)
     }
 
-    /// **M2 re-audit (2026-05-13)**: full mission inspect including the last
     /// 30 mission-category events.
     async fn inspect_mission(&self) -> Option<serde_json::Value> {
         let mission = self.observe_mission().await?;
@@ -1389,7 +1346,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M2 re-audit (2026-05-13)**: per-AI inspect including the last 30
     /// `ai.*` events filtered to `actor_id`.
     async fn inspect_ai(&self, actor_id: u64) -> Option<serde_json::Value> {
         let view = self.observe_ai(actor_id).await?;
@@ -1445,7 +1401,6 @@ impl EngineHandle for M0Engine {
         Some(merged)
     }
 
-    /// **M13** § "Pilot-inside-chassis dual silhouette" — chassis-side
     /// silhouette projection: per-zone HP percentages + pilot weight class
     /// scale factor. Surfaces the chassis half of the dual-layer HUD
     /// silhouette so consumers can pair with `observe.actor.silhouette`
@@ -1487,10 +1442,8 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M13** § cfctl `inspect.chassis` — full body graph + per-zone
     /// integrity + per-module state + pilot state + eject window for the
     /// requested actor's chassis. Returns `None` when no chassis is attached.
-    /// Per spec § "Body graph is inspectable via cfctl".
     async fn inspect_chassis(&self, target: Option<&str>) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         let sim = state.actor_state.as_ref()?;
@@ -1668,7 +1621,6 @@ impl EngineHandle for M0Engine {
             })
         });
         let last_modified_tick = terrain.chunk_last_modified_tick(cx, cy);
-        // M3 audit pass 5 (2026-05-13): spec literal field names are
         // `material_grid` (RLE-encoded) and `chunk_checksum`. The legacy
         // `material_grid_rle` + `checksum` aliases are kept alongside for
         // backwards-compat with any in-flight tooling.
@@ -1725,7 +1677,6 @@ impl EngineHandle for M0Engine {
         }))
     }
 
-    /// **M9** (audit round-3 fix gap 3) § cfctl `observe.terrain.material_at
     /// { x, y }` — resolve the material at world-space `(x, y)` against
     /// the live chunked terrain and return a `MaterialInfo` JSON with the
     /// 9 affordance flags (actor_passable, projectile_passable, diggable,

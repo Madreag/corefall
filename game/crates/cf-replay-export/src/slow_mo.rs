@@ -166,7 +166,6 @@ impl Default for SlowMoMultiplier {
 mod tests {
     use super::*;
 
-    /// VAL-M10B-SLOW-MO: `--slow-mo 2x` doubles duration deterministically.
     #[test]
     fn slow_mo_2x_doubles_duration() {
         let m = SlowMoMultiplier::parse("2x").expect("2x parses");
@@ -175,7 +174,6 @@ mod tests {
         assert_eq!(m.scale_ticks(1800), 3600);
     }
 
-    /// VAL-M10B-SLOW-MO: `--slow-mo 4x` quadruples duration.
     #[test]
     fn slow_mo_4x_quadruples_duration() {
         let m = SlowMoMultiplier::parse("4x").expect("4x parses");
@@ -184,7 +182,6 @@ mod tests {
         assert_eq!(m.scale_ticks(1800), 7200);
     }
 
-    /// VAL-M10B-SLOW-MO: `--slow-mo 3.5x` returns typed error.
     #[test]
     fn slow_mo_non_integer_rejected_with_typed_error() {
         let err = SlowMoMultiplier::parse("3.5x").expect_err("3.5x must error");

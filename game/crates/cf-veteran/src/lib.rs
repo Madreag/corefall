@@ -45,7 +45,6 @@ use cf_aging::BiologicalAge;
 use cf_prosthetic::ProstheticInstance;
 use cf_scar::ScarTimeline;
 
-/// **M14I** § per-veteran dossier — aggregates every long-term-consequence
 /// signal an actor accumulates over their career.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VeteranDossier {
@@ -116,7 +115,6 @@ impl VeteranDossier {
     }
 }
 
-/// **M14I** § engine-side veteran roster (one entry per actor with at
 /// least one persistent long-term state element).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]

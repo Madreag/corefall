@@ -61,7 +61,6 @@ fn source_label(source: IntentSource) -> &'static str {
 }
 
 impl M0Engine {
-    /// **M14I** § `act.player.install_prosthetic` dispatch.
     pub(crate) fn dispatch_m14i_install_prosthetic(
         &self,
         target_actor_id: u64,
@@ -194,7 +193,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M14I** § `act.player.maintain_prosthetic` dispatch.
     pub(crate) fn dispatch_m14i_maintain_prosthetic(
         &self,
         target_actor_id: u64,
@@ -293,7 +291,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M14I** § `act.player.retire_veteran` dispatch.
     pub(crate) fn dispatch_m14i_retire_veteran(
         &self,
         target_actor_id: u64,
@@ -402,7 +399,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M14I** § per-tick long-term-consequence pass — wired into the
     /// M0 engine tick loop alongside M14H. Returns the number of events
     /// emitted. Uses the engine's configured tick rate to derive
     /// `dt_seconds`.
@@ -412,7 +408,6 @@ impl M0Engine {
         self.m14i_tick_with_dt(tick, sim_time_ms, dt_seconds)
     }
 
-    /// **M14I** § per-tick long-term-consequence pass with explicit
     /// `dt_seconds`. Tests use this to fast-forward through years of
     /// in-game time without simulating millions of sim ticks. Returns
     /// the number of events emitted.
@@ -423,7 +418,6 @@ impl M0Engine {
         let mut phantom_events: Vec<(u64, ZoneId, u32, bool)> = Vec::new();
         let mut cancer_handoffs: Vec<(u64, f32)> = Vec::new();
         let mut terminal_died: Vec<u64> = Vec::new();
-        // **M14I** post-survival pass: actors who were DYING at the
         // moment of attachable.detached have a severed limb but no
         // phantom_limb trait yet. Promote them once they're back in a
         // survivable status.
@@ -638,7 +632,6 @@ impl M0Engine {
             );
             emissions += 1;
         }
-        // **M14I** § post-survival phantom-limb emissions.
         for (actor_id, zone, tick_severed) in post_survival_promotions {
             self.recorder.record(
                 tick,
@@ -759,7 +752,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14I** § scar-acquisition hook. Called from the M14H treatment
     /// dispatchers whenever a closure-type treatment completes against a
     /// matching wound.
     ///
@@ -901,7 +893,6 @@ impl M0Engine {
         count
     }
 
-    /// **M14I** § phantom-limb hook. Called when an actor's `attachable`
     /// detaches via the M14 detach pass.
     ///
     /// If the actor is currently in a survivable status
@@ -926,7 +917,6 @@ impl M0Engine {
         );
     }
 
-    /// **M14I** § phantom-limb hook variant that chains the
     /// `phantom_limb.acquired` event to a parent (e.g. the
     /// `attachable.detached` event id) so the cause-chain walker can
     /// trace the severance to the original projectile hit.
@@ -989,7 +979,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14I** § concussion hook. Called when a Concussion wound at
     /// KO-threshold severity (>= 0.5) fires. Bumps the actor's
     /// `concussion_count` and emits `memory_loss.minor_acquired` /
     /// `memory_loss.major_acquired` on threshold crossings.
@@ -1039,7 +1028,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14I** § radiation dose accumulator. Called by M17 cumulative-
     /// dose tracker. Emits `disease.exposed` once on threshold crossing
     /// (M16B consumer activates `cancer.lifecycle`).
     pub fn m14i_add_radiation_dose(
@@ -1082,7 +1070,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14I** § ensure the actor carries a biological age clock for
     /// the resolved origin id. No-op if the actor already has one. Idempotent.
     pub fn m14i_ensure_age_clock(&self, actor_id: u64, initial_age_years: f32) {
         if let Ok(mut s) = self.state.write() {
@@ -1099,7 +1086,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14I** § test helper — read the actor's long-term snapshot.
     pub fn m14i_actor_long_term_snapshot(
         &self,
         actor_id: u64,
@@ -1110,7 +1096,6 @@ impl M0Engine {
         Some(actor.m14i_long_term.clone())
     }
 
-    /// **M14I** § test helper — inject a chronic-condition trait without
     /// the M16C lifecycle. Used by scenario 9 (chronic-depression
     /// baseline) and content-validation tests.
     pub fn m14i_apply_chronic_condition(&self, actor_id: u64, trait_id: &str) {
@@ -1129,7 +1114,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14I** § test helper — run `f` with mutable access to the
     /// engine's actor sim. Returns `Some(R)` when the state was held,
     /// `None` when the engine wasn't fully initialized.
     pub fn with_mut_state<R>(
@@ -1141,7 +1125,6 @@ impl M0Engine {
         Some(f(sim))
     }
 
-    /// **M14I** § scenario 9 — chronic_depression "Refuse non-essential
     /// order" roll. Returns true ~10% of the time when the actor has the
     /// `chronic_depression` trait; always false otherwise. Determinism
     /// is anchored by the engine seed + sim tick + actor id so the AI
@@ -1163,7 +1146,6 @@ impl M0Engine {
             .chronic_depression_refuse_roll(seed)
     }
 
-    /// **M14I** § read the engine's veteran roster (cf-veteran). The
     /// roster is populated when an actor commits to retirement; M41 +
     /// M48C consume it.
     pub fn m14i_veteran_roster(&self) -> Option<cf_veteran::VeteranRoster> {
@@ -1171,7 +1153,6 @@ impl M0Engine {
         Some(s.m14i_veteran_roster.clone())
     }
 
-    /// **M14I** § read the engine's retirement-narrative registry
     /// (cf-storyteller). Populated when retire commits.
     pub fn m14i_retirement_narratives(
         &self,
@@ -1180,7 +1161,6 @@ impl M0Engine {
         Some(s.m14i_retirement_narratives.clone())
     }
 
-    /// **M14I** § build the per-actor dossier view (cf-ui::veteran_dossier).
     /// M48C consumes this to render the pilot dossier tab.
     pub fn m14i_actor_dossier_view(
         &self,
@@ -1199,7 +1179,6 @@ impl M0Engine {
         ))
     }
 
-    /// **M14I** § resolve an actor's effective move-speed multiplier
     /// (consumers: cf-actor walking sim + AI doctrine).
     pub fn m14i_actor_move_speed_multiplier(&self, actor_id: u64) -> f32 {
         let Ok(s) = self.state.read() else { return 1.0 };
@@ -1216,7 +1195,6 @@ impl M0Engine {
     }
 }
 
-/// **M14I** § resolve the cosmetic decal id for a scar of a given wound
 /// kind. Mirrors the M14G decal vocabulary so M45A can render the
 /// resulting decals from the same atlas.
 fn scar_decal_id(kind: WoundKind) -> String {

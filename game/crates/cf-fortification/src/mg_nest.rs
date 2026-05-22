@@ -500,7 +500,6 @@ impl SpotterScope {
 /// Resolve the spotter-scope acquisition multiplier for a crewed
 /// MG / sniper actor.
 ///
-/// Per spec § "Spotter scope":
 ///
 /// > standalone `spotter_scope` grants +50% acquisition to adjacent
 /// > crewed MG / sniper (HP 100; destruction removes bonus).
@@ -720,7 +719,6 @@ mod tests {
         assert!(!nest.is_crewed());
     }
 
-    /// VAL-M9C-013: while crewed, primary fire is rebound to the
     /// mounted MG. The personal weapon is suspended; the fortification
     /// records each `fire_rounds` call decrementing rounds_remaining.
     #[test]
@@ -744,7 +742,6 @@ mod tests {
             AMMO_BOX_MG_ROUNDS - 5
         );
 
-        // VAL-M9C-014: 800-round capacity drains exactly to 0 then
         // emits ammo_box_depleted on the round that finishes the box.
         let outcome = nest.fire_rounds(AMMO_BOX_MG_ROUNDS - 5);
         assert_eq!(outcome.rounds_fired, AMMO_BOX_MG_ROUNDS - 5);
@@ -756,7 +753,6 @@ mod tests {
         assert_eq!(outcome.rounds_fired, 0);
         assert!(!outcome.ammo_box_depleted);
 
-        // VAL-M9C-015: player swaps in a fresh ammo box; fire resumes.
         nest.swap_ammo_box();
         assert_eq!(
             nest.ammo_box.as_ref().unwrap().rounds_remaining,
@@ -773,7 +769,6 @@ mod tests {
         assert_eq!(outcome.rounds_fired, 0);
     }
 
-    /// VAL-M9C-UNCREW-EMIT: each of the three uncrew paths emits a
     /// `mg_nest_uncrewed` event with the correct cause.
     #[test]
     fn mg_nest_uncrewed_emits_all_three_causes() {
@@ -802,7 +797,6 @@ mod tests {
         assert!(!nest.is_crewed());
     }
 
-    /// VAL-M9C-018: tripod deploy/crew/pack cycle preserves
     /// `rounds_remaining` bit-equal across the cycle.
     #[test]
     fn mg_tripod_deploy_crew_pack_preserves_ammo() {
@@ -863,7 +857,6 @@ mod tests {
         assert_eq!(tripod.start_pack(1), Err(MgTripodError::StillCrewed));
     }
 
-    /// VAL-M9C-BUNKER-SLIT-DAMAGE: the 8-px aperture routes rounds
     /// through to the crewing actor; rounds outside the aperture
     /// bounce off the surrounding concrete with zero damage to crew
     /// AND zero HP decrement to the slit.
@@ -905,7 +898,6 @@ mod tests {
         assert_eq!(r.actor_damage, 400);
     }
 
-    /// VAL-M9C-SPOTTER-SCOPE-BEHAVIOR: standalone spotter scope grants
     /// +50% acquisition to an adjacent crewed actor; destruction
     /// removes the bonus.
     #[test]

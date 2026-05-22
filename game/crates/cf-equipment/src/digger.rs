@@ -12,7 +12,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M2 / M3**: data-driven dig tool spec.
 ///
 /// - `dig_strength` scales how much material a single act removes (placeholder;
 ///   M3's `try_carve` currently uses a flat carve radius — strength enters at

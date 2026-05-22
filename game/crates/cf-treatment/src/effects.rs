@@ -18,7 +18,6 @@ use serde::{Deserialize, Serialize};
 use crate::producers::TreatmentKind;
 use cf_wound::WoundKind;
 
-/// **M14H** § canonical effect tag for one treatment producer.
 ///
 /// The engine pattern-matches on this when applying the completed
 /// treatment to the patient's actor state.
@@ -108,7 +107,6 @@ impl TreatmentEffect {
     }
 }
 
-/// **M14H** § static map from [`TreatmentKind`] to [`TreatmentEffect`].
 ///
 /// `zone_hint` provides the engine with the wound zone when known (e.g.
 /// cauterize requires an explicit zone; bandage applies to the most-bleeding

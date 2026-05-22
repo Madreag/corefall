@@ -45,7 +45,6 @@ pub const SPEED_OF_SOUND_AMMONIA_M_PER_S: f32 = 415.0;
 /// Doppler math runs.
 pub const SPEED_OF_SOUND_VACUUM_M_PER_S: f32 = 0.0;
 
-/// **M12B** § Audio-propagation medium discriminant. Names match the
 /// `audio.spatial_resolved` schema enum so the replay verifier can round-
 /// trip the wire string.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -93,7 +92,6 @@ impl Medium {
     }
 }
 
-/// **M12B** § Resolved per-medium filter coefficients. Wired into
 /// `SpatialEnvelope.medium_filter`. The cf-app HRIR convolution adapter
 /// applies the low-pass + gain at playback time; the sim only carries
 /// the coefficient triple.
@@ -196,7 +194,6 @@ impl MediumFilter {
     }
 }
 
-/// **M12B** § `medium_at(pos)` stub. Real implementation reads from
 /// `cf-atmos::medium_at(pos)`; for headless / determinism tests the
 /// caller supplies the medium directly. This helper is the canonical
 /// "pick a medium between two points" predicate — it samples at the

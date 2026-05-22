@@ -23,11 +23,9 @@ use cf_ai::{
     DoctrineMode,
 };
 
-/// **M7B**: convenience id for the engine's player squad. At M7B the
 /// player commands at most one squad; M25 widens to a small fleet.
 pub const PLAYER_SQUAD_ID: u64 = 0;
 
-/// **M7B**: engine-side container for per-squad state. Owned by the
 /// `EngineMutable` so brain-hop / scenario reset can find it deterministically.
 #[derive(Debug, Clone, Default)]
 pub struct M7BSquadWorld {
@@ -65,7 +63,6 @@ impl M7BSquadWorld {
         self.squads.get_mut(&squad_id)
     }
 
-    /// **M7B**: issue a verb against a squad. Returns the issue outcome +
     /// the JSON payload the engine should emit on the recorder
     /// (either `squad.command_issued` or `squad.command_vetoed`).
     pub fn issue_verb(
@@ -116,7 +113,6 @@ impl M7BSquadWorld {
         IssueOutcome { outcome: res, payload }
     }
 
-    /// **M7B**: switch the formation kind for a squad.
     pub fn set_formation(
         &mut self,
         squad_id: u64,
@@ -158,7 +154,6 @@ impl M7BSquadWorld {
         }
     }
 
-    /// **M7B**: assign a sticky role to a member.
     pub fn assign_role(
         &mut self,
         squad_id: u64,
@@ -180,7 +175,6 @@ impl M7BSquadWorld {
         RoleAssignmentOutcome { result, payload }
     }
 
-    /// **M7B**: open a breach chain (Stack → Breach → Frag → Advance).
     /// Returns the `squad.breach_chain_started` payload. Pre-assigns
     /// sectors-of-fire from the `StackDoor` formation slot definitions:
     /// Stack-1 ahead, Stack-2 left, Stack-3 right, Stack-4 rear per spec.
@@ -221,7 +215,6 @@ impl M7BSquadWorld {
         })
     }
 
-    /// **M7B**: advance the breach chain. Returns:
     /// - `step_payload`: `squad.breach_chain_step` payload (always present
     ///   until the chain completes).
     /// - `complete_payload`: `squad.breach_chain_complete` payload (Some
@@ -234,7 +227,6 @@ impl M7BSquadWorld {
         self.advance_breach_chain_with_actors(squad_id, tick, &[])
     }
 
-    /// **M7B**: like `advance_breach_chain` but stamps the per-step actor
     /// ids + sectors-of-fire from the StackDoor formation. The engine
     /// calls this with the resolved stack actor ids so the replay event
     /// carries the full per-step assignment.
@@ -291,7 +283,6 @@ impl M7BSquadWorld {
         }
     }
 
-    /// **M7B**: tick the bounding-retreat sequence one swap. Returns the
     /// `squad.bounding_step` payload if a swap occurred. Half the squad
     /// covers while the other half moves rearward; the cover/move actor
     /// split is sourced from the current `role_assignments` (Heavy +
@@ -311,7 +302,6 @@ impl M7BSquadWorld {
         }))
     }
 
-    /// **M7B**: produce one `squad.formation_slot_broken` payload per
     /// member-actor that has wandered out of its assigned slot position.
     /// `positions` is the engine-supplied world position table.
     pub fn detect_and_report_broken_slots(
@@ -330,7 +320,6 @@ impl M7BSquadWorld {
             .collect()
     }
 
-    /// **M7B**: 2s periodic reslot driver. The engine calls this once per
     /// tick; when the squad is moving + the cadence has elapsed, the
     /// solver re-runs and the engine emits the resulting
     /// `squad.formation_set` + per-slot `squad.formation_slot_assigned`
@@ -361,9 +350,7 @@ impl M7BSquadWorld {
         ))
     }
 
-    /// **M7B**: notify the world that a squad member has been killed in
     /// action. Removes the role assignment, triggers an immediate reslot
-    /// (per spec § "collapses gracefully on member loss"), and returns
     /// the resulting collapse + reslot payloads for the engine to emit.
     pub fn on_member_kia(
         &mut self,
@@ -405,7 +392,6 @@ impl M7BSquadWorld {
         }
     }
 
-    /// **M7B**: open + immediately commit a brain-hop. Returns the
     /// `squad.brain_hop` payload.
     pub fn brain_hop_payload(
         &mut self,
@@ -428,7 +414,6 @@ impl M7BSquadWorld {
         })
     }
 
-    /// **M7B**: produce the full `srv.dump_squad_state` JSON view for a
     /// squad. Includes the squad-state row + verb registry + formation
     /// catalog + archetype-BT node counts so the M25 wheel / Tab overlay
     /// renders without a second round-trip.
@@ -548,7 +533,6 @@ impl M7BSquadWorld {
     }
 }
 
-/// **M7B**: split the squad's role assignments into the "cover this half"
 /// and "move this half" actor lists for the bounding-retreat sequence.
 /// Heavy + Marksman + SquadLeader bias toward covering; Pointman +
 /// Rifleman + Engineer bias toward moving. Phase swaps swap the lists.
@@ -579,7 +563,6 @@ pub fn bounding_split(
     }
 }
 
-/// **M7B**: render a `squad.formation_slot_broken` JSON payload.
 pub fn slot_broken_payload(squad_id: u64, report: &SlotBrokenReport, next_solve_tick: u64) -> Value {
     json!({
         "squad_id": squad_id,
@@ -608,7 +591,6 @@ fn arg_to_json(v: &VerbArgValue) -> Value {
     }
 }
 
-/// **M7B**: typed wrapper for `issue_verb` results.
 pub struct IssueOutcome {
     pub outcome: CommandIssue,
     pub payload: Value,
@@ -620,7 +602,6 @@ impl IssueOutcome {
     }
 }
 
-/// **M7B**: typed wrapper for formation-set results.
 pub struct FormationSetOutcome {
     pub previous: FormationKind,
     pub new_kind: FormationKind,
@@ -628,26 +609,22 @@ pub struct FormationSetOutcome {
     pub assignment_payloads: Vec<Value>,
 }
 
-/// **M7B**: typed wrapper for role-assignment results.
 pub struct RoleAssignmentOutcome {
     pub result: cf_ai::squad_state::RoleAssignmentResult,
     pub payload: Value,
 }
 
-/// **M7B**: combined return for `advance_breach_chain`.
 pub struct BreachChainAdvance {
     pub step_payload: Option<Value>,
     pub complete_payload: Option<Value>,
 }
 
-/// **M7B**: combined return for `on_member_kia`. When `removed` is true,
 /// the engine emits the collapse + reslot payloads in order.
 pub struct KiaOutcome {
     pub removed: bool,
     pub reslot: Option<FormationSetOutcome>,
 }
 
-/// **M7B**: parse a `VerbArgValue` from a JSON `{kind, value}` shape.
 pub fn parse_verb_arg(value: &Value) -> Result<VerbArgValue, String> {
     let kind = value
         .get("kind")

@@ -5,7 +5,6 @@ use crate::{
 
 use super::common::make_zone;
 
-/// **M13** § "Chassis archetypes — M13 ships 5" — non-humanoid quadruped
 /// body graph: 4 legs + 2 claws + torso + sensor cluster + carapace = 11 zones.
 pub(crate) fn crab_body_graph() -> BodyGraph {
     let zones = vec![
@@ -161,7 +160,6 @@ pub(crate) fn crab_body_graph() -> BodyGraph {
     }
 }
 
-/// **M13** § "Crab / quadruped" chassis spec. 11-zone non-humanoid; no jet.
 pub fn crab_quadruped_spec() -> ChassisSpec {
     let zones = vec![
         make_zone(BodyZone::Torso, 120.0, 8.0, 80.0, 4.0, 100.0, 30.0),

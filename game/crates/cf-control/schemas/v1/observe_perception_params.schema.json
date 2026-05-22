@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ObservePerceptionParams",
-  "description": "**M6**: `observe.perception` — return per-actor perception projection\n(sight cone + hearing radius + stealth meter + last footstep loudness\nband + last occlusion factor). `actor_id=None` resolves to the player.",
+  "description": "(sight cone + hearing radius + stealth meter + last footstep loudness\nband + last occlusion factor). `actor_id=None` resolves to the player.",
   "type": "object",
   "properties": {
     "actor_id": {

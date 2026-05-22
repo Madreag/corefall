@@ -214,7 +214,6 @@ impl WalkPath {
     }
 }
 
-/// VAL-M9B-HUD-003: derive the HUD chevron sequence for a `Standing`
 /// player walking the path. Returns the chevron state at each beat.
 #[must_use]
 pub fn chevron_sequence_for_walk(path: &WalkPath) -> Vec<ChevronState> {
@@ -322,7 +321,6 @@ mod tests {
         three_distinct_tints();
     }
 
-    /// VAL-M9B-HUD-003: per-movement chevron sequence matches the spec
     /// walkthrough.
     #[test]
     fn chevron_sequence_per_movement() {

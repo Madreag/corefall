@@ -116,7 +116,6 @@ mod tests {
         assert!(matches!(err, SaveError::MigrationFailed { .. }));
     }
 
-    /// **M4B § "Migration corpus matrix passes for every fixture"** — the
     /// v1 -> v2 handler's output for the canonical v1_minimal blob MUST
     /// produce a stable canonical-JSON BLAKE3. This is the binding
     /// contract that `m4b_migration_matrix.sh` verifies in CI.

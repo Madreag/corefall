@@ -56,7 +56,6 @@ pub struct ApfsdsThroughModulePayload {
     pub final_energy_j: f32,
 }
 
-/// **M14D** § projectile-pair contact killcam payload (VAL-M14D-019).
 /// Surfaced only when the per-player `replay_intercepts` setting is
 /// opted in; the default-off behaviour means the killcam queue is
 /// empty for these events on default settings.
@@ -80,7 +79,6 @@ pub enum KillcamVariantTrigger {
     HeatJetTraversed,
     /// `armor.apfsds_long_rod_through` fired.
     ApfsdsLongRodThrough,
-    /// **M14D** § `collision.projectile_pair_contact` fired. Killcam
     /// excludes this trigger from the candidate queue by default; the
     /// per-player `replay_intercepts` setting opts inclusion.
     ProjectilePairContact,
@@ -97,7 +95,6 @@ pub enum KillcamVariant {
     HeatPenetration(HeatPenetrationPayload),
     /// M14C APFSDS-through-module cam (glowing long-rod path).
     ApfsdsThroughModule(ApfsdsThroughModulePayload),
-    /// **M14D** § projectile-pair contact cam. Only added to the
     /// killcam queue when the per-player `replay_intercepts` setting is
     /// `true` (default is `false` per VAL-M14D-019).
     ProjectilePairContact(ProjectilePairContactPayload),
@@ -120,7 +117,6 @@ impl KillcamVariant {
     }
 }
 
-/// **M14C** § VAL-M14C-013: dispatch a killcam variant based on the
 /// trigger event. Returns a non-default variant payload for HEAT /
 /// APFSDS impacts; returns the default fallback for everything else.
 #[must_use]
@@ -134,7 +130,6 @@ pub fn dispatch_variant(
         KillcamVariantTrigger::ApfsdsLongRodThrough => {
             KillcamVariant::ApfsdsThroughModule(apfsds_payload.unwrap_or_default())
         }
-        // **M14D** trigger handled by `dispatch_pair_contact_variant`
         // which threads the per-player `replay_intercepts` opt-in. The
         // default surface here returns the fallback so the M14C surface
         // doesn't accidentally surface projectile-pair cams when called
@@ -144,7 +139,6 @@ pub fn dispatch_variant(
     }
 }
 
-/// **M14D** § VAL-M14D-019 / VAL-CROSS-004: dispatch a killcam variant
 /// for a `collision.projectile_pair_contact` event. Returns the
 /// non-default `ProjectilePairContact` variant ONLY when the player's
 /// `replay_intercepts` setting is `true`; otherwise returns the default
@@ -158,7 +152,6 @@ pub fn dispatch_pair_contact_variant(payload: ProjectilePairContactPayload, repl
     }
 }
 
-/// **M14D** § VAL-M14D-019 default value: per-player `replay_intercepts`
 /// defaults to `false` (killcam excludes projectile-pair contacts by
 /// default; player can opt in via settings).
 pub const DEFAULT_REPLAY_INTERCEPTS: bool = false;

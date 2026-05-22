@@ -67,7 +67,6 @@ impl WireVisual {
 mod tests {
     use super::*;
 
-    /// VAL-M9C-051: every wire kind has a distinct texture id + tint.
     #[test]
     fn wire_visuals_are_pairwise_distinct() {
         let mut seen = vec![];

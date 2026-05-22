@@ -110,7 +110,6 @@ fn table_for(stance: HitZoneStance) -> &'static [ZoneAabb] {
     }
 }
 
-/// **M13** § "PROJECTILE-VS-ACTOR HIT DETECTION (deterministic; no RNG)".
 /// Resolves the body zone at the given local-space coordinate.
 /// `local_x` is post-facing-flip (positive = near side); `local_y` is
 /// normalized 0..1 from feet to crown.

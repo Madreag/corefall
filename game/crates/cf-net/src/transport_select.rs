@@ -32,7 +32,6 @@ pub enum ServerMode {
     P2pSession,
 }
 
-/// **M8B § scenario "joining as a guest"** vs host-of-lan_room.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LanParticipantRole {
@@ -79,7 +78,6 @@ impl TransportMode {
     }
 }
 
-/// **M8B § Acceptance "Transport-select picks ..."**: the canonical
 /// deterministic decision function.
 pub fn select_transport(input: &TransportSelectInput) -> TransportMode {
     match input.server_mode {
@@ -158,7 +156,6 @@ mod tests {
         assert_eq!(m, TransportMode::DedicatedServerAuth);
     }
 
-    /// **M8B § Notes "CI gate runs the full matrix"**: the decision is
     /// deterministic per (server_mode, client_caps).
     #[test]
     fn full_matrix_is_deterministic() {

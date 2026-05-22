@@ -27,7 +27,6 @@ pub use cf_treatment::{
 };
 use cf_treatment::TreatmentKind;
 
-/// **M14H** § per-AI-medic doctrine wrapper. Persists across ticks so the
 /// decision tree's `last_treatment_applied` + `last_monitor_tick` state
 /// survive between AI updates.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -71,7 +70,6 @@ impl MedicDoctrineState {
         self.last_monitor_tick = tree.last_monitor_tick;
     }
 
-    /// **M14H** § Spec § Notes for the implementer: "Field-medic decision
     /// tree is a finite-state machine; AI medic doctrine consumes via M22
     /// utility scorer". This resolver is the canonical M22 entry point:
     /// the M7 thinking stack invokes it after Utility scores
@@ -116,7 +114,6 @@ impl MedicDoctrineState {
     }
 }
 
-/// **M14H** § snapshot consumed by the `patient.assessed` replay event.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MedicAssessment {
     pub medic_actor_id: u64,
@@ -170,7 +167,6 @@ mod tests {
         }
     }
 
-    /// **M14H** Gherkin scenario 5 (M22 utility scorer integration): the
     /// resolver produces a concrete MedicAction + MedicAssessment.
     #[test]
     fn resolve_next_action_produces_apply_for_arterial_bleed() {

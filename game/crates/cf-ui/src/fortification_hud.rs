@@ -208,7 +208,6 @@ impl Plugin for FortificationHudPlugin {
 mod tests {
     use super::*;
 
-    /// VAL-M9C-053: HP bar is hidden when nothing is selected; shown
     /// when set with a non-zero max.
     #[test]
     fn fortification_hp_bar_visibility() {

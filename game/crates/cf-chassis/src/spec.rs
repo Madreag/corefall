@@ -18,7 +18,6 @@ pub struct ChassisSpec {
     /// Tick rate this spec was instantiated with (used to size [`crate::EjectWindow`]).
     /// Independent of the runtime tick rate; resolved on insertion.
     pub mass_kg: f32,
-    /// **M13** § "Armor mounting angles per chassis archetype". Per-zone
     /// armor mount angles drive M9 angled-armor math.
     #[serde(default)]
     pub armor_angles: ArmorMountAngles,

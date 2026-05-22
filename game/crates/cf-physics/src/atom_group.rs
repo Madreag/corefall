@@ -23,7 +23,6 @@ pub struct Atom {
     pub offset: [f32; 2],
 }
 
-/// **M14A** § "AtomGroup" — pixel-perfect collision shape (per-atom positions).
 ///
 /// CCCP `Entities/AtomGroup.h` reference; the Rust shape is simpler — we
 /// carry just the atom offsets + the path-following push logic. Full
@@ -65,7 +64,6 @@ impl AtomGroup {
     }
 }
 
-/// **M14A** § "Algorithm (Corefall summary)" — outcome of one
 /// `push_as_limb` call.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct SweepOutcome {
@@ -81,7 +79,6 @@ pub struct SweepOutcome {
     pub fraction_advanced: f32,
 }
 
-/// **M14A** § "push_travel" — single push step against terrain.
 ///
 /// Given a foot at `limb_pos` traveling toward `target_velocity_world`,
 /// integrate over `dt_ms` and return the impulse the foot pushes the chassis
@@ -116,7 +113,6 @@ pub fn push_travel(
     }
 }
 
-/// **M14A** § "push_as_limb — the heart of CC walking" — pure function form.
 ///
 /// Inputs are the joint world position, the joint velocity, the limb path
 /// (mutated to advance), the walk angle for this leg, the per-tick time,
@@ -206,7 +202,6 @@ pub fn push_as_limb(
     outcome
 }
 
-/// **M14A** § "FlailAsLimb — severed/ragdoll fallback" — CCCP
 /// `AtomGroup.cpp:1288-1306`.
 #[allow(clippy::similar_names, clippy::too_many_arguments)]
 pub fn flail_as_limb(
@@ -243,7 +238,6 @@ pub fn flail_as_limb(
     }
 }
 
-/// **M14A** § "evaluate_ricochet" — surface-angle vs hardness check.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RicochetOutcome {
     Bounce { outgoing_dir: [f32; 2], energy_loss_pct: f32 },

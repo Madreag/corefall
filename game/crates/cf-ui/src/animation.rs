@@ -17,7 +17,6 @@
 
 use bevy::prelude::*;
 
-/// **M12**: animation hook kinds — one per per-element lifecycle event.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum AnimationHook {
     /// Panel appearing (slide + fade-in).
@@ -96,7 +95,6 @@ pub fn ease_out_cubic(t: f32) -> f32 {
     1.0 - u * u * u
 }
 
-/// **M12** § Animation system — "UI panel transitions (slide + skew +
 /// ease per DR-046)". The skew rotation that pairs with the slide
 /// during a panel `Entry` / `Exit`. Returns the skew angle in radians,
 /// peaks at `~0.12 rad` mid-transition then settles back to zero. The
@@ -124,7 +122,6 @@ pub fn panel_skew_radians(pulse: &AnimationPulse) -> f32 {
     }
 }
 
-/// **M12** § Animation system — "UI panel transitions (slide ...)".
 /// The slide-axis offset that pairs with [`panel_skew_radians`]. Returns
 /// the normalized progress from off-screen (0.0) to settled (1.0)
 /// during Entry; inverted (1.0 → 0.0) during Exit.
@@ -141,7 +138,6 @@ pub fn panel_slide_offset(pulse: &AnimationPulse) -> f32 {
     }
 }
 
-/// **M12**: one in-flight animation hook on a HUD node.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AnimationPulse {
     pub hook: AnimationHook,
@@ -202,7 +198,6 @@ impl AnimationPulse {
     }
 }
 
-/// **M12**: animation table per HUD node. cf-app reads back the eased
 /// progress for each (node_id, hook) pair to drive opacity / scale / skew
 /// on the corresponding Bevy entity.
 #[derive(Resource, Debug, Default, Clone)]
@@ -291,7 +286,6 @@ pub fn tick_animations(time: Res<Time>, mut state: ResMut<AnimationState>) {
     state.tick(dt_ms);
 }
 
-/// **M12**: animation plugin wiring [`AnimationState`].
 pub struct AnimationPlugin;
 
 impl Plugin for AnimationPlugin {

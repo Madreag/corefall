@@ -282,7 +282,6 @@ impl M0Engine {
         }
     }
 
-    /// **M9B / m9b-4**: place a [`TrenchSegment`] into the live engine
     /// trench-world index at the supplied origin (template-relative
     /// coordinates are translated to world by the caller). Returns the
     /// allocated `segment_id` so the cfctl handler can carry it on the
@@ -319,7 +318,6 @@ impl M0Engine {
         id
     }
 
-    /// **M9B / m9b-4**: append a module to a previously placed
     /// segment. Called by the cfctl `place_trench_module` handler so
     /// `observe.trench_segment_at_pos` reflects the embedded module.
     ///
@@ -342,7 +340,6 @@ impl M0Engine {
         true
     }
 
-    /// **M9B / m9b-4**: bulk-insert a vector of placed segments from a
     /// dropped trench template. Returns the first segment_id allocated.
     pub(crate) fn insert_trench_segments_bulk(
         &self,
@@ -773,7 +770,6 @@ pub(crate) fn m9b_scenario_collapse_hardness(scenario_id: &str) -> f32 {
 }
 
 impl M0Engine {
-    /// **M9B audit GAP-1**: emit `trench.cover_state_changed` for every
     /// actor whose (cover_state, segment_variant, stance) tuple changed
     /// this tick. Reads the live trench world index, snapshots each
     /// actor's current cover, and compares to the last latched tuple.
@@ -864,7 +860,6 @@ impl M0Engine {
         }
     }
 
-    /// **M9B audit GAP-2**: tick the trench doctrine for every opted-in
     /// actor. Builds [`cf_ai::TrenchDoctrineInputs`] from per-actor state
     /// and the live trench world, runs `TrenchDoctrine::tick`, emits
     /// `ai.cover_decision`, and updates the per-actor exposure counter.
@@ -1016,7 +1011,6 @@ impl M0Engine {
         }
     }
 
-    /// **M9B audit GAP-3**: tick drainage for every segment with a
     /// `drainage_sump` embedded module. Accumulates per-tick rainfall
     /// from the active scenario, calls `drainage_sump_tick`, and emits
     /// `trench.drainage_flushed` on each flush cycle.
@@ -1086,7 +1080,6 @@ impl M0Engine {
         }
     }
 
-    /// **M9B audit GAP-5**: tick per-segment collapse for every
     /// non-collapsed segment in the trench world. Mutates the runtime
     /// integrity field and emits `trench.segment_collapsed` exactly
     /// once per segment.
@@ -1191,7 +1184,6 @@ impl M0Engine {
         }
     }
 
-    /// **M9B audit GAP-4**: process the per-tick collection of MG fire
     /// records emitted by reactive guards, looking for hits that cross
     /// a `parapet_raised` segment carrying a `Breastwork` module. Each
     /// matching hit applies one round of damage to the segment's

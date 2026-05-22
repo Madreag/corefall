@@ -2,7 +2,6 @@ use std::path::Path;
 
 use crate::report::ValidationReport;
 
-/// **M4A**: validate every JSONL line in a ledger file against the locked
 /// v1 AssetEntry schema. Each line that fails surfaces as a FAIL with the
 /// per-line reason; lines that recompute their AssetId mismatch
 /// `id_drift` reason for CI to pattern-match.
@@ -55,7 +54,6 @@ mod tests {
     use crate::test_helpers::write_tmp;
     use std::fs;
 
-    /// **M4A**: `cf-mod validate content/asset_ledger/ledger.jsonl` happily
     /// accepts a well-formed v1 ledger AND surfaces id_drift / schema drift
     /// as FAIL.
     #[test]

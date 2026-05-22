@@ -54,7 +54,7 @@
       }
     },
     "cells": {
-      "description": "**M14B § \"Surface in observe.frame.cells\"** — per-cell atmosphere\nprojection (pressure + temperature + gas composition). Empty for\nscenarios that don't declare `atmosphere_cells` in the manifest.",
+      "description": "projection (pressure + temperature + gas composition). Empty for\nscenarios that don't declare `atmosphere_cells` in the manifest.",
       "type": "array",
       "default": [],
       "items": {
@@ -62,7 +62,7 @@
       }
     },
     "controls_capture": {
-      "description": "**M1 / Gap D3**: controls-capture surface. When `captured=true`\ncf-ui renders the CAPTURED zone and cf-app suppresses keyboard/mouse\ndispatch.",
+      "description": "cf-ui renders the CAPTURED zone and cf-app suppresses keyboard/mouse\ndispatch.",
       "$ref": "#/$defs/ControlsCaptureView",
       "default": {
         "captured": false
@@ -86,7 +86,7 @@
       "minimum": 0
     },
     "gravity_vectors": {
-      "description": "**M14B** § per-actor gravity vector projection. Reports the\nscenario-base gravity plus stacked overrides as observed at the\nactor's position this tick. Empty for scenarios with no actors.",
+      "description": "scenario-base gravity plus stacked overrides as observed at the\nactor's position this tick. Empty for scenarios with no actors.",
       "type": "array",
       "default": [],
       "items": {
@@ -105,7 +105,7 @@
       ]
     },
     "mount_links": {
-      "description": "**M14J § cf-control::observe — observe.mount_link list** — every\nactive rider/critter pairing (rider_id + critter_id + combined_mass).",
+      "description": "active rider/critter pairing (rider_id + critter_id + combined_mass).",
       "type": "array",
       "default": [],
       "items": {
@@ -131,7 +131,7 @@
       }
     },
     "ropes": {
-      "description": "**M14J § cf-control::observe — observe.rope list** — every embedded\ngrapple rope + zip-line cable currently in the world. Pulled from\n`EngineMutable::m14j_ropes`; consumers read endpoints + tautness.",
+      "description": "grapple rope + zip-line cable currently in the world. Pulled from\n`EngineMutable::m14j_ropes`; consumers read endpoints + tautness.",
       "type": "array",
       "default": [],
       "items": {
@@ -187,7 +187,7 @@
       ]
     },
     "trench_segment_at_pos": {
-      "description": "**M9B / VAL-M9B-CFCTL-003**: optional projection of the trench\nsegment at a queried tile position. `None` when no segment has\nbeen queried OR the queried tile is open ground. Populated on\ndemand by `observe.trench_segment_at_pos` callers; the standard\nobserve stream leaves this empty so the frame stays cheap.",
+      "description": "segment at a queried tile position. `None` when no segment has\nbeen queried OR the queried tile is open ground. Populated on\ndemand by `observe.trench_segment_at_pos` callers; the standard\nobserve stream leaves this empty so the frame stays cheap.",
       "anyOf": [
         {
           "$ref": "#/$defs/TrenchSegmentView"
@@ -198,7 +198,7 @@
       ]
     },
     "ziplines": {
-      "description": "**M14J § cf-control::observe — observe.zipline list** — subset of\n`ropes` that are deployed zip-line cables (canonical high/low ends\n+ active rider count).",
+      "description": "`ropes` that are deployed zip-line cables (canonical high/low ends\n+ active rider count).",
       "type": "array",
       "default": [],
       "items": {
@@ -299,7 +299,6 @@
       ]
     },
     "ActorGravityView": {
-      "description": "**M14B** § per-actor gravity vector projection for `observe.frame.gravity_vectors`.",
       "type": "object",
       "properties": {
         "active_override_ids": {
@@ -350,13 +349,12 @@
           "minItems": 2
         },
         "bloom_factor": {
-          "description": "**M1**: most-recent reticle bloom factor (`Soldat Sprites.pas:4870`).",
           "type": "number",
           "format": "float",
           "default": 1.0
         },
         "body_silhouette": {
-          "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n**M5**: `placeholder=false` when sourced from a real chassis body graph;\n`placeholder=true` for legacy actors without a chassis.",
+          "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n`placeholder=true` for legacy actors without a chassis.",
           "$ref": "#/$defs/BodySilhouetteView",
           "default": {
             "arm_left_hp_pct": 1.0,
@@ -369,7 +367,7 @@
           }
         },
         "chassis": {
-          "description": "**M5**: full chassis projection (per-zone integrity, modules, stage,\npilot state, eject window). `None` for legacy actors without a chassis.",
+          "description": "pilot state, eject window). `None` for legacy actors without a chassis.",
           "anyOf": [
             {
               "$ref": "#/$defs/ChassisView"
@@ -387,17 +385,15 @@
           "type": "boolean"
         },
         "cover_state": {
-          "description": "**M9B**: trench cover state derived from (stance × current\ntrench segment variant) per VAL-M9B-CFCTL-003 + VAL-M9B-COVERMATRIX-001.\nOne of `Exposed | Partial | Full`. Defaults to `Exposed` for actors\non open ground (no trench segment under foot).",
+          "description": "trench segment variant) per VAL-M9B-CFCTL-003 + VAL-M9B-COVERMATRIX-001.\nOne of `Exposed | Partial | Full`. Defaults to `Exposed` for actors\non open ground (no trench segment under foot).",
           "type": "string",
           "default": "Exposed"
         },
         "crouch_active": {
-          "description": "**M5**: per-tick movement-intent flags surfaced to AI / HUD.",
           "type": "boolean",
           "default": false
         },
         "dying_dwell_ticks_remaining": {
-          "description": "**M1**: DYING dwell ticks remaining (CCCP `Actor.cpp:1229`).",
           "type": "integer",
           "format": "uint32",
           "default": 0,
@@ -417,7 +413,7 @@
           "minimum": 0
         },
         "inventory": {
-          "description": "**M1 re-audit (2026-05-13)**: full inventory contents as labels in\nslot order (4 entries for M1; \"empty\" for unset slots). Mirrors\n`cf_actor::ActorObservation.inventory` so consumers reading\n`observe.frame.actors[]` see the same payload as `observe.actor`.",
+          "description": "slot order (4 entries for M1; \"empty\" for unset slots). Mirrors\n`cf_actor::ActorObservation.inventory` so consumers reading\n`observe.frame.actors[]` see the same payload as `observe.actor`.",
           "type": "array",
           "default": [],
           "items": {
@@ -429,20 +425,17 @@
           "default": false
         },
         "knockdown_ticks_remaining": {
-          "description": "**M1**: knockdown recovery ticks remaining (0 when not stunned).",
           "type": "integer",
           "format": "uint32",
           "default": 0,
           "minimum": 0
         },
         "mass_kg": {
-          "description": "**M1**: physical mass (kg). Drives mass_factor in physics + stability cost.",
           "type": "number",
           "format": "float",
           "default": 80.0
         },
         "mission_critical": {
-          "description": "**M1**: mission_critical flag (caps damage at DOWNED when true).",
           "type": "boolean",
           "default": false
         },
@@ -458,7 +451,6 @@
           "type": "boolean"
         },
         "origin_id": {
-          "description": "**M5**: actor origin tag (`human`, `robot`, `android`).",
           "type": "string",
           "default": "human"
         },
@@ -472,7 +464,6 @@
           "minItems": 2
         },
         "recoil_accumulator": {
-          "description": "**M1**: alternating-recoil accumulator value (CCCP `HDFirearm.cpp:891`).",
           "type": "number",
           "format": "float",
           "default": 0.0
@@ -526,19 +517,16 @@
           "minimum": 0
         },
         "sharp_aim_progress": {
-          "description": "**M1**: sharp-aim progress (0..1).",
           "type": "number",
           "format": "float",
           "default": 0.0
         },
         "stability": {
-          "description": "**M1**: stability scalar (0.0 = disrupted, 1.0 = solid).",
           "type": "number",
           "format": "float",
           "default": 1.0
         },
         "stability_recovery_rate": {
-          "description": "**M1**: per-tick stability recovery rate.",
           "type": "number",
           "format": "float",
           "default": 0.019999999552965164
@@ -580,7 +568,7 @@
       ]
     },
     "AimAssist": {
-      "description": "**M8**: aim assist mode (`aim_assist`). Spec § Accessibility extras —\noff / steady_aim / auto_aim_with_damage_penalty.",
+      "description": "off / steady_aim / auto_aim_with_damage_penalty.",
       "oneOf": [
         {
           "description": "No aim assist.",
@@ -600,7 +588,6 @@
       ]
     },
     "AtmosphericCellGasView": {
-      "description": "**M14B** § per-gas projection inside [`AtmosphericCellView`].",
       "type": "object",
       "properties": {
         "fraction": {
@@ -617,7 +604,7 @@
       ]
     },
     "AtmosphericCellView": {
-      "description": "**M14B** § per-cell atmosphere projection for `observe.frame.cells`.\nAuthored by the scenario manifest and mutated by the M14B\nstratification kernel each step.",
+      "description": "Authored by the scenario manifest and mutated by the M14B\nstratification kernel each step.",
       "type": "object",
       "properties": {
         "column_id": {
@@ -776,7 +763,7 @@
       ]
     },
     "CameraMotion": {
-      "description": "**M11**: camera-motion granularity (paired with `reduced_motion` for\nfiner follow-camera control).",
+      "description": "finer follow-camera control).",
       "oneOf": [
         {
           "description": "Reduced — suppress follow-camera + recoil-camera animation.",
@@ -791,7 +778,7 @@
       ]
     },
     "CaptionMode": {
-      "description": "**M11**: captions verbosity mode. Filters which event categories surface\nas captions in the HUD strip.",
+      "description": "as captions in the HUD strip.",
       "oneOf": [
         {
           "description": "Captions disabled (no caption strip rendered).",
@@ -874,11 +861,10 @@
       ]
     },
     "ChassisView": {
-      "description": "**M5**: chassis projection for `cfctl observe` / `inspect`.",
       "type": "object",
       "properties": {
         "bleed_rate_per_sec": {
-          "description": "**M14**: total per-second bleed rate (sum across all bleeding zones)\nfor the actor. Drives the HUD bleeding indicator.",
+          "description": "for the actor. Drives the HUD bleeding indicator.",
           "type": "number",
           "format": "float",
           "default": 0.0
@@ -907,7 +893,7 @@
           "type": "string"
         },
         "limb_states": {
-          "description": "**M14**: per-zone limb-loss state machine projection. One entry per\nchassis zone with the current [`cf_physics::ZoneState`] label, plus\nthe bleed_rate per-second derived from the zone's state.",
+          "description": "chassis zone with the current [`cf_physics::ZoneState`] label, plus\nthe bleed_rate per-second derived from the zone's state.",
           "type": "array",
           "default": [],
           "items": {
@@ -928,7 +914,7 @@
           "type": "string"
         },
         "ragdoll_state": {
-          "description": "**M14**: ragdoll authority state for the actor (`animated` /\n`activating` / `active` / `static_collapse`). Mirrors\n[`cf_physics::RagdollState`].",
+          "description": "`activating` / `active` / `static_collapse`). Mirrors\n[`cf_physics::RagdollState`].",
           "type": "string",
           "default": "animated"
         },
@@ -1015,7 +1001,7 @@
       ]
     },
     "ColorCueMode": {
-      "description": "**M8**: color blind / contrast palette mode (`color_cue_mode`). Spec §\nAccessibility extras — Default / ColorblindSafe / Protanopia /\nDeuteranopia / Tritanopia / MonochromeTest.",
+      "description": "Accessibility extras — Default / ColorblindSafe / Protanopia /\nDeuteranopia / Tritanopia / MonochromeTest.",
       "oneOf": [
         {
           "description": "Default game palette.",
@@ -1050,7 +1036,7 @@
       ]
     },
     "ComicStyleOverlay": {
-      "description": "**M12**: comic-style overlay mode mirror — `full | subtle | off`.\nDrives `cf-ui::comic_overlay::ComicOverlayMode` at runtime.",
+      "description": "Drives `cf-ui::comic_overlay::ComicOverlayMode` at runtime.",
       "oneOf": [
         {
           "description": "Speech bubbles for chatter + onomatopoeia on impacts + comic-panel\nboss intros + comic death recap available behind toggle.",
@@ -1070,7 +1056,7 @@
       ]
     },
     "ContrastMode": {
-      "description": "**M11**: contrast palette mode for the ACC-A floor. Replaces the legacy\n`high_contrast: bool` with a tri-state enum (Standard / HighContrastDark /\nHighContrastLight) per spec § Settings tree.",
+      "description": "`high_contrast: bool` with a tri-state enum (Standard / HighContrastDark /\nHighContrastLight) per spec § Settings tree.",
       "oneOf": [
         {
           "description": "Standard palette (default).",
@@ -1090,7 +1076,6 @@
       ]
     },
     "ControlsCaptureView": {
-      "description": "**M1 / Gap D3**: minimal HUD projection for the CONTROLS CAPTURED badge.",
       "type": "object",
       "properties": {
         "captured": {
@@ -1108,7 +1093,6 @@
       ]
     },
     "DebugExplainerLevel": {
-      "description": "**M11**: debug-explainer verbosity (for the death recap + AI debug overlays).",
       "oneOf": [
         {
           "description": "Player-friendly plain-language explanations (default).",
@@ -1165,7 +1149,7 @@
           "minimum": 0
         },
         "intent_label": {
-          "description": "**M1.5**: human-readable intent label combining guard state + last\ntactic (\"ALERT: heard_shot\", \"ENGAGED\", \"RELOADING\", \"STUCK:\nblocked\"). cf-ui surfaces this above the guard sprite when\n`Settings.ai_debug == true`.",
+          "description": "tactic (\"ALERT: heard_shot\", \"ENGAGED\", \"RELOADING\", \"STUCK:\nblocked\"). cf-ui surfaces this above the guard sprite when\n`Settings.ai_debug == true`.",
           "type": "string",
           "default": ""
         },
@@ -1178,7 +1162,7 @@
           "minimum": 0
         },
         "position": {
-          "description": "**M1.5**: guard's last-known world position, copied from the actor\nworld so the `--ai-debug` floating intent label can anchor at the\nsprite. Optional (None when the actor world isn't loaded).",
+          "description": "world so the `--ai-debug` floating intent label can anchor at the\nsprite. Optional (None when the actor world isn't loaded).",
           "type": [
             "array",
             "null"
@@ -1214,7 +1198,7 @@
       ]
     },
     "GameSpeedAssist": {
-      "description": "**M8**: slow-motion accessibility (`game_speed_assist`). Spec §\nCamera + game feel — Off / Slowdown75 / Slowdown25 / FullPause.",
+      "description": "Camera + game feel — Off / Slowdown75 / Slowdown25 / FullPause.",
       "oneOf": [
         {
           "description": "Sim runs at native rate.",
@@ -1239,7 +1223,6 @@
       ]
     },
     "HoldBehavior": {
-      "description": "**M11**: hold-behavior variant for the ACC-A floor (replaces tap-only).",
       "oneOf": [
         {
           "description": "Press-and-hold semantics (default; matches `hold_to_confirm=true`).",
@@ -1303,7 +1286,6 @@
       ]
     },
     "InputProfile": {
-      "description": "**M11**: primary input profile (drives default HUD focus path).",
       "oneOf": [
         {
           "description": "Keyboard + mouse (default).",
@@ -1328,7 +1310,6 @@
       ]
     },
     "LimbStateView": {
-      "description": "**M14**: per-zone limb state for `cfctl inspect chassis`.",
       "type": "object",
       "properties": {
         "bleed_multiplier": {
@@ -1395,7 +1376,7 @@
           "type": "string"
         },
         "show_me_why_event_id": {
-          "description": "**M1.5**: DR-023 \"Show me why\" replay-handoff anchor surfaced\nfor the mission-resolved modal.",
+          "description": "for the mission-resolved modal.",
           "type": [
             "string",
             "null"
@@ -1403,7 +1384,7 @@
           "default": null
         },
         "show_replay_cta": {
-          "description": "**M1.5**: cf-ui modal flag — render the \"Show me why\" CTA when\n`true`.",
+          "description": "`true`.",
           "type": "boolean",
           "default": false
         },
@@ -1473,7 +1454,7 @@
       ]
     },
     "MountLinkView": {
-      "description": "**M14J § \"observe.mount_link list\"** — projection of one rider/critter\npairing.",
+      "description": "pairing.",
       "type": "object",
       "properties": {
         "combined_mass_kg": {
@@ -1517,7 +1498,6 @@
       ]
     },
     "ObjectiveHelp": {
-      "description": "**M11**: objective-help verbosity (tutorial / mission text density).",
       "type": "string",
       "enum": [
         "minimal",
@@ -1656,7 +1636,7 @@
       ]
     },
     "RopeView": {
-      "description": "**M14J § \"observe.rope list\"** — projection of one embedded verlet\nrope + its endpoints + tautness state.",
+      "description": "rope + its endpoints + tautness state.",
       "type": "object",
       "properties": {
         "embedded": {
@@ -1731,39 +1711,36 @@
       "type": "object",
       "properties": {
         "accel": {
-          "description": "**M1 Gap F1**: ground acceleration (units / s²). Default 1500.0\nmirrors `cf-actor::sim::ActorTuning::default().ground_acceleration`.",
+          "description": "mirrors `cf-actor::sim::ActorTuning::default().ground_acceleration`.",
           "type": "number",
           "format": "float",
           "default": 1500.0
         },
         "ai_debug": {
-          "description": "**M1.5**: when true, cf-ui renders a floating intent label above\nevery reactive guard (\"ALERT: heard_shot\", \"ENGAGED\", \"RELOADING\").\nToggled via `--ai-debug` CLI flag on cf-app and `act.settings.set\n{ ai_debug: true }` through cfctl.",
+          "description": "every reactive guard (\"ALERT: heard_shot\", \"ENGAGED\", \"RELOADING\").\nToggled via `--ai-debug` CLI flag on cf-app and `act.settings.set\n{ ai_debug: true }` through cfctl.",
           "type": "boolean",
           "default": false
         },
         "ai_difficulty": {
-          "description": "**M1.5 G6**: active AI difficulty preset id. Engine applies the\nmatching `cf-ai::DifficultyPreset` to every `ReactiveGuard` whenever\nthis changes.",
+          "description": "matching `cf-ai::DifficultyPreset` to every `ReactiveGuard` whenever\nthis changes.",
           "type": "string",
           "default": "tough_crowd"
         },
         "aim_assist": {
-          "description": "**M8**: aim assist mode (off / steady / auto).",
           "$ref": "#/$defs/AimAssist",
           "default": "off"
         },
         "camera_motion": {
-          "description": "**M11**: camera-motion granularity (Reduced / Standard).",
           "$ref": "#/$defs/CameraMotion",
           "default": "standard"
         },
         "caption_background_opacity": {
-          "description": "**M11**: caption background opacity (0.0..=1.0; default 0.8).",
           "type": "number",
           "format": "float",
           "default": 0.800000011920929
         },
         "caption_categories": {
-          "description": "**M11**: caption category subset (subset of\n[`SUPPORTED_CAPTION_CATEGORIES`]). Default 4 of 6.",
+          "description": "[`SUPPORTED_CAPTION_CATEGORIES`]). Default 4 of 6.",
           "type": "array",
           "default": [
             "accessibility",
@@ -1777,7 +1754,7 @@
           "uniqueItems": true
         },
         "caption_mode": {
-          "description": "**M11**: captions verbosity mode (Off / CriticalOnly / Standard /\nExpanded). Filters which events surface as captions.",
+          "description": "Expanded). Filters which events surface as captions.",
           "$ref": "#/$defs/CaptionMode",
           "default": "off"
         },
@@ -1785,62 +1762,56 @@
           "type": "boolean"
         },
         "cinematic_captions_enabled": {
-          "description": "**M12C**: captions-enabled mirror for the cinematic caption\nribbon. Defaults to `captions` (M11 mode) but exposed as a\nseparate flag so cfctl tests can toggle the cinematic surface\nindependently of the gameplay caption strip. Per spec § \"the\nM12A `caption_visible` predicate gates the subtitle ribbon\".",
+          "description": "ribbon. Defaults to `captions` (M11 mode) but exposed as a\nseparate flag so cfctl tests can toggle the cinematic surface\nindependently of the gameplay caption strip. Per spec § \"the\nM12A `caption_visible` predicate gates the subtitle ribbon\".",
           "type": "boolean",
           "default": true
         },
         "cinematic_kills": {
-          "description": "**M8**: cinematic kill cam on boss final blow.",
           "type": "boolean",
           "default": true
         },
         "color_cue_mode": {
-          "description": "**M8**: color blind / contrast palette mode.",
           "$ref": "#/$defs/ColorCueMode",
           "default": "default"
         },
         "comic_death_recap": {
-          "description": "**M12**: when `true`, the death recap renders as a 4-panel comic-style\ncause chain. When `false` (default), the M10 replay viewer +\ncause-chain walker is used. Gated by `comic_style_overlay != Off`.",
+          "description": "cause chain. When `false` (default), the M10 replay viewer +\ncause-chain walker is used. Gated by `comic_style_overlay != Off`.",
           "type": "boolean",
           "default": false
         },
         "comic_style_overlay": {
-          "description": "**M12**: comic-style overlay mode (`full | subtle | off`). Drives\nspeech bubbles, onomatopoeia stamps, comic-panel boss intros, and\nthe comic death-recap availability. Default is `Subtle` per spec\n§ Comic-style framing — opt-in juice, not core identity.",
+          "description": "speech bubbles, onomatopoeia stamps, comic-panel boss intros, and\nthe comic death-recap availability. Default is `Subtle` per spec\n§ Comic-style framing — opt-in juice, not core identity.",
           "$ref": "#/$defs/ComicStyleOverlay",
           "default": "subtle"
         },
         "compass_enabled": {
-          "description": "**M8**: master compass enable toggle.",
           "type": "boolean",
           "default": true
         },
         "contrast_mode": {
-          "description": "**M11**: contrast palette mode. Tri-state replacing the legacy\n`high_contrast: bool`. Standard / HighContrastDark / HighContrastLight.",
+          "description": "`high_contrast: bool`. Standard / HighContrastDark / HighContrastLight.",
           "$ref": "#/$defs/ContrastMode",
           "default": "standard"
         },
         "damage_direction_enabled": {
-          "description": "**M8**: damage direction indicator enable toggle.",
           "type": "boolean",
           "default": true
         },
         "damage_numbers": {
-          "description": "**M8**: damage numbers cosmetic (floating \"+15\" text on hit).",
           "type": "boolean",
           "default": false
         },
         "debug_enabled": {
-          "description": "**M8**: master debug-overlay enable gate. In production builds the\n7 cf-debug overlays only render when `debug_enabled = true`. Dev\nbuilds bypass the gate.",
+          "description": "7 cf-debug overlays only render when `debug_enabled = true`. Dev\nbuilds bypass the gate.",
           "type": "boolean",
           "default": false
         },
         "debug_explainer_level": {
-          "description": "**M11**: debug-explainer level (Player / Designer / Raw).",
           "$ref": "#/$defs/DebugExplainerLevel",
           "default": "player"
         },
         "debug_overlays": {
-          "description": "**M8**: set of currently-enabled cf-debug overlays (snake_case ids\nper `cf_debug::DebugOverlay::as_str`). Mirrors the cf-debug\n`DebugOverlayState` so cfctl `observe.debug.overlays` round-trips.",
+          "description": "per `cf_debug::DebugOverlay::as_str`). Mirrors the cf-debug\n`DebugOverlayState` so cfctl `observe.debug.overlays` round-trips.",
           "type": "array",
           "default": [],
           "items": {
@@ -1849,34 +1820,31 @@
           "uniqueItems": true
         },
         "fog_of_war_on": {
-          "description": "**M8**: fog-of-war on (default true per spec § Difficulty modifiers).",
           "type": "boolean",
           "default": true
         },
         "friction": {
-          "description": "**M1 Gap F1**: ground friction (units / s²). Default 1200.0 mirrors\n`cf-actor::sim::ActorTuning::default().ground_friction`.",
+          "description": "`cf-actor::sim::ActorTuning::default().ground_friction`.",
           "type": "number",
           "format": "float",
           "default": 1200.0
         },
         "friendly_fire_on": {
-          "description": "**M8**: friendly fire on.",
           "type": "boolean",
           "default": false
         },
         "game_speed_assist": {
-          "description": "**M8**: slow-motion accessibility (Off / Slowdown75 / Slowdown25 /\nFullPause). Cosmetic per M4; replay-deterministic.",
+          "description": "FullPause). Cosmetic per M4; replay-deterministic.",
           "$ref": "#/$defs/GameSpeedAssist",
           "default": "off"
         },
         "gravity": {
-          "description": "**M1 Gap F1**: gravity acceleration applied to the actor in\n`cf-physics` (units / s²; negative pulls toward the floor). Default\n`-980.0`.",
+          "description": "`cf-physics` (units / s²; negative pulls toward the floor). Default\n`-980.0`.",
           "type": "number",
           "format": "float",
           "default": -980.0
         },
         "hardcore_mode": {
-          "description": "**M8**: hardcore mode (composite of multiple modifiers).",
           "type": "boolean",
           "default": false
         },
@@ -1884,12 +1852,10 @@
           "type": "boolean"
         },
         "hit_stop_enabled": {
-          "description": "**M8**: hit-stop pulse on impactful hits.",
           "type": "boolean",
           "default": true
         },
         "hold_behavior": {
-          "description": "**M11**: hold-behavior variant (default Hold).",
           "$ref": "#/$defs/HoldBehavior",
           "default": "hold"
         },
@@ -1906,12 +1872,11 @@
           "default": false
         },
         "input_profile": {
-          "description": "**M11**: input profile (default keyboard+mouse).",
           "$ref": "#/$defs/InputProfile",
           "default": "keyboard_mouse"
         },
         "jump_force": {
-          "description": "**M1 Gap F1**: jump impulse (units / s). Default `420.0` mirrors\n`cf-actor::sim::ActorTuning::default().jump_impulse`.",
+          "description": "`cf-actor::sim::ActorTuning::default().jump_impulse`.",
           "type": "number",
           "format": "float",
           "default": 420.0
@@ -1930,59 +1895,51 @@
           "default": false
         },
         "killcam_enabled": {
-          "description": "**M8**: killcam toggle (on by default per spec § Killcam).",
           "type": "boolean",
           "default": true
         },
         "language": {
-          "description": "**M8**: active language code (en baseline; Tier-A 11 reserved for\nT-ACC-PLUS BP9+).",
+          "description": "T-ACC-PLUS BP9+).",
           "type": "string",
           "default": "en"
         },
         "limited_ammo": {
-          "description": "**M8**: limited-ammo modifier.",
           "type": "boolean",
           "default": false
         },
         "mini_map_enabled": {
-          "description": "**M8**: master mini-map enable toggle (Settings.no_minimap inverts).",
           "type": "boolean",
           "default": true
         },
         "mini_map_zoom": {
-          "description": "**M8**: mini-map zoom (clamped 0.25..=4.0).",
           "type": "number",
           "format": "float",
           "default": 1.0
         },
         "no_minimap": {
-          "description": "**M8**: hide the mini-map (overrides `mini_map_enabled` when true).",
           "type": "boolean",
           "default": false
         },
         "no_respawn": {
-          "description": "**M8**: no-respawn modifier.",
           "type": "boolean",
           "default": false
         },
         "objective_help": {
-          "description": "**M11**: objective-help verbosity (Minimal / Standard / Verbose).",
           "$ref": "#/$defs/ObjectiveHelp",
           "default": "standard"
         },
         "permadeath": {
-          "description": "**M8**: permadeath modifier.",
           "type": "boolean",
           "default": false
         },
         "recoil_decay_per_tick": {
-          "description": "**M1 Gap F1**: per-tick decay of `recoil_accumulator` toward zero\n(CCCP `HDFirearm.cpp:891`). Default `0.05`.",
+          "description": "(CCCP `HDFirearm.cpp:891`). Default `0.05`.",
           "type": "number",
           "format": "float",
           "default": 0.05000000074505806
         },
         "reduce_camera_shake_pct": {
-          "description": "**M1 / DR-055**: accessibility floor — camera shake magnitude is\nmultiplied by `(1.0 - reduce_camera_shake_pct)`. 0.0 = full shake,\n1.0 = no shake. Clamped to `[0, 1]` by `apply_settings_patch`.",
+          "description": "multiplied by `(1.0 - reduce_camera_shake_pct)`. 0.0 = full shake,\n1.0 = no shake. Clamped to `[0, 1]` by `apply_settings_patch`.",
           "type": "number",
           "format": "float",
           "default": 0.0
@@ -1997,7 +1954,7 @@
           "type": "boolean"
         },
         "remap_groups": {
-          "description": "**M11**: remap-action group subset (subset of\n[`SUPPORTED_REMAP_GROUPS`]). Default `[gameplay]`.",
+          "description": "[`SUPPORTED_REMAP_GROUPS`]). Default `[gameplay]`.",
           "type": "array",
           "default": [
             "gameplay"
@@ -2008,54 +1965,51 @@
           "uniqueItems": true
         },
         "scope_zoom_fov": {
-          "description": "**M8**: scope ADS FOV in degrees (clamped 5..=90).",
           "type": "number",
           "format": "float",
           "default": 30.0
         },
         "screen_shake_scale": {
-          "description": "**M11**: screen-shake scale (0.0..=1.0; default 1.0 = full shake;\n0.0 = no shake). Multiplicative on camera punch + recoil shake.\nReplaces the inverse-sense `reduce_camera_shake_pct`; the legacy\nfield is preserved for back-compat (mirror updated whenever this\nchanges via `apply_settings_patch`).",
+          "description": "0.0 = no shake). Multiplicative on camera punch + recoil shake.\nReplaces the inverse-sense `reduce_camera_shake_pct`; the legacy\nfield is preserved for back-compat (mirror updated whenever this\nchanges via `apply_settings_patch`).",
           "type": "number",
           "format": "float",
           "default": 1.0
         },
         "sharp_aim_build_ticks": {
-          "description": "**M1 Gap F1**: ticks to fully build sharp aim from 0 -> 1.0 (CCCP\n`AHuman.cpp:1779`). Default `30` (~0.5s at 60Hz).",
+          "description": "`AHuman.cpp:1779`). Default `30` (~0.5s at 60Hz).",
           "type": "integer",
           "format": "uint32",
           "default": 30,
           "minimum": 0
         },
         "speedrun_mode": {
-          "description": "**M8**: speedrun mode (HUD shows persistent timer + segment\nmarkers; mission resolves immediately on objectives).",
+          "description": "markers; mission resolves immediately on objectives).",
           "type": "boolean",
           "default": false
         },
         "storyteller": {
-          "description": "**M12C**: active storyteller id matching `cf-cinematic::StorytellerId`\n(`cassandra_classic` | `phoebe_chillax` | `randy_random` |\n`ironman` | `sandbox`). Forward-compat with M25's director-driven\nstoryteller selection. cf-shell + cfctl set this via\n`act.settings.set`; cf-cinematic reads it at every kernel engage\nper spec § \"The cinematic player reads the active storyteller\nfrom M25 director state and applies its profile globally.\"",
+          "description": "(`cassandra_classic` | `phoebe_chillax` | `randy_random` |\n`ironman` | `sandbox`). Forward-compat with M25's director-driven\nstoryteller selection. cf-shell + cfctl set this via\n`act.settings.set`; cf-cinematic reads it at every kernel engage\nper spec § \"The cinematic player reads the active storyteller\nfrom M25 director state and applies its profile globally.\"",
           "type": "string",
           "default": "cassandra_classic"
         },
         "text_scale": {
-          "description": "**M8**: text scale (mirrors ui_scale; some HUD widgets honour this\ndistinct field per spec § Settings menu Accessibility tab).",
+          "description": "distinct field per spec § Settings menu Accessibility tab).",
           "type": "number",
           "format": "float",
           "default": 1.0
         },
         "tick_rate_hz": {
-          "description": "**M1**: tick-rate observable. Mirrors the engine's\n`tick_rate_hz` so cfctl `observe.settings` round-trips a single\nauthoritative value. Defaults to 60.",
+          "description": "`tick_rate_hz` so cfctl `observe.settings` round-trips a single\nauthoritative value. Defaults to 60.",
           "type": "integer",
           "format": "uint32",
           "default": 60,
           "minimum": 0
         },
         "time_limit": {
-          "description": "**M8**: time-limit modifier (mission has a hard timer).",
           "type": "boolean",
           "default": false
         },
         "ui_density": {
-          "description": "**M8**: HUD density preset.",
           "$ref": "#/$defs/UiDensity",
           "default": "comfortable"
         },
@@ -2064,7 +2018,7 @@
           "format": "float"
         },
         "walk_threshold": {
-          "description": "**M1 Gap F1**: horizontal-speed threshold (units / s) below which the\nactor counts as \"slow enough\" to keep building sharp aim. Default 1.5.",
+          "description": "actor counts as \"slow enough\" to keep building sharp aim. Default 1.5.",
           "type": "number",
           "format": "float",
           "default": 1.5
@@ -2103,13 +2057,13 @@
           "minimum": 0
         },
         "chunk_count": {
-          "description": "**M3 audit pass 5 (2026-05-13)**: spec-literal alias for\n`allocated_chunk_count`. Same value, different field name so\nconsumers can read either.",
+          "description": "`allocated_chunk_count`. Same value, different field name so\nconsumers can read either.",
           "type": "integer",
           "format": "uint32",
           "minimum": 0
         },
         "current_overlay_mode": {
-          "description": "**M2**: active material-overlay mode (\"off\" by default). Cycled via\n`act.player.toggle_material_overlay`. One of `off`, `integrity`,\n`pathability`, `mobility`, `hazard`, `build_repair`.",
+          "description": "`act.player.toggle_material_overlay`. One of `off`, `integrity`,\n`pathability`, `mobility`, `hazard`, `build_repair`.",
           "type": "string",
           "default": "off"
         },
@@ -2135,7 +2089,7 @@
           }
         },
         "material_distribution": {
-          "description": "**M3 audit pass 5 (2026-05-13)**: spec-literal `material_distribution\n{id: pixel_count}` keyed by material id (u8). Same data as\n`material_counts` but with id keys instead of name keys.",
+          "description": "{id: pixel_count}` keyed by material id (u8). Same data as\n`material_counts` but with id keys instead of name keys.",
           "type": "object",
           "additionalProperties": false,
           "default": {},
@@ -2153,14 +2107,12 @@
           "minimum": 0
         },
         "total_carve_events": {
-          "description": "**M2**: cumulative carve event count emitted this run.",
           "type": "integer",
           "format": "uint64",
           "default": 0,
           "minimum": 0
         },
         "total_debris_spawned": {
-          "description": "**M2**: cumulative debris pixels spawned this run.",
           "type": "integer",
           "format": "uint64",
           "default": 0,
@@ -2226,7 +2178,7 @@
       ]
     },
     "TrenchSegmentView": {
-      "description": "**M9B / VAL-M9B-CFCTL-003**: typed projection of one trench segment\nreturned by `observe.trench_segment_at_pos`. The shape mirrors\n`cf_trench::TrenchSegment` so cfctl callers get a stable JSON view.",
+      "description": "returned by `observe.trench_segment_at_pos`. The shape mirrors\n`cf_trench::TrenchSegment` so cfctl callers get a stable JSON view.",
       "type": "object",
       "properties": {
         "depth": {
@@ -2277,7 +2229,7 @@
       ]
     },
     "UiDensity": {
-      "description": "**M8 / M11**: HUD density preset (`ui_density`). Spec § Accessibility tab —\nCompact / Comfortable / Spacious. M11 added `Comfortable` as the canonical\ndefault-density name (was `Normal` under M8 — accepted as an alias).",
+      "description": "Compact / Comfortable / Spacious. M11 added `Comfortable` as the canonical\ndefault-density name (was `Normal` under M8 — accepted as an alias).",
       "oneOf": [
         {
           "description": "Compact — denser HUD layout.",
@@ -2297,7 +2249,7 @@
       ]
     },
     "ZiplineView": {
-      "description": "**M14J § \"observe.zipline list\"** — projection of one deployed zip-line\ncable in canonical (high_end, low_end) orientation.",
+      "description": "cable in canonical (high_end, low_end) orientation.",
       "type": "object",
       "properties": {
         "brake_decel_m_s2": {

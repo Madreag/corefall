@@ -17,7 +17,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7/M9**: mission pacing phases. M7 ships the four `Setup` / `Buildup`
 /// / `Climax` / `Debrief` variants; M9 adds the reactor-defense
 /// `Prep` / `Launch` / `BuildUp` / `SustainPeak` / `Relax` variants. The
 /// M7 4-phase wire strings (`setup`/`buildup`/`climax`/`debrief`) are
@@ -36,19 +35,14 @@ pub enum MissionPhase {
     Climax,
     /// Mission resolution.
     Debrief,
-    /// **M9**: player can move + dig before the guard activates. Window
     /// defaults to 5 seconds (300 ticks @ 60Hz).
     Prep,
-    /// **M9**: guard becomes active and starts targeting the reactor.
     Launch,
-    /// **M9**: reactor under sustained pressure, no pressure escalation
     /// yet. Renamed from M7's `Buildup` to follow the M9 spec's snake-
     /// case wire string `build_up`.
     #[serde(rename = "build_up")]
     BuildUp,
-    /// **M9**: reactor pressure state has reached Critical or worse.
     SustainPeak,
-    /// **M9**: guard is down; mission timer continues without new
     /// pressure.
     Relax,
 }
@@ -66,7 +60,6 @@ impl MissionPhase {
         MissionPhase::Debrief,
     ];
 
-    /// **M7**: the legacy 4-phase pacing order (preserved for back-compat
     /// with M7 missions that don't ship the M9 reactor-defense pacer).
     pub const M7_PACING: [MissionPhase; 4] = [
         MissionPhase::Setup,
@@ -75,7 +68,6 @@ impl MissionPhase {
         MissionPhase::Debrief,
     ];
 
-    /// **M9**: the 7-phase reactor-defense pacing order per the M9 spec.
     pub const M9_PACING: [MissionPhase; 7] = [
         MissionPhase::Setup,
         MissionPhase::Prep,
@@ -119,7 +111,6 @@ impl MissionPhase {
         self as u8
     }
 
-    /// **M7**: the legacy hardcoded successor used by 4-phase missions
     /// that don't carry a custom `phase_sequence`. Preserved so M7
     /// callers continue to compile + advance through Setup → Buildup →
     /// Climax → Debrief. **M9** extends the table so the 7-phase
@@ -144,7 +135,6 @@ impl MissionPhase {
     }
 }
 
-/// **M7/M9**: phase state + dwell timers. The mission director ticks this
 /// once per game tick and emits `mission.phase_changed` on transitions
 /// (M7 + M9). M9 also emits the distinct `mission.director_phase_change`
 /// event so downstream consumers (M10 viewer, M11 HUD) can subscribe to
@@ -154,7 +144,6 @@ impl MissionPhase {
 pub struct PhaseState {
     pub current: MissionPhase,
     pub entered_tick: u64,
-    /// **M7** durations (seconds). Apply when the current phase is the
     /// matching variant.
     pub setup_seconds: f32,
     pub buildup_seconds: f32,
@@ -162,34 +151,27 @@ pub struct PhaseState {
     /// True once `current == Debrief`; latched so the director doesn't
     /// emit duplicate transitions.
     pub debrief_entered: bool,
-    /// **M9**: ordered phase sequence the director walks. Defaults to the
     /// M7 4-phase pacing for back-compat; M9 scenarios override with
     /// [`MissionPhase::M9_PACING`] so the director steps Setup → Prep →
     /// Launch → BuildUp → SustainPeak → Relax → Debrief.
     #[serde(default = "default_m7_phase_sequence")]
     pub phase_sequence: Vec<MissionPhase>,
-    /// **M9**: phases entered (in order) since scenario start. Mirrors
     /// the `phases_completed` field surfaced by `observe.mission.director`.
     #[serde(default)]
     pub phases_completed: Vec<MissionPhase>,
-    /// **M9**: prep-window length in seconds. Default 5.0s = 300 ticks @
     /// 60Hz so the guard does not fire before tick ~300.
     #[serde(default = "default_prep_seconds")]
     pub prep_seconds: f32,
-    /// **M9**: launch-phase dwell. Defaults to 1 tick @ 60Hz so the
     /// pacer flips to BuildUp on the very next tick, matching the spec
     /// table ("Guard spawns. Fire mission.objective_started").
     #[serde(default = "default_launch_seconds")]
     pub launch_seconds: f32,
-    /// **M9**: maximum BuildUp dwell. `None` means the transition is
     /// event-driven (engine calls `advance` when reactor pressure crosses
     /// into Critical).
     #[serde(default)]
     pub build_up_seconds: Option<f32>,
-    /// **M9**: maximum SustainPeak dwell. `None` means event-driven.
     #[serde(default)]
     pub sustain_peak_seconds: Option<f32>,
-    /// **M9**: maximum Relax dwell. `None` means event-driven.
     #[serde(default)]
     pub relax_seconds: Option<f32>,
 }
@@ -225,7 +207,6 @@ impl PhaseState {
         }
     }
 
-    /// **M9**: build a 7-phase reactor-defense PhaseState. Setup → Prep
     /// after 1 tick; Prep → Launch after `prep_seconds` (default 5s);
     /// Launch → BuildUp after `launch_seconds` (default 1 tick); the
     /// remaining transitions are event-driven (engine calls `advance`
@@ -282,7 +263,6 @@ impl PhaseState {
         Some(self.entered_tick.saturating_add(ticks))
     }
 
-    /// **M9**: successor of the current phase per `phase_sequence`. Falls
     /// back to [`MissionPhase::next`] when the current phase is not in
     /// the configured sequence (M7 back-compat with code that constructs
     /// a `PhaseState` whose sequence does not contain a transient
@@ -309,7 +289,6 @@ impl PhaseState {
         Some(next)
     }
 
-    /// **M9**: phase elapsed seconds at the supplied tick. Used to fill
     /// the `duration_seconds` field on `mission.director_phase_change`.
     pub fn phase_elapsed_seconds(&self, tick: u64, tick_rate_hz: u32) -> f32 {
         if tick_rate_hz == 0 {
@@ -335,7 +314,6 @@ impl Default for PhaseState {
     }
 }
 
-/// **M7**: emitted whenever the active phase changes. The payload shape is
 /// preserved for M7 back-compat; **M9** emits this AND the new
 /// `mission.director_phase_change` event with the additional
 /// `duration_seconds` field.
@@ -347,7 +325,6 @@ pub struct PhaseChangedEvent {
     pub cause: String,
 }
 
-/// **M9**: emitted alongside `PhaseChangedEvent` at every phase
 /// transition. Carries the time the previous phase was active so M10's
 /// timeline + M11's HUD strip can render dwell-aware pacing.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

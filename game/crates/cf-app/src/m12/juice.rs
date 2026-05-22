@@ -8,7 +8,6 @@ use cf_ui::{ComicOverlayMode, ComicOverlayState, HudState, SlideshowPhase, Slide
 use crate::app::components::M12ScreenFlash;
 use crate::app::resources::EngineHolder;
 
-/// **M12**: mirror cf-control's accessibility + comic-overlay settings into
 /// the M12 plugin resources every frame.
 pub(crate) fn m12_sync_settings_to_juice_state(
     holder: Res<EngineHolder>,
@@ -35,7 +34,6 @@ pub(crate) fn m12_sync_settings_to_juice_state(
     }
 }
 
-/// **M12**: infer the active `SceneMood` from the engine's current
 /// mission-director phase + any environmental hazard signal, then
 /// request a `ColorGradingState::cross_fade_to()` when it changes.
 pub(crate) fn m12_sync_scene_mood_from_mission_phase(
@@ -58,7 +56,6 @@ pub(crate) fn m12_sync_scene_mood_from_mission_phase(
     }
 }
 
-/// **M12**: route Space / Esc / Enter input to `ShellApiCommand::SkipIntroSlideshow`
 /// while the slideshow is playing. The current `ShellScreen` is checked so we
 /// never collide with in-mission Esc-to-pause.
 pub(crate) fn m12_ingest_slideshow_skip_input(
@@ -81,7 +78,6 @@ pub(crate) fn m12_ingest_slideshow_skip_input(
     }
 }
 
-/// **M12**: apply the live `ColorGrade` to Bevy's `ClearColor` so the
 /// background frame reflects the per-scene tint.
 pub(crate) fn m12_apply_color_grading_to_clear_color(
     grading: Res<ColorGradingState>,
@@ -98,12 +94,10 @@ pub(crate) fn m12_apply_color_grading_to_clear_color(
     }
 }
 
-/// **M12**: baseline pixel-art-friendly cleared background (matches
 /// `cf-render-2d::M0_CLEAR_COLOR`). The grading shader multiplies this
 /// channel-wise before applying brightness.
 const M12_BACKGROUND_LINEAR: [f32; 3] = [0.051, 0.071, 0.102];
 
-/// **M12**: when a new banner appears in `HudState.banners` that wasn't
 /// present in the previous frame, trigger a `BannerSlideIn` juice pulse
 /// on the corresponding HUD node.
 pub(crate) fn m12_trigger_banner_slide_in_juice(
@@ -122,7 +116,6 @@ pub(crate) fn m12_trigger_banner_slide_in_juice(
     *seen = current;
 }
 
-/// **M12** § Critical-hit punch screen flash + chromatic-aberration overlay.
 pub(crate) fn m12_render_screen_flash_overlay(
     mut commands: Commands,
     juice: Res<JuiceState>,
@@ -154,7 +147,6 @@ pub(crate) fn m12_render_screen_flash_overlay(
     }
 }
 
-/// **M12** § Juice rule SFX cues — dispatch one `AudioCue::Juice` per
 /// pulse fired this frame.
 pub(crate) fn m12_dispatch_juice_audio_cues(juice: Res<JuiceState>, mut seen: Local<HashSet<String>>) {
     use cf_audio::{AudioCue, AudioPlugin, NullAudioPlugin};

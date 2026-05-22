@@ -19,7 +19,6 @@ use crate::cli::{
 use crate::client::{AutoLaunchOpts, Session};
 
 
-/// **M4B § cfctl save**: dispatch every save subcommand. The
 /// `quicksave` / `quickload` / `autosave-now` / `last` paths require a
 /// running server (so the engine has actor state to capture); the
 /// `inspect` / `migrate` / `list` paths run inline against on-disk save
@@ -399,7 +398,6 @@ pub(crate) fn cmd_replay(action: ReplayAction) -> Result<()> {
         }
     }
     let status = cmd.status().context("spawn cf-tools-replay-viewer")?;
-    // VAL-M10B-035: headless `edit` exits with code 74 — we propagate
     // that exit code so script harnesses can disambiguate the
     // editor-unavailable path from other failures. Production CLI
     // routes any non-zero exit through anyhow's error path so the
@@ -566,7 +564,6 @@ pub(crate) fn cmd_run(
         expected_outcome: None,
     };
     let mut config = build_engine_config(inputs).context("cfctl run: build_engine_config failed")?;
-    // **M4B § "Tamper-evident competitive replays"** + § "Delta baseline
     // cadence is enforced" — propagate the CLI flags into the engine
     // config. Default cadence preserved for runs that don't pass --delta-
     // baseline-cadence-ticks; chain mode is off by default.
@@ -920,7 +917,6 @@ pub(crate) async fn cmd_inspect(
     };
     let output = match action {
         InspectAction::Actor { actor, format } => {
-            // **M1**: prefer the server-side `inspect.actor` envelope (includes
             // the last 30 actor-category events for the target). Falls back to
             // observe.once if the server hasn't implemented inspect.actor.
             let payload = if let Some(id) = actor {
@@ -944,7 +940,6 @@ pub(crate) async fn cmd_inspect(
             (target, format)
         }
         InspectAction::Equipment { preset_id, format } => {
-            // **M1 Gap A5**: full RifleSpec via inspect.equipment.
             let payload = session
                 .send_request("inspect.equipment", json!({"preset_id": preset_id}))
                 .await

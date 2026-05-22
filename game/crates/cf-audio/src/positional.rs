@@ -115,7 +115,6 @@ pub fn direction_of(source: [f32; 2], listener: [f32; 2]) -> AudioDirection {
     }
 }
 
-/// **M12A** § Distance attenuation. Returns the per-source volume gain
 /// `[0, 1]` based on the Euclidean distance + the SFX's declared
 /// `propagation_range_m` falloff. Inverse-square curve clamped to the
 /// `[0, 1]` band; values past `propagation_range_m` are zero (the
@@ -142,7 +141,6 @@ pub fn distance_attenuation(distance_m: f32, propagation_range_m: f32) -> f32 {
     falloff.clamp(0.0, 1.0)
 }
 
-/// **M12A** § Atmospheric occlusion. Walls + dense atmosphere attenuate
 /// audio; vacuum completely silences it (sound doesn't propagate in
 /// space). `atmosphere_density` is the M19 per-tile density value (0.0
 /// = vacuum, 1.0 = sea-level); `wall_thickness_m` is the cumulative
@@ -160,7 +158,6 @@ pub fn occlusion_attenuation(atmosphere_density: f32, wall_thickness_m: f32) -> 
     atmo.sqrt() * wall_atten
 }
 
-/// **M12A** § Combined per-source gain — distance × occlusion + a
 /// hard-clamp to `[0, 1]`. Returns `0.0` for sources outside the
 /// propagation range OR in vacuum.
 #[must_use]
@@ -179,7 +176,6 @@ pub fn source_gain(
     (attn * occ).clamp(0.0, 1.0)
 }
 
-/// **M12A** § Voice prioritization — spec § Pitfalls: "Spam-event audio
 /// pile-up: 50 actors firing simultaneously = 50 gunshots playing at
 /// once. Audio engine must limit voice count + prioritize (closest
 /// first)".
@@ -198,7 +194,6 @@ pub fn top_n_by_gain(gains: &[f32], n: usize) -> Vec<usize> {
 /// values reduce CPU overhead; Steam Deck T-PERF caps at 32.
 pub const MAX_SIMULTANEOUS_VOICES: usize = 32;
 
-/// **M12B** § Spec § Files entry-point.
 ///
 /// `positional.rs` is the named entry point per the M12B spec § Files
 /// section ("MODIFY: add `resolve_spatial` entry point"). The actual

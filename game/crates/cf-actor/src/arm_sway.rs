@@ -52,7 +52,6 @@ pub struct ArmSwayContext {
     pub stride_progress: f32,
 }
 
-/// **M14A** § "FG arm rotation" — CCCP `AHuman.cpp:2478-2486`.
 pub fn fg_arm_rotation(ctx: &ArmSwayContext) -> f32 {
     let body_contrib = ctx.fg_flail_scalar
         * ctx.body_rot.sin().abs()
@@ -61,7 +60,6 @@ pub fn fg_arm_rotation(ctx: &ArmSwayContext) -> f32 {
     ctx.aim_angle + body_contrib
 }
 
-/// **M14A** § "BG arm rotation" — CCCP `AHuman.cpp:2495`.
 pub fn bg_arm_rotation(ctx: &ArmSwayContext, bg_supporting_fg: bool) -> f32 {
     if bg_supporting_fg {
         // 2-handed support: BG arm reaches forward toward weapon. Sway × 0.5
@@ -73,7 +71,6 @@ pub fn bg_arm_rotation(ctx: &ArmSwayContext, bg_supporting_fg: bool) -> f32 {
     }
 }
 
-/// **M14A** § "Head tracking aim — with status fallback" — CCCP
 /// `AHuman.cpp:2461-2466`.
 pub fn head_rotation_target(ctx: &ArmSwayContext) -> f32 {
     let abs_rot = ctx.body_rot.abs();
@@ -85,7 +82,6 @@ pub fn head_rotation_target(ctx: &ArmSwayContext) -> f32 {
     }
 }
 
-/// **M14A** § "Empty arms swing with stride" — phase-offset 180° from legs.
 pub fn empty_arm_swing(stride_progress: f32) -> f32 {
     // Empty arm swing: sin wave at ArmSwingRate=1.0, phase-shifted PI.
     (stride_progress * std::f32::consts::TAU + std::f32::consts::PI).sin() * ARM_SWING_RATE * 0.15

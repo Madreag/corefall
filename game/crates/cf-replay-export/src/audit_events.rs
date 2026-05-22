@@ -152,7 +152,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-036: started → markers (in chapter-time ascending) →
     /// completed ordering.
     #[test]
     fn audit_events_emit_in_required_order() {

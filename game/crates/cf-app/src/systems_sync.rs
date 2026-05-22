@@ -25,7 +25,6 @@ pub(crate) fn sync_engine_tick_to_capture_clock(holder: Res<EngineHolder>, mut c
     clock.current_tick = holder.0.current_tick().0;
 }
 
-/// **M10 § "references M9A asset icons"** — startup system that hydrates
 /// the cf-render-2d `AssetIndex` from the workspace's canonical
 /// `content/asset_ledger/ledger.jsonl`. The replay viewer + in-game
 /// death-recap modal call `AssetIndex.get(canonical_name)` to resolve
@@ -158,7 +157,6 @@ pub(crate) fn pump_recorder_events_into_capture_keyframes(
     }
 }
 
-/// **M1 Gap E**: drain the recorder's ux.* + equipment.weapon_fired events
 /// since the last frame and translate them into render-layer effects
 /// (CameraShake, HitStop, MuzzleFlash). Uses a per-frame cursor so each
 /// event is consumed exactly once.
@@ -290,7 +288,6 @@ pub(crate) fn drive_engine_tick(holder: Res<EngineHolder>, mut runtime: ResMut<A
     }
 }
 
-/// **M1 R2 / Blocker 3b**: unpaced engine driver. Runs on Bevy's Update
 /// schedule (not FixedUpdate) so it isn't capped at `tick_rate_hz` real-time
 /// firing.
 pub(crate) fn drive_engine_tick_unpaced(holder: Res<EngineHolder>, mut runtime: ResMut<AppRuntime>) {
@@ -633,7 +630,6 @@ pub(crate) fn sync_actor_state_to_render(
     }
 }
 
-/// **M9** § HUD readability + observability + Reactor visual feedback —
 /// mirror the engine's reactor + timer projections into the cf-ui
 /// widgets + cf-render-2d sprite resource so the HUD reactor strip + the
 /// timer-warning captions + the reactor sprite swap all reflect the

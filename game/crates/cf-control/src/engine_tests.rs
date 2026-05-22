@@ -30,7 +30,6 @@ mod tests {
 
     #[test]
     fn prototype_slice_for_milestone_uppercases_letter_suffix() {
-        // Bugbot 3212491755 + Devin 3212416493 regression: letter-suffixed
         // milestones (m3a, m3b, m4a, m4b) must produce uppercase prototype
         // slice strings (M3A, M3B, M4A, M4B). Pre-fix, `format!("M{rest}")`
         // returned the lowercased rest from `to_lowercase()` and produced
@@ -60,7 +59,6 @@ mod tests {
 
     #[test]
     fn notes_addendum_categories_match_per_milestone_layering() {
-        // Devin 3212580450 regression: notes_addendum_for_milestone must NOT
         // claim categories that haven't shipped yet at the named milestone.
         // M0 = system / control / determinism only; M1 adds actor / combat /
         // equipment / input; M1.5 adds ai / mission / terrain; M2 adds
@@ -98,7 +96,6 @@ mod tests {
 
     #[test]
     fn notes_addendum_categories_layer_correctly_for_post_m5_10_milestones() {
-        // Devin 3212593186 regression: the prior explicit-enumeration match
         // arms stopped at m5.10, so M6/M6.5/M7/M8/etc. silently fell through
         // to "categories shipped: system, control, determinism" only —
         // missing the entire append-only layer they should have inherited.
@@ -251,7 +248,6 @@ mod tests {
 
     #[test]
     fn notes_addendum_includes_dr007_for_every_m2_plus_milestone() {
-        // Bugbot 3212607793 + Devin 3212623450 regression: DR-007 is
         // reference documentation for the material set shape. Every M2+
         // bundle has material events in events.jsonl + benefits from the
         // addendum, regardless of whether the milestone EXTENDS or just
@@ -1960,7 +1956,6 @@ mod tests {
         );
     }
 
-    /// **M6B § Acceptance: Container nesting depth-limited**.
     /// Full engine round trip: a chest at depth-1 holding a crate at
     /// depth-2; attempting to nest a third container into the crate
     /// rejects with the spec-locked `max_depth_exceeded` reason and
@@ -2067,7 +2062,6 @@ mod tests {
         );
     }
 
-    /// **M6B § Acceptance: Encumbrance band transition fires the
     /// `inventory.encumbrance_threshold_crossed` event**.
     #[tokio::test]
     async fn m6b_encumbrance_band_transition_fires_event() {
@@ -2115,7 +2109,6 @@ mod tests {
         assert!((walk_mult - 0.5).abs() < 0.01, "walk_speed_multiplier must be ~0.5");
     }
 
-    /// **M6B § Acceptance: Item picked up via the engine adds canonical mass
     /// to the inventory grid AND emits `equipment.item_picked_up_with_mass`**.
     #[tokio::test]
     async fn m6b_pickup_emits_mass_aware_event_and_updates_grid() {

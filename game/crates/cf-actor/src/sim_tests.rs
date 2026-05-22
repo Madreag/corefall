@@ -588,7 +588,6 @@ fn projectile_does_not_hit_owner() {
     }
 }
 
-/// **M1.5 G8 (tutorial_safety)**: lethal damage to a controllable actor
 /// caps at DYING when StepDeps.tutorial_safety = true. Without the flag
 /// the DYING dwell promotes to DEAD as usual.
 #[test]
@@ -633,7 +632,6 @@ fn tutorial_safety_caps_lethal_damage_at_dying() {
     assert_eq!(actor.status, Status::Dead);
 }
 
-/// **M1 R2 / Gap G1 (drop physics)**: a `LooseItem` dropped above the
 /// floor must fall under gravity, settle within a bounded number of
 /// ticks, and emit exactly one `SettledLooseItem` outcome.
 #[test]
@@ -692,7 +690,6 @@ fn loose_item_falls_and_settles_within_bounded_ticks() {
     );
 }
 
-/// **M14 audit pass 3 (Finding 3)**: a single projectile that crosses
 /// multiple actor AABBs in one tick MUST emit multiple HitOutcomes —
 /// one per actor — in priority (entry-t ascending) order. This is the
 /// canonical regression for the swept-collision priority queue's
@@ -763,7 +760,6 @@ fn projectile_crosses_multiple_actors_emits_one_hit_per_actor_in_priority_order(
         assert!((hit.ray_origin.x - 0.0).abs() < 1.0, "ray origin near projectile start");
         assert!(hit.distance_traveled > 0.0, "distance_traveled must be set");
     }
-    // **M14 audit pass 4 (Finding 5)**: energy is conserved across
     // passthroughs. Each non-last hit absorbs 60% of the projectile's
     // remaining damage (40% continues). The LAST actor in priority
     // order stops the projectile and absorbs whatever is left.

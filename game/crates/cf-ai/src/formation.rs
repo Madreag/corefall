@@ -17,7 +17,6 @@ pub mod transforms;
 pub use slot_solver::{SlotAssignment, SlotSolver};
 pub use transforms::{rotate_local_to_world, world_anchor_for_slot};
 
-/// **M7B**: one of the 9 formation kinds. The enum order is the canonical
 /// collapse chain Wedge → Diamond → Column → Single-File when a slot is
 /// orphaned by member loss.
 #[repr(u8)]
@@ -95,7 +94,6 @@ impl FormationKind {
     }
 }
 
-/// **M7B**: per-slot role hint. Sticky to member assignment but advisory —
 /// the engine reassigns on KIA / brain-hop.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -147,7 +145,6 @@ impl SquadRoleHint {
     }
 }
 
-/// **M7B**: one slot in a formation. `offset` is in commander-facing local
 /// space (x forward, y left). Roll-up sectors-of-fire are advisory metadata
 /// the BT consumes when expanding Breach / Stack.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -159,7 +156,6 @@ pub struct FormationSlot {
     pub sector_bearing_degrees: f32,
 }
 
-/// **M7B**: data-driven formation definition. Loaded from
 /// `game/content/ai/formations/<kind>.ron` at boot OR via `builtin(kind)`
 /// for tests / headless paths.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -11,7 +11,6 @@ use crate::app::components::{
 };
 use crate::app::resources::WorkspaceAssetRoot;
 
-/// **M12**: when cf-shell transitions into `ShellScreen::IntroSlideshow`,
 /// seed `SlideshowState` with the 8 canonical intro slides + the
 /// `music_intro_campaign` track id.
 pub(crate) fn m12_start_intro_slideshow_on_shell_screen_enter(
@@ -42,7 +41,6 @@ pub(crate) fn m12_start_intro_slideshow_on_shell_screen_enter(
     );
 }
 
-/// **M12**: advance the slideshow cursor every frame. Uses Bevy's `Time`
 /// resource for the delta so the slide timeline respects pause + reduced
 /// virtual speed.
 pub(crate) fn m12_advance_slideshow_state(time: Res<Time>, mut slideshow: ResMut<SlideshowState>) {
@@ -56,7 +54,6 @@ pub(crate) fn m12_advance_slideshow_state(time: Res<Time>, mut slideshow: ResMut
     slideshow.tick(dt_ms);
 }
 
-/// **M12**: render the slideshow as a fullscreen Bevy UI overlay.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn m12_render_slideshow_overlay(
     mut commands: Commands,
@@ -193,7 +190,6 @@ pub(crate) fn m12_render_slideshow_overlay(
     }
 }
 
-/// **M12**: when the slideshow reaches `Completed` or `Skipped`, emit a
 /// `ShellApiCommand::QuitToMenu` (or similar) to transition cf-shell back
 /// to the Main Menu and clear the slideshow state.
 pub(crate) fn m12_finalize_completed_slideshow(
@@ -218,13 +214,11 @@ pub(crate) fn m12_finalize_completed_slideshow(
     }
 }
 
-/// **M12**: resolve a ledger output_path (absolute, on-disk) to a path
 /// RELATIVE to the workspace root.
 pub(crate) fn m12_asset_path_relative_to(root: &Path, abs: &Path) -> Option<PathBuf> {
     abs.strip_prefix(root).ok().map(|p| p.to_path_buf())
 }
 
-/// **M12**: spawn the music + voice-over `AudioPlayer` entities when the
 /// slideshow transitions from idle → playing.
 pub(crate) fn m12_spawn_slideshow_audio(
     mut commands: Commands,
@@ -280,7 +274,6 @@ pub(crate) fn m12_spawn_slideshow_audio(
     }
 }
 
-/// **M12**: despawn the slideshow audio entities when the slideshow is
 /// not playing. Bevy stops playback when the entity is removed.
 pub(crate) fn m12_despawn_slideshow_audio(
     mut commands: Commands,

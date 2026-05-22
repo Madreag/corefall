@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::thinking_stack::{Layer, LayerKind, LayerOutput, ThinkingContext};
 
-/// **M7-A**: Layer 1 emergency response decisions.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ReactiveDecision {
@@ -42,7 +41,6 @@ impl ReactiveDecision {
     }
 }
 
-/// **M7-A**: Layer 1 reactive controller.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct ReactiveLayer {
     /// Most recent decision the layer produced (for debug + audit).

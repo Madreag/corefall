@@ -484,7 +484,6 @@ pub(crate) fn run_ledger(action: &LedgerAction, global_strict: bool, json_output
     }
 }
 
-/// **M1 Gap H2**: validate every event in `<bundle_dir>/events.jsonl` against
 /// `cf_replay::schemas::validate_event_payload`. Returns non-zero exit on
 /// any schema violation. Outputs JSON when `--json` is set so CI can parse
 /// the report.

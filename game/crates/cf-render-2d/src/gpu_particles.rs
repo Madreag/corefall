@@ -34,7 +34,6 @@ pub struct GpuParticleGlobals {
     pub gravity: f32,
 }
 
-/// **M8A**: GPU compute particle system descriptor. M9+ wires this into
 /// the Bevy render schedule; the descriptor holds the pool capacity and
 /// the shader source.
 #[derive(Debug, Clone)]
@@ -53,7 +52,6 @@ impl Default for GpuParticleSystem {
 }
 
 impl GpuParticleSystem {
-    /// **M8A § Determinism**: GPU particle state is cosmetic; cf-headless
     /// replay ignores GPU state entirely. This helper returns the
     /// canonical `cosmetic: true` flag for any debris event batched into
     /// the recorder.

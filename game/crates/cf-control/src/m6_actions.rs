@@ -56,7 +56,6 @@ pub enum M6Action {
     MeleeBash,
     /// Edge-trigger close-range kick.
     MeleeKick,
-    /// **M14 audit pass 3 (GAP-M6-01)**: edge-trigger sprint-fueled
     /// shoulder check. Distinct from kick because it requires the actor
     /// to be in Sprint stance and delivers a higher knockdown probability.
     MeleeShoulderCheck,
@@ -74,7 +73,6 @@ pub enum M6Action {
     /// actor)". Distinct from `SetFacing` which is the manual cfctl
     /// override (debug surface).
     AimSetFacing { facing: String },
-    /// **M6B**: nest a container item inside another container that
     /// already lives in the actor's inventory grid. The child item is
     /// allocated a fresh instance id and inserted into the parent's
     /// nested container. Rejected with `max_depth_exceeded` per spec

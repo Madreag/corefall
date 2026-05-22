@@ -61,7 +61,6 @@ pub struct SweptHitResolved {
     pub priority_total: u32,
 }
 
-/// **M14**: deterministically resolve a slate of candidate swept hits into
 /// a priority-ordered slice. Closer (lower `entry_t`) hits resolve first;
 /// ties break on `target_id` ascending.
 ///
@@ -220,7 +219,6 @@ mod tests {
     }
 }
 
-/// **M14D**: stable identifier for a projectile-pair swept candidate.
 /// Carried as a payload on [`SweptCandidateKind::ProjectilePair`]. The
 /// engine matches the pair back to the M14D `cf-physics::projectile`
 /// kernel's contact list by `(a_id, b_id)`.
@@ -232,7 +230,6 @@ pub struct ProjectilePairKey {
     pub toi: f32,
 }
 
-/// **M14D**: mixed swept-candidate kind — actor-vs-projectile (the
 /// M14 default) or projectile-vs-projectile pair (the M14D extension).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum SweptCandidateKind {
@@ -240,7 +237,6 @@ pub enum SweptCandidateKind {
     ProjectilePair(ProjectilePairKey),
 }
 
-/// **M14D**: resolved entry from [`prioritize_mixed_swept_candidates`].
 /// Mirrors the [`SweptHitResolved`] shape on the actor branch and
 /// carries the pair key + the priority index/total on the pair branch.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -255,7 +251,6 @@ pub enum ResolvedSweptCandidate {
     },
 }
 
-/// **M14D § VAL-M14D-013**: deterministically resolve a mixed slate of
 /// actor + projectile-pair swept candidates into a priority-ordered
 /// slice. Closer-first (lower TOI) wins; ties break on the candidate
 /// kind's stable key (`target_id` for actor; `(a_id, b_id)` for pair).

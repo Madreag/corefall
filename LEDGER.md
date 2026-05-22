@@ -36,6 +36,20 @@ Last updated: 5/21/2026 5:30 PM MST (Session 12 in flight)
   - Parallel CA + reactions + phase — DONE Session 11 (kernel_parallel.rs lives in tree; kernel.rs imports from it)
   - But kernel.rs still carries DEAD_ leftovers from the refactor — CLEAN UP REQUIRED
 
+### Session 12 progress (in flight)
+
+| Step | Status | LOC delta | Test delta |
+|---|---|---|---|
+| AGENTS.md: stricter comment + settings/content rule | DONE | +9 | n/a |
+| kernel.rs: drop DEAD_* + orphan snap helpers (449 LOC dead code) | DONE | kernel.rs 1680→1231 | 0 |
+| reaction_registry.json: 37 → 55 reactions per M15D | DONE | +18 entries | 0 |
+| phase_registry.json: 22 → 32 transitions (granite/basalt/glass/gold/copper/sand/rubber/plastic/ozone/salt) | DONE | +10 entries | 0 |
+| MATERIAL_TABLE: fix co2 id 43→53 (stale from before u16 renumber) | DONE | bug fix | -1 +1 |
+| material_id_from_name: expand 20→60 names | DONE | +40 entries | 0 |
+| MATERIAL_TABLE: add 6 hazards (chlorine, ammonia, electric_arc, lightning, polluted_water, mercury) | DONE | +160 LOC | 0 |
+| Relaxed content_driven_registries test to subset check | DONE | n/a | 0 |
+| 4295 → 4296 tests pass | — | — | +1 |
+
 ### Audit findings (cumulative; new findings appended as I work)
 
 | # | Finding | Severity | Status |

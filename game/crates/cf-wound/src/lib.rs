@@ -76,7 +76,6 @@ pub use severity::{SeverityBand, BAND_LABEL_CRITICAL};
 
 use serde::{Deserialize, Serialize};
 
-/// **M14G** canonical wound kinds.
 ///
 /// Spec prose says "28 canonical" but the bullet list totals 30 across the
 /// 6 categories — per the mission AGENTS.md spec-ambiguity policy the
@@ -249,7 +248,6 @@ pub enum WoundCategory {
     Sensory,
 }
 
-/// **M14G** stable per-actor wound identifier. Monotonic within an
 /// `ActorWoundList`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -261,7 +259,6 @@ impl WoundId {
     }
 }
 
-/// **M14G** typed wound record. One per producer emission.
 ///
 /// `id` is unique within the owning `ActorWoundList`. `severity` is normalized
 /// to `[0, 1]`. `age_ticks` increments every tick (mutation cadence does not
@@ -351,7 +348,6 @@ impl Wound {
     }
 }
 
-/// **M14G** per-wound visible state machine.
 ///
 /// `Fresh` is the default emission state. The aging pass transitions
 /// `CleanBandage` → `BandageSoaked` after the soak-through interval
@@ -394,7 +390,6 @@ impl WoundVisibleState {
     }
 }
 
-/// **M14G** ActorWoundList — per-actor wound storage keyed by zone with a
 /// monotonic id allocator. Determinism: uses BTreeMap so iteration order is
 /// stable.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -507,7 +502,6 @@ impl ActorWoundList {
 mod tests {
     use super::*;
 
-    /// VAL-M14G-001: every variant in the bullet list must be constructible
     /// by name (round-trip).
     #[test]
     fn all_woundkind_variants_present() {
@@ -519,7 +513,6 @@ mod tests {
         assert_eq!(WoundKind::COUNT, 30);
     }
 
-    /// VAL-M14G-001: serde round-trip.
     #[test]
     fn woundkind_serde_round_trip() {
         for kind in WoundKind::ALL.iter() {
@@ -529,7 +522,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14G-006: Wound carries each contract field with the spec-mandated
     /// defaults.
     #[test]
     fn wound_record_initial_state() {
@@ -548,7 +540,6 @@ mod tests {
         assert!(!w.scarred);
     }
 
-    /// VAL-M14G-007: ActorWoundList stores wounds keyed by zone with stable
     /// iteration.
     #[test]
     fn actor_wound_list_per_zone() {
@@ -571,7 +562,6 @@ mod tests {
         assert_eq!(list.total_count(), 3);
     }
 
-    /// VAL-M14G-048: Wound ids are unique across all wounds in one
     /// ActorWoundList.
     #[test]
     fn wound_id_unique_per_actor() {
@@ -599,7 +589,6 @@ mod tests {
         assert_eq!(ids.len(), 50);
     }
 
-    /// VAL-M14G-043: bandaged + sutured are independent boolean flags.
     #[test]
     fn bandaged_and_sutured_independent_flags() {
         let mut w = Wound::new(WoundId(1), WoundKind::LacerationLight, 0.3, ZoneId::from("arm_left"));

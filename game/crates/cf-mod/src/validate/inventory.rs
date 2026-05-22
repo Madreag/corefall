@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use crate::report::ValidationReport;
 
-/// **M6B**: ItemSpec manifest entry shape (mirrors
 /// `cf_equipment::ItemSpec::{id, category}`).
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -11,7 +10,6 @@ pub(crate) struct M6BItemManifestEntry {
     pub(crate) category: String,
 }
 
-/// **M6B**: full item manifest envelope. Schema_version is locked at 1
 /// per spec § Files.
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -20,7 +18,6 @@ pub(crate) struct M6BItemManifest {
     pub(crate) items: Vec<M6BItemManifestEntry>,
 }
 
-/// **M6B**: validate the on-disk
 /// `content/equipment/items/manifest.ron` against the canonical
 /// `cf_equipment::item_spec` registry. Each manifest entry MUST resolve
 /// through `spec_for_id()` and the declared `category` MUST match the
@@ -96,7 +93,6 @@ pub(crate) fn validate_item_manifest(path: &Path, report: &mut ValidationReport)
     }
 }
 
-/// **M6B**: validate a standalone `content/equipment/items/<id>.ron`
 /// ItemSpec definition. The file must parse as a `cf_equipment::ItemSpec`
 /// (via serde) and the canonical id MUST already be registered in the
 /// runtime registry (so mods can't ship arbitrary undeclared ids while

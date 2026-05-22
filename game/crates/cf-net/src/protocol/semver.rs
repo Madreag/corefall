@@ -23,7 +23,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M8B § locked**: cf-net protocol semver as a 3-tuple. Bumped per
 /// the byte-pin CI gate's rules.
 ///
 /// - **0.1.0** (M8A baseline): NetFrame + NetPayload locked, JSON wire.
@@ -102,7 +101,6 @@ pub enum NegotiationOutcome {
 }
 
 impl NegotiationOutcome {
-    /// **M8B § Acceptance "Semver negotiation rejects a major-mismatched
     /// client"** — when the outcome is a major-mismatch rejection,
     /// convert to the spec-literal `NetError::ProtocolVersionMismatch {
     /// server, client }` with `server` + `client` packed as u16. Returns
@@ -174,7 +172,6 @@ pub fn negotiate(
     }
 }
 
-/// **M8B § Acceptance "Protocol downgrade attack is rejected"** — when
 /// the client's advertised semver in the application-layer Handshake
 /// differs from the value embedded in the QUIC TLS-bound transport
 /// parameters, the session MUST close with a TLS handshake mismatch

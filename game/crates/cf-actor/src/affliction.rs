@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// **M5.8 forward-hook (DR-040 ResourceAccumulators)**: per-actor resource
 /// values driven by origin reaction matrix at M5.8. Reserved layout slot at
 /// M5 so save bundles + observe frames serialize the slot now and M5.8 can
 /// fill values without a checksum byte-layout shift.
@@ -16,7 +15,6 @@ pub struct ResourceAccumulators {
     pub concussion_dose: f32,
 }
 
-/// **M5.7/M5.8 forward-hook (DR-036 affliction layer)**: per-actor systemic
 /// state. Spec-locked enum prevents typos across BP4 milestones.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

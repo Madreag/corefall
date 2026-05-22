@@ -41,7 +41,6 @@ pub const NODES: &[&str] = &[
     "heavy_track_mover",
 ];
 
-/// **M7B**: squad verbs the Heavy exposes as distinct BT subtrees.
 pub const SQUAD_VERB_IDS: &[&str] = &[
     "suppress_window",
     "suppress_target",

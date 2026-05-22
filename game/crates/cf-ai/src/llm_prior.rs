@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use crate::cf_mind::{Doctrine, LlmMind, MindContext, NullLlmMind};
 use crate::thinking_stack::{Layer, LayerKind, LayerOutput, ThinkingContext};
 
-/// **M7-A**: doctrine prior produced by Layer 5. M7-A ships a small fixed
 /// vocabulary; M23's cf-mind extends with LLM-generated strings (still
 /// quantized via the LayerCache to stay deterministic per-run).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -37,12 +36,10 @@ impl DoctrinePrior {
     }
 }
 
-/// **M7-A**: Layer 5 LLM-prior cache. INTERFACE only — M7 does not invoke
 /// any LLM. When enabled (`enabled = true`), the producer writes to
 /// `last_prior` on its own cadence. The layer's `tick_layer` exposes the
 /// current cached prior via `ctx.doctrine`.
 ///
-/// **M7-B**: optional `LlmMind` producer can be injected via `set_mind`.
 /// When attached AND enabled, the layer calls `mind.query(...)` at the
 /// configured cadence and caches the returned `Doctrine`. When the mind
 /// returns `None`, the layer falls back to the previously cached prior
@@ -55,7 +52,6 @@ pub struct LlmPriorLayer {
     pub last_prior: DoctrinePrior,
     /// Cadence (ticks) between producer writes. Default = 5 sec at 60 Hz.
     pub producer_cadence_ticks: u32,
-    /// **M7-B**: optional async producer. M7 default = `NullLlmMind` (always
     /// returns `None`). M23's cf-mind crate ships the real impl.
     #[serde(skip, default = "default_mind")]
     pub mind: Box<dyn LlmMind>,
@@ -105,7 +101,6 @@ impl LlmPriorLayer {
         }
     }
 
-    /// **M23 hook**: the producer calls this when the LLM mind generates a
     /// new doctrine string. Re-writing with the same label is a no-op.
     pub fn write_prior(&mut self, label: impl Into<String>, tick: u64) {
         let next = label.into();
@@ -117,14 +112,12 @@ impl LlmPriorLayer {
         }
     }
 
-    /// **M7-B**: install an `LlmMind` producer. Default is `NullLlmMind`
     /// (always returns `None`). M23's cf-mind crate calls this with its
     /// real producer.
     pub fn set_mind(&mut self, mind: Box<dyn LlmMind>) {
         self.mind = mind;
     }
 
-    /// **M7-B**: query the attached `LlmMind` and, on `Some(Doctrine)`,
     /// cache the new label. Returning `None` is a legitimate fallback —
     /// the cached prior stays in place so Layer 5 still emits a stable
     /// doctrine string and Layers 1-4 continue normally (BT/HTN-only).
@@ -191,7 +184,6 @@ mod tests {
         assert_eq!(out.reason, "llm_prior_cached");
     }
 
-    /// **M7-B**: null mind keeps the BT/HTN-only fallback path intact.
     /// When the mind returns `None`, the cached prior stays at its
     /// previous (or default) value so Layer 5 still emits a stable
     /// doctrine string. Layers 1-4 continue ticking normally.
@@ -207,7 +199,6 @@ mod tests {
         assert_eq!(layer.last_prior.label, "defensive");
     }
 
-    /// **M7-B**: a custom mind that returns `Some(Doctrine)` updates the
     /// cached prior, which Layer 5 surfaces on the next `tick_layer`.
     #[test]
     fn custom_mind_writes_doctrine_through_query_mind() {
@@ -231,7 +222,6 @@ mod tests {
         assert_eq!(out.reason, "llm_prior_cached");
     }
 
-    /// **M7-B**: a disabled layer does not query the mind even if one is
     /// attached — preserves the M7 "off by default" contract.
     #[test]
     fn disabled_layer_does_not_query_mind() {

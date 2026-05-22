@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerClimbParams",
-  "description": "**M5**: `act.player.climb` — sticky climb toggle (placeholder cue).",
   "type": "object",
   "properties": {
     "active": {

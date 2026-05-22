@@ -7,19 +7,14 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14H** § "Bandage stops Light/Moderate bleed; soaks at 180s".
 pub const BANDAGE_SOAK_THROUGH_SECONDS: f32 = 180.0;
 
-/// **M14H** § "Tourniquet necrosis threshold = 90 min".
 pub const TOURNIQUET_NECROSIS_THRESHOLD_SECONDS: f32 = 90.0 * 60.0;
 
-/// **M14H** § "Surgery skill-check pass rate medic_t1 = 70%".
 pub const MEDIC_T1_SKILL_PASS_RATE_X1000: u32 = 700;
 
-/// **M14H** § "Surgery skill-check pass rate surgeon_t1 = 90%".
 pub const SURGEON_T1_SKILL_PASS_RATE_X1000: u32 = 900;
 
-/// **M14H** § 22 canonical treatment producers.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -113,7 +108,6 @@ impl TreatmentKind {
     }
 }
 
-/// **M14H** § tool requirements per producer.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -145,7 +139,6 @@ impl ToolRequirement {
     }
 }
 
-/// **M14H** § skill requirements per producer.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -177,7 +170,6 @@ impl SkillRequirement {
     }
 }
 
-/// **M14H** § risk surfaces per producer.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -221,7 +213,6 @@ impl RiskKind {
     }
 }
 
-/// **M14H** § per-treatment producer spec record.
 ///
 /// Equivalent to a row in the spec's 22-row producer table. Loaded from
 /// `content/treatments/<id>.ron` or via `treatment_catalog()` (baked
@@ -280,7 +271,6 @@ fn spec(
     }
 }
 
-/// **M14H** § canonical 22-row producer catalog (baked defaults).
 #[must_use]
 pub fn treatment_catalog() -> Vec<TreatmentSpec> {
     vec![
@@ -569,7 +559,6 @@ pub fn treatment_spec(kind: TreatmentKind) -> TreatmentSpec {
         .expect("treatment catalog must contain every TreatmentKind")
 }
 
-/// **M14H** § Registry of treatment specs loaded from
 /// `content/treatments/*.ron`. Mirrors `cf-wound::WoundSpecRegistry`.
 #[derive(Debug, Clone, Default)]
 pub struct TreatmentSpecRegistry {

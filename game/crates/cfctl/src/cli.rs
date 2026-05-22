@@ -75,7 +75,6 @@ pub enum Cmd {
         high_contrast: bool,
         #[arg(long)]
         paced: bool,
-        /// **M4B § "Tamper-evident competitive replays"** — enable
         /// per-event BLAKE3 chain mode. Tournament-mode bundles publish
         /// `run_manifest.json.ledger_chain_anchor` and every event carries
         /// `prev_event_hash` + `chained_hash_hex` so any third party can
@@ -83,7 +82,6 @@ pub enum Cmd {
         /// wasn't tampered with between record + replay.
         #[arg(long, default_value_t = false)]
         ledger_chain: bool,
-        /// **M4B § "Delta baseline cadence is enforced"** — override the
         /// default 600-tick (10 s @ 60 Hz) baseline cadence. 0 disables
         /// snapshot emission entirely.
         #[arg(long, default_value_t = cf_save::delta::DEFAULT_BASELINE_CADENCE_TICKS)]
@@ -121,7 +119,6 @@ pub enum Cmd {
         #[command(subcommand)]
         action: ReplayAction,
     },
-    /// **M5**: `cfctl inspect actor` — pull the full ChassisView projection
     /// for the player (or a specific actor id) from `observe.once`. Prints
     /// chassis spec_id, stage, pilot_state, every zone with per-layer integrity,
     /// every module with state + bound_zone, destroyed_zones[],
@@ -130,7 +127,6 @@ pub enum Cmd {
         #[command(subcommand)]
         action: InspectAction,
     },
-    /// **M4A**: query the engine's asset-ledger summary projection via
     /// `observe.assets.ledger_summary`. Prints total + per-category / tier
     /// / status counts. Use `--inline` to skip the server and read the
     /// canonical `content/asset_ledger/ledger.jsonl` directly.
@@ -140,7 +136,6 @@ pub enum Cmd {
         #[arg(long)]
         inline: bool,
     },
-    /// **M4B**: save subsystem CLI surface. Provides `quicksave`, `quickload`,
     /// `autosave-now`, `list`, `inspect <path>`, `migrate <path> --to <version>`
     /// and `last` (proxy for `observe.save.last`).
     Save {
@@ -152,34 +147,28 @@ pub enum Cmd {
 
 #[derive(Debug, Subcommand)]
 pub enum SaveAction {
-    /// **M4B § F5 quicksave** — write the current world to
     /// `<dir>/quicksave.cfsave`. Default `<dir>` = `./saves/quicksave`.
     Quicksave {
         #[arg(long, default_value = "saves/quicksave")]
         dir: PathBuf,
     },
-    /// **M4B § F9 quickload** — read + migrate `<dir>/quicksave.cfsave`.
     Quickload {
         #[arg(long, default_value = "saves/quicksave")]
         dir: PathBuf,
     },
-    /// **M4B § "Mission autosave fires every 60 seconds"** — force a
     /// one-shot autosave even when the timer hasn't elapsed.
     AutosaveNow {
         #[arg(long, default_value = "saves/quicksave")]
         dir: PathBuf,
     },
-    /// **M4B**: list every `.cfsave` directory under `dir` with its
     /// schema_version + blake3 + size. Useful for AI agents auditing the
     /// save library.
     List {
         #[arg(long, default_value = "saves")]
         dir: PathBuf,
     },
-    /// **M4B § "cf-headless save inspect"** — print schema_version + delta
     /// chain depth + ledger anchor for a single `<path>.cfsave`.
     Inspect { path: PathBuf },
-    /// **M4B § "cf-headless save migrate"** — migrate a single
     /// `<path>.cfsave` to `--to <major.minor.patch>` (default: current
     /// build's schema).
     Migrate {
@@ -187,7 +176,6 @@ pub enum SaveAction {
         #[arg(long)]
         to: Option<String>,
     },
-    /// **M4B § "observe.save.last"** — proxy that returns the last save
     /// metadata snapshot the running engine has tracked.
     Last,
 }
@@ -208,7 +196,6 @@ pub enum InspectAction {
         #[arg(long, value_enum, default_value_t = OutputFormat::Pretty)]
         format: OutputFormat,
     },
-    /// **M1**: Inspect equipment preset (full `RifleSpec`).
     Equipment {
         #[arg(long = "preset", short = 'p')]
         preset_id: String,
@@ -304,24 +291,19 @@ pub enum ActAction {
         #[arg(long)]
         node: Option<String>,
     },
-    /// **M5**: `act.player.crouch` — sticky crouch toggle.
     PlayerCrouch {
         #[arg(long)]
         active: bool,
     },
-    /// **M5**: `act.player.climb` — sticky climb toggle.
     PlayerClimb {
         #[arg(long)]
         active: bool,
     },
-    /// **M5**: `act.player.jet` — jet thrust toggle (requires Jet module nominal/degraded).
     PlayerJet {
         #[arg(long)]
         active: bool,
     },
-    /// **M5**: `act.player.eject` — trigger pilot eject from a chassis.
     PlayerEject,
-    /// **M5**: `act.chassis.repair zone=<head|torso|arm_left|...>` and/or `module_id=<id>`.
     ChassisRepair {
         /// Body zone to repair (e.g. `torso`, `arm_right`, `hand_left`).
         #[arg(long)]
@@ -333,14 +315,11 @@ pub enum ActAction {
         #[arg(long, default_value = "field_kit")]
         reason: String,
     },
-    /// **M5**: `act.chassis.salvage` — pull every surviving module from a wrecked chassis.
     ChassisSalvage {
         #[arg(long, default_value = "manual")]
         reason: String,
     },
-    /// **M5**: `act.chassis.clear_jam` — manually clear a weapon jam.
     ChassisClearJam,
-    /// **M9B-2**: `act.player.drop_trench_template id=<template> origin_x=<i32> origin_y=<i32>`.
     /// Drops the authored trench template at the supplied tile origin
     /// and emits `trench.template_dropped` with the template SHA256 +
     /// segment_count + placed/missing fortification arrays. The template
@@ -353,7 +332,6 @@ pub enum ActAction {
         #[arg(long)]
         origin_y: i32,
     },
-    /// **M9B-3**: `act.player.dig_trench_segment variant=<id>
     /// [tool_id=<id>] [substrate_hardness=<f32>] [strict]`.
     /// Carves a trench segment with the specified variant. Substrate
     /// hardness ≥ 0.5 on `deep` falls back to `shallow_scrape` with a
@@ -369,7 +347,6 @@ pub enum ActAction {
         #[arg(long, default_value_t = false)]
         strict: bool,
     },
-    /// **M9B-3**: `act.player.place_trench_module module_id=<id> segment_id=<u64>`.
     /// Places an embedded module on a built trench segment; emits
     /// `trench.module_placed`.
     PlayerPlaceTrenchModule {
@@ -378,7 +355,6 @@ pub enum ActAction {
         #[arg(long)]
         segment_id: u64,
     },
-    /// **M9B-3**: `act.player.repair_trench_module module_id=<id> segment_id=<u64>`.
     /// Repairs a damaged trench module; emits `trench.module_repaired`.
     PlayerRepairTrenchModule {
         #[arg(long)]
@@ -386,7 +362,6 @@ pub enum ActAction {
         #[arg(long)]
         segment_id: u64,
     },
-    /// **M14H**: `act.player.treat kind=<TreatmentKind> target=<actor_id>`.
     /// Applies a treatment producer to the target actor. `kind` is one of
     /// the 22 M14H canonical TreatmentKind names (PascalCase, e.g.
     /// `FieldBandageV1`, `Sutures V1`, `DefibrillatorV1`).
@@ -396,25 +371,21 @@ pub enum ActAction {
         #[arg(long)]
         target: u64,
     },
-    /// **M14H**: `act.player.scan target=<actor_id>` — start a 30s Medical
     /// Scanner read.
     PlayerScan {
         #[arg(long)]
         target: u64,
     },
-    /// **M14H**: `act.player.cpr_round target=<actor_id>` — apply one CPR
     /// round.
     PlayerCprRound {
         #[arg(long)]
         target: u64,
     },
-    /// **M14H**: `act.player.defib target=<actor_id>` — deliver a defib
     /// shock.
     PlayerDefib {
         #[arg(long)]
         target: u64,
     },
-    /// **M14H**: `act.player.surgery_start target=<actor_id>
     /// wounds_to_treat=<u32> [surgeon_t1] [seed=<u64>]`.
     PlayerSurgeryStart {
         #[arg(long)]
@@ -426,48 +397,38 @@ pub enum ActAction {
         #[arg(long)]
         seed: Option<u64>,
     },
-    /// **M14H**: `act.player.triage_select target=<actor_id?>` — open the
     /// Patient Detail panel. Omit `target` to clear the selection.
     PlayerTriageSelect {
         #[arg(long)]
         target: Option<u64>,
     },
-    /// **M14J**: `act.player.vault` — manual vault override (auto-vault is detect-driven).
     PlayerVault,
-    /// **M14J**: `act.player.wall_jump` — wall-jump while in contact grace.
     PlayerWallJump,
-    /// **M14J**: `act.player.fire_grapple target_x=<f32> target_y=<f32>`.
     PlayerFireGrapple {
         #[arg(long)]
         target_x: f32,
         #[arg(long)]
         target_y: f32,
     },
-    /// **M14J**: `act.player.rope_input climb=<-1..1> [swing=<-1..1>]`.
     PlayerRopeInput {
         #[arg(long)]
         climb: f32,
         #[arg(long, default_value_t = 0.0)]
         swing: f32,
     },
-    /// **M14J**: `act.player.release_rope` — release embedded rope.
     PlayerReleaseRope,
-    /// **M14J**: `act.player.zipline_clip line_id=<u64>`.
     PlayerZiplineClip {
         #[arg(long)]
         line_id: u64,
     },
-    /// **M14J**: `act.player.zipline_brake engaged=<bool>`.
     PlayerZiplineBrake {
         #[arg(long)]
         engaged: bool,
     },
-    /// **M14J**: `act.player.mount critter_id=<u64>`.
     PlayerMount {
         #[arg(long)]
         critter_id: u64,
     },
-    /// **M14J**: `act.player.dismount`.
     PlayerDismount,
 }
 
@@ -555,7 +516,6 @@ pub enum ReplayAction {
     },
     /// Validate a bundle. `cfctl replay validate <bundle>`.
     Validate { bundle_dir: PathBuf },
-    /// **M10B § VAL-M10B-035**: export the bundle to an MP4 via the
     /// `cf-tools-replay-viewer export` pipeline.
     Export {
         bundle_dir: Option<PathBuf>,
@@ -576,7 +536,6 @@ pub enum ReplayAction {
         #[arg(long)]
         slow_mo: Option<String>,
     },
-    /// **M10B § VAL-M10B-035**: open the egui editor for a bundle.
     /// Headless mode (TTY-less invocations / `--headless`) prints a
     /// structured envelope to stdout and exits with the documented
     /// `74` code.

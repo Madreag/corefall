@@ -26,13 +26,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::medium::SPEED_OF_SOUND_AIR_M_PER_S;
 
-/// **M12B** § Min Doppler factor (3 octaves down).
 pub const DOPPLER_FACTOR_MIN: f32 = 0.25;
 
-/// **M12B** § Max Doppler factor (2 octaves up).
 pub const DOPPLER_FACTOR_MAX: f32 = 4.0;
 
-/// **M12B** § Resolved Doppler descriptor.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct DopplerShift {
     /// Multiplicative pitch shift `f_observed / f_source`. Clamped to
@@ -85,7 +82,6 @@ fn normalize_dir(from: [f32; 2], to: [f32; 2]) -> [f32; 2] {
     }
 }
 
-/// **M12B** § Resolve the Doppler factor between source and listener.
 ///
 /// `c` is the medium-corrected speed of sound. Use `343.0` for Earth-air;
 /// `cf-atmos::medium_at(midpoint).speed_of_sound_m_per_s` for the
@@ -93,7 +89,6 @@ fn normalize_dir(from: [f32; 2], to: [f32; 2]) -> [f32; 2] {
 /// with `clamped=false` — the surrounding spatial resolver gates audio
 /// to `gain=0` BEFORE calling doppler, so this is just a safety net.
 ///
-/// Per spec § HRTF resolution: the dot product is taken against the
 /// listener-to-source unit vector.
 #[must_use]
 pub fn resolve_doppler(
@@ -124,7 +119,6 @@ pub fn resolve_doppler(
     clamp_factor(raw, c)
 }
 
-/// **M12B** § Clamp a raw Doppler factor to the safe range
 /// `[DOPPLER_FACTOR_MIN, DOPPLER_FACTOR_MAX]`. Catches NaN/Inf — broken
 /// velocity inputs collapse to a unity descriptor with `clamped=true`.
 #[must_use]

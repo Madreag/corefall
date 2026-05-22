@@ -15,15 +15,12 @@ pub struct ActorTuning {
     pub ground_friction: f32,
     pub jump_impulse: f32,
     pub terminal_velocity: f32,
-    /// **M1 Gap F1**: per-tick recoil decay rate; passed through to the
     /// per-actor `recoil_decay_rate` field at construction. Defaulted on
     /// stale serialized bundles via `#[serde(default = ...)]`.
     #[serde(default = "default_recoil_decay_per_tick")]
     pub recoil_decay_per_tick: f32,
-    /// **M1 Gap F1**: ticks to fully build sharp aim from 0 -> 1.0.
     #[serde(default = "default_sharp_aim_build_ticks")]
     pub sharp_aim_build_ticks: u32,
-    /// **M1 Gap F1**: horizontal-speed threshold (units / s) for sharp-aim
     /// "slow enough" gate.
     #[serde(default = "default_walk_threshold_tuning")]
     pub walk_threshold: f32,
@@ -59,7 +56,6 @@ impl Default for ActorTuning {
 
 /// Inputs for one [`crate::sim::step`] call.
 ///
-/// **M1 Gap F3**: `tuning` lets the engine pass settings-driven cvars in.
 /// When `tuning` is `None`, `ActorTuning::default()` is used (matches
 /// historical M1 behaviour byte-for-byte).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -73,11 +69,9 @@ pub struct StepDeps {
     /// pattern on the Y-axis instead of a hardcoded constant.
     pub region_max_y: f32,
     pub auto_reload_when_empty: bool,
-    /// **M1 Gap F3**: feel cvars sourced from `cf-control::Settings` (or
     /// `None` for tests / callers that want the historical defaults).
     #[serde(default)]
     pub tuning: Option<ActorTuning>,
-    /// **M1.5 G8**: when true, the DYING → DEAD transition is suppressed
     /// for controllable actors so a tutorial player can never be punted to
     /// a restart screen by a single lethal hit (DR-023). The flag is
     /// sourced from the scenario manifest's `tutorial_safety` field via

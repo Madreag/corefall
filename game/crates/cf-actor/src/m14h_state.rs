@@ -5,7 +5,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14H** § kind of active per-actor buff. Each variant corresponds to a
 /// treatment producer whose effect persists past `treatment.completed`.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -58,7 +57,6 @@ impl BuffKind {
     }
 }
 
-/// **M14H** § single active buff on an actor. Stored in `ActorState.m14h_buffs`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActiveBuff {
     pub kind: BuffKind,
@@ -86,7 +84,6 @@ impl ActiveBuff {
     }
 }
 
-/// **M14H** § antibiotic-course tracking state.
 ///
 /// Doses are taken on an interval; `resistance_risk` flips true if a dose
 /// is missed (compound score crosses threshold for the t1 / t2 risk surfaces).

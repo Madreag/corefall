@@ -195,7 +195,6 @@ mod tests {
         assert_eq!(error.code, error_codes::METHOD_NOT_FOUND);
     }
 
-    /// **M8B § cfctl new methods** — observe.net.session_transport
     /// dispatch returns a stable empty view (live engine wires at M9+).
     #[tokio::test]
     async fn m8b_observe_net_session_transport_dispatches() {
@@ -509,7 +508,6 @@ mod tests {
             .expect("waiter task should not panic");
     }
 
-    /// **M4A**: `observe.assets.ledger_summary` returns a well-formed JSON
     /// summary (total + by_category + by_tier + by_status + non-fresh
     /// arrays) backed by the engine handle's projection. Default impl
     /// returns either the canonical ledger's contents or an empty
@@ -564,7 +562,6 @@ mod tests {
         assert!(result.get("by_category").unwrap().is_object());
     }
 
-    /// **M4A**: when no ledger summary is available the surface still
     /// returns an empty-but-well-formed projection so callers don't have
     /// to special-case the missing-file case.
     #[tokio::test]
@@ -605,7 +602,6 @@ mod tests {
 
     #[tokio::test]
     async fn runbundle_write_rejects_path_traversal() {
-        // **M4 § runbundle.write rejects path traversal**: spec requires
         // distinct rejection reasons:
         //   - `absolute_path_rejected` for ids starting with `/`
         //   - `path_traversal_rejected` for `..` or `\`
@@ -652,7 +648,6 @@ mod tests {
         }
     }
 
-    /// **M9B-2 / VAL-M9B-CFCTL-001 (subset)**: `act.player.drop_trench_template`
     /// is routable on the cf-control server. With a well-formed
     /// payload the dispatcher returns an `accepted` ack — never the
     /// generic `-32601 MethodNotFound` error.
@@ -710,7 +705,6 @@ mod tests {
         );
     }
 
-    /// **M9B-3 / VAL-M9B-CFCTL-001**: 4 player methods + 2 observe
     /// methods route on the cf-control server (the assertion list:
     /// `act.player.dig_trench_segment`, `act.player.place_trench_module`,
     /// `act.player.drop_trench_template`, `act.player.repair_trench_module`,
@@ -788,7 +782,6 @@ mod tests {
         }
     }
 
-    /// **M9B-3**: `act.player.dig_trench_segment` rejects malformed
     /// variant ids upstream of dispatch.
     #[tokio::test]
     async fn act_player_dig_trench_segment_rejects_empty_variant() {
@@ -817,7 +810,6 @@ mod tests {
         );
     }
 
-    /// **M9B-3 / VAL-M9B-CFCTL-002**: `observe.actor.cover_state`
     /// returns one of the three declared values.
     #[tokio::test]
     async fn observe_actor_cover_state_returns_enum_value() {
@@ -842,7 +834,6 @@ mod tests {
         );
     }
 
-    /// **M9B-3 / VAL-M9B-CFCTL-002**: `observe.trench_segment_at_pos`
     /// returns either `null` or an object.
     #[tokio::test]
     async fn observe_trench_segment_at_pos_returns_null_or_object() {
@@ -867,7 +858,6 @@ mod tests {
         );
     }
 
-    /// **M9C-2 / VAL-M9C-010 (subset)**: the 4 new cfctl methods owned
     /// by this feature route on the cf-control server — none of them
     /// returns `-32601 MethodNotFound`. Future m9c-3..m9c-6 features
     /// add the remaining 6 cfctl methods to the same dispatch table.
@@ -916,7 +906,6 @@ mod tests {
         }
     }
 
-    /// **M9C-2**: `act.player.deploy_mg_tripod` with `mode: "pack"`
     /// satisfies VAL-M9C-PACK-TRIPOD-SURFACE alongside the dedicated
     /// `act.player.pack_mg_tripod` method.
     #[tokio::test]
@@ -943,7 +932,6 @@ mod tests {
         assert_eq!(result.get("mode").and_then(|v| v.as_str()), Some("pack"));
     }
 
-    /// **M9C-2**: `act.player.crew_fortification` rejects id=0 with
     /// `fortification_id_zero` before reaching the engine handler.
     #[tokio::test]
     async fn m9c_crew_fortification_rejects_zero_id() {
@@ -968,7 +956,6 @@ mod tests {
         );
     }
 
-    /// **M9C-4 / VAL-M9C-010 (subset)**: the 2 new cfctl methods
     /// owned by `m9c-4-minefield-suite-robot-engineer-doctrine` route
     /// on the cf-control server — neither returns `MethodNotFound`.
     #[tokio::test]
@@ -1016,7 +1003,6 @@ mod tests {
         }
     }
 
-    /// **M9C-4**: `act.player.deploy_minefield_template` rejects an
     /// empty template id before reaching the engine handler.
     #[tokio::test]
     async fn m9c_deploy_minefield_template_rejects_empty_id() {
@@ -1045,7 +1031,6 @@ mod tests {
         );
     }
 
-    /// **M9C-4**: `act.player.disarm_mine` accepts the robot-routed
     /// path (per VAL-M9C-043) — `robot_id` substitutes for `actor_id`.
     #[tokio::test]
     async fn m9c_disarm_mine_accepts_robot_route() {
@@ -1071,7 +1056,6 @@ mod tests {
         assert_eq!(result.get("agent").and_then(|v| v.as_str()), Some("robot"));
     }
 
-    /// **M9C-4**: `act.player.disarm_mine` rejects when both
     /// `actor_id` AND `robot_id` are missing.
     #[tokio::test]
     async fn m9c_disarm_mine_requires_actor_or_robot() {
@@ -1099,7 +1083,6 @@ mod tests {
         );
     }
 
-    /// **M9C-6 / VAL-M9C-010**: every one of the 10 M9C cfctl methods
     /// routes on the cf-control server. The closure-feature worker
     /// asserts none returns `MethodNotFound` (-32601). The four
     /// methods owned by m9c-2 / m9c-4 are re-tested here so the
@@ -1197,7 +1180,6 @@ mod tests {
         }
     }
 
-    /// **M9C-6**: `act.player.cut_wire` rejects wire_id=0 / actor_id=0
     /// before reaching the engine handler.
     #[tokio::test]
     async fn m9c_cut_wire_rejects_zero_ids() {
@@ -1233,7 +1215,6 @@ mod tests {
         }
     }
 
-    /// **M9C-6**: `act.player.repair_fortification` rejects id=0.
     #[tokio::test]
     async fn m9c_repair_fortification_rejects_zero_id() {
         let engine = StubEngine;
@@ -1257,7 +1238,6 @@ mod tests {
         );
     }
 
-    /// **M9C-6**: `act.player.unpower_fence` returns `powered=false`
     /// + `cause="breaker_toggled"` so the closure-feature worker
     /// observes the `fence_depowered.cause` value matching the
     /// schema enum.
@@ -1285,7 +1265,6 @@ mod tests {
         );
     }
 
-    /// **M12C** § cfctl cinematic surface — every method routes (not
     /// `MethodNotFound`). Stub engine defaults to "no cinematic
     /// active" so the request shape is exercised end-to-end.
     #[tokio::test]
@@ -1336,7 +1315,6 @@ mod tests {
         }
     }
 
-    /// **M12C** § `srv.dump_cinematic_state` returns the "no cinematic"
     /// sentinel from the stub engine — schema_version + phase ended +
     /// active false.
     #[tokio::test]

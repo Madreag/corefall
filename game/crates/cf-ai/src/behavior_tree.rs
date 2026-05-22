@@ -19,7 +19,6 @@ use crate::archetype_bt::{self, ArchetypeBtKind};
 use crate::task::TaskType;
 use crate::thinking_stack::{Layer, LayerKind, LayerOutput, ThinkingContext};
 
-/// **M7-A**: composable BT node. Sequence / Selector / Decorator + leaf
 /// `Action(name)`. The tree is small (depth ≤ 4) so we serialize it as a
 /// flat enum.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -56,7 +55,6 @@ fn walk(node: &BtNode, out: &mut Vec<String>) {
     }
 }
 
-/// **M7-A**: low-level action the BT leaf names. The engine translates this
 /// into actual movement / fire / repair commands.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -102,7 +100,6 @@ impl BehaviorAction {
     }
 }
 
-/// **M7-A**: Layer 3 behavior tree.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BehaviorTreeLayer {
     /// Latest BT root the layer produced. Reset each tick.
@@ -265,7 +262,6 @@ impl BehaviorTreeLayer {
     }
 }
 
-/// **M7B**: map an M7B `Archetype` enum onto an `ArchetypeBtKind` row. Medic
 /// reuses the rifleman tree (closest analog with cover-based behavior) until
 /// a dedicated medic_bt ships in a future milestone.
 pub fn archetype_to_bt_kind(archetype: Archetype) -> ArchetypeBtKind {
@@ -295,7 +291,6 @@ fn strip_archetype_prefix(name: &str) -> &str {
     name
 }
 
-/// **M7B**: map a leaf node name (with or without archetype prefix) to its
 /// `BehaviorAction`. Falls back to `Idle` for unrecognised names.
 fn name_to_action(raw: &str) -> BehaviorAction {
     let stripped = strip_archetype_prefix(raw);

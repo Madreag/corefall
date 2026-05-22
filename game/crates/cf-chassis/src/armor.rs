@@ -72,16 +72,13 @@ pub struct ZoneState {
     pub layers: Vec<ArmorLayer>,
     pub wound_hp: f32,
     pub wound_hp_max: f32,
-    /// **M14A** § "Per-attachable `damage_multiplier`" — scales incoming
     /// damage on this zone (< 1.0 = tougher). Default 1.0.
     #[serde(default = "default_damage_multiplier")]
     pub damage_multiplier: f32,
-    /// **M14A** § "Per-zone `gib_impulse_limit`" — impulse threshold (N·s)
     /// below which the zone cannot be gibbed off. Default 800 N·s; heavy
     /// chassis raises this to 1600..3200 N·s.
     #[serde(default = "default_gib_impulse_limit")]
     pub gib_impulse_limit: f32,
-    /// **M14A** § "Per-zone `stagger_factor`" — multiplier on hit-reaction
     /// duration + knockdown probability (0.2 = heavy; 1.0 = baseline).
     #[serde(default = "default_stagger_factor")]
     pub stagger_factor: f32,
@@ -117,7 +114,6 @@ impl ZoneState {
         }
     }
 
-    /// **M14A** § "Per-zone tunings" — chain-able builder for heavy-armor archetypes.
     #[must_use]
     pub fn with_damage_multiplier(mut self, mult: f32) -> Self {
         self.damage_multiplier = mult;
@@ -192,7 +188,6 @@ impl ZoneState {
     }
 }
 
-/// **M13** § "Armor mounting angles per chassis archetype". Per-zone mount
 /// angles drive the M9 angled-armor math: incoming projectiles that strike
 /// at a glancing angle effectively thicken the armor.
 #[allow(clippy::struct_field_names)]

@@ -36,7 +36,6 @@ impl M0Engine {
         self.state.read().ok().and_then(|s| s.m14e_chunks.get(&chunk_id).map(|c| c.field))
     }
 
-    /// **M14E** § Read the chunked-terrain pixel at the supplied
     /// world-space pixel coordinates. Returns `None` when no chunked
     /// terrain is loaded. Used by VAL-M14E-003 + VAL-M14E-028 tests.
     pub fn m14e_terrain_material_at(&self, px: i64, py: i64) -> Option<cf_terrain::MaterialId> {
@@ -46,18 +45,15 @@ impl M0Engine {
             .and_then(|s| s.chunked_terrain.as_ref().map(|t| t.material_at(px, py)))
     }
 
-    /// **M14E** § cumulative cave-in invocation count.
     pub fn m14e_total_cave_ins(&self) -> u32 {
         self.state.read().map(|s| s.m14e_total_cave_ins).unwrap_or(0)
     }
 
-    /// **M14E** § cumulative integrity-pass invocation count. Equal to
     /// `floor(T / 15)` after T ticks per VAL-M14E-019.
     pub fn m14e_pass_invocations(&self) -> u64 {
         self.state.read().map(|s| s.m14e_pass_invocations).unwrap_or(0)
     }
 
-    /// **M14E** § query whether a given actor is currently in the
     /// KnockedDown state because of a cave-in this run.
     pub fn m14e_actor_knockdown(&self, actor_id: u64) -> bool {
         self.state
@@ -67,17 +63,14 @@ impl M0Engine {
             .unwrap_or(false)
     }
 
-    /// **M14E** § cumulative `terrain.support_beam_placed` event count.
     pub fn m14e_total_beams_placed(&self) -> u32 {
         self.state.read().map(|s| s.m14e_total_beams_placed).unwrap_or(0)
     }
 
-    /// **M14E** § cumulative `terrain.support_beam_destroyed` event count.
     pub fn m14e_total_beams_destroyed(&self) -> u32 {
         self.state.read().map(|s| s.m14e_total_beams_destroyed).unwrap_or(0)
     }
 
-    /// **M14E** § Per-tick collapse-check pass — wired after the M14D
     /// projectile-pair pass + before the terrain dirty-region flush.
     /// Per spec literal § "deferred update" + N=15 cadence:
     ///   1. Every tick, advance per-chunk cave-in roll (uses chance
@@ -293,7 +286,6 @@ impl M0Engine {
         }
 
         // 2) Per-tick cave-in roll using seeded engine RNG.
-        // VAL-M14E-007: cave-in fires AFTER L1/L2/L3 escalation. Gate
         // the roll on `chunk.l3_at_tick` having been set (which means
         // the integrity field has decayed below the cascade threshold).
         type CaveInEmission = (
@@ -347,7 +339,6 @@ impl M0Engine {
                     continue;
                 }
                 if !l3_set {
-                    // VAL-M14E-007: L3 must be reached before cave-in
                     // fires. Skip the roll until the integrity field
                     // crosses the cascade threshold. The pending-
                     // cascade path bypasses this because the cascade
@@ -474,7 +465,6 @@ impl M0Engine {
                     }),
                     None,
                 );
-                // VAL-M14E-006: each cave_in_triggered (primary OR
                 // cascade) gets exactly one CaveInThunder cue + render
                 // primitive at its own chunk's bbox.
                 let nbr_centre_x = (payload.bbox_min[0] + payload.bbox_max[0]) / 2;
@@ -520,7 +510,6 @@ impl M0Engine {
                 self.m14e_mutate_ceiling_to_air(&cascade_payload);
             }
             if let Some(actor_id) = damage_actor {
-                // **M14E** § fall_impulse_chain → KnockedDown wiring.
                 let outcome = cf_physics::cave_in_fall_impulse_chain(
                     payload.falling_debris_count,
                     1.0,
@@ -559,7 +548,6 @@ impl M0Engine {
                         None,
                     );
                 }
-                // **M14G § VAL-CROSS-007**: route the cave-in impulse
                 // through `classify_fall_fracture` so a falling-debris
                 // hit produces a typed `Fracture*` wound on the actor
                 // underneath. Per spec the foot/shin joints carry the
@@ -608,7 +596,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14E** § Place a support beam at the actor-supplied world position.
     /// Emits `terrain.support_beam_placed`, debits 2 iron + 1 wood, writes
     /// `MATERIAL_SUPPORT_BEAM` (id=8) pixels into the chunked terrain over
     /// the placer's 8-px-half-width footprint, and locks the integrity
@@ -622,7 +609,6 @@ impl M0Engine {
         const FOOTPRINT_HALF_PX: i64 = 8;
         let placed = if let Ok(mut s) = self.state.write() {
             s.m14e_total_beams_placed = s.m14e_total_beams_placed.saturating_add(1);
-            // VAL-M14E-009: debit 2 iron + 1 wood from the actor's
             // crafting resources (saturating at 0 so a debit from an
             // empty inventory still records the delta).
             let resources = s
@@ -637,7 +623,6 @@ impl M0Engine {
                 cf_terrain::lock_radius_to_beam(&mut chunk.field, center_lx, center_ly, 1);
                 chunk.anchored = true;
             }
-            // VAL-M14E-028: write MATERIAL_SUPPORT_BEAM (id=8) into the
             // chunked-terrain pixel buffer over the beam footprint.
             // 8-px half-width per the placer geometry.
             let mut wrote_pixels = false;
@@ -683,7 +668,6 @@ impl M0Engine {
         placed
     }
 
-    /// **M14E** § Demolish a support beam at the supplied world position.
     /// Emits `terrain.support_beam_destroyed`, unlocks the integrity field
     /// ±8 px around the position, and arms a force-pass deadline at
     /// `tick + 5` so the next collapse-check pass runs within the
@@ -747,7 +731,6 @@ impl M0Engine {
         unlocked
     }
 
-    /// **M14E** § Mutate the chunked-terrain ceiling pixels in the
     /// collapse bbox to `MATERIAL_AIR`. Idempotent — running the same
     /// payload twice writes the same pixels twice with no net change.
     /// Per VAL-M14E-003 the mutation persists past tick 600 and is

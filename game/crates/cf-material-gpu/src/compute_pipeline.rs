@@ -94,7 +94,6 @@ impl ReactionEntryGpu {
     }
 }
 
-/// **M15B** § Per-tick GPU dispatch inputs. The host builds this from
 /// the chunked terrain + heat field + reaction registry, hands it to
 /// [`dispatch_compute_step`], and reads back the resulting pixel grid
 /// + reactions-fired counter.
@@ -119,7 +118,6 @@ pub struct GpuStepInputs {
     pub parity: u32,
 }
 
-/// **M15B** § Per-tick GPU dispatch outputs.
 #[derive(Debug, Clone)]
 pub struct GpuStepOutputs {
     /// Post-step pixel grid. Length = `width × height`.
@@ -278,7 +276,6 @@ fn try_init_gpu_inner() -> Result<ComputePipelineState, GpuUnavailableReason> {
     })
 }
 
-/// **M15B** § Dispatch one GPU compute step. Per spec § "wgpu compute
 /// pipeline for chunked CA + reaction table + checksum readback":
 /// uploads the pixel + heat + reaction-table buffers, runs the CA +
 /// reaction-table compute pipelines back-to-back, reads back the post-
@@ -586,7 +583,6 @@ fn dispatch_compute_step_inner(
 mod tests {
     use super::*;
 
-    /// VAL-M15B-009: `try_init` returns CpuFallback when built without
     /// the `gpu` feature (the default for sim crates).
     #[test]
     #[cfg(not(feature = "gpu"))]
@@ -597,7 +593,6 @@ mod tests {
         assert_eq!(reason, Some(GpuUnavailableReason::FeatureDisabled));
     }
 
-    /// VAL-M15B-010: error formatting is stable across releases (used
     /// by telemetry).
     #[test]
     fn error_display_is_stable() {
@@ -611,7 +606,6 @@ mod tests {
         assert_eq!(e.to_string(), "GPU dispatch failed: oom");
     }
 
-    /// VAL-M15B-011: GpuUnavailableReason names round-trip through
     /// `as_str`.
     #[test]
     fn unavailable_reason_str_names_are_stable() {
@@ -624,7 +618,6 @@ mod tests {
         assert_eq!(GpuUnavailableReason::PipelineFailed.as_str(), "pipeline_failed");
     }
 
-    /// VAL-M15B-012: ReactionEntryGpu carries the spec literal layout
     /// (5 u32 fields + 1 padding word).
     #[test]
     fn reaction_entry_gpu_layout_is_six_u32() {
@@ -637,7 +630,6 @@ mod tests {
         assert_eq!(e.min_temp_k, 273);
     }
 
-    /// VAL-M15B-013: None byproduct serializes as the spec-locked
     /// sentinel.
     #[test]
     fn reaction_entry_none_byproduct_uses_sentinel() {
@@ -646,7 +638,6 @@ mod tests {
         assert_eq!(e.min_temp_k, 0);
     }
 
-    /// VAL-M15B-014: dispatch_compute_step returns FeatureDisabled
     /// when the `gpu` feature is off (sim-crate default).
     #[test]
     #[cfg(not(feature = "gpu"))]

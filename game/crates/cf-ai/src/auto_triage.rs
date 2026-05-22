@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::constants::{seconds_to_ticks_for, MEDIC_AUTO_TRIAGE_APPLY_SECONDS, MEDIC_AUTO_TRIAGE_REACH_SECONDS};
 
-/// **M7-A**: per-bot auto-triage tracker. The Medic archetype's thinking
 /// stack picks `TriageDownedAlly`; the engine instantiates an
 /// `AutoTriageMission` and ticks it each frame.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -71,7 +70,6 @@ impl AutoTriageMission {
     }
 }
 
-/// **M7-A**: lifecycle states for one auto-triage mission.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -93,7 +91,6 @@ impl AutoTriageState {
     }
 }
 
-/// **M7-A**: `ai.auto_triage_initiated` event payload (consumed by cf-control).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AutoTriageInitiatedEvent {
     pub medic_actor_id: u64,
@@ -119,7 +116,6 @@ impl AutoTriageInitiatedEvent {
     }
 }
 
-/// **M7-A**: `ai.auto_triage_applied` event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AutoTriageAppliedEvent {
     pub medic_actor_id: u64,

@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct GuardId(pub u32);
 
-/// **M8A**: per-guard ECS component scaffolding. The full state machine
 /// lives in cf-ai::sim and cf-ai::thinking_stack; this component is the
 /// surface the M9+ engine host queries via ECS.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]

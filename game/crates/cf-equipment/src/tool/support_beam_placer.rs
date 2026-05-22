@@ -22,7 +22,6 @@ pub const SUPPORT_BEAM_PLACER_ID: &str = "support_beam_placer";
 /// Tech-tier of the placer. Per spec literal T1.
 pub const SUPPORT_BEAM_PLACER_TIER: u8 = 1;
 
-/// **M14E** § T1 support-beam placer. Carries the per-beam crafting
 /// cost (`2 iron + 1 wood`) plus the placement geometry. The
 /// `placement_pixel_footprint` field is the half-extent (in pixels)
 /// around the placer target that the `support_beam` material covers
@@ -105,7 +104,6 @@ pub fn support_beam_placer_m14e_default() -> SupportBeamPlacerSpec {
 mod tests {
     use super::*;
 
-    /// VAL-M14E-012: support_beam_placer registers at tier T1 with
     /// per-beam cost `[(Iron, 2), (Wood, 1)]`.
     #[test]
     fn support_beam_placer_default_matches_spec_cost_and_tier() {

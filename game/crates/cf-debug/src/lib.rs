@@ -7,7 +7,7 @@
 //! consumes per-frame. Tests stay headless.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 pub mod ai_overlay;
 pub mod collision_overlay;

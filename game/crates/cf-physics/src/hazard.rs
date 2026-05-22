@@ -6,7 +6,6 @@
 //! `cf-control/src/engine.rs`; this module exposes the pure decision
 //! function so consumers (and tests) can call it without an engine.
 
-/// **M3**: returns the damage an actor should take this tick from a hazard
 /// tile. `damage_per_tick` comes from `MaterialDef.damage_per_tick`. If the
 /// material is not hazardous or `damage_on_touch=false`, returns 0.
 #[must_use]

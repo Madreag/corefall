@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ObserveChassisSilhouetteParams",
-  "description": "**M13** § \"Pilot-inside-chassis dual silhouette\" — chassis silhouette\nprojection (per-zone HP for the chassis side of the dual layer).",
+  "description": "projection (per-zone HP for the chassis side of the dual layer).",
   "type": "object",
   "properties": {
     "actor_id": {

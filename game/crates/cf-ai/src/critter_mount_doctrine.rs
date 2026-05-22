@@ -10,7 +10,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14J** § "rider provides `ride_direction` (dx, dy as input to
 /// critter's locomotion goal); critter AI handles gait selection (walk /
 /// trot / canter / gallop) via its own M14A limb paths".
 #[repr(u8)]
@@ -54,7 +53,6 @@ impl CritterGait {
     }
 }
 
-/// **M14J** § "Mounted-pairing combined mass: rider.mass + critter.mass →
 /// critter chassis aggregates both for M14A speed curves" — per-tick
 /// gait + locomotion goal output.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -76,7 +74,6 @@ impl Default for CritterMountGoal {
     }
 }
 
-/// **M14J** § "rider weapon inputs go to rider's own arm sim —
 /// independent of critter motion" — pick a gait from the rider's
 /// `ride_direction` magnitude. Pure / deterministic.
 ///
@@ -113,7 +110,6 @@ pub fn select_gait_for_ride_input(
     }
 }
 
-/// **M14J** § "critter AI swaps free roam → obey rider" — pick the gait
 /// for a free / un-ridden critter. M27's wandering doctrine produces the
 /// rider-direction input via its own pathing; for the unmounted case the
 /// AI returns Idle by default (M27 free-roam is layered above this).

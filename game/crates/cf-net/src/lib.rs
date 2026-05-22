@@ -74,7 +74,6 @@ pub enum NetError {
     FrameTooLarge(usize),
     #[error("content hash mismatch on join")]
     ContentHashMismatch,
-    /// **M8B § Acceptance "Protocol downgrade attack is rejected"**: the
     /// session is closed with `NetError::Transport("tls handshake
     /// mismatch")` literal per spec. TLS-bound semver / application
     /// Handshake skew is the canonical trigger.
@@ -86,7 +85,6 @@ pub enum NetError {
 
 pub type NetResult<T> = Result<T, NetError>;
 
-/// **M8B § Acceptance "Protocol downgrade attack is rejected"** —
 /// canonical error string for a TLS-bound handshake mismatch (downgrade
 /// attempt). Producers wrap this in [`NetError::Transport`] per spec
 /// literal: `NetError::Transport("tls handshake mismatch")`.

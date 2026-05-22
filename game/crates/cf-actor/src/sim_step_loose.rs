@@ -28,7 +28,6 @@ const LOOSE_ITEM_FLOOR_RESTITUTION: f32 = 0.35;
 /// Per-tick horizontal-velocity damping while on the ground.
 const LOOSE_ITEM_GROUND_FRICTION: f32 = 0.85;
 
-/// **M1 R2 / Gap G1**: tick the gravity/floor/dwell loop on every loose
 /// item. Items that already settled this tick clear their one-shot latch;
 /// items that newly settle push a `SettledLooseItem` into the step report
 /// for the engine to emit `actor.inventory_settled`.

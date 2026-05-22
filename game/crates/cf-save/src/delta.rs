@@ -252,7 +252,6 @@ pub fn reconstruct_chain(
     Ok(frames)
 }
 
-/// **M4B § "Delta snapshot reconstructs to byte-identical state"** —
 /// returns the reconstructed snapshot at `tick` from the supplied
 /// `(baseline, deltas)` pair, by walking forward from the baseline and
 /// applying every delta whose tick is <= `tick`.

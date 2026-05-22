@@ -170,7 +170,6 @@ pub fn normalized_hardness(id: MaterialId) -> f32 {
         MATERIAL_DIRT => 0.2,
         MATERIAL_LOOSE_FILL => 0.1,
         MATERIAL_CONCRETE => 0.7,
-        // **M14E** § support_beam carries integrity above the cascade
         // threshold so neighbor cave-ins do not cascade through it.
         // Same numeric tier as `metal_nohook` (0.9) per the M14E table.
         MATERIAL_METAL_NOHOOK | MATERIAL_SUPPORT_BEAM => 0.9,

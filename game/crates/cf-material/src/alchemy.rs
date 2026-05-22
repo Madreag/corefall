@@ -125,12 +125,10 @@ impl AlchemyRegistry {
     }
 }
 
-/// **M15** § the canonical launch alchemy registry. Material ids match
 /// `content/materials/material_registry.json`:
 /// - 13=water, 33=coal, 34=ore_iron, 35=ore_gold, 36=ore_copper,
 ///   37=ore_uranium, 42=salt, 48=gunpowder, 68=iron, 69=steel.
 ///
-/// Per spec § "Alchemy table for crafting reactions" the launch recipes
 /// are iron+coal+heat → steel, water+salt+saltpeter → gunpowder (we
 /// stand in ore_uranium/sulfur via salt for the launch set), and the
 /// brass + uranium recipes. M25 will gate them.
@@ -200,7 +198,6 @@ pub fn default_alchemy_registry() -> AlchemyRegistry {
     AlchemyRegistry::new(raw.to_vec())
 }
 
-/// **M15** § station-managed crafting state. The station is a placeable
 /// fixture; the engine ticks it forward and emits the two events on
 /// invoke / complete.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

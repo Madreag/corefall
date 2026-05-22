@@ -91,7 +91,6 @@ impl M0Engine {
         }
     }
 
-    /// **M4B § "Delta baseline cadence is enforced"** — per-tick snapshot
     /// emitter. Reads the current world state via [`Self::snapshot_world_save`]
     /// and produces either a baseline event (when `tick % cadence == 0`) or
     /// a delta event chained back to the most recent baseline.

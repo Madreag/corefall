@@ -29,7 +29,6 @@ impl SenseKind {
     }
 }
 
-/// **M14I** § locked functional-debuff enum.
 ///
 /// Matches the spec's named variant list exactly. Per-variant stat
 /// semantics are documented at the call site (cf-actor::long_term passive
@@ -96,7 +95,6 @@ impl FunctionalDebuff {
     }
 }
 
-/// **M14I** § per-wound × closure × severity → debuff matrix.
 ///
 /// Spec table:
 /// - `LacerationSevere × sutures × 0.8` → `ReducedZoneStrength{zone, 0.05}`.

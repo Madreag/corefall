@@ -158,11 +158,9 @@ impl M0Engine {
                 hold_threshold_ms: live_settings.hold_threshold_ms,
                 key_remap_enabled: live_settings.key_remap_enabled,
                 key_bindings: live_settings.key_bindings.clone(),
-                // M2 audit pass 5 (2026-05-13): persist live difficulty preset
                 // into the run manifest so cfctl reproductions don't have to
                 // walk observe.settings events to recover the preset id.
                 ai_difficulty: live_settings.ai_difficulty.clone(),
-                // M1 audit pass 7 (2026-05-13): persist the full feel-cvar
                 // suite per spec literal "run_manifest.json.settings reflects
                 // the patched values".
                 accel: live_settings.accel,
@@ -175,7 +173,6 @@ impl M0Engine {
                 reduce_camera_shake_pct: live_settings.reduce_camera_shake_pct,
                 tick_rate_hz: self.config.tick_rate_hz,
             },
-            // **M4 § Per-scenario checksum cadence**: respect the engine's
             // configured `checksum_cadence_ticks` (which the CLI flag
             // `--checksum-cadence-ticks <N>` plumbs through). Previously
             // the manifest always reported the m0_default cadence (60),
@@ -201,7 +198,6 @@ impl M0Engine {
                     cf_replay::ExpectedOutcome::Clean
                 }
             }),
-            // **M4B § "Replays survive a game update"** — record the
             // SaveSchemaVersion this run was produced under. Default
             // `[2, 0, 0]` matches `cf_save::CURRENT_SAVE_SCHEMA_VERSION`.
             save_schema_version: [
@@ -209,11 +205,9 @@ impl M0Engine {
                 cf_save::CURRENT_SAVE_SCHEMA_VERSION.minor,
                 cf_save::CURRENT_SAVE_SCHEMA_VERSION.patch,
             ],
-            // **M4B § "Delta baseline cadence is enforced"** — honor the
             // engine config (default 600 = 10 s @ 60 Hz, per spec). cf-app
             // / cfctl can override via `--delta-baseline-cadence-ticks`.
             delta_baseline_cadence_ticks: self.config.delta_baseline_cadence_ticks,
-            // **M4B § "Tamper-evident competitive replays"** — read the
             // recorder's current chain anchor. `Some(_)` in tournament
             // mode (`--ledger-chain`); `None` for dev bundles. Computed
             // continuously as events are recorded; the value at manifest-

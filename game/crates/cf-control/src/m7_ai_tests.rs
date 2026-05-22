@@ -63,7 +63,6 @@ mod tests {
         assert_eq!(bot.auto_repair.as_ref().unwrap().progressed_ticks, 2);
     }
 
-    /// **M7-A fix-round-2 (audit gap A9)**: ready_triage_completions
     /// returns the medic + target id once the mission's reach deadline
     /// elapses. Before the deadline, the scan is empty even when a
     /// mission is in flight.
@@ -80,7 +79,6 @@ mod tests {
         assert_eq!(ready, vec![(ActorId(1), ActorId(99))]);
     }
 
-    /// **M7-A fix-round-2 (audit gap A11)**: ready_repair_progressions
     /// fires once when the engineer's first_tick_deadline lands AND the
     /// mission has not yet recorded a repair tick. Subsequent calls
     /// after a repair tick has been recorded return empty (engine drives
@@ -112,7 +110,6 @@ mod tests {
         assert_eq!(world.phase.as_ref().unwrap().current, MissionPhase::Buildup);
     }
 
-    /// **M7 (audit gap A15)**: track_kills increments the cumulative
     /// counter once per filtered DYING transition.
     #[test]
     fn track_kills_increments_cumulative_count() {
@@ -125,7 +122,6 @@ mod tests {
         assert_eq!(count2, 5);
     }
 
-    /// **M7 (audit gap A15)**: try_spawn_reinforcement returns Some when
     /// the active phase + cumulative kills satisfy a registered wave.
     /// Idempotent — a re-tick after spawn returns None.
     #[test]
@@ -146,7 +142,6 @@ mod tests {
         assert!(try_spawn_reinforcement(&mut world, 5, 2000).is_none());
     }
 
-    /// **M7 (audit gap A16/A17)**: apply_boss_damage_and_ability
     /// surfaces the canonical phase-change + the canonical ability for
     /// the new phase in one call. Phase 1 → 2 fires `shield`; the latch
     /// prevents a second emission while still in Phase 2.
@@ -171,7 +166,6 @@ mod tests {
         );
     }
 
-    /// **M7 (audit gap A14)**: drain_objective_graph_emissions surfaces
     /// each optional objective exactly once when its dependencies clear.
     #[test]
     fn objective_graph_optional_offered_emits_once_per_objective() {
@@ -200,7 +194,6 @@ mod tests {
         assert!(emit2.optional_offered.is_empty());
     }
 
-    /// **M7 (audit gap A13)**: drain_objective_graph_emissions surfaces
     /// the chosen branch when a BranchingPoint has a `chosen_branch`.
     #[test]
     fn objective_graph_branched_emits_on_chosen_branch() {
@@ -225,7 +218,6 @@ mod tests {
         assert!(emit2.objective_branched.is_empty());
     }
 
-    /// **M7 (audit gap A14)**: optional objectives gated behind unmet
     /// dependencies are NOT offered until the dependency completes.
     #[test]
     fn objective_graph_optional_waits_for_dependencies() {
@@ -268,7 +260,6 @@ mod tests {
         assert_eq!(emit2.optional_offered[0].get("objective_id").unwrap(), &json!("bonus"));
     }
 
-    /// **M7 (audit gap A17)**: Phase 1 has no canonical ability so
     /// drain_boss_phase_ability returns None until a phase change.
     #[test]
     fn boss_phase_1_has_no_ability() {
@@ -277,7 +268,6 @@ mod tests {
         assert!(drain_boss_phase_ability(&mut world, 0).is_none());
     }
 
-    /// **M7-B**: `act.player.set_priority` mutates the bot's
     /// PriorityTable AND keeps the utility scorer's cached priority in
     /// sync so the next tick scores against the new weight.
     #[test]
@@ -364,7 +354,6 @@ mod tests {
         assert_eq!(view.get("auto_action_cap").unwrap(), &json!(3));
     }
 
-    /// **M7-B**: PriorityTable persists across snapshot/restore cycles
     /// (round-trip preserves weights). Spec § PriorityTable persists.
     #[test]
     fn priority_table_round_trips_through_snapshot_restore() {
@@ -462,7 +451,6 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // **M7-A fix-round-2 (audit gaps A1-A7)**: payload shape + behavior
     // transition coverage for the 7 sub-plan events the engine emits via
     // `detect_behavior_transitions`.
     // -----------------------------------------------------------------
@@ -706,7 +694,6 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // **M7-B fix-round-2 (audit gap A18)**: per-event mood / stress /
     // faction delta coverage. Verifies the helpers mutate the world
     // accumulators correctly and return ready-to-record payloads.
     // -----------------------------------------------------------------

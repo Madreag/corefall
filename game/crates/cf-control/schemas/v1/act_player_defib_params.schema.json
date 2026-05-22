@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerDefibParams",
-  "description": "**M14H** § `act.player.defib` — deliver a defibrillator shock.",
   "type": "object",
   "properties": {
     "schema_version": {

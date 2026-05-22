@@ -4,7 +4,6 @@ use crate::{ActorId, ItemSlot, Vec2};
 
 /// Source of a `ControlIntent` for replay/audit.
 ///
-/// **M14 audit pass 3 (GAP-M1-04)**: the M1 spec lists IntentSource as
 /// `{Player, Ai, Replay, Script}`. The original implementation diverged
 /// into `{Human, Cfctl, Ai, Replay}`. We accept both the spec names AND
 /// the legacy names on the input side via serde aliases, but emit only

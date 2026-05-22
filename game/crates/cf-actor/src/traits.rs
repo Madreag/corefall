@@ -30,7 +30,6 @@ pub mod ids {
     pub const RETIRED_VETERAN: &str = "retired_veteran";
 }
 
-/// **M14I** § per-actor trait set. Stored on `cf-actor::ActorState`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TraitSet {

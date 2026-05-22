@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerCprRoundParams",
-  "description": "**M14H** § `act.player.cpr_round` — apply one CPR round.",
   "type": "object",
   "properties": {
     "schema_version": {

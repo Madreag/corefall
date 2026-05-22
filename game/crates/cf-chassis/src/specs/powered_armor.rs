@@ -32,7 +32,6 @@ pub fn powered_armor_spec() -> ChassisSpec {
         ChassisModule::new("shield.bubble", ModuleKind::Shield, BodyZone::Torso, 50.0),
         ChassisModule::new("sensor.scope", ModuleKind::Sensor, BodyZone::Head, 25.0),
         ChassisModule::not_present("repair_drone.none", ModuleKind::RepairDrone),
-        // **M13** § "Per-chassis module positions" — Powered Armor: +
         // power_core (torso center), targeting_computer (head),
         // gun_mount (arm), shield_emitter (chest).
         ChassisModule::new("power_core.cell", ModuleKind::PowerCore, BodyZone::Torso, 50.0)

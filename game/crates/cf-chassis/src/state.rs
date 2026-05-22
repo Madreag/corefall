@@ -37,27 +37,20 @@ pub struct ChassisState {
     pub last_stage_reason: String,
     /// Modules salvaged after wreck (populated by [`ChassisState::salvage`]).
     pub salvaged_modules: Vec<ChassisModule>,
-    /// **M13** § "Armor mounting angles per chassis archetype".
     #[serde(default)]
     pub armor_angles: ArmorMountAngles,
-    /// **M13** § "Chassis ability slots" — active ability roster.
     #[serde(default)]
     pub abilities: ChassisAbilitySlots,
-    /// **M13** § "Weapon modifier slots (Noita-style combinatorial)".
     #[serde(default)]
     pub weapon_modifiers: WeaponModifierSet,
-    /// **M13** § "Cockpit camera anchor" — current camera anchor request.
     #[serde(default)]
     pub camera_anchor: CameraAnchor,
-    /// **M13** § "Boarding / disembarking transitions" — ticks remaining in
     /// the 1500ms boarding transition (0 = idle).
     #[serde(default)]
     pub boarding_ticks_remaining: u32,
-    /// **M13** § "Boarding / disembarking transitions" — ticks remaining in
     /// the 1500ms disembarking transition.
     #[serde(default)]
     pub disembarking_ticks_remaining: u32,
-    /// **M13** § "Boarding / disembarking transitions" — full transition
     /// budget in ticks at the chassis tick rate (1500ms).
     #[serde(default)]
     pub transition_ticks_total: u32,
@@ -99,7 +92,6 @@ impl ChassisState {
         }
     }
 
-    /// **M13** § "Cockpit camera anchor" — switch the active camera anchor.
     /// Returns `Ok(prev_anchor)` on success or a typed reason on rejection.
     pub fn set_camera_anchor(&mut self, anchor: CameraAnchor) -> Result<CameraAnchor, &'static str> {
         if anchor == CameraAnchor::Cockpit && !self.kind.supports_cockpit_anchor() {
@@ -110,7 +102,6 @@ impl ChassisState {
         Ok(prev)
     }
 
-    /// **M13** § "Boarding / disembarking transitions" — kick off the
     /// 1500ms boarding transition. Returns `true` when accepted (was idle).
     pub fn begin_boarding(&mut self) -> bool {
         if self.boarding_ticks_remaining > 0 || self.disembarking_ticks_remaining > 0 {
@@ -120,7 +111,6 @@ impl ChassisState {
         true
     }
 
-    /// **M13** § "Boarding / disembarking transitions" — kick off the 1500ms
     /// disembarking transition.
     pub fn begin_disembarking(&mut self) -> bool {
         if self.boarding_ticks_remaining > 0 || self.disembarking_ticks_remaining > 0 {
@@ -130,13 +120,11 @@ impl ChassisState {
         true
     }
 
-    /// **M13** § "Boarding / disembarking transitions" — true iff the chassis
     /// is mid-transition (input rejected during).
     pub fn is_in_transition(&self) -> bool {
         self.boarding_ticks_remaining > 0 || self.disembarking_ticks_remaining > 0
     }
 
-    /// **M13** § "Boarding / disembarking transitions" — tick the transition
     /// timers. Returns the side that just completed (if any).
     pub fn tick_transitions(&mut self) -> Option<TransitionCompleted> {
         if self.boarding_ticks_remaining > 0 {
@@ -153,24 +141,20 @@ impl ChassisState {
         None
     }
 
-    /// **M13** § "Chassis ability slots" — activate one ability slot.
     pub fn activate_ability(&mut self, ability: ChassisAbility) -> Result<AbilitySlotState, AbilityRejectReason> {
         self.abilities.activate(ability)
     }
 
-    /// **M13** § "Chassis ability slots" — tick every slot's cooldown + effect.
     pub fn tick_abilities(&mut self) -> AbilityTickOutcome {
         self.abilities.tick()
     }
 
-    /// **M13** § "Weapon modifier slots" — attach a modifier to the active weapon.
     pub fn attach_weapon_modifier(&mut self, m: WeaponModifier) -> Result<bool, &'static str> {
         let before_len = self.weapon_modifiers.modifiers.len();
         self.weapon_modifiers.attach(m)?;
         Ok(self.weapon_modifiers.modifiers.len() > before_len)
     }
 
-    /// **M13** § "Weapon modifier slots" — detach a modifier.
     pub fn detach_weapon_modifier(&mut self, m: WeaponModifier) -> bool {
         self.weapon_modifiers.detach(m)
     }
@@ -296,7 +280,6 @@ impl ChassisState {
         outcome.zone_destroyed = zone_destroyed;
         let _ = wound_destroyed; // tracked for future routing into actor HP coefficient
         outcome.actor_hp_damage = remaining.max(0.0);
-        // **M13** § "Limb loss functional consequences" — head/torso loss is
         // INSTANT DEATH per CCCP decapitation rule. Tutorial-safety overrides
         // (`tutorial_safety=true` caps damage at PilotInjured) suppress lethal.
         if zone_destroyed && !self.tutorial_safety && matches!(zone, BodyZone::Head | BodyZone::Torso) {
@@ -390,7 +373,6 @@ impl ChassisState {
         }
     }
 
-    /// **M13** § "Critical chassis modules with full mechanics" — apply
     /// damage to a module and surface its cascade outcome (ammo cookoff,
     /// engine fire, optics blind, etc.). The engine wires this into
     /// `module.ammo_rack_cooking` / `module.ammo_rack_detonated` /
@@ -409,7 +391,6 @@ impl ChassisState {
         let module_state = module.state;
         let cascade = module.failure_cascade;
         let ammo_remaining = module.ammo_quantity_remaining;
-        // **M14 audit pass 4 (Finding 8)**: tier-crossing cascades fire
         // ONLY when the module's `state` has advanced past its previous
         // `last_cascade_emitted_state` — otherwise multiple zone hits in a
         // single tick (or any other rapid succession of calls while
@@ -420,7 +401,6 @@ impl ChassisState {
         let last_emitted = module
             .last_cascade_emitted_state;
         let tier_advanced = (module_state as u8) > (last_emitted as u8);
-        // Per spec § "Ammo rack module (explosive cascade)" — first-hit cooks
         // 1/3 of remaining ammo; severe-hit (Failed state) detonates the rack.
         if cascade == FailureCascade::AmmoCookoff && tier_advanced {
             match module_state {
@@ -452,7 +432,6 @@ impl ChassisState {
                 _ => {}
             }
         }
-        // Per spec § "Engine module (fire risk)" — penetrated engine spills
         // oil; destroyed engine cascades fire. Tier-gated.
         if cascade == FailureCascade::EngineFire && tier_advanced {
             if matches!(module_state, ModuleStateKind::Warning | ModuleStateKind::Failed) {
@@ -465,7 +444,6 @@ impl ChassisState {
                 cascade_events.push(CriticalModuleEvent::EngineFire);
             }
         }
-        // Per spec § "Reactor module" — pressure_state advances per damage tier.
         // Reactor pressure has its own internal crossed flag below (it only
         // emits when `pressure` > prior `pressure_state`); leave that as the
         // authoritative dedupe for reactors.
@@ -487,7 +465,6 @@ impl ChassisState {
                 cascade_events.push(CriticalModuleEvent::ReactorPressureAdvanced { tier: pressure });
             }
         }
-        // Per spec § "Cockpit module" — penetration deals direct damage to pilot.
         // Per-hit cascade (carries damage payload); gates on damage>0 instead
         // of tier_advanced so multiple hits all surface their damage.
         if cascade == FailureCascade::PilotDirectDamage
@@ -500,7 +477,6 @@ impl ChassisState {
                 self.pilot_state = PilotState::Injured;
             }
         }
-        // Per spec § "Optics module" — damaged → sight × 0.5; destroyed → blind.
         if cascade == FailureCascade::SightImpairment
             && tier_advanced
             && matches!(module_state, ModuleStateKind::Warning | ModuleStateKind::Failed)
@@ -509,7 +485,6 @@ impl ChassisState {
                 blind: module_state == ModuleStateKind::Failed,
             });
         }
-        // Per spec § "Transmission module" — damaged → speed × 0.6; destroyed → immobile.
         if cascade == FailureCascade::MobilityLoss
             && tier_advanced
             && matches!(module_state, ModuleStateKind::Warning | ModuleStateKind::Failed)
@@ -518,7 +493,6 @@ impl ChassisState {
                 immobile: module_state == ModuleStateKind::Failed,
             });
         }
-        // **M14 audit pass 4 (Finding 8)**: latch the high-water mark so
         // subsequent same-state calls don't refire the tier-gated cascades.
         if tier_advanced {
             if let Some(m) = self.module_mut(&module_id) {
@@ -536,7 +510,6 @@ impl ChassisState {
         })
     }
 
-    /// **M13** § "Spalling integration with chassis modules" — given an
     /// impact point in chassis-local space, fire 1-3 deterministic spalling
     /// fragments into the chassis and report each fragment's module hit.
     /// `seed` is the caller-supplied deterministic PRNG seed (NO thread_rng).
@@ -750,7 +723,6 @@ impl ChassisState {
                 let prev = m.state;
                 m.hp = m.hp_max;
                 m.state = ModuleStateKind::Nominal;
-                // **M14 audit pass 4 (Finding 8)**: reset cascade
                 // emission high-water mark so re-damage re-fires its
                 // tier-crossing cascades.
                 m.last_cascade_emitted_state = ModuleStateKind::Nominal;
@@ -802,7 +774,6 @@ impl ChassisState {
         let prev = module.state;
         module.hp = module.hp_max;
         module.state = ModuleStateKind::Nominal;
-        // **M14 audit pass 4 (Finding 8)**: reset the cascade-emitted
         // high-water mark on repair so future damage that re-crosses a
         // tier emits its cascade event again.
         module.last_cascade_emitted_state = ModuleStateKind::Nominal;
@@ -823,7 +794,6 @@ impl ChassisState {
         }
     }
 
-    /// **M5 scenario manifest** path: set the stage directly. Used by
     /// `ScenarioChassis::initial_stage` so a scenario can spawn a chassis
     /// already in `Wreck` / `Disabled` for salvage proof. Does NOT recompute
     /// from zone/module integrity — callers that need integrity-driven stage

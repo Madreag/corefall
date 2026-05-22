@@ -157,7 +157,6 @@ pub fn build_debrief_modal(bundle_dir: &Path, run_id: &str) -> DebriefModal {
 mod tests {
     use super::*;
 
-    /// VAL-M10B-DEBRIEF-CTA: the modal's widget tree contains the
     /// Export Last Replay CTA with the documented id + label.
     #[test]
     fn export_last_replay_button_is_in_widget_tree() {
@@ -168,7 +167,6 @@ mod tests {
         assert!(button.on_click.is_some(), "CTA must have an on-click dispatch");
     }
 
-    /// VAL-M10B-DEBRIEF-CTA: the button's on-click handler invokes
     /// `cf-tools-replay-viewer export <bundle> --preset clip_compact
     /// --out <platform_default_path>`.
     #[test]

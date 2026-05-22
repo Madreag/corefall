@@ -106,7 +106,6 @@ pub fn m6_tool_presets() -> Vec<ToolPreset> {
     ]
 }
 
-/// **M9B**: T0 entrenching-tool catalog. The cf-equipment tool surface
 /// keeps the M6 `ToolPreset` schema (no cost/dig-time fields) untouched
 /// and exposes M9B-specific dig tools via this parallel catalog so the
 /// cfctl handler `act.player.dig_trench_segment` (m9b-3) can look up
@@ -116,7 +115,6 @@ pub fn m9b_entrenching_tools() -> Vec<entrenching::EntrenchingToolSpec> {
     vec![entrenching::entrenching_tool_m9b_default()]
 }
 
-/// **M9B**: lookup an entrenching-tool spec by its catalog id. Returns
 /// `None` for unknown ids so cfctl can surface a structured error
 /// rather than panic.
 #[must_use]
@@ -124,7 +122,6 @@ pub fn find_entrenching_tool(id: &str) -> Option<entrenching::EntrenchingToolSpe
     m9b_entrenching_tools().into_iter().find(|t| t.id == id)
 }
 
-/// **M9B**: union catalog of every dig-tool registered for M9B trench
 /// carving — entrenching_tool (T0) plus the three M30B-tier pickaxes
 /// (T1 / T2 / T3). Returned as a sorted-by-`tier` list so the cfctl
 /// dispatcher picks the lowest dig time among the player's equipped
@@ -141,7 +138,6 @@ pub fn m9b_dig_tools_all() -> Vec<entrenching::EntrenchingToolSpec> {
     all
 }
 
-/// **M9B**: lookup any registered dig-tool spec (entrenching_tool or
 /// pickaxe T1/T2/T3) by catalog id.
 #[must_use]
 pub fn find_m9b_dig_tool(id: &str) -> Option<entrenching::EntrenchingToolSpec> {
@@ -151,7 +147,6 @@ pub fn find_m9b_dig_tool(id: &str) -> Option<entrenching::EntrenchingToolSpec> {
     dig_pickaxe::find_pickaxe_dig(id).map(|p| dig_pickaxe::as_dig_tool_spec(&p))
 }
 
-/// **M9C**: enumeration of the new T1/T2 fortification tools per spec
 /// § "Crates / modules touched": `minesweeper`, `wire_cutters`,
 /// `engineering_tool`. The entrenching_tool is shared with M9B and is
 /// catalogued separately via [`m9b_entrenching_tools`].
@@ -185,7 +180,6 @@ pub fn is_m9c_tool(id: &str) -> bool {
     )
 }
 
-/// **M14E** § Support-beam placer catalog. T1 tool that writes the
 /// `support_beam` material at the placement target. Returns the
 /// single registered placer instance.
 #[must_use]
@@ -193,7 +187,6 @@ pub fn m14e_support_beam_placer() -> support_beam_placer::SupportBeamPlacerSpec 
     support_beam_placer::support_beam_placer_m14e_default()
 }
 
-/// **M14E** § Resolve the placer spec by id. Returns `None` for
 /// unknown ids so cfctl handlers can emit a structured error.
 #[must_use]
 pub fn find_support_beam_placer(id: &str) -> Option<support_beam_placer::SupportBeamPlacerSpec> {
@@ -204,7 +197,6 @@ pub fn find_support_beam_placer(id: &str) -> Option<support_beam_placer::Support
     }
 }
 
-/// **M14F** § True when the supplied id maps to one of the
 /// brace-strut tier items (T1 / T2 / T3).
 #[must_use]
 pub fn is_brace_strut_tool(id: &str) -> bool {
@@ -224,7 +216,6 @@ mod tests {
         assert!(v.len() >= 7);
     }
 
-    /// VAL-M9C-054: minesweeper, wire_cutters, engineering_tool +
     /// entrenching_tool are all registered + reachable from the
     /// equipment catalog. (entrenching_tool ships in M9B.)
     #[test]
@@ -263,7 +254,6 @@ mod tests {
         assert!(b.persistent_marker);
     }
 
-    /// VAL-M9B-PICKAXE-001: pickaxe-tier dig times are strictly faster
     /// than the entrenching_tool baseline (T3 < T2 < T1 < entrenching).
     #[test]
     fn pickaxe_dig_time_scales_with_tier_in_catalog() {
@@ -297,7 +287,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9B-PICKAXE-001: pickaxes register a `deep` dig time the
     /// entrenching_tool does not — the pickaxe is the only tool that
     /// can attempt the `deep` variant.
     #[test]
@@ -320,7 +309,6 @@ mod tests {
         assert!(baseline.dig_time_for_variant("deep").is_none());
     }
 
-    /// VAL-M9B-PICKAXE-001: every pickaxe declares non-zero stamina cost.
     #[test]
     fn pickaxes_have_stamina_cost() {
         for p in dig_pickaxe::m9b_pickaxe_dig_tools() {
@@ -328,7 +316,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14E-012: support_beam_placer is registered at T1 with the
     /// canonical per-beam cost `2 iron + 1 wood`.
     #[test]
     fn support_beam_placer_registered_at_t1_with_iron_wood_cost() {
@@ -339,7 +326,6 @@ mod tests {
         assert_eq!(cost, [("iron", 2), ("wood", 1)]);
     }
 
-    /// VAL-CROSS-023: the support-beam placer is registered at a distinct
     /// slot id from the M14F brace_strut catalog (no collision).
     #[test]
     fn support_beam_placer_lookup_finds_canonical_id() {
@@ -374,7 +360,6 @@ mod tests {
         assert!(!is_brace_strut_tool("unknown_tool"));
     }
 
-    /// VAL-CROSS-023: placement of a `brace_strut_t1` debits its own cost
     /// (2 iron + 1 wood per VAL-M14F-022) and does NOT debit a
     /// `support_beam_placer` resource.
     #[test]

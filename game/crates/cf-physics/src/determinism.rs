@@ -111,7 +111,6 @@ impl DivergenceEvent {
         hex_encode(&self.cpu_bytes)
     }
 
-    /// **M15B** § Build the recorder payload JSON for this divergence
     /// event. The shape matches `cf-replay/schemas/event/
     /// material_gpu_cpu_divergence_detected.json`. The engine layer
     /// plugs this into
@@ -129,11 +128,9 @@ impl DivergenceEvent {
     }
 }
 
-/// **M15B** § GPU vs CPU divergence detector. Walks both traces in
 /// lock-step and returns the first divergence event (or `Match` when
 /// every sample agreed).
 ///
-/// Per spec § acceptance scenario 7:
 /// > When per-tick checksum diverges Then
 /// > material_gpu_cpu_divergence_detected fires at the first divergent
 /// > tick
@@ -187,7 +184,6 @@ pub fn detect_first_divergence(gpu: &[ChecksumSample], cpu: &[ChecksumSample]) -
     }
 }
 
-/// **M15B** § Per-tick incremental detector. The engine pushes one GPU
 /// sample + one CPU sample per tick; the detector returns
 /// `Some(DivergenceEvent)` the moment the two disagree (and
 /// short-circuits all future samples until reset).
@@ -279,7 +275,6 @@ impl DivergenceDetector {
         self.latched.is_some()
     }
 
-    /// **M15B** § Forensics state-dump. Per spec § acceptance scenario 7:
     /// > And the engine pauses + dumps both states for forensics
     ///
     /// Returns a deterministic, JSON-serializable forensics bundle
@@ -297,7 +292,6 @@ impl DivergenceDetector {
     }
 }
 
-/// **M15B** § Forensics state-dump returned by [`DivergenceDetector::forensics_dump`].
 /// JSON-serializable so the engine layer can persist it to disk and
 /// surface it via cfctl. Per spec § acceptance scenario 7 "the engine
 /// pauses + dumps both states for forensics".
@@ -502,7 +496,6 @@ mod tests {
     }
 
     /// VAL-M15B-det-011: a 600-tick agreement window stays in `Match`.
-    /// Per spec § acceptance scenario 1.
     #[test]
     fn match_holds_over_600_ticks() {
         let mut gpu = Vec::with_capacity(600);

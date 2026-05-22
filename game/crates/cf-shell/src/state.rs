@@ -39,7 +39,6 @@ pub enum ShellScreen {
     InMission,
     /// Workshop browser (forwards to cf-mod UI).
     Workshop,
-    /// **M12**: CCCP-style intro slideshow — 8 painted slides + subtitles
     /// + music + voice. Reached from Title → "New Game" (first run) or
     /// Main Menu → Story → "Replay Intro". Skippable.
     IntroSlideshow,
@@ -177,7 +176,6 @@ pub struct ShellState {
     pub show_me_why_visible: bool,
     /// Last loading-tip index for stable rotation.
     pub last_tip_index: usize,
-    /// **M12**: which intro-slideshow slot is currently playing (None when
     /// the slideshow is not on screen). Cleared when the slideshow ends
     /// or is skipped.
     pub intro_slideshow_slot: Option<crate::shell_api::IntroSlideshowSlot>,
@@ -245,7 +243,6 @@ pub struct SaveSlotMetadata {
     pub thumbnail_png_path: Option<String>,
     pub is_corrupt: bool,
     pub is_empty: bool,
-    /// **M4B § "save_load module reads + displays schema version next to
     /// each slot"** — pretty schema version (`vMAJOR.MINOR.PATCH`) parsed
     /// from the on-disk `.cfsave` payload. Empty when the slot is empty.
     #[serde(default)]

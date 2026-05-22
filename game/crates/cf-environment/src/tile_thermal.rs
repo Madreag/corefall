@@ -31,7 +31,6 @@ pub const FROSTBITE_FIRST_DEGREE_TICKS: u64 = 60;
 pub const FROSTBITE_SECOND_DEGREE_TICKS: u64 = 300;
 pub const FROSTBITE_THIRD_DEGREE_TICKS: u64 = 600;
 
-/// **M14G** tile-thermal typed wound emit. Severity is the per-band default
 /// (0.2 / 0.5 / 0.85 for burns; 0.2 / 0.5 / 0.9 for frostbite).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThermalWoundEmit {
@@ -97,7 +96,6 @@ pub fn classify_tile_thermal(zone: ZoneId, temperature_k: f32, dwell_ticks: u64)
 mod tests {
     use super::*;
 
-    /// VAL-M14G-013: burn-degree escalation at 5/30/60 ticks.
     #[test]
     fn burn_degree_escalation_timeline() {
         let zone = ZoneId::from("foot_right");
@@ -111,7 +109,6 @@ mod tests {
         assert_eq!(third.kind, WoundKind::Burn3rd);
     }
 
-    /// VAL-M14G-014: Frostbite1st at tick 60; Frostbite3rd at tick 600.
     #[test]
     fn frostbite_emergence_and_escalation() {
         let zone = ZoneId::from("hand_right");
@@ -124,7 +121,6 @@ mod tests {
         assert_eq!(three.kind, WoundKind::Frostbite3rd);
     }
 
-    /// VAL-M14G-030: hot tile escalates 1st/2nd/3rd and cold tile escalates
     /// frostbite 1st/2nd/3rd by exposure ticks.
     #[test]
     fn hot_cold_thermal_wound_escalation_ladders() {

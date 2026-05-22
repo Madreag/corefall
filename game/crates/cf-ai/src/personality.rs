@@ -7,7 +7,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7-A**: 20 launch personality traits.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -119,7 +118,6 @@ impl PersonalityTrait {
     }
 }
 
-/// **M7-A**: per-actor personality profile.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct PersonalityProfile {
     pub display_name: String,
@@ -160,7 +158,6 @@ impl PersonalityProfile {
     }
 }
 
-/// **M7-A**: `actor.mood_changed` event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MoodChangedEvent {
     pub actor_id: u64,

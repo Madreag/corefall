@@ -48,7 +48,6 @@ mod tests {
         assert!(kinds.contains(&CameraKind::KillCam));
     }
 
-    /// VAL-M10B-024: the selector materialises into a CameraScript
     /// the director can consume. One selected track == one
     /// CameraTrack on the resulting script.
     #[test]
@@ -61,7 +60,6 @@ mod tests {
         assert_eq!(script.tracks.len(), sel.tracks.len());
     }
 
-    /// VAL-M10B-024: omitting all selections produces an empty
     /// CameraScript. The director treats this as "no per-tick pose
     /// override active" — the live spectator director takes over.
     #[test]

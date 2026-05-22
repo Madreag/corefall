@@ -5,7 +5,7 @@
   "type": "object",
   "properties": {
     "ammo_kind": {
-      "description": "**M14C** § \"Wire ammo-spec to engine.fire; surface in\n`cfctl.act.player.fire` ammo-kind\" — optional snake_case ammo\nkind selector. Accepted values: `regular`, `tracer`, `high_explosive`,\n`pellet`, `heat`, `apfsds`. `None` = use the weapon's default\nround (existing M6 behavior). Unknown values reject at the\ndispatch boundary with `unknown_ammo_kind`.",
+      "description": "`cfctl.act.player.fire` ammo-kind\" — optional snake_case ammo\nkind selector. Accepted values: `regular`, `tracer`, `high_explosive`,\n`pellet`, `heat`, `apfsds`. `None` = use the weapon's default\nround (existing M6 behavior). Unknown values reject at the\ndispatch boundary with `unknown_ammo_kind`.",
       "type": [
         "string",
         "null"

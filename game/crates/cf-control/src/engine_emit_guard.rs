@@ -53,15 +53,12 @@ impl M0Engine {
                 None,
             );
         }
-        // **M1.5 G2/G3**: emit one `ai.perception_signal` per fresh signal.
         for sig in &report.perception_signals {
-            // M2 audit pass 5 (2026-05-13): hearing perception signals chain
             // back to the originating `equipment.alarm_registered` event so
             // M10 can walk `state_changed(heard_shot) → perception_signal(hearing)
             // → alarm_registered`. Other signal kinds have no upstream parent
             // event (sight is intrinsic, memory_decayed is timer-driven).
             let perception_parent = sig.alarm_event_id.clone();
-            // M2 audit pass 7 (2026-05-13): payload includes spec-literal
             // aliases — `actor_id` (guard), `source_id` (player), `source_pos`
             // (=source_position), `line_of_sight` (for sight kinds). Legacy
             // `actor`/`source_actor`/`source_position` retained.
@@ -96,7 +93,6 @@ impl M0Engine {
         // chain back to it (spec cause chain requires
         // weapon_fired → tactic_chosen → target_acquired → perception_signal).
         //
-        // **M4 § Parent-event-id cause chains**: when no fresh perception
         // signal fired this tick, fall back (in priority order) to the
         // actor's most recent ai.state_changed event, then to
         // system.run_started as the root parent. This guarantees
@@ -129,12 +125,10 @@ impl M0Engine {
             );
             tactic_chosen_event_id = Some(id);
         }
-        // M2 audit pass 5 (2026-05-13): emit one `ai.state_changed` event per
         // transition in spec order. A single tick can produce multiple
         // transitions (e.g. Idle → Alert via heard_shot, then Alert → Engaged
         // via target_acquired after aim_settle elapses on the same tick).
         for s in &report.state_changes {
-            // M2 audit pass 7 (2026-05-13): spec literal payload uses
             // `from`/`to`/`reason` (matching the JSON schema). Emit both the
             // schema-required names AND the legacy `previous`/`next`/`cause`
             // alias so in-flight bundles continue to parse.
@@ -155,14 +149,12 @@ impl M0Engine {
                 }),
                 last_perception_signal_id.clone(),
             );
-            // **M4 § ai cause chains**: track most-recent state_changed
             // per actor so subsequent tactic_chosen events (without a
             // fresh perception signal) can chain to it.
             if let Ok(mut st) = self.state.write() {
                 st.last_ai_state_changed_by_actor.insert(guard_id, event_id);
             }
         }
-        // M2 audit pass 7 (2026-05-13): stash the most recent state-change
         // cause onto the guard so the --ai-debug label can render
         // "ALERT: heard shot" (reason) rather than the chosen tactic.
         if let Some(last) = report.state_changes.last() {
@@ -172,7 +164,6 @@ impl M0Engine {
                 }
             }
         }
-        // **M1.5 G1**: target_acquired chains to the last perception_signal
         // so M3B can walk acquired → signal → alarm/sight.
         if let Some(t) = &report.target_acquired {
             let acquired_id = self.recorder.record(
@@ -187,7 +178,6 @@ impl M0Engine {
                 }),
                 last_perception_signal_id.clone(),
             );
-            // **M9 § Reactive guard targeting + path reaction (DR-008
             // utility scoring)**: wire `cf_ai::target_selection::score_all`
             // into the production target-acquisition path. The scorer
             // ranks every candidate (player + reactor) by
@@ -220,7 +210,6 @@ impl M0Engine {
                 None,
             );
         }
-        // **M14 audit pass 3 (GAP-M7-05 LOW fix)**: M7 spec § Personality
         // traits — paranoid bots occasionally fire `ai.target_acquired`
         // with no real target. Only fires when:
         //   - The bot has the Paranoid trait
@@ -271,7 +260,6 @@ impl M0Engine {
                 }
             }
         }
-        // **M1.5 G4**: missed_shot_reason fires per miss to give the replay
         // viewer a stable vocabulary of why a guard's shot didn't connect.
         if let Some(reason) = &report.missed_shot_reason {
             self.recorder.record(
@@ -286,9 +274,7 @@ impl M0Engine {
                 None,
             );
         }
-        // **M1.5 G5**: stuck_state_changed + recovery_action.
         //
-        // M2 audit pass 7 (2026-05-13): spec literal payload requires
         // `stuck_time_ticks` + `blocker_id` + `old_state` + `new_state`
         // (with values e.g. "engaged"→"engaged_stuck"). Keep legacy
         // `stuck_ticks` + `blocker` aliases for back-compat.

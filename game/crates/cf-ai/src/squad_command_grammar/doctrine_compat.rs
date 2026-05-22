@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::autonomy::DoctrineMode;
 
-/// **M7B**: veto reason emitted by the matrix.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VetoReason {
     /// Convention `doctrine_<X>_blocks_<Y>`.
@@ -33,7 +32,6 @@ impl VetoReason {
     }
 }
 
-/// **M7B**: per-doctrine veto set. A verb listed under a doctrine is vetoed
 /// when that doctrine is active.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DoctrineCompatMatrix {

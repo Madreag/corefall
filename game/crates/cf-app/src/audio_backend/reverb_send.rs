@@ -18,12 +18,10 @@
 
 use cf_audio::{DecayBand, ReverbProfile};
 
-/// **M12B** § IR cross-fade window in ms when the listener crosses a
 /// room boundary. Spec literal § "Cross-fade the IR over 250 ms to
 /// avoid clicks".
 pub const IR_CROSS_FADE_MS: f32 = 250.0;
 
-/// **M12B** § Canonical IR file ids — the 8 pre-baked impulse
 /// responses shipped under `game/content/audio/reverb/impulse_responses/`.
 /// Per M12B spec § Files:
 ///
@@ -41,11 +39,9 @@ const IR_IDS: &[&str] = &[
     "vacuum_null",
 ];
 
-/// **M12B** § Pick the canonical IR id for a given [`ReverbProfile`].
 /// The selector reads `tail_seconds` + `decay_band` and picks the IR
 /// whose spectral character + decay length matches best.
 ///
-/// Per spec § Notes:
 ///
 /// > Convolution-reverb modder pipeline (custom IRs) — modders extend
 /// > `material_registry` + select from the 8 baked IRs.
@@ -67,7 +63,6 @@ pub fn current_ir_id_for(profile: &ReverbProfile) -> &'static str {
     }
 }
 
-/// **M12B** § All canonical IR ids — used by content-validation tests
 /// to confirm every id has a backing IR file in
 /// `game/content/audio/reverb/impulse_responses/`.
 #[must_use]
@@ -75,7 +70,6 @@ pub fn all_ir_ids() -> &'static [&'static str] {
     IR_IDS
 }
 
-/// **M12B** § Compute the cross-fade alpha during an IR swap. `0.0` at
 /// fade-start, `1.0` at fade-complete. Linear ramp; pre-clamped to
 /// `[0.0, 1.0]`.
 #[must_use]
@@ -83,19 +77,16 @@ pub fn cross_fade_alpha(elapsed_ms: f32) -> f32 {
     (elapsed_ms / IR_CROSS_FADE_MS).clamp(0.0, 1.0)
 }
 
-/// **M12B** § Spec § HRTF resolution formula multiplier — the
 /// `SpatialEnvelope.reverb_send_db` is computed as `wet_dry_mix * 0.6`
 /// in linear gain space. The ReverbSendBus uses the same multiplier so
 /// the per-source spatial envelope and the bus-level send agree.
 pub const REVERB_SEND_GAIN_MULTIPLIER: f32 = 0.6;
 
-/// **M12B** § Spec § Acceptance "Reverb send routes through Bevy bus
 /// correctly": "the wet return mixes back at -3 dB into the master
 /// bus". Locked at -3 dB so the convolution-reverb tail doesn't
 /// dominate the master bus.
 pub const WET_RETURN_DB: f32 = -3.0;
 
-/// **M12B** § One playback frame produced by the reverb send bus —
 /// per-bus send level + active IR id + cross-fade alpha when an IR
 /// swap is in flight.
 #[derive(Debug, Clone, PartialEq)]
@@ -110,13 +101,11 @@ pub struct ReverbSendFrame {
     /// 0.0..=1.0 cross-fade progress (0 = fully on previous, 1 = fully
     /// on current).
     pub cross_fade_alpha: f32,
-    /// **M12B** § Wet-return mixback level in dB. Locked at
     /// [`WET_RETURN_DB`] per spec acceptance.
     pub wet_return_db: f32,
 }
 
 impl ReverbSendFrame {
-    /// **M12B** § Resolve a [`ReverbSendFrame`] given a [`ReverbProfile`]
     /// + the previous frame (for cross-fade detection).
     #[must_use]
     pub fn from_profile(profile: &ReverbProfile, previous: Option<&ReverbSendFrame>) -> Self {
@@ -137,13 +126,11 @@ impl ReverbSendFrame {
         }
     }
 
-    /// **M12B** § `true` when an IR cross-fade is in flight.
     #[must_use]
     pub fn is_fading(&self) -> bool {
         self.fading_from.is_some() && self.cross_fade_alpha < 1.0
     }
 
-    /// **M12B** § Multiplicative linear wet-return gain
     /// (`10^(wet_return_db / 20)`). Used by the bevy_audio backend to
     /// mix the convolution-reverb tail back into the master bus.
     #[must_use]
@@ -152,7 +139,6 @@ impl ReverbSendFrame {
     }
 }
 
-/// **M12B** § Reverb send bus. The cf-app Bevy audio backend owns one
 /// instance; the bus has a single global send level + a single global
 /// IR. Per spec § "Reverb send is one global send bus, not per-room".
 #[derive(Debug, Clone, Default)]
@@ -165,7 +151,6 @@ pub struct ReverbSendBus {
 }
 
 impl ReverbSendBus {
-    /// **M12B** § Update the bus given a new [`ReverbProfile`] (from the
     /// listener's current room). Returns the resolved
     /// [`ReverbSendFrame`] for the Bevy backend.
     pub fn update(&mut self, profile: &ReverbProfile, delta_ms: f32) -> ReverbSendFrame {

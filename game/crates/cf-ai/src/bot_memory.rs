@@ -29,7 +29,6 @@ pub const ALLY_MEMORY_CAPACITY: usize = 8;
 /// Recent-events ring depth.
 pub const RECENT_EVENTS_RING_DEPTH: usize = 64;
 
-/// **M7-A**: per-cell summary in the perception grid. Compact (8 bytes) so
 /// the 64×64 grid fits in 32 KB even with redundancy. Threat / cover /
 /// friendly fields are `0..=255` quantized for tight packing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -48,7 +47,6 @@ pub struct PerceptionCell {
     pub flags: u8,
 }
 
-/// **M7-A**: one threat memory record (per-enemy).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThreatMemoryRecord {
     pub actor_id: u64,
@@ -66,7 +64,6 @@ pub struct ThreatMemoryRecord {
     pub player_tagged: bool,
 }
 
-/// **M7-A**: coarse weapon class the bot remembers about a threat. M13+
 /// chassis adds tank/gunship/heavy-weapon variants.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -100,7 +97,6 @@ impl ThreatWeaponClass {
     }
 }
 
-/// **M7-A**: one ally memory record.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AllyMemoryRecord {
     pub actor_id: u64,
@@ -112,7 +108,6 @@ pub struct AllyMemoryRecord {
     pub last_refresh_tick: u64,
 }
 
-/// **M7-A**: one entry in the recent-events ring. Compact for cache
 /// efficiency; payload is a coarse classification + tick. The HTN re-planner
 /// matches on `kind` + delta-tick to detect goal failure / opportunity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -163,7 +158,6 @@ impl RecentEventKind {
     }
 }
 
-/// **M7-A**: full per-bot memory state.
 ///
 /// **Storage discipline**: the perception grid is stored as a `Vec` sized to
 /// exactly `PERCEPTION_GRID_CELLS` (= 4096). Length is enforced by `new` and
@@ -340,7 +334,6 @@ impl Default for BotMemory {
     }
 }
 
-/// **M7-A**: fixed-depth ring buffer of recent witnessed events.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RecentEventRing {
     entries: Vec<RecentEvent>,

@@ -13,7 +13,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7B**: verb family — drives wheel grouping + UI sectioning.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -58,7 +57,6 @@ pub fn verb_family_label(family: VerbFamily) -> &'static str {
     }
 }
 
-/// **M7B**: argument kind for the registry's per-verb arg schema.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -88,7 +86,6 @@ impl VerbArgKind {
     }
 }
 
-/// **M7B**: one argument slot in a verb's schema.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VerbArgSpec {
     pub name: String,
@@ -96,7 +93,6 @@ pub struct VerbArgSpec {
     pub required: bool,
 }
 
-/// **M7B**: a single verb definition. Held as `&'static str` slices where
 /// possible; the RON path uses owned String + Vec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VerbDef {
@@ -116,7 +112,6 @@ impl VerbDef {
     }
 }
 
-/// **M7B**: verb registry. Ordered insertion is preserved; UI surfaces walk
 /// `iter()` for stable wheel layout.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VerbRegistry {
@@ -193,7 +188,6 @@ fn verb(
     }
 }
 
-/// **M7B**: the 50+ canonical verbs. Held as a builder so tests can assert
 /// uniqueness + size without touching the filesystem.
 pub fn builtin_registry() -> VerbRegistry {
     let mut r = VerbRegistry::new();

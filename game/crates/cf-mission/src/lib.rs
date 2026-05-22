@@ -66,7 +66,6 @@ pub use m14a_resource_drain::{
 };
 pub use m14b_world::{ScenarioAtmosCell, ScenarioGravityOverride, ScenarioWindSource};
 
-// **M7**: Mission director v0.5 — additive multi-objective DiGraph + 4-phase
 // pacing + reinforcement waves + mini-boss patterns. The M2 single-vec
 // objective list keeps working unchanged; M7 layers the v0.5 graph on top
 // so scenarios can opt in.
@@ -75,21 +74,18 @@ pub mod objective_graph;
 pub mod phases;
 pub mod reinforcement;
 
-// **M9**: Reactor pressure-state machine + 3-layer armor cascade
 // (External / Internal / Core). Forward-compat surface for the M13 chassis
 // 15-zone × 3-layer model and the M25+ command-core (DR-027). Lives in a
 // sibling module so the lib.rs `Reactor` struct can compose the M9 types
 // without bloating the file.
 pub mod reactor;
 
-// **M9B**: launch scenario registry (8 trench scenarios under
 // `game/content/scenarios/m9b_*.ron`). The module exposes
 // `SCENARIO_IDS` + `registry()` + `tick_budget_for(id)` so closure-
 // feature verification can enumerate the M9B launch roster without
 // scanning the filesystem.
 pub mod m9b_scenarios;
 
-// **M9C**: launch scenario registry (10 fortification scenarios under
 // `game/content/scenarios/m9c_*.ron`). Same shape as
 // `m9b_scenarios`: enumerated registry + per-scenario tick budgets
 // (with `m9c_full_strongpoint` budgeted at 3600 ticks per VAL-M9C-050

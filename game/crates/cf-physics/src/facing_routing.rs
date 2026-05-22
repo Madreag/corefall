@@ -34,7 +34,6 @@ impl HitDirection {
     }
 }
 
-/// **M14**: classify a hit direction from the projectile's velocity vector
 /// relative to the target's facing sign (+1.0 right, -1.0 left).
 ///
 /// Algorithm: compute the dot of the velocity with the facing vector
@@ -67,7 +66,6 @@ pub fn classify_hit_direction(velocity: (f32, f32), facing_sign: f32) -> HitDire
     }
 }
 
-/// **M14**: list of zones EXPOSED to a hit from the given direction. The
 /// engine consults this when resolving which zone the projectile damages
 /// (a back-facing hit can damage the back_arm + backpack; a front-facing
 /// hit cannot, because the actor's body blocks them).
@@ -94,7 +92,6 @@ pub fn exposed_zones(direction: HitDirection) -> &'static [&'static str] {
     }
 }
 
-/// **M14**: mirror a local-x coordinate by facing direction. The spec's
 /// pipeline step 4 says "Mirror local_x by Actor::facing". Right-facing
 /// actor: identity. Left-facing actor: flip x. Local-space y stays the
 /// same (the side-view is top-down on the vertical axis).

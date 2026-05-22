@@ -129,7 +129,6 @@ impl Container {
     }
 }
 
-/// **M6B**: per-actor inventory grid.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InventoryGrid {
     /// Backpack tier that determines the grid dimensions.
@@ -257,7 +256,6 @@ impl InventoryGrid {
     /// container (identified by `parent_instance_id`). Returns the
     /// allocated `instance_id` or [`MAX_DEPTH_EXCEEDED`] on rejection.
     ///
-    /// Per spec § Acceptance criteria:
     /// > Given a chest (level 1) containing a crate (level 2)
     /// > When player tries to nest another container inside the crate
     /// > Then act.player.nest_container rejects with "max_depth_exceeded"
@@ -276,7 +274,6 @@ impl InventoryGrid {
         };
         let candidate_depth = try_nest_depth(parent_info.depth, parent_info.max_cap, child_is_container)?;
         let _ = candidate_depth; // depth is enforced; only used for the check
-        // **M6B § ContainerCapacity::allowed_categories**: empty set =
         // accept-all (default). Non-empty set rejects children whose
         // category is not in the whitelist with `category_not_allowed`.
         if let Some(allowed) = parent_info.allowed_categories.as_ref() {
@@ -450,7 +447,6 @@ fn find_placement_mut(items: &mut [PlacedItem], target_id: u64) -> Option<&mut P
     None
 }
 
-/// **M6B § Inventory encumbrance aggregator**: per-actor envelope that
 /// holds the carry baseline, current carried mass + bulk, the derived
 /// walk-speed multiplier, and the discrete encumbrance band.
 ///

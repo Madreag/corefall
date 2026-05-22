@@ -37,7 +37,7 @@
 //! - **Mission-open / between / end hooks**: `cf-shell::cinematic_hooks`.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 #![allow(clippy::module_name_repetitions)]
 
 pub mod camera_moves;

@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerTreatParams",
-  "description": "**M14H** § `act.player.treat` — apply a treatment producer.",
   "type": "object",
   "properties": {
     "kind": {

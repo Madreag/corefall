@@ -4,7 +4,6 @@
 //! (x forward, y left). The world-space anchor is the commander's
 //! current position rotated by the commander's facing.
 
-/// **M7B**: rotate a local offset by `facing_radians` to world frame.
 /// `facing_radians` is the commander's facing direction in standard math
 /// convention (0 = +x, π/2 = +y, etc.).
 pub fn rotate_local_to_world(local: [f32; 2], facing_radians: f32) -> [f32; 2] {
@@ -15,7 +14,6 @@ pub fn rotate_local_to_world(local: [f32; 2], facing_radians: f32) -> [f32; 2] {
     ]
 }
 
-/// **M7B**: compute the world anchor for a slot offset given the commander
 /// position + facing.
 pub fn world_anchor_for_slot(
     commander_pos: [f32; 2],

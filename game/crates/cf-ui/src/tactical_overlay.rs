@@ -17,7 +17,6 @@ use cf_ai::{
     FormationDef,
 };
 
-/// **M7B**: one entry in the overlay's verb list.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TacticalOverlayVerbEntry {
     pub verb_id: String,
@@ -28,21 +27,18 @@ pub struct TacticalOverlayVerbEntry {
     pub valid_target: String,
 }
 
-/// **M7B**: one entry in the overlay's formation list.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TacticalOverlayFormationEntry {
     pub kind: String,
     pub slot_count: usize,
 }
 
-/// **M7B**: one entry in the overlay's per-archetype BT row.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TacticalOverlayArchetypeBtEntry {
     pub kind: String,
     pub node_count: usize,
 }
 
-/// **M7B**: Bevy resource the Tab overlay reads to populate its verb list,
 /// formation list, and archetype BT panel. Populated from cf-ai's builtin
 /// registry by default; the engine refreshes from RON when content reloads.
 #[derive(Resource, Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -53,12 +49,10 @@ pub struct TacticalOverlayVerbList {
 }
 
 impl TacticalOverlayVerbList {
-    /// **M7B**: build from cf-ai's built-in registry.
     pub fn from_builtin() -> Self {
         Self::from_registry(&builtin_registry())
     }
 
-    /// **M7B**: build from a caller-provided registry (used when RON
     /// reloads).
     pub fn from_registry(registry: &VerbRegistry) -> Self {
         let verbs: Vec<TacticalOverlayVerbEntry> = registry

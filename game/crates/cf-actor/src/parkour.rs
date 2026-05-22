@@ -14,33 +14,25 @@ use serde::{Deserialize, Serialize};
 
 use crate::FacingDirection;
 
-/// **M14J** § "wall-jump impulse coefficient" — perpendicular impulse is
 /// 70% of the canonical jump impulse.
 pub const WALL_JUMP_PERPENDICULAR_FRACTION: f32 = 0.70;
 
-/// **M14J** § "chained wall-jumps before touching ground". Spec literal: 3.
 pub const MAX_CHAINED_WALL_JUMPS: u32 = 3;
 
-/// **M14J** § "wall-contact grace window". Spec literal: 250 ms.
 pub const WALL_CONTACT_GRACE_MS: u32 = 250;
 
-/// **M14J** § "vault auto-trigger forward sweep distance". Spec § notes
 /// for the implementer: "Tune the swept-volume forward distance to 0.4-0.5
 /// m so the actor commits only when collision is inevitable." We pick 0.5 m.
 pub const VAULT_FORWARD_SWEEP_M: f32 = 0.5;
 
-/// **M14J** § "vault max obstacle height". Spec § "Vault chest-high
 /// obstacles (≤1.2 m)".
 pub const VAULT_MAX_OBSTACLE_HEIGHT_M: f32 = 1.2;
 
-/// **M14J** § "vault duration". Spec § "200 ms `Vault` stance".
 pub const VAULT_DURATION_MS: u32 = 200;
 
-/// **M14J** § "wall-jump cinematic duration". Spec § "200 ms transition
 /// each step".
 pub const WALL_JUMP_DURATION_MS: u32 = 200;
 
-/// **M14J** § per-tick parkour cache for the limb-path dispatch. Set by
 /// [`detect_vault`] and [`detect_wall_jump`]; consumed by `walk_sim_tick`
 /// when it sees the auto-vault / wall-jump trigger.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
@@ -109,7 +101,6 @@ pub struct WallCandidate {
     pub normal_sign: f32,
 }
 
-/// **M14J** § "vault-detect helper" — one swept-volume query per tick at
 /// chest height in the actor's facing direction. Returns `Some(...)` when
 /// a solid chest-high obstacle is within `VAULT_FORWARD_SWEEP_M` in front
 /// of the actor.
@@ -171,7 +162,6 @@ where
     })
 }
 
-/// **M14J** § "wall-jump-detect helper" — perpendicular swept-volume
 /// query at the actor's bounding-box mid-line. Returns `Some(...)` when a
 /// vertical surface is in contact within 0.2 m on either side.
 #[must_use]
@@ -198,7 +188,6 @@ where
     None
 }
 
-/// **M14J** § "Wall-jump grants perpendicular impulse" — compute the
 /// velocity delta from a wall-jump trigger. Returns `(vx, vy)` to ADD to
 /// the actor's current velocity:
 ///  - vx flips sign at full magnitude (reflects horizontal velocity)
@@ -220,7 +209,6 @@ pub fn wall_jump_velocity_delta(current_velocity: [f32; 2], wall_normal_sign: f3
     [dvx, dvy]
 }
 
-/// **M14J** § "Auto-vault clears chest-high crate at full run" — apply the
 /// vault outcome to the actor's state. Returns the new world-space position
 /// + velocity once the vault completes; horizontal velocity is preserved.
 #[must_use]

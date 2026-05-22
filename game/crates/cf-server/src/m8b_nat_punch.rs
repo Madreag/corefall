@@ -60,7 +60,6 @@ pub enum JoinOutcome {
     },
 }
 
-/// **M8B § Acceptance "Online match join time stays under 6 seconds even
 /// behind double-NAT routers"**: server-side join flow.
 ///
 /// The `peer_behavior` argument lets tests model the NAT scenarios

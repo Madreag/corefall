@@ -13,7 +13,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M12A** § Bus taxonomy — one fader per `Settings.audio.*_volume`
 /// slider. cf-app mirrors each into the matching `MixBuses` field every
 /// frame.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]

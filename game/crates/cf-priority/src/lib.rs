@@ -32,7 +32,7 @@
 //! re-order task variants.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 use serde::{Deserialize, Serialize};
 

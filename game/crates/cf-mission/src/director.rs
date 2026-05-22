@@ -19,7 +19,6 @@ pub use crate::{
     MissionLifecycle, MissionResult, MissionState, MissionTickInputs, MissionTickReport, ObjectiveProgressUpdate,
 };
 
-/// **M2 spec hook**: advance the mission director one tick. Forwarder to the
 /// canonical `cf_mission::step` so consumers that import per the spec path
 /// `cf_mission::director::step` resolve cleanly.
 pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionTickReport {

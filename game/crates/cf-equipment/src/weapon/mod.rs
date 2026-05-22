@@ -103,7 +103,6 @@ impl WeaponClass {
 /// M6 weapon descriptor: rifle-spec compatible firing data + class metadata
 /// + fire-mode set + per-shot loudness multiplier (extended over M1's scalar).
 ///
-/// **M6C** added `crew_required` + `bipod_compatible` + `vehicle_mountable`
 /// fields so the spec-literal firearm descriptors (`heavy_machine_gun_50cal`
 /// "crew-served; vehicle-mountable", `squad_automatic_saw` "bipod + sustained
 /// suppress") have concrete data the engine can gate on. All three are
@@ -120,15 +119,12 @@ pub struct WeaponPreset {
     pub mass_kg: f32,
     /// Effective range in world units (cosmetic / HUD).
     pub effective_range: f32,
-    /// **M6C**: minimum crew size to operate (1 = solo; 2 = gunner+loader).
     /// Default 1 keeps existing M6 presets unchanged.
     #[serde(default = "default_crew_required")]
     pub crew_required: u8,
-    /// **M6C**: true when this weapon can deploy a bipod for sustained
     /// suppression. Drives `act.player.deploy_bipod` validity.
     #[serde(default)]
     pub bipod_compatible: bool,
-    /// **M6C**: true when this weapon can be vehicle-mounted (HMG, etc).
     #[serde(default)]
     pub vehicle_mountable: bool,
 }

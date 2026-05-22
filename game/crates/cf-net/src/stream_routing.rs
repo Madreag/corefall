@@ -52,7 +52,6 @@ impl TransportBinding {
     }
 }
 
-/// **M8B § locked**: per-payload transport binding. This is the only
 /// canonical mapping consumed by the M9+ QUIC wiring; any new payload
 /// variant MUST be added here at the same time as PayloadKind is
 /// extended.

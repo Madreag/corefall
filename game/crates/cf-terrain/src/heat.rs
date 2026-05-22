@@ -172,7 +172,6 @@ impl HeatField {
         self.temperature_k.iter().all(|t| (t - self.ambient_k).abs() <= epsilon_k)
     }
 
-    /// **M15B** § Radiative cooling toward ambient. Each cell is lerped
     /// toward [`Self::ambient_k`] by `cool_mix` per call. This
     /// simulates radiation losses to the world-outside-the-heat-grid
     /// at ambient temperature — without it, heat injected into the

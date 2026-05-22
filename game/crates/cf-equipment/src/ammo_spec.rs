@@ -119,7 +119,6 @@ pub const HEAT_ROUND_V1_ID: &str = "heat_round_v1";
 /// Stable id of the M14C reference APFSDS round.
 pub const APFSDS_ROUND_V1_ID: &str = "apfsds_round_v1";
 
-/// **M14C** § HEAT v1 reference spec (10 MJ @ 3 km/s, 5° cone, 0.6 m optimum).
 #[must_use]
 pub fn heat_round_v1() -> HeatRoundSpec {
     HeatRoundSpec {
@@ -134,7 +133,6 @@ pub fn heat_round_v1() -> HeatRoundSpec {
     }
 }
 
-/// **M14C** § APFSDS v1 reference spec (7 kg DU @ 1600 m/s, 30:1 aspect).
 #[must_use]
 pub fn apfsds_round_v1() -> ApfsdsRoundSpec {
     ApfsdsRoundSpec {
@@ -272,7 +270,6 @@ mod tests {
 
     #[test]
     fn heat_damage_uses_velocity_mass_product() {
-        // VAL-M14C-022: HEAT damage tracks `velocity × mass`, NOT raw KE.
         let mut a = heat_round_v1();
         let mut b = heat_round_v1();
         // Identical velocity × mass product, different individual values.

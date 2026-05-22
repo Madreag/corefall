@@ -23,12 +23,10 @@ pub const DEFIB_CPR_BOOST_PER_ROUND: f32 = 0.10;
 pub const DEFIB_CHARGES_DEFAULT: u32 = 4;
 pub const CPR_BRUISE_THRESHOLD_ROUNDS: u32 = 3;
 pub const CPR_ROUNDS_MAX: u32 = 5;
-/// **M14H** § spec table § "5s per shock; 8s recharge". The defib
 /// dispatcher rejects shots fired within `DEFIB_RECHARGE_SECONDS` of the
 /// last shock with `out_of_charges` (until 8s elapse).
 pub const DEFIB_RECHARGE_SECONDS: f32 = 8.0;
 
-/// **M14H** § cardiac arrest trigger surface.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -70,7 +68,6 @@ impl CardiacOutcome {
     }
 }
 
-/// **M14H** § cardiac event stream entry.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "event")]
 pub enum CardiacEvent {
@@ -104,7 +101,6 @@ pub enum CardiacEvent {
     },
 }
 
-/// **M14H** § cardiac arrest state machine.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CardiacState {
     pub actor_id: u64,
@@ -262,7 +258,6 @@ impl CardiacState {
 mod tests {
     use super::*;
 
-    /// **M14H** Gherkin scenario 2: Defibrillator restores rhythm after CPR.
     /// Given actor in cardiac arrest, when 2 cardiac.cpr_round fire (40s)
     /// + act.player.defib fires → cardiac.defib_attempted fires AND the
     /// success roll is 50% + 20% (2 CPR rounds) = 70%.

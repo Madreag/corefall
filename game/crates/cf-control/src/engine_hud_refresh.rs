@@ -40,7 +40,6 @@ impl M0Engine {
         let Some(actor) = sim.world.actors.get(&pid) else {
             return;
         };
-        // **M14 audit pass 4 (Finding 1)**: a foot soldier mid-boarding
         // has no chassis yet, but the HUD must still surface the
         // "Boarding..." banner. Raise it BEFORE the chassis early-return
         // below so the banner fires regardless of chassis presence.
@@ -68,7 +67,6 @@ impl M0Engine {
                 push_banner(&mut state.hud_banners, banner);
             }
         }
-        // **M13** § "Ejecting / Salvaging modes" — `EJECT_WINDOW_OPEN`
         // banner fires when the chassis enters the eject stage but the pilot
         // is still bound (window-open phase). The existing `eject_active`
         // banner covers the ejecting state itself.
@@ -104,7 +102,6 @@ impl M0Engine {
                 },
             );
         }
-        // **M13** § "Brain hopping" — `BRAIN_AT_RISK` banner when the
         // player IS the brain AND HP < 30%.
         if actor.is_brain && actor.hp_max > 0.0 && actor.hp / actor.hp_max < 0.3 {
             push_banner_dedup(
@@ -119,7 +116,6 @@ impl M0Engine {
                 },
             );
         }
-        // **M13** § "Cockpit camera anchor" — COCKPIT badge in STATUS zone.
         if chassis.camera_anchor == cf_chassis::CameraAnchor::Cockpit {
             push_banner_dedup(
                 &mut state.hud_banners,
@@ -133,7 +129,6 @@ impl M0Engine {
                 },
             );
         }
-        // **M13** § "Boarding / disembarking transitions" — HUD captions
         // "Boarding..." / "Exiting...".
         if chassis.boarding_ticks_remaining > 0 {
             push_banner_dedup(
@@ -161,7 +156,6 @@ impl M0Engine {
                 },
             );
         }
-        // **M13** § "Both legs lost (crawl mode)" — "CRAWLING — both legs lost".
         let destroyed = chassis.destroyed_zones();
         let both_legs_lost =
             destroyed.contains(&cf_chassis::BodyZone::LegLeft) && destroyed.contains(&cf_chassis::BodyZone::LegRight);
@@ -178,7 +172,6 @@ impl M0Engine {
                 },
             );
         }
-        // **M13** § "Both arms lost (no weapons)" — "DISARMED — both arms lost".
         let both_arms_lost =
             destroyed.contains(&cf_chassis::BodyZone::ArmLeft) && destroyed.contains(&cf_chassis::BodyZone::ArmRight);
         if both_arms_lost {

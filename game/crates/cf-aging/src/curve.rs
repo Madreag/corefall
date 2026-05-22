@@ -18,7 +18,6 @@ pub const MAX_SPEED_DECAY_PER_YEAR_DEFAULT: f32 = 0.004;
 /// Default per-year wound_heal_rate decay coefficient (human, post-30).
 pub const HEAL_RATE_DECAY_PER_YEAR_DEFAULT: f32 = 0.006;
 
-/// **M14I** § per-origin aging curve coefficients.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AgingCurve {
     pub caloric_max_decay_per_year: f32,
@@ -36,7 +35,6 @@ impl AgingCurve {
     }
 }
 
-/// **M14I** § resolve the per-origin curve.
 #[must_use]
 pub fn age_curve_for_origin(origin: AgingOrigin) -> AgingCurve {
     match origin {

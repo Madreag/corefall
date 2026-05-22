@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "InspectMaterialParams",
-  "description": "**M2**: `inspect.material.<id>` — return the full MaterialDef for the\ngiven id (resolved against the canonical launch set).",
+  "description": "given id (resolved against the canonical launch set).",
   "type": "object",
   "properties": {
     "id": {

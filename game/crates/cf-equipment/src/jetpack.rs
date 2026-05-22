@@ -51,7 +51,6 @@ impl JetpackType {
     }
 }
 
-/// **M14A** § "Jetpack physics — full algorithm" — per-archetype jetpack
 /// runtime + spec.
 #[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -210,7 +209,6 @@ impl Jetpack {
         None
     }
 
-    /// **M14A** § "Burst" — initial jump impulse.
     pub fn burst(&mut self, fuel_use_multiplier: f32, dt_ms: u32, aim_angle: f32, h_flipped: bool) -> f32 {
         self.is_emitting = true;
         let burst_size = self.jet_time_total_ms.max(2) as f32;
@@ -224,7 +222,6 @@ impl Jetpack {
         self.base_thrust_n * self.burst_thrust_multiplier
     }
 
-    /// **M14A** § "Thrust" — sustained burn.
     pub fn thrust(&mut self, fuel_use_multiplier: f32, dt_ms: u32, aim_angle: f32, h_flipped: bool) -> f32 {
         self.is_emitting = true;
         let fuel_usage = dt_ms as f32 * fuel_use_multiplier;
@@ -238,7 +235,6 @@ impl Jetpack {
         self.base_thrust_n
     }
 
-    /// **M14A** § "Recharge" — refill fuel, clear emit, revert to STAND.
     pub fn recharge(&mut self, dt_ms: u32) {
         self.is_emitting = false;
         let restore = (dt_ms as f32 * self.jet_replenish_rate) as i64;
@@ -272,7 +268,6 @@ impl Jetpack {
     }
 }
 
-/// **M14A** § "Atmospheric pressure efficiency". Linear between three anchors:
 /// vacuum ×1.5, Earth ×1.0, Venus ×0.5.
 pub fn jet_pressure_efficiency(local_pressure_kpa: f32) -> f32 {
     const VACUUM_KPA: f32 = 1.0;
@@ -294,7 +289,6 @@ pub fn jet_pressure_efficiency(local_pressure_kpa: f32) -> f32 {
     }
 }
 
-/// **M14A** § "Update burst state" — per-tick jetpack tick.
 ///
 /// Returns the thrust vector to apply to the actor body this tick (N).
 ///

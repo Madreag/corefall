@@ -71,7 +71,6 @@ pub fn default_output_path(run_id: &str, extension: &str) -> Option<PathBuf> {
 mod tests {
     use super::*;
 
-    /// VAL-M10B-DEFAULT-PATH: resolved directory ends in `Corefall`
     /// per the spec's documented location.
     #[test]
     fn default_directory_ends_with_corefall_subdir() {
@@ -87,7 +86,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-DEFAULT-PATH: the resolved path's parent (the
     /// platform Movies/Videos directory) MUST match the host OS — on
     /// macOS the directory name MUST be `Movies` (per
     /// `NSMoviesDirectory`); on Linux + Windows it MUST be `Videos`.
@@ -112,7 +110,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-DEFAULT-PATH: composed path = directory + run_id +
     /// extension.
     #[test]
     fn default_output_path_appends_filename() {

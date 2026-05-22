@@ -5,7 +5,6 @@
 //! bloom-scaling helpers so consumers + tests can compute bloom values
 //! without depending on Bevy.
 
-/// **M1**: compute the reticle's pixel radius from a normalized bloom factor.
 /// Bloom 1.0 = baseline reticle; bloom 7.0 = max-bloom running/jumping shot.
 /// The formula mirrors OpenSoldat's `Sprites.pas:4870` — pixel radius scales
 /// with the cube root of the bloom factor so the perceived size grows
@@ -15,7 +14,6 @@ pub fn reticle_pixel_radius(bloom_factor: f32, base_radius_px: f32) -> f32 {
     base_radius_px * bloom.powf(1.0 / 3.0)
 }
 
-/// **M1**: tool-validity color cue. RED tint on `Some(false)`, normal
 /// on `Some(true)` or `None`. Matches the `update_reticle_color` system.
 pub fn reticle_color_for_validity(tool_valid: Option<bool>) -> [f32; 3] {
     match tool_valid {

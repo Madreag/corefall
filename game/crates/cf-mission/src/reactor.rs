@@ -165,13 +165,11 @@ pub const TIMER_WARNING_THRESHOLDS_S: &[(u32, &str, &str)] = &[
     (5, "critical", "5 SECONDS — HOLD THE LINE"),
 ];
 
-/// **M9** forward-compat placeholder for the M25+ command-core power grid.
 /// Empty at M9; DR-027 fills the field shape (generators, breakers, lines).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PowerGridPlaceholder {}
 
-/// **M9** forward-compat placeholder for chassis modules (M13+ DR-021),
 /// shields (M13+ + M25+), repair pads (M25+), doors (M25+), affliction
 /// overlay (M16+), and environment signal (M20+). Empty struct so M25+
 /// can extend without bumping the schema; round-trips as `{}` via serde.

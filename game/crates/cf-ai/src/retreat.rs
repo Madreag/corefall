@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::personality::PersonalityProfile;
 
-/// **M7-A**: retreat trigger reason — vocabulary for the
 /// `ai.retreat_decision.reason` field.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -31,7 +30,6 @@ impl RetreatReason {
     }
 }
 
-/// **M7-A**: retreat decision payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RetreatDecisionEvent {
     pub actor_id: u64,
@@ -42,7 +40,6 @@ pub struct RetreatDecisionEvent {
     pub tick: u64,
 }
 
-/// **M7-A**: compute the effective retreat HP threshold, factoring in
 /// personality traits + mood/stress. Default is 30% (per spec). Brave
 /// trait lowers to 15%; coward raises to 50%. Stressed mood raises by 10%.
 pub fn effective_retreat_threshold(profile: &PersonalityProfile) -> f32 {

@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::loss::LossReason;
 
-/// **M2 re-audit (2026-05-13)**: mission lifecycle state machine per spec
 /// literal "Mission state machine: Init → Loaded → InProgress → Resolved".
 /// Independent from `MissionResult` — `MissionResult` is the OUTCOME shape
 /// when `lifecycle == Resolved`. Transitions:
@@ -40,7 +39,6 @@ impl MissionLifecycle {
     }
 }
 
-/// **M2 re-audit (2026-05-13)**: renamed `Active → InProgress` per the
 /// spec literal "MissionResult::{InProgress, Won, Lost, Aborted}".
 /// `serde(rename_all = "snake_case")` makes the wire value `"in_progress"`
 /// — the prior `"active"` was renamed in lockstep.

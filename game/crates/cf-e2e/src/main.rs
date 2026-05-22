@@ -45,13 +45,11 @@ struct Cli {
     /// Path to a `.cfctl.json` script file (or unqualified script name from
     /// `game/scripts/cfctl/`). M1.5 baseline name.
     ///
-    /// **M2 re-audit (2026-05-13)**: `--ai-harness <name>` is an alias for
     /// `--script <name>` so AI-trust-harness scenarios (AI-H-01..) can be
     /// invoked by the spec-canonical flag name. Both flags accept the same
     /// values; specifying both is a CLI error.
     #[arg(long, conflicts_with = "ai_harness")]
     script: Option<String>,
-    /// **M2 re-audit (2026-05-13)**: AI trust harness alias for `--script`.
     /// Use this when invoking AI-H-NN test scenarios so the invocation reads
     /// `cargo run -p cf-e2e -- --ai-harness ai_h_01_sentry_hears_threat`
     /// per the M2 spec text.
@@ -124,7 +122,6 @@ struct Cli {
     /// invocation). 0 = use cf-app's default (60 Hz).
     #[arg(long, default_value_t = 0)]
     tick_rate_hz: u32,
-    /// **M1 R2 / Blocker 3b**: drive the spawned cf-app in unpaced mode so
     /// `sim.run_for_ticks` budgets resolve in a handful of Bevy frames
     /// instead of pacing 1 tick per Bevy frame (~60Hz wall-clock).
     /// Required for the m1_5min_endurance script (18000 ticks) which
@@ -167,7 +164,6 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     tracing::info!(target: "cf::e2e", scenario = %cli.scenario, script = ?cli.script, ai_harness = ?cli.ai_harness, "starting cf-e2e");
     let _ = (cli.save_load_roundtrip, cli.verify_checksums);
-    // M2 audit pass 5 (2026-05-13): for `--ai-harness`, the spec requires
     // the runner to emit an `ai_test_result {status, duration_seconds,
     // replay_path}` block alongside the standard stdout JSON. Capture the
     // wall-clock start now so the printout at the end can include the
@@ -436,7 +432,6 @@ async fn main() -> Result<()> {
     if !all_pass {
         anyhow::bail!("cf-e2e expectations failed");
     }
-    // M2 audit pass 5 (2026-05-13): augment stdout with an `ai_test_result`
     // block when --ai-harness was used. Spec literal: "the runner emits
     // ai_test_result with status, duration, replay_path".
     let mut payload = json!({
@@ -450,7 +445,6 @@ async fn main() -> Result<()> {
         let duration_seconds = started.elapsed().as_secs_f64();
         let replay_path = cf_replay::resolve_run_bundle_root(None).display().to_string();
         if let Some(obj) = payload.as_object_mut() {
-            // M2 audit pass 7 (2026-05-13): spec literal field name is
             // `duration`; `duration_seconds` retained as alias.
             obj.insert(
                 "ai_test_result".into(),
@@ -587,7 +581,6 @@ struct LaunchOptions<'a> {
     reduced_motion: bool,
     reduced_shake: bool,
     reduced_flash: bool,
-    /// **M1 R2 / Blocker 3b**: forward `--unpaced` to cf-app so the engine
     /// races through sim.run_for_ticks budgets without per-tick wall-clock
     /// pacing.
     unpaced: bool,
@@ -877,7 +870,6 @@ fn invoke_composer(python_bin: &str, script: &Path, run_dir: &Path) -> Result<Va
 
 /// - `enemy.<actor_id>.state` etc.
 fn lookup(value: &Value, key: &str) -> Option<Value> {
-    // **M9** § cf-e2e --expect operators — six new keys per spec
     // § "Crates / modules touched / cf-e2e":
     //   mission.reactor_alive          (bool — true while first reactor's hp > 0)
     //   mission.reactor_hp_pct         (number — first reactor's hp_percent)
@@ -949,7 +941,6 @@ fn lookup(value: &Value, key: &str) -> Option<Value> {
                 .count();
             Some(Value::from(count as u64))
         }
-        // **M11**: ACC-A surface shortcuts. The dotted `observe.accessibility.<flag>` /
         // `observe.actor.silhouette.<zone>` / `observe.actor.module_strip.<slot>` /
         // `ux.banner_raised.severity` operators are spec-named convenience aliases
         // that resolve against the live observe-frame projection.
@@ -1011,7 +1002,6 @@ fn lookup(value: &Value, key: &str) -> Option<Value> {
 /// Inner walker; isolated so the M9 shortcut keys above don't need to call
 /// the full event-stream resolver.
 fn lookup_inner(value: &Value, key: &str) -> Option<Value> {
-    // **M1 R2 / Gap G3**: structured event-stream operators. These are useful
     // for cfctl scripts that need to assert "K events of type X with field
     // Y = Z fired during this run." The grammar:
     //
@@ -1082,7 +1072,6 @@ fn lookup_inner(value: &Value, key: &str) -> Option<Value> {
         return Some(node.clone());
     }
     // M5: `actor.<id>.foo.bar` lookup against `actors[]` by id (`actor.player.*` also accepted).
-    // **M1.5 fix**: the actor resolver only fires when the second segment is
     // either the literal "player" or a parseable u64 id. Otherwise the path
     // looks like `actor.<event_type>.count` (a bare event-stream expectation,
     // per the spec text) and we fall through to the event-stream passthrough
@@ -1112,7 +1101,6 @@ fn lookup_inner(value: &Value, key: &str) -> Option<Value> {
         }
         return Some(current);
     }
-    // **M1.5 / 10-line parser passthrough**: the M1.5 spec writes bare
     // `ai.state_changed.count>=N`, `terrain.terrain_carved.count>=N`,
     // `mission.objective_completed.count>=N` etc. (no `events.` prefix). If
     // the first segment matches a known event category AND the path's
@@ -1495,7 +1483,6 @@ mod tests {
         );
     }
 
-    /// **M1.5 P1**: bare-prefix passthrough so the M1.5 spec's
     /// `ai.state_changed.count>=N` / `terrain.terrain_carved.count>=N`
     /// syntax resolves without an explicit `events.` prefix.
     #[test]
@@ -1517,7 +1504,6 @@ mod tests {
         assert_eq!(lookup(&obs, "actor.player.hp"), Some(Value::from(80)));
     }
 
-    /// **M13** § "cf-e2e: `--expect actor.<id|player>.chassis.pilot_state=<value>`
     /// lookup support". The actor-by-id resolver already supports nested chassis
     /// paths; this test pins the contract so a future refactor can't silently
     /// regress the dotted path drill-down used by cf-e2e scripts.

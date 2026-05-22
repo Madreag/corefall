@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 use super::{transforms::world_anchor_for_slot, FormationDef, FormationKind, SquadRoleHint};
 
-/// **M7B**: one resolved slot assignment for a member.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SlotAssignment {
     pub member_actor_id: u64,
@@ -22,7 +21,6 @@ pub struct SlotAssignment {
     pub sector_bearing_degrees: f32,
 }
 
-/// **M7B**: roster row consumed by the solver.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemberRoster {
     pub actor_id: u64,
@@ -31,7 +29,6 @@ pub struct MemberRoster {
     pub stable_priority: u32,
 }
 
-/// **M7B**: slot solver. The solver is stateless across runs; the engine
 /// re-builds the `MemberRoster` from current ground truth each cycle.
 #[derive(Debug, Default, Clone)]
 pub struct SlotSolver;

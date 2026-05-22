@@ -24,7 +24,6 @@ pub use verb_registry::{
 
 use crate::autonomy::DoctrineMode;
 
-/// **M7B**: one issuable squad verb (the parser's output after argument
 /// validation + doctrine compat). The squad state then drives the BT
 /// expansion + per-actor goal assignment.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,7 +38,6 @@ pub struct SquadCommand {
     pub issued_tick: u64,
 }
 
-/// **M7B**: typed argument value carried by a parsed verb.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind", content = "value")]
 pub enum VerbArgValue {
@@ -90,7 +88,6 @@ impl VerbArgValue {
     }
 }
 
-/// **M7B**: validate-and-veto outcome of `try_issue`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CommandIssue {
     /// The verb passed argument validation + doctrine compat; commit it.
@@ -119,7 +116,6 @@ impl CommandIssue {
     }
 }
 
-/// **M7B**: end-to-end issue helper. Validates args + doctrine + returns
 /// the typed outcome. Pure function — no side effects on squad state.
 pub fn try_issue(
     registry: &VerbRegistry,

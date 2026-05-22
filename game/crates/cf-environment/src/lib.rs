@@ -56,7 +56,6 @@ impl EnvironmentSignal {
         }
     }
 
-    /// **M14A** § "cf-environment (EXTEND)" — append a hazard to the active list
     /// without duplicates.
     pub fn add_hazard(&mut self, h: HazardClass) {
         if !self.active_hazards.contains(&h) {
@@ -64,7 +63,6 @@ impl EnvironmentSignal {
         }
     }
 
-    /// **M14A** § "per-stride hazard.actor_contact emission from cf-terrain
     /// + cf-atmos sample at planted foot position" — given a per-stride
     ///   material id + atmosphere sample, return the set of active hazards.
     pub fn from_stride_contact(material_id: u8, pressure_kpa: f32, temp_k: f32, o2_kpa: f32) -> Self {

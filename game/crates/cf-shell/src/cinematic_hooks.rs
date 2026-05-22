@@ -69,13 +69,11 @@ pub struct CinematicHookRequest {
     pub storyteller_id: Option<String>,
 }
 
-/// **M12C** § "Between-mission cinematic plays once per campaign-day".
 /// Stable token tracked by `ShellState` so the second visit to base
 /// before mission select skips the between-mission cinematic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct BetweenMissionPlayedToday(pub bool);
 
-/// Per spec § "Mission-opening cinematic boot path …". Resolves the
 /// RON path under `content/cinematics/opening/<mission_id>.cinematic.ron`.
 /// Returns `None` when the file is missing — the boot path skips
 /// silently per the spec contract.
@@ -97,7 +95,6 @@ pub fn on_mission_load(content_root: &Path, mission_id: &str) -> Option<Cinemati
     })
 }
 
-/// Per spec § "Between-mission cinematic plays once per campaign-day".
 /// Resolves the between-mission RON path. Returns `None` when:
 ///
 /// - The file is missing (no monologue authored for the storyteller).
@@ -115,7 +112,6 @@ pub fn on_mission_success(
     if between_played_today.0 {
         return None;
     }
-    // Per spec § "Cassandra delivers a dread monologue / Phoebe a
     // quirky one / Randy chaotic / Ironman a challenge / Sandbox
     // NONE (skipped; instant transition)". The Sandbox path resolves
     // via the kernel's `suppress_cinematics` flag — the hook still
@@ -138,7 +134,6 @@ pub fn on_mission_success(
     })
 }
 
-/// Per spec § "Campaign-ending cinematic is 2-5 minutes with 3-act
 /// structure / 5 storyteller-specific finales / Cassandra's reads as
 /// elegy; Phoebe's as quiet hope; Randy's as a cackling shrug; Ironman's
 /// as a salute; Sandbox skips Acts 1-2 and runs only Act 3 painted
@@ -161,7 +156,6 @@ pub fn on_campaign_end(content_root: &Path, storyteller_id: &str) -> Option<Cine
     })
 }
 
-/// Per spec § "the per-storyteller stinger picks a variant from
 /// `content/cinematics/opening_stingers/<storyteller_id>.ron`."
 ///
 /// Reads the RON stinger table for `storyteller_id`. Returns the parsed

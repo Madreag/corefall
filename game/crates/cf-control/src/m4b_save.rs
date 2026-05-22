@@ -96,7 +96,6 @@ fn version_tuple(save: &WorldSave) -> [u16; 3] {
     ]
 }
 
-/// **M4B § "Autosave is cheap. Mission autosave fires every 60 seconds"** —
 /// autosave interval in seconds (engine clock, NOT wall clock per the
 /// spec Notes). The actual tick interval is derived per-run from
 /// `tick_rate_hz` so the 60-second contract holds at any tick rate.
@@ -107,7 +106,6 @@ pub const AUTOSAVE_INTERVAL_SECONDS: u64 = 60;
 /// call [`autosave_interval_ticks`] with the right rate.
 pub const AUTOSAVE_INTERVAL_TICKS: u64 = AUTOSAVE_INTERVAL_SECONDS * 60;
 
-/// **M4B Notes**: "The autosave timer (60 s default) runs on the engine
 /// clock, not wall clock; this preserves determinism for
 /// replay-against-autosave testing." This helper converts the 60-second
 /// interval into the per-tick-rate tick count so the timer fires at the
@@ -239,7 +237,6 @@ mod tests {
         assert!(autosave_due(0, 60 * 60 + 1));
     }
 
-    /// **M4B Notes "60 s default runs on the engine clock"** — at 120 Hz
     /// the same 60-second interval is 7200 ticks, not 3600.
     #[test]
     fn autosave_due_honors_tick_rate_hz() {

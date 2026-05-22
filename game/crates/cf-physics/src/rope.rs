@@ -99,7 +99,6 @@ impl Default for RopeNode {
     }
 }
 
-/// **M14J** § "Verlet rope". Holds `segment_count + 1` nodes connected
 /// by `segment_count` distance-constraints of length `segment_length_m`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Rope {
@@ -276,7 +275,6 @@ impl Rope {
         [bob[0] - anchor[0], bob[1] - anchor[1]]
     }
 
-    /// **M14J** § "8-segment verlet rope — standard 2-pass solver" — advance
     /// the rope simulation one tick. `dt_seconds` is the fixed sim dt
     /// (1/60 at 60 Hz). `iterations` is the number of distance-constraint
     /// relaxation passes (default 4 per spec).
@@ -354,7 +352,6 @@ impl Rope {
     }
 }
 
-/// **M14J** § "Rope swing exits at pendulum velocity" — compute the
 /// instantaneous tangential velocity at the apex of a pendulum arc.
 ///
 /// For a pendulum of length `length_m` released at angle `theta_rad` from

@@ -157,7 +157,6 @@ impl M0Engine {
                         } else {
                             actor.cinematic_kind = Some(cf_actor::Stance::KnifeThrow);
                             actor.cinematic_ticks_remaining = 24;
-                            // **M6**: spawn a KnifeProjectile under physics with
                             // 50% of the equipped melee's base damage. The tick
                             // scheduler advances the projectile + emits
                             // `combat.knife_throw_landed` on collision.
@@ -186,7 +185,6 @@ impl M0Engine {
                     M6Action::WeaponSwap { slot } => {
                         let new_slot = cf_actor::ItemSlot(u32::from(*slot));
                         let prev = actor.inventory.selected;
-                        // **M6**: replace the instant `actor.inventory.try_select(...)`
                         // with the WeaponSwap state machine. The selected slot is
                         // changed at swap completion (see tick_m6_actor_state),
                         // and firing is locked while `weapon_swap_in_progress`.
@@ -280,7 +278,6 @@ impl M0Engine {
                     M6Action::DeployBipod => {
                         let can_deploy = actor.crouch_active || actor.prone_active;
                         if can_deploy {
-                            // **M6**: actually flip the bipod state on the actor so
                             // the firing path in cf-actor::sim multiplies recoil by
                             // BIPOD_RECOIL_FACTOR + bloom by BIPOD_BLOOM_FACTOR.
                             let deployed = actor.bipod.try_deploy(true);
@@ -307,7 +304,6 @@ impl M0Engine {
                         }
                     }
                     M6Action::CycleFireMode => {
-                        // **M6**: cycle the actor's current weapon to the next
                         // entry in its [`cf_equipment::FireModeSet::available`]
                         // list. The selected weapon's preset id determines the
                         // mode ladder (see [`cf_equipment::available_fire_modes_for`]);
@@ -341,7 +337,6 @@ impl M0Engine {
                         });
                     }
                     M6Action::CookGrenade => {
-                        // **M6**: cook the held grenade — subtract cook tick from
                         // remaining fuse. If cook exceeds fuse, the grenade
                         // detonates in hand (lethal). Emits
                         // `equipment.grenade_cooked` with the new remaining fuse.
@@ -362,7 +357,6 @@ impl M0Engine {
                         }
                     }
                     M6Action::ThrowGrenade => {
-                        // **M6**: spawn a grenade projectile under physics with
                         // the (possibly-cooked) fuse. The tick scheduler counts
                         // the fuse down + emits `equipment.grenade_detonated` at
                         // fuse=0 with the type-specific effect. The arc preview
@@ -411,7 +405,6 @@ impl M0Engine {
                         if actor.limb_loss.weapon_fire_disabled() {
                             reject_reason = actor.limb_loss.reject_reason_for("fire");
                         } else {
-                            // **M6**: shoulder-check during sprint substitutes
                             // the rifle bash with the heavier impact (per spec
                             // table: shoulder check = 10 blunt + 80% knockdown).
                             let melee_kind = if actor.sprint_active {
@@ -440,7 +433,6 @@ impl M0Engine {
                             actor_position: actor.position,
                         });
                     }
-                    // **M14 audit pass 3 (GAP-M6-01)**: sprint-fueled
                     // shoulder check. Resolves through the MeleeKind::ShoulderCheck
                     // preset (higher knockdown probability than Kick).
                     M6Action::MeleeShoulderCheck => {
@@ -453,7 +445,6 @@ impl M0Engine {
                         });
                     }
                     M6Action::UseTool { tool_kind } => {
-                        // **M6**: apply wear on each use; emit
                         // `equipment.tool_broken` when durability hits 0. For
                         // tool="repair", restore wear on every tool entry in
                         // the actor's durability map and emit one
@@ -586,7 +577,6 @@ impl M0Engine {
                         parent_instance_id,
                         child_item_id,
                     } => {
-                        // **M6B § Acceptance: Container nesting depth-limited**.
                         // The actor must have an inventory grid attached; the
                         // grid drives the depth check + emits the locked
                         // `max_depth_exceeded` reason on rejection.
@@ -651,7 +641,6 @@ impl M0Engine {
                 }
             }
         }
-        // **M6**: resolve a melee hit against actors within reach BEFORE
         // we release the state write-guard so we can mutate target HP +
         // roll knockdown deterministically off the engine's seeded RNG.
         let mut melee_hit_emit: Option<MeleeHitEmit> = None;
@@ -719,7 +708,6 @@ impl M0Engine {
             if let Some((id, swap)) = swap_to_register {
                 state.weapon_swap_state.insert(id, swap);
             }
-            // **M6**: register the grenade projectile so the tick scheduler
             // can advance + detonate it.
             if let Some(spawn) = grenade_to_spawn.take() {
                 let projectile_id = state.next_guard_projectile_id;
@@ -739,7 +727,6 @@ impl M0Engine {
                     stuck: false,
                 });
             }
-            // **M6**: register the knife projectile so the tick scheduler
             // can advance + emit `combat.knife_throw_landed` on collision.
             if let Some(spawn) = knife_to_spawn.take() {
                 let projectile_id = state.next_guard_projectile_id;
@@ -754,7 +741,6 @@ impl M0Engine {
                 state.knife_projectiles.push(knife);
             }
         }
-        // **M6**: resolve the stealth-kill: find the nearest actor in front
         // of (same facing as) the attacker within STEALTH_KILL_REACH, apply
         // instant-kill damage, and emit `combat.stealth_kill_executed`.
         // Gate already enforced by the dispatch (stealth_meter < MAX).
@@ -816,11 +802,9 @@ impl M0Engine {
                 None,
             );
         }
-        // **M6**: apply per-tool side-effects + emit tool-specific events.
         if let Some(effect) = tool_effect.take() {
             self.apply_tool_effect(effect, tick, sim_time_ms);
         }
-        // **M6**: spawn a physical item entity in the world for drop_item.
         if let Some(mut spawn) = drop_item_spawn.take() {
             let dropped_item_id_clone = spawn.item_id.clone();
             let dropped_slot = spawn.original_slot;
@@ -830,7 +814,6 @@ impl M0Engine {
                 s.m6_next_dropped_item_id = s.m6_next_dropped_item_id.saturating_add(1);
                 s.m6_dropped_items.push(spawn);
             }
-            // **M6B**: mirror the drop into the actor's inventory grid
             // (remove the most-recent placement of the item) + emit
             // the mass-aware sibling event.
             let (grid_total_mass, grid_total_bulk, instance_id) =
@@ -874,9 +857,7 @@ impl M0Engine {
             );
             self.tick_m6b_encumbrance_after_change(tick, sim_time_ms, player_id);
         }
-        // **M6**: scan pickup radius + add nearest item to first empty slot.
         //
-        // **M6 (knife retrieve)**: the scan covers BOTH
         // `state.m6_dropped_items` and `state.knife_projectiles` so
         // `act.player.pickup` closes the second half of spec § "Knife
         // throw + retrieve" ("When player approaches + presses E: knife
@@ -1019,7 +1000,6 @@ impl M0Engine {
                     }),
                     None,
                 );
-                // **M6B**: also emit the mass-aware sibling event with the
                 // canonical knife spec from the ItemSpec registry. Falls
                 // back to the legacy values when no spec is registered.
                 let knife_spec = cf_equipment::spec_for_id(cf_equipment::KNIFE_M6_DEFAULT_ID);
@@ -1066,7 +1046,6 @@ impl M0Engine {
                 self.tick_m6b_encumbrance_after_change(tick, sim_time_ms, player_id);
             }
             if let Some((dropped_id, item_id, weight, slot)) = picked_dropped {
-                // **M6B**: also emit the mass-aware sibling event with the
                 // canonical ItemSpec from the registry.
                 let spec = cf_equipment::spec_for_id(&item_id);
                 let (mass_kg, dims, bulk, category) = if let Some(s) = spec.as_ref() {
@@ -1110,7 +1089,6 @@ impl M0Engine {
                 self.tick_m6b_encumbrance_after_change(tick, sim_time_ms, player_id);
             }
         }
-        // **M6**: emit follow-on events (melee hit, knockdown, tool broken,
         // tool repaired) AFTER releasing the write-guard so the recorder
         // can re-borrow without dead-locking.
         if let Some(emit) = melee_hit_emit {
@@ -1135,7 +1113,6 @@ impl M0Engine {
                 }),
                 None,
             );
-            // **M14** § "Heavy melee severance (chainsaw / katana / hatchet)".
             // Per-weapon severance_chance × (1 - joint_strength_normalized);
             // rolled against the engine's seeded RNG. Cf-equipment currently
             // ships hatchet (0.15) as the M6 heavy-melee tier; chainsaw +
@@ -1181,7 +1158,6 @@ impl M0Engine {
                     );
                 }
             }
-            // **M8** (Cluster E fix): auto-trigger a 50 ms hit-stop pulse on
             // melee impact per spec § "Hit-stop on impact — Given melee hit
             // OR AP round hit / When hit lands / Then camera.hit_stop fires".
             // Honors `Settings.hit_stop_enabled` (skips on opt-out per the
@@ -1200,7 +1176,6 @@ impl M0Engine {
                 #[rustfmt::skip]
                 let _ = self.recorder.record(tick, sim_time_ms, "camera", "hit_stop", payload, None);
             }
-            // **M14G § VAL-M14G-023**: blunt-face dental damage emit.
             // Per spec, every melee blunt-impulse hit whose target zone
             // is face-aligned `head_front` AND whose impulse magnitude
             // exceeds the tooth threshold emits `wound.created` with
@@ -1256,7 +1231,6 @@ impl M0Engine {
                 json!({"actor": actor_id, "tool": tool, "durability": durability}),
                 None,
             );
-            // **M13** § "Tool degradation routing through chassis" — when a
             // tool socketed in a chassis breaks, also surface the
             // `chassis.tool_durability_changed` event so chassis-aware
             // consumers (M7 Engineer auto-repair, HUD) can react without
@@ -1300,7 +1274,6 @@ impl M0Engine {
                     None,
                 );
             }
-            // **M13** § "Tool degradation routing through chassis" — repair
             // also surfaces the chassis-extension event when the actor is
             // chassis-bound.
             let chassis_tool_event_target = if let Ok(state) = self.state.read() {
@@ -1359,7 +1332,6 @@ impl M0Engine {
         }
         self.recorder
             .record(tick, sim_time_ms, "control", "command_accepted", accepted_payload, None);
-        // **M6**: signal_friendly / signal_enemy_spotted / mark_waypoint
         // broadcast the corresponding intent to all squad followers via
         // `cf_squad::Squad::broadcast_to_followers`. Mark_waypoint also
         // emits a stand-alone `squad.waypoint_marked` event with the
@@ -1456,7 +1428,6 @@ impl M0Engine {
         }
         let mut state = state;
         let issuer = state.player_actor.unwrap_or_default();
-        // **M6**: build the command + apply it to the named member (or
         // broadcast to all followers when `bot_actor` is None). This
         // mutates `state.squad` so the AI tick can consult
         // `member.current_command` and act accordingly.
@@ -1497,7 +1468,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M6**: `act.squad.cancel_command` — returns the named squad member
     /// to the default `FollowLeader` command. Re-emits
     /// `squad.command_issued` with `kind="follow_leader"` so the replay
     /// stream stays linear.
@@ -1537,7 +1507,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M7-B**: dispatch `act.player.set_priority`. Mutates the bot's
     /// PriorityTable AND the utility scorer's cached priority so the
     /// next AI tick scores against the new weight. Emits
     /// `ai.priority_table_changed` on success.
@@ -1605,7 +1574,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M7-B**: dispatch `act.player.set_autonomy_mode`. Emits
     /// `ai.autonomy_mode_changed` on success.
     pub(crate) fn dispatch_set_autonomy_mode(
         &self,
@@ -1669,7 +1637,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M7-B**: dispatch `act.player.apply_role_template`. Replaces the
     /// bot's PriorityTable with the chosen role template + emits
     /// `ai.role_template_applied` AND `ai.archetype_chosen`.
     pub(crate) fn dispatch_apply_role_template(
@@ -1753,7 +1720,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M7-B**: dispatch `act.player.apply_quick_preset`. Shifts task
     /// weights ±2 per spec § Quick presets. Emits
     /// `ai.quick_preset_applied`.
     pub(crate) fn dispatch_apply_quick_preset(
@@ -1817,7 +1783,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M7B**: dispatch `act.squad.issue` — parse args, validate, run
     /// doctrine check, mutate squad state, emit the appropriate event.
     /// Chain-aware verbs (`stack_door` / `breach_door` / `frag_out` /
     /// `advance` / `retreat_in_order`) also drive the matching squad
@@ -1871,7 +1836,6 @@ impl M0Engine {
         let payload = outcome.payload.clone();
         let was_accepted = outcome.is_accepted();
 
-        // **M7B**: chain-aware side effects when the verb was accepted.
         // The squad state machines (breach chain + bounding) auto-drive
         // their events here so the per-verb issue produces the correct
         // chain-step / bounding-step payloads per spec.
@@ -1923,7 +1887,6 @@ impl M0Engine {
                     }
                 }
                 "retreat_in_order" => {
-                    // Per spec § "Retreat In Order = bounding (half
                     // cover, half move 30u, swap); emits
                     // squad.bounding_step". Start the bounding sequence
                     // at the rally arg (if supplied).
@@ -1961,7 +1924,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M7B**: dispatch `act.squad.set_formation` — collapse to fit member
     /// count, run slot solver, emit `squad.formation_set` +
     /// `squad.formation_slot_assigned` per slot.
     pub(crate) fn dispatch_m7b_squad_set_formation(
@@ -2035,7 +1997,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M7B**: dispatch `act.squad.assign_role` — mutate role_assignments
     /// + emit `squad.role_assigned`.
     pub(crate) fn dispatch_m7b_squad_assign_role(
         &self,
@@ -2080,7 +2041,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M7B**: dispatch `srv.dump_squad_state` — returns a JSON view.
     pub(crate) fn dispatch_m7b_dump_squad_state(
         &self,
         squad_id: u64,

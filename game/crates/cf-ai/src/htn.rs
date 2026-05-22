@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use crate::task::TaskType;
 use crate::thinking_stack::{Layer, LayerKind, LayerOutput, ThinkingContext};
 
-/// **M7-A**: HTN root goal vocabulary. Top-level intents the planner pursues.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -42,14 +41,12 @@ impl HtnRootGoal {
     }
 }
 
-/// **M7-A**: one entry in the HTN goal stack.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HtnGoal {
     pub label: String,
     pub favored_task: Option<TaskType>,
 }
 
-/// **M7-A**: Layer 4 HTN planner.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HtnLayer {
     pub root: HtnRootGoal,

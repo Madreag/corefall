@@ -10,7 +10,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7-A**: the canonical 22 task types the Utility scorer reasons about.
 /// One-to-one with the Priority Table grid columns. Stable ordinal ↔ wire
 /// representation (snake_case in JSON) — replay bundles store the names.
 ///
@@ -44,7 +43,6 @@ pub enum TaskType {
 }
 
 impl TaskType {
-    /// **M8A lock surface**: every variant in declaration order. Length must
     /// remain exactly 22 across the project's lifetime.
     pub const ALL: [TaskType; 22] = [
         TaskType::EngageVisibleEnemy,

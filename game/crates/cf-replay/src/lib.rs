@@ -74,25 +74,20 @@ pub struct Event {
     pub payload: serde_json::Value,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub parent_event_id: Option<String>,
-    /// **M4 envelope v0.1**: optional envelope-level actor reference. When
     /// the event is about / caused by a specific actor, set this so
     /// downstream consumers can filter without parsing the payload.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub actor_id: Option<u64>,
-    /// **M4 envelope v0.1**: optional source actor (the one taking action).
     /// Distinct from `actor_id` (the affected actor) — e.g. shooter vs
     /// victim, or carrier vs item.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub source_id: Option<u64>,
-    /// **M4 envelope v0.1**: optional team string ("player" / "enemy" /
     /// "neutral" / faction name) for fast filtering.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub team: Option<String>,
-    /// **M4 envelope v0.1**: optional 2D world position [x, y] where the
     /// event happened. Surface-level convenience for spatial filtering.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub pos: Option<[f32; 2]>,
-    /// **M4 envelope v0.1**: optional bounding box [min_x, min_y, max_x,
     /// max_y] for events that span an area (terrain carve, blast, hazard
     /// cell). Surface-level convenience for spatial filtering.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -109,7 +104,6 @@ pub struct Event {
     /// the event is a gameplay surface.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cosmetic: Option<bool>,
-    /// **M4 ↔ M4A integration**: optional reference to a `cf-asset-ledger`
     /// entry. Set on events that reference an AI-generated asset (capture
     /// grid screenshot, audio playback, mod-supplied content). M4A's
     /// `cf-mod ledger verify` cross-references this against the ledger's
@@ -117,7 +111,6 @@ pub struct Event {
     /// `AssetId` (blake3 hex prefix).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub asset_ref: Option<String>,
-    /// **M4B § "Tamper-evident competitive replays"** — optional BLAKE3
     /// hash linking this event to the immediately-prior event in
     /// tournament-mode bundles. The chain is verified by `cf-mod ledger
     /// verify --bundle <path>` + `cf-tools-replay-viewer validate`. Dev
@@ -125,7 +118,6 @@ pub struct Event {
     /// parse unchanged.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub prev_event_hash: Option<String>,
-    /// **M4B § "Tamper-evident competitive replays"** — the BLAKE3-keyed
     /// hash for THIS event (binding `prev_event_hash` + canonical payload).
     /// Stored alongside `prev_event_hash` so the verifier can pinpoint the
     /// tamper to the exact event_id rather than the next one. `None` when
@@ -218,7 +210,6 @@ pub struct SettingsBlock {
     /// affect the deterministic sim checksum directly.
     #[serde(default)]
     pub key_bindings: BTreeMap<String, String>,
-    /// **M2 audit pass 5 (2026-05-13)**: AI difficulty preset id ("cakewalk",
     /// "tough_crowd", "veteran") — the live preset applied by
     /// `act.settings.set { ai_difficulty: ... }`. Persisted into the run
     /// manifest so consumers can reproduce the run without consulting
@@ -226,7 +217,6 @@ pub struct SettingsBlock {
     /// deserialize cleanly.
     #[serde(default)]
     pub ai_difficulty: String,
-    /// **M1 audit pass 7 (2026-05-13)**: full "feel cvars" suite persisted
     /// into run_manifest.json.settings so deterministic replay tools can
     /// reconstruct the run's tunings without consulting `observe.settings`
     /// probes. All fields default to 0.0/false/0 so legacy bundles
@@ -347,7 +337,6 @@ pub struct RunManifest {
     /// per-outcome event-count rules above.
     #[serde(default)]
     pub expected_outcome: ExpectedOutcome,
-    /// **M4B § "Replays survive a game update"** — the `.cfsave`
     /// SaveSchemaVersion this run was recorded under. Serialized as a
     /// 3-element JSON array `[major, minor, patch]` (canonical form so
     /// canonical-JSON BLAKE3 stays unambiguous). Defaults to the current
@@ -355,12 +344,10 @@ pub struct RunManifest {
     /// cleanly.
     #[serde(default = "default_save_schema_version")]
     pub save_schema_version: [u16; 3],
-    /// **M4B § "Save files are smaller"** — cadence at which baseline
     /// snapshots are emitted into the run bundle. Default 600 ticks
     /// (10 s @ 60 Hz). Configurable per scenario.
     #[serde(default = "default_delta_baseline_cadence_ticks")]
     pub delta_baseline_cadence_ticks: u64,
-    /// **M4B § "Tamper-evident competitive replays"** — the BLAKE3 chain
     /// anchor (chained_hash_hex of the final event in the run). Set in
     /// tournament mode; `None` in dev mode so existing bundles continue
     /// to parse unchanged.
@@ -413,14 +400,12 @@ pub struct PerformanceBlock {
     pub ticks_run: u64,
     pub wall_seconds: f64,
     pub tick_rate_hz: u32,
-    /// **M3 re-open (2026-05-13)**: terrain coalesce-cost roll-up. Populated
     /// from the engine's per-tick `terrain.terrain_dirty_region_batch`
     /// samples. `coalesce_cost_avg` is the mean rects_in over the sampled
     /// window (last 1024 ticks). `total_rects_in` / `total_rects_out` are
     /// cumulative across the run. See `specs/active/M3.md` § Re-opened gaps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terrain: Option<TerrainPerfBlock>,
-    /// **M8A § per-subsystem latency budgets** — additive-only extension
     /// of the M4 v0.1 envelope. Existing M1-M8 bundle readers ignore the
     /// optional field; M8A producers populate per-subsystem
     /// p50/p99/p999 (microseconds). Consumed by `cf-mod validate-bundle`
@@ -429,7 +414,6 @@ pub struct PerformanceBlock {
     pub subsystems: Option<crate::perf::M8aPerfSummary>,
 }
 
-/// **M3 re-open (2026-05-13)**: terrain coalesce-cost roll-up for
 /// `summary.json.perf.terrain`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TerrainPerfBlock {
@@ -450,7 +434,6 @@ pub struct PerfSample {
     pub ticks_run: u64,
     pub wall_seconds: f64,
     pub tick_rate_hz: u32,
-    /// **M3 re-open**: optional terrain perf block.
     pub terrain: Option<TerrainPerfBlock>,
 }
 
@@ -501,7 +484,6 @@ pub struct RunSummary {
     pub checksum_event_count: u64,
     pub first_tick: Option<u64>,
     pub last_tick: Option<u64>,
-    /// **M4 § Recorder backpressure does not drop silently**: per-run
     /// recorder telemetry. `peak_buffer_depth` records the maximum queue
     /// depth reached at any point during the run; `dropped_cosmetic` /
     /// `dropped_gameplay` partition the dropped count by event class.
@@ -511,7 +493,6 @@ pub struct RunSummary {
     pub recorder: RecorderBlock,
 }
 
-/// **M4 § Recorder backpressure**: per-run recorder telemetry block.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RecorderBlock {
     pub peak_buffer_depth: usize,
@@ -523,13 +504,11 @@ pub struct RecorderBlock {
 /// Append-friendly recorder. Events go through here so the writer can apply backpressure
 /// and surface dropped counts in `summary.json.event_counts.dropped_total`.
 ///
-/// **M4 § Recorder backpressure**: when `capacity` is reached, the recorder
 /// drops the oldest COSMETIC event first (priority-aware drop) so gameplay
 /// events are never starved by particle/visual cosmetics. If no cosmetic
 /// event is in the buffer, the new gameplay event itself is dropped (counted
 /// in `dropped_total` and the next emitted event picks up the dropped count).
 ///
-/// **M4B § "Tamper-evident competitive replays"** — the recorder optionally
 /// runs in CHAIN MODE. When [`Recorder::enable_chain_mode`] has been called,
 /// every recorded event carries a `prev_event_hash` + `chained_hash_hex` pair
 /// computed via [`cf_save::ledger_chain::Encoder`]. The final
@@ -540,7 +519,6 @@ pub struct Recorder {
     inner: Mutex<RecorderInner>,
     /// Maximum events before backpressure drops. 0 = unlimited.
     capacity: usize,
-    /// **M4B**: ledger chain encoder. `Some(_)` when [`Recorder::enable_chain_mode`]
     /// has been called; default `None` (events ship without chain fields,
     /// matching legacy bundle behavior).
     chain_encoder: Mutex<Option<cf_save::ledger_chain::Encoder>>,
@@ -598,7 +576,6 @@ impl Recorder {
         }
     }
 
-    /// **M4B § "Tournament-mode chain anchor"** — enable per-event BLAKE3
     /// chain mode. The encoder uses keyed-BLAKE3 with a per-run key derived
     /// from `(run_id, seed)` so chains from two different runs (or the same
     /// run with a different seed) produce different anchors. Idempotent:
@@ -609,7 +586,6 @@ impl Recorder {
         *guard = Some(encoder);
     }
 
-    /// **M4B**: returns true when chain mode is engaged.
     pub fn chain_mode_enabled(&self) -> bool {
         self.chain_encoder
             .lock()
@@ -617,7 +593,6 @@ impl Recorder {
             .is_some()
     }
 
-    /// **M4B § "Tournament-mode chain anchor"** — the BLAKE3 chained_hash of
     /// the final event. Returns `None` when chain mode is OFF or no event
     /// has been recorded yet.
     pub fn chain_anchor(&self) -> Option<String> {
@@ -680,7 +655,6 @@ impl Recorder {
         self.record_with_cosmetic(tick, sim_time_ms, category, event_type, payload, parent_event_id, true)
     }
 
-    /// **M4 ↔ M4A integration**: record an event referencing an asset-ledger
     /// entry (`asset_ref`). Used by capture-grid screenshots, audio playback,
     /// mod-supplied content, etc. The asset_ref value is a string-encoded
     /// `cf-asset-ledger::AssetId` (blake3 hex). Cosmetic when `cosmetic` is
@@ -765,7 +739,6 @@ impl Recorder {
         } else {
             None
         };
-        // **M4B § "Tamper-evident competitive replays"** — when chain mode
         // is on, compute the per-event BLAKE3 keyed chain hash over the
         // canonical-JSON of the payload. Both `prev_event_hash` and
         // `chained_hash_hex` are stored on the envelope so the verifier
@@ -875,7 +848,6 @@ impl Recorder {
         inner.pending_drop_tag = inner.pending_drop_tag.saturating_add(count);
     }
 
-    /// **M4**: tag the next emitted event with the current outstanding
     /// drop count so it surfaces in the bundle (per M4 § "the per-event
     /// payload that triggered the overflow includes dropped_count in the
     /// next emitted event"). Returns the count and clears the outstanding
@@ -939,7 +911,6 @@ impl Recorder {
     }
 }
 
-/// **M4A ↔ M4**: parameter bundle for [`Recorder::record_with_asset_ref`].
 /// Bundles the envelope identity (`tick`, `sim_time_ms`, `category`, etc.)
 /// plus the `asset_ref` (string-encoded `cf-asset-ledger::AssetId`) and the
 /// cosmetic flag so the recorder writes a single event with the ledger
@@ -1260,7 +1231,6 @@ mod tests {
         assert_eq!(parsed.category, "system");
     }
 
-    /// **M4 ↔ M4A integration**: `record_with_asset_ref` populates the
     /// envelope-level `asset_ref` field with a ledger AssetId string. Run
     /// bundles that capture grids / audio playback / mod assets MUST link
     /// to the canonical ledger entry via this field.

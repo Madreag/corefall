@@ -31,17 +31,14 @@ pub enum ShellApiCommand {
     ResumeMission,
     AdvanceFreStep,
     BackFreStep,
-    /// **M12**: open the CCCP-style intro slideshow. `slot` distinguishes
     /// the first-launch intro from the Main Menu → Story → "Replay Intro"
     /// re-watch. Per spec § CCCP-style intro slideshow.
     OpenIntroSlideshow {
         slot: IntroSlideshowSlot,
     },
-    /// **M12**: skip the currently-playing slideshow.
     SkipIntroSlideshow,
 }
 
-/// **M12**: slot identifying which slideshow surface is being opened.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IntroSlideshowSlot {
     /// First-launch intro slideshow (8 slides — "you will now join the frontier").

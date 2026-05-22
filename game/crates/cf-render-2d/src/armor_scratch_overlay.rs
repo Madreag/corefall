@@ -13,7 +13,6 @@ pub struct ScratchOverlay {
 }
 
 impl ScratchOverlay {
-    /// **M14A** § "Visible armor scratches" — derive the decal level from
     /// external HP integrity (1.0 = full; 0.0 = breached).
     pub fn for_external_integrity(integrity: f32) -> Self {
         let level = if integrity >= 0.7 {

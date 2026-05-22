@@ -27,7 +27,6 @@
 
 use bevy::prelude::*;
 
-/// **M12**: every juice rule recognized by the renderer. Mirrors the
 /// `ux.juice_applied` schema enum so the snake_case identifier round-trips
 /// through the replay surface.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -57,7 +56,6 @@ impl JuiceKind {
     }
 
     /// Canonical full animation duration (ms) before accessibility scaling.
-    /// Per spec § Juice rules.
     #[must_use]
     pub fn duration_ms(self) -> u32 {
         match self {
@@ -116,7 +114,6 @@ impl JuiceKind {
     }
 }
 
-/// **M12**: M12 accessibility flags mirror. cf-app writes this each
 /// frame from the live `cf-control::Settings` snapshot. Default = all
 /// flags off (full juice).
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -126,7 +123,6 @@ pub struct JuiceAccessibility {
     pub reduce_flash: bool,
 }
 
-/// **M12**: one canonical scale-curve sample at `t` in `[0, 1]` for the
 /// given rule. Per spec:
 ///
 /// - `ButtonHover`: ease-out from 1.0 → 1.05.
@@ -157,7 +153,6 @@ pub fn scale_at(rule: JuiceKind, t: f32) -> f32 {
     }
 }
 
-/// **M12**: ease-in-out curve sample for the banner slide (spec § Banner
 /// slide-in: "slide from right edge over 200ms ease-in-out").
 ///
 /// Returns the normalized offset from the off-screen anchor to the on-screen
@@ -175,7 +170,6 @@ pub fn slide_offset(rule: JuiceKind, t: f32) -> f32 {
     }
 }
 
-/// **M12** § Button hover juice — "glow halo appears". Returns the
 /// halo alpha [0..1] over the lifetime of a hover pulse. The curve
 /// rises sharply (matching the 80 ms ease-out scale) and stays solid
 /// until the pulse expires.
@@ -189,7 +183,6 @@ pub fn glow_halo_alpha(rule: JuiceKind, t: f32) -> f32 {
     eased.clamp(0.0, 1.0)
 }
 
-/// **M12** § Critical-hit punch juice — "screen flash". Returns the
 /// screen-flash alpha [0..1]. Spikes at `t=0` (instant flash) and
 /// decays linearly. Suppressed when `reduce_flash=true` (the JuicePulse
 /// suppression flag already handles that — this function returns 0 when
@@ -206,7 +199,6 @@ pub fn screen_flash_alpha(pulse: &JuicePulse) -> f32 {
     (1.0 - t).powi(2)
 }
 
-/// **M12** § Critical-hit punch juice — "chromatic aberration". Returns
 /// the chromatic-aberration amplitude in arbitrary screen-space units
 /// (0.0 = none, ~6.0 = strong split). Suppressed when `reduce_flash=true`.
 #[must_use]
@@ -221,7 +213,6 @@ pub fn chromatic_aberration_amplitude(pulse: &JuicePulse) -> f32 {
     6.0 * (1.0 - t)
 }
 
-/// **M12** § Camera shake amplitude curve — exponential decay from
 /// `amplitude_px_0` toward zero with time-constant `decay_s`.
 ///
 /// `t_s` is the elapsed seconds since the shake began; the function
@@ -229,7 +220,6 @@ pub fn chromatic_aberration_amplitude(pulse: &JuicePulse) -> f32 {
 /// cinematic shakes both feed off the same envelope. Returns the
 /// instantaneous amplitude (px) the noise sampler multiplies by.
 ///
-/// Per spec § M12C "Shake — perlin-noise additive offset, parameterized
 /// by amplitude_px + frequency_hz + decay_s; reuses M12's
 /// `cf-render-2d::juice::camera_shake_amplitude` curve."
 #[must_use]
@@ -243,7 +233,6 @@ pub fn camera_shake_amplitude(amplitude_px_0: f32, t_s: f32, decay_s: f32) -> f3
     amplitude_px_0 * (-t_s / decay_s).exp()
 }
 
-/// **M12** § Weapon swap whoosh — "brief light streak". Returns the
 /// streak intensity [0..1]. Suppressed when `reduce_motion=true`.
 #[must_use]
 pub fn weapon_swap_streak_intensity(pulse: &JuicePulse) -> f32 {
@@ -261,7 +250,6 @@ pub fn weapon_swap_streak_intensity(pulse: &JuicePulse) -> f32 {
     }
 }
 
-/// **M12**: live state for a juice pulse the renderer is currently driving.
 /// Owned by the [`JuiceState`] resource; cf-app pushes new pulses via
 /// [`JuiceState::push`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -302,7 +290,6 @@ impl JuicePulse {
     }
 }
 
-/// **M12**: collected juice pulses currently driving HUD animation.
 /// cf-app pushes new pulses, the [`tick_juice`] system decays them per
 /// frame, and the HUD consumers read [`JuiceState::scale_for`] /
 /// [`JuiceState::slide_for`] to derive visual state.
@@ -347,7 +334,6 @@ impl JuiceState {
         scale
     }
 
-    /// **M12**: composite glow halo alpha on `node` (max across active
     /// glow-emitting pulses). Used by the renderer to overlay a soft
     /// halo around hovered buttons / picked-up items.
     #[must_use]
@@ -362,7 +348,6 @@ impl JuiceState {
         alpha.clamp(0.0, 1.0)
     }
 
-    /// **M12**: peak screen-flash alpha across every active
     /// `CriticalHitPunch` pulse (typically pinned to the global
     /// `ux.critical_hit` node). Used by the post-process pass to drive
     /// the cosmetic flash + chromatic aberration.
@@ -375,7 +360,6 @@ impl JuiceState {
         peak
     }
 
-    /// **M12**: peak chromatic-aberration amplitude across active
     /// `CriticalHitPunch` pulses. Same nodeless lookup as
     /// [`Self::screen_flash`].
     #[must_use]
@@ -417,7 +401,6 @@ impl JuiceState {
         self.pulses.len()
     }
 
-    /// **M12** § cf-app integration — iterate every (node, pulse) pair.
     /// cf-app's audio dispatcher uses this to emit one `AudioCue::Juice`
     /// per newly-fired pulse.
     pub fn for_each_active_pulse<F: FnMut(&str, &JuicePulse)>(&self, mut f: F) {
@@ -442,7 +425,6 @@ pub fn tick_juice(time: Res<Time>, mut state: ResMut<JuiceState>) {
     state.tick(dt_ms);
 }
 
-/// **M12**: juice plugin wiring `JuiceState` + `JuiceAccessibility`.
 pub struct JuicePlugin;
 
 impl Plugin for JuicePlugin {

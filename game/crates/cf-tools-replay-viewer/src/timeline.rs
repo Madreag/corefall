@@ -35,7 +35,6 @@ pub use crate::editor::{
 mod tests {
     use super::*;
 
-    /// VAL-M10B-029: a trim selection is well-formed when end > start.
     #[test]
     fn trim_selection_is_valid_when_end_after_start() {
         let sel = TrimSelection {
@@ -46,7 +45,6 @@ mod tests {
         assert_eq!(sel.len_ticks(), 120);
     }
 
-    /// VAL-M10B-029: empty selection (start == end) is invalid.
     #[test]
     fn trim_selection_is_invalid_when_empty() {
         let sel = TrimSelection {
@@ -57,7 +55,6 @@ mod tests {
         assert_eq!(sel.len_ticks(), 0);
     }
 
-    /// VAL-M10B-028: latency budget constant matches spec (16 ms).
     #[test]
     fn scrub_latency_budget_is_sixteen_ms() {
         assert_eq!(SCRUB_LATENCY_BUDGET_MS, 16);

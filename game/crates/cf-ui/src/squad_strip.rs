@@ -69,15 +69,11 @@ pub struct SquadStripMember {
     pub hp_fraction: f32,
     /// Optional alert badge (e.g. "LOW HP", "DOWNED", "BLEEDING").
     pub alert: Option<String>,
-    /// **M11**: current command issued to the bot (e.g. "HOLD",
     /// "ADVANCE", "FOLLOW"). `None` when no order is active.
     pub current_command: Option<String>,
-    /// **M11**: per-bot autonomy mode (Full/Standard/Manual).
     pub autonomy_mode: SquadAutonomyMode,
-    /// **M11**: short tail of the bot's recent `reason_label_recent` ring
     /// (latest reason first). Surfaces in the row badge + tooltip.
     pub reason_label_recent: Option<String>,
-    /// **M11**: top-priority task icon (drives the per-row icon column).
     pub priority_icon: Option<PriorityIcon>,
 }
 

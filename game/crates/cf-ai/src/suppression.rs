@@ -6,7 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7-A**: suppression event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SuppressionEvent {
     pub actor_id: u64,

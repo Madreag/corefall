@@ -151,7 +151,6 @@ mod tests {
             .unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
     }
 
-    /// VAL-M9C-005: every fortification RON loads cleanly.
     #[test]
     fn fortifications_load_all() {
         for kind in FortificationKind::ALL {
@@ -257,7 +256,6 @@ mod tests {
         }
     }
 
-    /// VAL-M9C-007: unknown FortificationKind enum is rejected by the
     /// loader at parse time with a typed error.
     #[test]
     fn fortification_kind_unknown_enum_rejected() {
@@ -266,7 +264,6 @@ mod tests {
         assert!(result.is_err(), "unknown kind must reject");
     }
 
-    /// VAL-M9C-007: unknown wire_kind enum is rejected by the loader.
     #[test]
     fn fortification_unknown_wire_kind_rejected() {
         let bad = "(kind: barbed_wire, hp: 200, footprint_tiles: (1, 1), build_time_seconds: 4, material_cost: {}, wire_kind: Some(not_a_wire_kind))";
@@ -274,7 +271,6 @@ mod tests {
         assert!(result.is_err(), "unknown wire_kind must reject");
     }
 
-    /// VAL-M9C-007: unknown mine_kind enum is rejected by the loader.
     #[test]
     fn fortification_unknown_mine_kind_rejected() {
         let bad = "(kind: barbed_wire, hp: 200, footprint_tiles: (1, 1), build_time_seconds: 4, material_cost: {}, mine_kind: Some(not_a_mine_kind))";

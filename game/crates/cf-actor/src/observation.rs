@@ -24,7 +24,6 @@ pub struct ActorObservation {
     pub hp_max: f32,
     pub selected_slot: u32,
     pub selected_item: String,
-    /// **M1 re-audit (2026-05-13)**: full inventory contents as an array of
     /// item labels in slot order (length 4 for M1; matches `Inventory.items`).
     /// Closes the M1 spec drift item — spec said the observation includes
     /// `inventory[]` but code only surfaced `selected_slot + selected_item`.
@@ -35,10 +34,8 @@ pub struct ActorObservation {
     /// M4A: per-zone body silhouette projection. `placeholder=false` when sourced
     /// from a real M5 chassis body graph.
     pub body_silhouette: BodySilhouette,
-    /// **M5**: full chassis projection when the actor has a chassis attached.
     #[serde(default)]
     pub chassis: Option<ChassisView>,
-    /// **M5**: actor origin tag (`human`, `robot`, `android`, ...).
     #[serde(default = "default_origin_id")]
     pub origin_id: String,
     /// W1.3: stability scalar (0.0 = fully disrupted, 1.0 = stable).
@@ -50,129 +47,95 @@ pub struct ActorObservation {
     /// Physical mass in kg. Affects movement feel, stability resistance, knockdown.
     #[serde(default = "default_mass_kg")]
     pub mass_kg: f32,
-    /// **M5**: per-tick movement-intent mirror.
     #[serde(default)]
     pub crouch_active: bool,
     #[serde(default)]
     pub climb_active: bool,
     #[serde(default)]
     pub jet_active: bool,
-    /// **M1**: sharp-aim progress scalar (0..1) — CCCP `AHuman.cpp:1779`.
     #[serde(default)]
     pub sharp_aim_progress: f32,
-    /// **M1**: most-recent recoil accumulator value (CCCP `HDFirearm.cpp:891`).
     #[serde(default)]
     pub recoil_accumulator: f32,
-    /// **M1**: knockdown recovery ticks remaining. Zero when not in knockdown.
     #[serde(default)]
     pub knockdown_ticks_remaining: u32,
-    /// **M1**: DYING dwell countdown ticks remaining (CCCP `Actor.cpp:1229`).
     #[serde(default)]
     pub dying_dwell_ticks_remaining: u32,
-    /// **M1**: mission-critical flag (caps damage at DOWNED).
     #[serde(default)]
     pub mission_critical: bool,
-    /// **M1**: most-recent computed reticle bloom multiplier (Soldat `Sprites.pas:4870`).
     /// 1.0 = standing/walking; >1 = movement / airborne / sharp-aim breakup.
     #[serde(default = "default_bloom_factor")]
     pub bloom_factor: f32,
-    /// **M6**: side-view facing direction.
     #[serde(default)]
     pub facing: String,
-    /// **M6**: stamina pool current value (0..1).
     #[serde(default)]
     pub stamina: f32,
-    /// **M6**: stamina pool capacity (>=1.0 if extended).
     #[serde(default)]
     pub stamina_max: f32,
-    /// **M6**: sticky sprint intent.
     #[serde(default)]
     pub sprint_active: bool,
-    /// **M6**: sticky prone intent.
     #[serde(default)]
     pub prone_active: bool,
-    /// **M6**: current lean angle (degrees; negative=left, positive=right).
     #[serde(default)]
     pub lean_angle_degrees: f32,
-    /// **M6**: current lean direction (none/left/right).
     #[serde(default)]
     pub lean_direction: String,
-    /// **M6**: latched stealth meter (0..1).
     #[serde(default)]
     pub stealth_meter: f32,
-    /// **M6**: HUD spotted-caption flag.
     #[serde(default)]
     pub spotted: bool,
-    /// **M6**: cover side (none/left/right/both).
     #[serde(default)]
     pub cover_side: String,
-    /// **M6**: cover effectiveness 0..1.
     #[serde(default)]
     pub cover_effectiveness: f32,
-    /// **M6**: total inventory weight (kg).
     #[serde(default)]
     pub inventory_weight_kg: f32,
-    /// **M6**: true when weight forces walking (>30kg).
     #[serde(default)]
     pub weight_forces_walk: bool,
-    /// **M6 (M13 forward-compat)**: per-limb loss flags surfaced for the HUD
     /// + action-rejection contract.
     #[serde(default)]
     pub limb_loss: LimbLossFlags,
-    /// **M6**: extended inventory slots (8 active + 3 reserved tank).
     /// Each entry includes kind + state ("empty" / "occupied" / "locked")
     /// + the locked tooltip on the reserved slots.
     #[serde(default)]
     pub inventory_extended: Vec<ExtendedInventorySlotView>,
-    /// **M6**: weapon-state projection (mag_remaining, fire_mode, bipod_state,
     /// suppressor_attached, reload_state, charge_fraction). See
     /// [`WeaponStateView`] for the shape contract.
     #[serde(default)]
     pub weapon_state: WeaponStateView,
-    /// **M13** § "Brain hopping / multi-actor control" — true when the
     /// player's brain currently resides in this actor.
     #[serde(default)]
     pub is_brain: bool,
-    /// **M13** § "Hit reactions per body part" — currently-active hit
     /// reaction label + ticks remaining + speed factor. Empty label when no
     /// reaction is active.
     #[serde(default)]
     pub hit_reaction_kind: String,
     #[serde(default)]
     pub hit_reaction_ticks_remaining: u32,
-    /// **M13** § "Drone allies" — drone mode + fuel (only populated when
     /// the actor is a drone).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drone_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drone_fuel: Option<f32>,
-    /// **M6B**: per-actor `max_carry_kg` (50 × origin modifier).
     #[serde(default)]
     pub max_carry_kg: f32,
-    /// **M6B**: per-actor `max_carry_volume_l` (60 × origin modifier).
     #[serde(default)]
     pub max_carry_volume_l: f32,
-    /// **M6B**: total carried mass in kg (sum of inventory grid).
     /// Distinct from the legacy `inventory_weight_kg` (M6 slot sum) so
     /// the M14A mass aggregator can consume a per-item canonical surface.
     #[serde(default)]
     pub total_carried_kg: f32,
-    /// **M6B**: total carried bulk in liters.
     #[serde(default)]
     pub total_carried_volume_l: f32,
-    /// **M6B**: walk-speed multiplier from the encumbrance curve
     /// (`1.0` empty, `0.5` at 100% carry).
     #[serde(default = "default_bloom_factor")]
     pub encumbrance_walk_speed_multiplier: f32,
-    /// **M6B**: discrete encumbrance band (none/light/moderate/heavy).
     #[serde(default)]
     pub encumbrance_band: String,
-    /// **M6B**: true when the actor is at or past 100% load (HUD shows
     /// "ENCUMBERED" warning per spec § "Encumbrance at 100% reduces
     /// walk speed").
     #[serde(default)]
     pub encumbered: bool,
-    /// **M6B**: per-actor inventory grid (Tetris placements + per-item
     /// mass + bulk + nested container counts). `None` for pre-M6B
     /// legacy actors; `Some(...)` for any actor with an attached
     /// `inventory_grid`.
@@ -180,11 +143,9 @@ pub struct ActorObservation {
     pub inventory_grid: Option<InventoryGridView>,
 }
 
-/// **M6**: extended-inventory slot projection. Mirrors
 /// `cf_equipment::inventory::ExtendedSlot` but lives here so observe.actor
 /// stays a pure cf-actor projection.
 ///
-/// **M6B**: extended with `bulk_volume_l` so `observe.actor.inventory`
 /// surfaces both per-slot mass + bulk per spec § Crates / modules touched
 /// (cf-control MODIFY — observe.actor.inventory extended with mass + bulk).
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -195,7 +156,6 @@ pub struct ExtendedInventorySlotView {
     pub item_id: String,
     #[serde(default)]
     pub weight_kg: f32,
-    /// **M6B**: per-slot bulk volume in liters (from
     /// `cf_equipment::ItemSpec.bulk_volume_l`). Zero for empty slots.
     #[serde(default)]
     pub bulk_volume_l: f32,
@@ -203,7 +163,6 @@ pub struct ExtendedInventorySlotView {
     pub locked_tooltip: Option<String>,
 }
 
-/// **M6B**: per-placement projection of the actor's inventory grid for
 /// `observe.actor`. Surfaces the canonical mass + bulk per item so the
 /// HUD + M27 Tetris UX + M14A mass aggregator all see one source of
 /// truth without each having to recompute from the spec registry.
@@ -225,7 +184,6 @@ pub struct InventoryGridPlacementView {
     pub quick_slot_eligible: bool,
 }
 
-/// **M6B**: full inventory-grid projection surfaced via
 /// `observe.actor.inventory_grid`. Mirrors
 /// `cf_actor::InventoryGrid` with derived totals so cfctl consumers see
 /// the canonical M6B surface without consulting the engine binary.
@@ -239,7 +197,6 @@ pub struct InventoryGridView {
     pub total_bulk_l: f32,
 }
 
-/// **M6**: high-level reload-state projection for [`WeaponStateView`].
 ///
 /// `Idle` covers both "ready to fire" and "between shots / pump-action
 /// chamber" — anything that is not actively in a multi-tick reload animation.
@@ -264,7 +221,6 @@ impl ReloadState {
     }
 }
 
-/// **M6**: per-actor weapon-state observation projection (the spec § "Crates
 /// / modules touched / cf-actor" bullet "ActorObservation extensions
 /// (cover_state, stamina, lean_angle, weapon_state)" weapon_state field).
 ///
@@ -310,7 +266,6 @@ pub struct WeaponStateView {
 }
 
 impl ActorObservation {
-    /// **M6**: build an [`ActorObservation`] with the per-actor rifle state
     /// threaded through so [`WeaponStateView::mag_remaining`] and
     /// [`WeaponStateView::reload_state`] reflect the live tick values from
     /// the engine's [`crate::sim::RifleStates`] map. Pass `None` from
@@ -388,7 +343,6 @@ impl From<&ActorState> for ActorObservation {
 }
 
 impl ActorState {
-    /// **M6**: build the extended-inventory projection (8 active slots + 3
     /// tank slots, with the tank slots reporting `state="locked"`).
     ///
     /// Slots 0..=7 mirror the actor's `Inventory.items` (8-slot vec on
@@ -414,7 +368,6 @@ impl ActorState {
         let mut out = Vec::with_capacity(slot_kinds.len() + tank_kinds.len());
         for (i, name) in slot_kinds.iter().enumerate() {
             let item = self.inventory.items.get(i).cloned().unwrap_or(InventoryItem::Empty);
-            // **M6B**: per-slot mass + bulk derive from the canonical
             // `cf_equipment::ItemSpec` registry. Unknown ids fall back
             // to the M6 hardcoded weight (3.5) for legacy compat.
             let (state, item_id, weight, bulk) = match &item {
@@ -448,7 +401,6 @@ impl ActorState {
         out
     }
 
-    /// **M6B**: build the per-actor inventory-grid projection used by
     /// `observe.actor.inventory_grid`. Walks every top-level placement
     /// in the grid and emits a [`InventoryGridPlacementView`] with the
     /// canonical mass + bulk + category + nested-count derived from
@@ -515,7 +467,6 @@ impl ActorState {
         })
     }
 
-    /// **M6**: project a [`WeaponStateView`] for the actor's currently
     /// selected weapon. All six fields are now live:
     ///
     /// - `mag_remaining` reads from
@@ -560,7 +511,6 @@ impl ActorState {
     }
 }
 
-/// **M5**: chassis projection for `cfctl observe` / `cfctl inspect chassis`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChassisView {
     pub spec_id: String,

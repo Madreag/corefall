@@ -82,29 +82,23 @@ enum Cmd {
         /// "Viewer capture in bundle" evidence, which is now this PNG.
         #[arg(long)]
         png: Option<PathBuf>,
-        /// **M10 § View subcommand**: filter to events whose envelope
         /// `actor_id`/`source_id` or payload `actor_id`/`shooter`/`target`
         /// matches the requested integer.
         #[arg(long)]
         actor: Option<u64>,
-        /// **M10 § View subcommand**: filter to events whose `event_type`
         /// exactly matches the requested string.
         #[arg(long)]
         event_type: Option<String>,
-        /// **M10 § View subcommand — watch mode**: tail the bundle's
         /// `events.jsonl` and emit new events as plain-language sentences
         /// as they're appended (Ctrl-C to exit). Bypasses the markdown
         /// renderer.
         #[arg(long)]
         watch: bool,
-        /// **M10**: polling interval (ms) for `--watch` mode. Default 100ms.
         #[arg(long, default_value_t = 100u64)]
         watch_interval_ms: u64,
-        /// **M10**: cap the watch loop at N poll iterations (tests / CI).
         /// Default: unbounded.
         #[arg(long)]
         watch_max_iterations: Option<u64>,
-        /// **M11**: filter the event tail to ACC-A audit trail events only
         /// (`accessibility.*` + `ux.*` categories). Composes with `--filter`
         /// by adding the categories to the union; takes effect even when
         /// `--filter` is empty.
@@ -154,13 +148,11 @@ enum Cmd {
     /// detailed FAIL message, and exit 0 / 1.
     Validate {
         bundle_dir: PathBuf,
-        /// **M10**: write a structured `validation.json` to this path
         /// instead of a single-line PASS/FAIL stdout. JSON shape:
         /// `{ run_id, status: "pass"|"fail", error: <kind+message>|null, warnings: [...] }`.
         #[arg(long)]
         output: Option<PathBuf>,
     },
-    /// **M10 § Summary subcommand**: emit a one-line sweep verdict for
     /// the bundle (`scenario @ run_id: result=..., ticks=..., ...`).
     Summary {
         bundle_dir: PathBuf,
@@ -171,7 +163,6 @@ enum Cmd {
         #[arg(long)]
         output: Option<PathBuf>,
     },
-    /// **M10 § Per-bot thinking timeline panel**: render the M7 5-layer
     /// AI thinking-stack timeline for `--actor <id>` from the bundle's
     /// `ai.reason_label_changed` + `ai.thinking_layer_invoked` events.
     ThinkingTimeline {
@@ -194,7 +185,6 @@ enum Cmd {
         #[arg(long)]
         output: Option<PathBuf>,
     },
-    /// **M10B § Export pipeline**: render the run bundle into an MP4
     /// via the `cf-replay-export` pipeline.
     ///
     /// `--list-presets` (m10b-1) introspects the preset registry; the
@@ -207,7 +197,6 @@ enum Cmd {
         /// shape `export <bundle> --preset <name> --out <path>`.
         #[arg(value_name = "BUNDLE_DIR")]
         bundle_dir: Option<PathBuf>,
-        /// **M10B § VAL-M10B-033**: enumerate exactly the 5 spec-declared
         /// presets with the 6 required fields each. Output is JSON for
         /// easy consumption by `jq -e '. | length == 5'`.
         #[arg(long, default_value_t = false)]
@@ -227,19 +216,15 @@ enum Cmd {
         /// workspace root (resolved by walking up from CWD).
         #[arg(long)]
         presets_dir: Option<PathBuf>,
-        /// **M10B § VAL-M10B-NO-AUDIO-BASE**: mute the base SFX +
         /// music mix; commentary remains audible.
         #[arg(long, default_value_t = false)]
         no_audio_base: bool,
-        /// **M10B § VAL-M10B-SLOW-MO**: integer multiplier `2x` /
         /// `4x` extends output duration deterministically. Non-integer
         /// values (`3.5x`, `1.5`) are rejected with a typed error.
         #[arg(long)]
         slow_mo: Option<String>,
     },
-    /// **M10B § Replay editor**: open the egui editor for `<bundle>`.
     ///
-    /// VAL-M10B-035: when an interactive TTY is present the editor's
     /// timeline + scrub + trim + multi-camera angle selector opens.
     /// In headless mode (`--headless`, or stdin not a TTY) prints a
     /// structured JSON envelope to stdout and exits with the
@@ -323,7 +308,6 @@ fn main() -> Result<()> {
                 return Ok(());
             }
             let bundle = load_bundle(&bundle_dir)?;
-            // **M4B § "Tamper-evident competitive replays"** — when the
             // bundle has a ledger_chain_anchor (tournament mode), refuse
             // to render its events if the chain is broken. Dev-mode
             // bundles (no anchor) pass through unchanged.
@@ -339,7 +323,6 @@ fn main() -> Result<()> {
                 );
                 bail!("ledger chain verification failed; refusing to render tampered bundle");
             }
-            // **M11**: --accessibility composes with --filter by adding the
             // ACC-A audit trail categories (accessibility, ux) to the union.
             let effective_filter = if accessibility {
                 if filter.trim().is_empty() {
@@ -435,12 +418,10 @@ fn main() -> Result<()> {
         }
         Cmd::Validate { bundle_dir, output } => match Bundle::load(&bundle_dir) {
             Ok(bundle) => {
-                // **M4B § "Viewer validate refuses to render tampered
                 // bundle"** — run the BLAKE3 ledger chain check before
                 // declaring PASS. When the chain anchor is set + the chain
                 // doesn't verify, downgrade to FAIL.
                 let chain_outcome = verify_bundle_chain(&bundle);
-                // **M4B § "ledger_chain_verified event fires in the viewer's
                 // audit log"** — record the outcome regardless of pass/fail
                 // so the audit trail is preserved.
                 if let Some(out) = &chain_outcome {
@@ -592,7 +573,6 @@ fn main() -> Result<()> {
     }
 }
 
-/// **M10B § VAL-M10B-013 / VAL-M10B-032 / VAL-M10B-033 / VAL-M10B-NO-AUDIO-BASE / VAL-M10B-SLOW-MO**:
 /// dispatches the `export` subcommand through [`cf_tools_replay_viewer::export_cmd::run_export`].
 fn run_export_dispatch(
     bundle_dir: Option<PathBuf>,
@@ -659,7 +639,6 @@ fn run_export_dispatch(
     }
 }
 
-/// **M10B § VAL-M10B-035**: dispatches the `edit` subcommand through
 /// [`cf_tools_replay_viewer::edit_cmd::run_edit`].
 fn run_edit_dispatch(
     bundle_dir: PathBuf,
@@ -711,7 +690,6 @@ fn load_bundle(path: &Path) -> Result<Bundle> {
     Bundle::load(path).with_context(|| format!("load run bundle {}", path.display()))
 }
 
-/// **M4B § "ledger_chain_verified event fires in the viewer's audit log"** —
 /// append one structured entry per validation run. The schema matches
 /// `cf-replay/schemas/event/ledger_chain_verified.json`. The audit log
 /// lives at `<bundle>/ledger_chain_audit.jsonl` (shared with `cf-mod
@@ -760,7 +738,6 @@ fn write_chain_audit_event(
     Ok(())
 }
 
-/// **M4B**: BLAKE3 ledger chain verifier shared between
 /// `cf-tools-replay-viewer validate` and the view header. Returns `None`
 /// when the bundle has no `ledger_chain_anchor` (dev mode); otherwise
 /// returns the structured outcome from `cf_save::ledger_chain::verify_chain`.

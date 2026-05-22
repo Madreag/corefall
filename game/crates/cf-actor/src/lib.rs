@@ -211,7 +211,6 @@ pub use vec2::Vec2;
 
 pub(crate) use actor_state::quantize_f32;
 
-/// **M14A** § "Atmospheric overlay" — re-export of [`cf_atmos::AtmosphereSample`]
 /// so callers don't need to depend on cf-atmos directly.
 pub use cf_atmos::AtmosphereSample;
 
@@ -243,7 +242,6 @@ mod tests {
 
     #[test]
     fn mission_critical_caps_at_dying() {
-        // M1 audit pass 6 (2026-05-13): spec literal "caps at DYING (does
         // not reach DEAD)". HP can reach 0; the actor enters DYING; the
         // DYING dwell never elapses to DEAD while mission_critical=true
         // (the dwell-elapsed branch in cf-actor::sim::step_one_actor
@@ -359,7 +357,6 @@ mod tests {
         // 8 (id u64) + 4*7 (position.x/y, velocity.x/y, aim.x/y, hp as i32) + 1 (status u8)
         // + 1 (on_ground u8) + 4 (selected slot u32) + 4 (stability i32)
         // + 4 (knockdown_ticks_remaining u32) = 50 bytes.
-        // **M4 § Checksum scope sim_state_v1** appends 9 more bytes:
         // 4 (sharp_aim_progress i32) + 4 (mass_kg i32) + 1 (origin_id u8) = 9.
         // Total = 59 bytes.
         assert_eq!(bytes.len(), 59);

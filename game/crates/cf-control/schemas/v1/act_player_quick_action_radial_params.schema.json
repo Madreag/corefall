@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerQuickActionRadialParams",
-  "description": "**M14A**: `act.player.quick_action_radial` — open/close the radial picker.",
   "type": "object",
   "properties": {
     "active": {

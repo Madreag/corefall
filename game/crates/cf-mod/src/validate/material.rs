@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use crate::report::ValidationReport;
 
-/// **M2**: validate a material registry JSON file (`content/materials/*.json`)
 /// against the v1 schema. Aggregates `RegistryValidationError`s from the
 /// cf-material loader and reports each as a FAIL entry with the structured
 /// `kind` so cfctl + CI can pattern-match on `unknown_field`, `duplicate_id`,

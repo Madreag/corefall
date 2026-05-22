@@ -41,13 +41,11 @@ pub mod armor_scratch_overlay;
 pub mod limb_render;
 pub mod quick_action_render;
 
-// **M14D** — Projectile-pair intercept renderer (spark cluster +
 // dual-trail termination). Bevy-free helper consumed by the live +
 // offline renderers via `IntercepRenderQueue::enqueue`. Honors the
 // `cosmetic: true` flag under backpressure per VAL-M14D-018.
 pub mod projectile_intercept;
 
-// **M14E** — Tunnel-collapse renderer (L1/L2/L3 ceiling crack decals +
 // falling-debris cone). Bevy-free helper consumed by the live + offline
 // renderers via `TunnelCollapseQueue::enqueue_cave_in`.
 pub mod tunnel_collapse;
@@ -84,7 +82,6 @@ pub mod reticle;
 #[cfg(feature = "bevy_render")]
 pub mod terrain;
 
-// **M9** § Reactor visual feedback — sprite swap on pressure_state,
 // bullet-impact sparks on hit, explosion VFX on destruction.
 #[cfg(feature = "bevy_render")]
 pub mod reactor_explosion;
@@ -93,14 +90,12 @@ pub mod reactor_sparks;
 #[cfg(feature = "bevy_render")]
 pub mod reactor_sprite;
 
-// **M12** § Juice rules + dynamic color grading. Per spec § Juice rules
 // (per DR-055 + DR-046) + Dynamic color grading per scene-mood.
 #[cfg(feature = "bevy_render")]
 pub mod color_grading;
 #[cfg(feature = "bevy_render")]
 pub mod juice;
 
-// **M12C** § Cinematic camera takeover — separate optional resource the
 // renderer reads first when a cinematic plays. Bevy-feature-gated; the
 // Bevy-free snapshot intermediate ships with both feature sets.
 #[cfg(feature = "bevy_render")]
@@ -241,7 +236,6 @@ mod live_render {
         }
     }
 
-    /// **M2**: composite plugin wiring the chunked-terrain renderer, the 5-mode
     /// material overlay, the loose-pixel debris system, and the tool-validity
     /// ghost preview. cf-app adds this alongside [`CfRenderPlugin`] +
     /// [`ActorSpritePlugin`].
@@ -258,7 +252,6 @@ mod live_render {
         }
     }
 
-    /// **M9** § Reactor visual feedback — wires the reactor sprite +
     /// bullet-impact spark emitter + destruction explosion VFX resources.
     /// cf-app spawns sparks on `combat.projectile_hit` (target_kind="reactor")
     /// and the explosion burst on `mission.reactor_destroyed`; this plugin's
@@ -330,7 +323,6 @@ mod live_render {
     // M1 Gap E1-E3: camera shake / hit-stop / follow-with-deadzone resources
     // ---------------------------------------------------------------------------
 
-    /// **M1 Gap E1**: camera shake state. cf-app writes `pending_magnitude` (in
     /// pixels) when an `ux.camera_punch_requested` event fires; the
     /// `apply_camera_effects` system decays the magnitude by ~exp(-dt/0.2s) and
     /// applies a per-frame random offset to the Camera2d. Setting
@@ -364,7 +356,6 @@ mod live_render {
         }
     }
 
-    /// **M1 Gap E2**: camera-follow-with-deadzone target + tuning. cf-app updates
     /// `target` each frame from the player actor position. The render system
     /// lerps the camera position toward the target whenever the target leaves
     /// the deadzone rectangle.
@@ -390,7 +381,6 @@ mod live_render {
         }
     }
 
-    /// **M1 Gap E3**: hit-stop state. cf-app writes `remaining_ms` when an
     /// `ux.hit_stop_requested` event fires. The `apply_camera_effects` system
     /// uses Bevy's `Time::set_relative_speed` to slow the world during the
     /// freeze window. M1 ships even a single-tick pause as proof of life.
@@ -476,24 +466,20 @@ mod live_render {
         pub breaches: Vec<BreachRender>,
         /// M1.5 extraction zone if the scenario carries a `ReachZone` objective.
         pub extraction_zone: Option<ExtractionRender>,
-        /// **M5**: current sim tick. Drives the walk-cycle phase for chassis-
         /// attached actors (legs alternate at ~8-tick cadence during Walking /
         /// Running stances). Without this, the silhouette stands still even
         /// while the position moves — which would re-introduce the
         /// "static sliding pawn" M5-DC-3 failure mode the chassis pips exist
         /// to close.
         pub tick: u64,
-        /// **M1 Gap E4**: tool-validity flag mirrored from
         /// `ObserveFrame::tool_validity::valid`. Drives the reticle color (red
         /// when false). `None` = no tool-validity tracking active (default).
         pub tool_valid: Option<bool>,
-        /// **M1 Gap J2**: most recent muzzle-flash payload (origin + decay).
         /// cf-app writes this when `equipment.weapon_fired` fires; cleared each
         /// frame after rendering.
         pub muzzle_flash: Option<MuzzleFlashRender>,
     }
 
-    /// **M1 Gap J2**: muzzle-flash projection.
     #[derive(Debug, Clone)]
     pub struct MuzzleFlashRender {
         pub origin: Vec2,
@@ -545,7 +531,6 @@ mod live_render {
         pub id: String,
     }
 
-    /// **M5**: per-chassis-zone overlay pip. cf-render-2d spawns 15 of these per
     /// chassis-attached actor, one per body zone (Head / Torso / ArmLeft / ArmRight
     /// / ForearmLeft / ForearmRight / HandLeft / HandRight / LegLeft / LegRight /
     /// ShinLeft / ShinRight / FootLeft / FootRight / Backpack). Each pip's color
@@ -560,7 +545,6 @@ mod live_render {
         pub zone: String,
     }
 
-    /// **M5** per-chassis-module overlay pip. Spawns 1 per `ChassisView.modules`
     /// entry per chassis-attached actor (jet, shield, sensor, weapon_mount,
     /// repair_drone). Color reflects module state (Nominal → green, Degraded
     /// → yellow, Warning → orange, Failed → red, NotPresent → not rendered).
@@ -574,7 +558,6 @@ mod live_render {
         pub module_id: String,
     }
 
-    /// **M5** held rifle sprite. Spawns 1 per actor whose `actor.selected_item`
     /// resolves to a rifle. Position follows the right-hand zone (or torso for
     /// chassis-less actors) + aim vector; rotation matches aim direction so the
     /// rifle visibly points where the player aims. Without this, the actor has
@@ -585,7 +568,6 @@ mod live_render {
         pub actor_id: u64,
     }
 
-    /// **M5** canonical body-zone layout in actor-local coordinates. Each entry is
     /// `(zone_name, dx, dy, width, height)` describing a small rect anchored at the
     /// actor's center. The layout assembles a 14-pip humanoid silhouette inside the
     /// actor's ~16×32 sprite bounds (PoweredArmor scale); LightMech scales 2.25× via
@@ -610,7 +592,6 @@ mod live_render {
         ("backpack", 0.0, 5.0, 6.0, 8.0),
     ];
 
-    /// **M5** scale multiplier per chassis kind. Powered Armor = 1.0 (baseline,
     /// scaled by `ACTOR_SILHOUETTE_BASE_SCALE` so the silhouette is visible at
     /// battlefield zoom); LightMech = 2.25× (matches the sim's `attach_chassis`
     /// half_extents: LightMech 18×36 vs PoweredArmor 10×20). Infantry default
@@ -623,7 +604,6 @@ mod live_render {
         }
     }
 
-    /// **M5** base actor silhouette scale multiplier applied to every chassis
     /// pip (and to chassis-less actors via `infantry_default_silhouette`). The
     /// CHASSIS_ZONE_LAYOUT geometry is authored at ~16×28 px bounds (PoweredArmor
     /// baseline); scaling by 2.0 produces a ~32×56 px on-screen silhouette that
@@ -633,7 +613,6 @@ mod live_render {
     /// state at-a-glance — defeating the M5-DC-3 / M5-DC-4 visual closure goal.
     pub const ACTOR_SILHOUETTE_BASE_SCALE: f32 = 2.0;
 
-    /// **M5** stance offset applied to the entire chassis silhouette. Moves the
     /// 15 pips together so the player can SEE crouch/climb/jet/eject states.
     fn stance_offset(stance: &str) -> (f32, f32, f32) {
         match stance {
@@ -647,7 +626,6 @@ mod live_render {
         }
     }
 
-    /// **M5** stage tint applied to every zone pip. Stage transitions become
     /// instantly visible: Nominal=untinted; Degraded=slight yellow; Disabled=orange;
     /// Wreck=red; Gibbed=very-dark-red.
     fn chassis_stage_tint(stage: &str) -> Color {
@@ -662,7 +640,6 @@ mod live_render {
         }
     }
 
-    /// **M5** per-zone anatomical tint. Pixel-sim battlefield per DR-019 wants the
     /// silhouette to read as a humanoid at-a-glance — head/helmet darker, chest
     /// armor plate brighter (Cortex's ChestPlateA overlay pattern), arms/legs at
     /// muted shade so they recede behind the torso, hands/feet at the brightest
@@ -695,7 +672,6 @@ mod live_render {
         }
     }
 
-    /// **M5** per-zone color: encodes the 3-layer armor state (External →
     /// Internal → Core → wound) through color. Corefall surfaces simulation
     /// depth Cortex/Soldat/Noita don't have: every zone has 3 stacked armor
     /// layers + a wound container, and the silhouette must show which deepest
@@ -748,7 +724,6 @@ mod live_render {
         )
     }
 
-    /// **M5** module pip color by module state. Module pips render as small
     /// overlay sprites on the chassis at their bound zone, so a player watching
     /// a wreck_eject scenario can SEE the jet module turn red when the backpack
     /// zone takes damage. This is a Corefall-only feature — Cortex actors don't
@@ -763,7 +738,6 @@ mod live_render {
         }
     }
 
-    /// **M5** module → bound-zone offset. Returns the (dx, dy) offset relative to
     /// the zone's center where the module pip should render. Multiple modules
     /// can be bound to the same zone (e.g., shield + sensor on torso); the
     /// caller cycles through positions.
@@ -779,7 +753,6 @@ mod live_render {
         }
     }
 
-    /// **M5** walk-cycle phase for leg/shin/foot pips. Driven by tick number +
     /// horizontal velocity sign so the legs visibly alternate during locomotion.
     /// Returns (left_leg_dy, right_leg_dy) — opposite phase between legs.
     fn walk_cycle_offsets(tick: u64, stance: &str, velocity_x: f32) -> (f32, f32) {
@@ -796,7 +769,6 @@ mod live_render {
         (cycle * amplitude, -cycle * amplitude)
     }
 
-    /// **M5** local proxy type so `zone_color` can take the chassis zone view
     /// without depending on cf-actor's exact struct. Matches the field set we
     /// read from `ActorObservation.chassis.zones[]`.
     pub(crate) struct ActorChassisZoneView {
@@ -843,7 +815,6 @@ mod live_render {
         }
     }
 
-    /// **M1 Gap E4**: tint the reticle red when `ActorRenderState::tool_valid ==
     /// Some(false)`, otherwise restore the canonical white tint. Friendly-fire
     /// color hook lands at M1.5 when teams ship.
     fn update_reticle_color(state: Res<ActorRenderState>, mut q: Query<&mut Sprite, With<ReticleRenderTag>>) {
@@ -858,7 +829,6 @@ mod live_render {
         }
     }
 
-    /// **M1 Gap J2**: render the muzzle-flash sprite for a couple of ticks after
     /// every `equipment.weapon_fired`. cf-app populates
     /// `ActorRenderState::muzzle_flash`; this system spawns a transient sprite
     /// at the muzzle origin and decays it.
@@ -888,7 +858,6 @@ mod live_render {
     #[derive(Component, Debug)]
     pub struct MuzzleFlashTag;
 
-    /// **M1 Gap J1**: per-stance silhouette tint for chassis-less actors. The
     /// pixel-art sprite frames under `content/sprites/actor_m1/` are reserved
     /// for the asset loader at BP4+; M1 ships the visible-silhouette stance
     /// swap so the player no longer renders as a transparent ghost rectangle.
@@ -994,12 +963,10 @@ mod live_render {
         for actor in &state.actors {
             keep.insert(actor.id, ());
             let pos = Vec2::new(actor.position[0], actor.position[1]);
-            // **M5**: every actor renders via the 15 per-zone pips (see
             // `sync_chassis_zone_sprites`). Chassis-attached actors use real
             // per-zone hp; chassis-less actors use a synthetic intact body
             // derived from HP.
             //
-            // **M1 Gap J1**: chassis-less actors (M1's player) get a Stance-
             // tinted silhouette so the actor renders as a visible body, not a
             // ghost rectangle behind the chassis pips. The tint varies by
             // stance (Idle / Walking / Running / Airborne / KnockedDown /
@@ -1076,7 +1043,6 @@ mod live_render {
         state.set_changed();
     }
 
-    /// **M5**: spawn / update / despawn the 15 chassis-zone pips per chassis-attached
     /// actor. Each pip is a small colored rect anchored at the zone's anatomical
     /// offset (Head at top, Hand-Right on the right side, Foot-Left at the bottom-
     /// left, etc.) inside the actor's silhouette. The pip color reflects the zone's
@@ -1110,7 +1076,6 @@ mod live_render {
         let mut keep: HashSet<(u64, String)> = HashSet::new();
 
         for actor in &state.actors {
-            // **M5**: every actor renders as a humanoid silhouette via the
             // CHASSIS_ZONE_LAYOUT — chassis-attached actors use real per-zone
             // hp from `chassis.zones[]`; chassis-less actors (M1 baseline,
             // micro_breach, m2/m2.5/m4a scenarios) use a synthetic intact
@@ -1246,7 +1211,6 @@ mod live_render {
         }
     }
 
-    /// **M5**: spawn / update / despawn module overlay pips (jet / shield /
     /// sensor / weapon_mount / repair_drone) per chassis-attached actor. The pip
     /// color reflects the module state and position follows the bound zone. This
     /// surfaces simulation depth Cortex doesn't have — the silhouette visibly
@@ -1333,7 +1297,6 @@ mod live_render {
         }
     }
 
-    /// **M5**: spawn / update / despawn the held rifle sprite per actor whose
     /// inventory carries a rifle. The rifle pip is a 12×3 rectangle anchored at
     /// the right-hand zone (or torso for chassis-less actors), rotated to point
     /// along the actor's aim vector. Without this, the actor has NO visible

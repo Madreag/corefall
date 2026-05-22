@@ -314,7 +314,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-022: 12 objective transitions + 3 armor_destroyed + 7
     /// deaths + 4 breaches = 26 chapter markers.
     #[test]
     fn chapter_markers_26_fixture_produces_26_markers() {
@@ -357,7 +356,6 @@ mod tests {
         assert_eq!(counts.values().sum::<usize>(), 26);
     }
 
-    /// VAL-M10B-023: chapter timecodes are frame-accurate to the
     /// event's tick within ≤ 1 frame at 60 fps.
     #[test]
     fn chapter_timecodes_are_frame_accurate_to_within_one_frame() {

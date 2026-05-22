@@ -7,7 +7,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M8A § server**: per-client bandwidth target (heavy combat p99).
 pub const PER_CLIENT_BANDWIDTH_P99_KBPS: u32 = 50;
 
 /// Server runtime configuration. M8A's cvars are additive to the cfctl
@@ -35,7 +34,6 @@ impl Default for ServerConfig {
     }
 }
 
-/// **M8A § server**: minimal authoritative-server scaffold. The actual
 /// QUIC transport + drive-tick integration lands at M9+.
 #[derive(Debug)]
 pub struct Server {
@@ -51,7 +49,6 @@ impl Server {
         }
     }
 
-    /// **M8A § server**: returns the canonical server-side run bundle
     /// path. Per spec § Acceptance — 8-client LAN session writes a
     /// single server-side run bundle to
     /// `prototype_runs/server/<run-id>/`.

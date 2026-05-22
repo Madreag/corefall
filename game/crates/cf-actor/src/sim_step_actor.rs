@@ -119,13 +119,11 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
             // any change to ActorTuning (e.g. M5 chassis grammar) propagates uniformly
             // instead of leaving stale hardcoded values in jump-impulse space.
             //
-            // **M5**: when a chassis is attached, the BodyGraph's destroyed-zone
             // movement-contribution multipliers scale max_speed + jump impulse,
             // and the `disables_rifle_when_destroyed` flag gates fire/reload.
             // The `forces_crawl_when_destroyed` and `disables_jet_when_destroyed`
             // flags route through stance derivation + jet command rejection.
             //
-            // **M1 Gap F3**: when `deps.tuning` is `Some(...)`, use those
             // engine-supplied values (settings-driven cvars) instead of the
             // defaults. None preserves byte-identical behaviour on bundles
             // recorded before the cvar surface existed.
@@ -153,7 +151,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
                 outcome.gear_dropped_by_limb_loss = true;
             }
             let effective_jump_impulse = tuning.jump_impulse * jump_factor;
-            // **M6B § Encumbrance**: scale walk speed by the inventory
             // grid's load curve (1.0 empty, 0.5 at 100% carry). Pure
             // multiplicative with chassis movement factor + crawl floor
             // so the spec's PARITY-34 (mass_factor) and M6B encumbrance
@@ -222,7 +219,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
 
     let mut outcome = pass.outcome;
 
-    // **M1.5 G8 fix**: tick down DYING dwell regardless of accepted_input.
     // Previously the dwell decrement lived inside the post-`accepted_input`
     // block which short-circuits for non-accepting-input actors (Dying /
     // Downed / Dead / Inactive). That meant a Dying actor's dwell never
@@ -291,11 +287,9 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
     // chassis grammar still permits weapon handling (right arm chain intact); otherwise
     // the rifle still ticks (so cooldowns advance) but ignores the pressed edges.
     //
-    // **M5**: a destroyed `HandRight` / `ForearmRight` / `ArmRight` zone with
     // `disables_rifle_when_destroyed=true` in the BodyGraph movement contribution
     // gates the fire path so a player with a blown-off rifle arm cannot keep shooting.
     //
-    // **M6**: `ActorState::weapon_fire_mode` selects between Single / Burst3 /
     // Charge / Arc / Auto. The cf-control engine pre-processes Charge holds
     // (accumulating `weapon_charge_fraction` up to
     // [`cf_equipment::SNIPER_CHARGE_MAX_SECONDS`]) and post-processes the
@@ -337,7 +331,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
 
     if rifle_outcomes.fired_this_tick {
         outcome.fired = true;
-        // **M6**: read bipod + suppressor state from the actor BEFORE the
         // recoil scaling so we can attribute the multiplied impulse and
         // loudness to the correct attachment. The bipod bloom multiplier
         // is applied later (after the per-stance multiplier) in the bloom
@@ -363,7 +356,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
             .map(|r| (r.spec.clone(), r.projectile_max_flight_ticks()))
             .expect("fired rifle must have a state");
 
-        // **M6**: surface the deterministic Magazine::pop_next_round + shell
         // ejection so the engine can emit equipment.magazine_changed +
         // equipment.shell_ejected. The M1 RifleState.ammo_in_mag decrement
         // remains the source of truth for the tracer cadence (preserved in
@@ -373,7 +365,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
         let (popped_round, shell_ejection) = {
             let _mag_capacity = spec.mag_capacity.max(1);
             let mag_remaining = state.rifles.get(&actor_id).map_or(0, |r| r.ammo_in_mag);
-            // **M14C** § round-kind resolution priority:
             //   1. `intent.ammo_kind` — per-shot override from cfctl
             //      `act.player.fire { ammo_kind: ... }` (e.g. HEAT / APFSDS
             //      for tank-grade rounds).
@@ -449,7 +440,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
             // `RifleSpec::inherits_firer_velocity` (CCCP `HDFirearm.cpp:752`).
             // True => half actor velocity is added so running-and-gunning shots
             // arc. False (mortar-style) => pure muzzle velocity.
-            // M1 audit pass 6 (2026-05-13): spec literal — when
             // `inherits_firer_velocity=true`, the projectile's initial
             // velocity is the muzzle vector PLUS the FULL actor velocity
             // (per CCCP HDFirearm.cpp:752). Pre-fix used `0.5` (half),
@@ -463,7 +453,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
         };
         outcome.muzzle_origin = Some(muzzle);
         // Loudness radius (CCCP HDFirearm.cpp:948): scaled by spec.loudness too.
-        // **M6**: when a suppressor is attached + intact, loudness × 0.4 per
         // [`cf_equipment::SUPPRESSOR_LOUDNESS_FACTOR`].
         let loudness_radius = 480.0_f32 * (damage / 10.0).clamp(1.0, 3.0) * spec.loudness.max(0.1) * suppressor_factor;
         outcome.loudness_radius = loudness_radius;
@@ -474,7 +463,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
         // applies to ALL particles of this shot (CCCP `Round.RTTRatio` is
         // per-shot, not per-particle).
         let particle_count = spec.particle_count.max(1);
-        // **M14J § "Mounted rider fires one-handed weapon at gallop" —
         // adds 0.1 rad mount_motion penalty when riding a moving critter.
         let mount_spread_bonus = {
             let actor_for_mount = state.world.actors.get(&actor_id);
@@ -499,7 +487,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
         // Angle of the base aim (radians).
         let base_angle = aim.y.atan2(aim.x);
         let base_speed = (base_velocity.x * base_velocity.x + base_velocity.y * base_velocity.y).sqrt();
-        // M1 audit pass 6 (2026-05-13): full inheritance per spec literal
         // (CCCP HDFirearm.cpp:752). Same fix as the single-particle path
         // above; kept duplicated because the multi-particle path computes
         // base_velocity independently.
@@ -693,7 +680,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
         // (1 - 0.6 * sharp_aim_progress) so a full sharp aim cuts the reticle
         // down to 40% of its baseline.
         //
-        // **M1 re-audit (2026-05-13)**: jumping (upward velocity off the
         // ground) gets the 7× multiplier — the spec literally distinguishes
         // "jumping = 7×" from "airborne = 3×". Implementation distinguishes
         // via `velocity.y > 0`: actor is rising = jumping; otherwise =
@@ -755,7 +741,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
         // STABLE actors do NOT take travel-impulse damage — they only become
         // UNSTABLE first via the stability scalar.
         //
-        // M1 audit pass 6 (2026-05-13): the previous outcome.new_status was
         // captured BEFORE this block so the engine missed the transition
         // and never emitted `actor.actor_status_changed cause="travel_impulse"`.
         // Re-sync new_status AND latch `travel_impulse_damage=true` so the
@@ -782,7 +767,6 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
             }
         }
 
-        // **M1.5 G8 note**: DYING dwell countdown now lives in the
         // unconditional pre-return block at the top of step_one_actor's
         // post-pass phase so dying actors (which don't accept input) still
         // tick their dwell. The dwell update therefore lands BEFORE this

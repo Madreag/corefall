@@ -28,9 +28,7 @@ pub struct ProjectileSpawnParams {
 }
 
 impl ProjectileSpawnParams {
-    /// **M1**: extract spawn params from a rifle spec.
     ///
-    /// M1 audit pass 6 (2026-05-13): full velocity inheritance per spec
     /// literal `muzzle_velocity_vector + actor_velocity` (CCCP
     /// `HDFirearm.cpp:752`).
     pub fn from_rifle(spec: &RifleSpec) -> Self {
@@ -44,7 +42,6 @@ impl ProjectileSpawnParams {
         }
     }
 
-    /// **M1**: loudness radius for the alarm event. Formula matches the
     /// engine's `cf-actor::sim` site:
     /// `480 * (damage / 10).clamp(1, 3) * loudness_scalar`.
     pub fn loudness_radius(&self) -> f32 {

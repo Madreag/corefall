@@ -57,11 +57,9 @@ fn source_label(source: IntentSource) -> &'static str {
     }
 }
 
-/// **M14H** chest zone identifier used for defib burn + CPR bruise emission.
 const CHEST_ZONE: &str = "torso_front";
 
 impl M0Engine {
-    /// **M14H** § `act.player.treat` dispatch.
     pub(crate) fn dispatch_m14h_treat(
         &self,
         kind_str: String,
@@ -151,7 +149,6 @@ impl M0Engine {
                 tick,
                 sim_time_ms,
             );
-            // **M14I**: closure treatments promote affected wounds to
             // ScarRecord entries on the actor's m14i_long_term timeline.
             if matches!(
                 kind,
@@ -178,7 +175,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M14H** § `act.player.scan` dispatch — start a 30s Medical Scanner
     /// read against `target_actor_id`. Emits `scan.started` + `scan.completed`
     /// with a real wound + affliction + buff snapshot.
     pub(crate) fn dispatch_m14h_scan(
@@ -240,7 +236,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M14H** § `act.player.cpr_round` dispatch. Reads + mutates the
     /// actor's persistent [`ActorCardiacComponent`] so consecutive_cpr_rounds
     /// is honored across multiple invocations (Gherkin scenario 2 "2
     /// cardiac.cpr_round events fire (40s elapsed) + 50% + 20% (2 CPR
@@ -313,7 +308,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M14H** § `act.player.defib` dispatch. Reads the actor's persistent
     /// [`ActorCardiacComponent`] for the consecutive_cpr_rounds boost,
     /// honors the 8s recharge interval, consumes one charge, and emits a
     /// Burn1st wound at the chest zone per shock.
@@ -458,7 +452,6 @@ impl M0Engine {
         )
     }
 
-    /// **M14H** § `act.player.surgery_start` dispatch.
     ///
     /// Per Gherkin scenario 3: "the full 5-phase sequence completes, then
     /// 3× treatment.applied fires (one per shrapnel removed)". This
@@ -536,7 +529,6 @@ impl M0Engine {
                 break;
             }
         }
-        // **M14I**: when surgery succeeds, close every still-open wound
         // on the patient as a ScarRecord (surgery is the heaviest closure
         // method + carries the SurgeryKit FunctionalDebuff matrix).
         let _ = self.m14i_record_scars_for_closure(
@@ -550,7 +542,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M14H** § `act.player.triage_select` dispatch — emits a
     /// `triage.queue_changed` event reflecting the new selected actor.
     /// Pulls per-actor wound state to populate `actor_ids_sorted` with the
     /// current squad's compound-TTD-sorted row list.
@@ -946,7 +937,6 @@ impl M0Engine {
     // dosing.
     // -----------------------------------------------------------------
 
-    /// **M14H** per-tick aging pass — called from the M0 engine's tick loop
     /// alongside the M14G wound aging pass.
     ///
     /// Mutates:
@@ -1297,7 +1287,6 @@ impl M0Engine {
 }
 
 impl M0Engine {
-    /// **M14H test helper**: query whether an actor currently carries a
     /// given buff (by canonical snake_case id).
     pub fn m14h_actor_has_buff(&self, actor_id: u64, buff_id: &str) -> bool {
         let Ok(s) = self.state.read() else { return false };
@@ -1306,7 +1295,6 @@ impl M0Engine {
         actor.m14h_buffs.iter().any(|b| b.kind.as_str() == buff_id)
     }
 
-    /// **M14H test helper**: query the actor's antibiotic course tier +
     /// doses_required + dose_interval_hours. Returns `None` when no
     /// course is active.
     pub fn m14h_actor_antibiotic_state(&self, actor_id: u64) -> Option<(u8, u32, f32)> {
@@ -1319,7 +1307,6 @@ impl M0Engine {
             .map(|c| (c.tier, c.doses_required, c.dose_interval_hours))
     }
 
-    /// **M14H test helper**: query an actor's cardiac component (defib
     /// shocks delivered, consecutive CPR rounds, chest_bruised flag).
     pub fn m14h_actor_cardiac(&self, actor_id: u64) -> Option<ActorCardiacComponent> {
         let s = self.state.read().ok()?;
@@ -1328,7 +1315,6 @@ impl M0Engine {
         Some(actor.m14h_cardiac.clone())
     }
 
-    /// **M14H test helper**: query an actor's active tourniquet apply
     /// ticks (zone → apply_tick).
     pub fn m14h_actor_tourniquets(
         &self,

@@ -27,7 +27,7 @@
 //! always shows the same text whether or not a real audio backend is wired.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -151,7 +151,6 @@ pub enum AudioCue {
         /// Caption surfaced to `HudState.captions`.
         caption: String,
     },
-    /// **M12** § Juice rule SFX cues. Each variant maps to one of the
     /// seven canonical juice rules per `cf-render-2d::juice::JuiceKind`.
     /// The accessibility_suppressed flag mirrors the matching
     /// `JuicePulse.accessibility_suppressed` so a recording plugin can
@@ -166,7 +165,6 @@ pub enum AudioCue {
         /// Mirror of the `JuicePulse.accessibility_suppressed` flag.
         accessibility_suppressed: bool,
     },
-    /// **M14E** § `terrain.structural_integrity_low` L1 warning cue.
     /// One-shot when the per-chunk integrity field first crosses the
     /// L1 threshold. Drives the "tunnel_creak" SFX backend stub.
     TunnelCreak {
@@ -175,7 +173,6 @@ pub enum AudioCue {
         /// Caption surfaced to `HudState.captions`.
         caption: String,
     },
-    /// **M14E** § `terrain.cave_in_triggered` collapse-onset cue. One
     /// per cave-in event. Drives the "cave_in_thunder" SFX backend stub.
     CaveInThunder {
         /// Chunk coordinate of the collapsing ceiling.

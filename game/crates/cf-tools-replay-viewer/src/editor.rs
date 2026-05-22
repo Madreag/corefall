@@ -300,7 +300,6 @@ mod tests {
         EditorState::new(0, 1800, 60, const_scene_for_tick(scene)).expect("editor")
     }
 
-    /// VAL-M10B-028: `EditorState::scrub_to(tick)` renders the exact
     /// frame within 16 ms, with a BLAKE3 hash that matches the
     /// offline-render reference. The test renders the reference, then
     /// scrubs and compares.
@@ -333,7 +332,6 @@ mod tests {
         assert_eq!(a.blake3_hex, b.blake3_hex);
     }
 
-    /// VAL-M10B-029: Set In / Set Out / Export Selection produces
     /// frame-accurate trim. The first + last frame BLAKE3 hashes
     /// match the corresponding offline-render references.
     #[test]

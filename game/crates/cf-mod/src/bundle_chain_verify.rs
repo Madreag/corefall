@@ -58,7 +58,6 @@ pub fn run(bundle_dir: &Path, json_output: bool) -> Result<()> {
         .with_context(|| format!("read {}", events_path.display()))?;
     let chained = read_chained_events(&events_text)?;
     let outcome = cf_save::ledger_chain::verify_chain(&run_id, seed, &chained);
-    // **M4B § "ledger_chain_verified event fires in the viewer's audit
     // log with anchor + total_events"** — append the structured audit
     // entry to `<bundle>/ledger_chain_audit.jsonl` regardless of result
     // (so the audit trail persists even when verification fails).
@@ -134,7 +133,6 @@ pub fn run(bundle_dir: &Path, json_output: bool) -> Result<()> {
     Ok(())
 }
 
-/// **M4B § "ledger_chain_verified event"** — append one structured audit
 /// entry to `<bundle>/ledger_chain_audit.jsonl`. The schema matches
 /// `cf-replay/schemas/event/ledger_chain_verified.json`. We use a sidecar
 /// file (not events.jsonl) because the bundle is otherwise read-only after
@@ -200,7 +198,6 @@ fn read_chained_events(text: &str) -> Result<Vec<cf_save::ledger_chain::ChainedE
             .to_string();
         let payload = env.get("payload").cloned().unwrap_or(Value::Null);
         let payload_canonical_json = serde_json::to_string(&payload)?;
-        // **M4B**: read both envelope-level chain fields. When a bundle was
         // recorded without chain mode, both are absent (`None`), and the
         // verifier will report tampered or empty_chain as appropriate.
         let prev_event_hash = env

@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActChassisSalvageParams",
-  "description": "**M5**: `act.chassis.salvage` — salvage modules from a wrecked chassis.",
   "type": "object",
   "properties": {
     "reason": {

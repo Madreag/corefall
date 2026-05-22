@@ -130,7 +130,6 @@ pub trait TtdContract {
     }
 }
 
-/// **M11 interim impl**: hardcoded TTD floors used until M17 ships the full
 /// per-difficulty table from `game/content/balance/ttd_floors_interim.ron`.
 /// The values mirror the floors in the .ron file (kept in sync by hand;
 /// M17's loader will read the .ron at scenario-load time and replace

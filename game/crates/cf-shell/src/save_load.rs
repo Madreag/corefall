@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 pub const NAMED_SLOT_COUNT: usize = 10;
 pub const AUTO_SAVE_SLOT_COUNT: usize = 3;
 
-/// **M4B § "save_load module reads + displays schema version next to each
 /// slot"** — UI verdict for a single save slot's schema status.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SlotSchemaVerdict {
@@ -62,7 +61,6 @@ impl SlotSchemaVerdict {
         }
     }
 
-    /// **M4B § "offers 'Migrate now' CTA for old slots"**.
     pub fn migrate_cta_label(&self) -> Option<&'static str> {
         match self {
             SlotSchemaVerdict::OutOfDate { .. } => Some("Migrate now"),
@@ -70,7 +68,6 @@ impl SlotSchemaVerdict {
         }
     }
 
-    /// **M4B § "rejects slots from future versions with a clear message"**.
     pub fn refusal_label(&self) -> Option<String> {
         match self {
             SlotSchemaVerdict::UnsupportedFuture {

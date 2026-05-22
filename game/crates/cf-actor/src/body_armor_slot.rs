@@ -144,14 +144,12 @@ impl BodyArmorSlot {
         body_sealed && helmet_sealed
     }
 
-    /// **M14J** § "helmet seal" — true when the helmet slot carries a
     /// sealed helmet (per M19C/M6C PPE seal flag). Used by the M14J swim
     /// integration to suppress drowning while submerged.
     pub fn helmet_seal_active(&self) -> bool {
         ppe_preset(&self.helmet.item_id).map_or(false, |p| p.sealed)
     }
 
-    /// **M14J** § "M19C dive-suit shell" — true when the body slot carries
     /// a dive-suit / hardsuit / EVA suit (per M19C/M6C PPE). Used by the
     /// M14J swim integration to suppress drowning.
     pub fn dive_suit_equipped(&self) -> bool {

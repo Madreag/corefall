@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use crate::report::ValidationReport;
 
-/// **M9B-2 / VAL-M9B-MOD-SEGMENT-001**: validate one
 /// `content/trench_segments/*.ron` file. The cf-trench
 /// `SegmentSpec::from_ron_str` rejects unknown enums + missing required
 /// fields (e.g. negative `depth`/`width`, since both are `u32`) with a
@@ -57,7 +56,6 @@ pub(crate) fn validate_trench_segment(path: &Path, report: &mut ValidationReport
     }
 }
 
-/// **M9B-2 / VAL-M9B-MODULES-001 (mod surface)**: validate one
 /// `content/trench_modules/*.ron` file via the cf-trench
 /// `ModuleSpec::from_ron_str` loader. Same typed-error contract as
 /// [`validate_trench_segment`].
@@ -111,7 +109,6 @@ fn extract_bad_fortification_id(msg: &str) -> Option<String> {
     None
 }
 
-/// **M9B-2 / VAL-M9B-TEMPLATE-003**: validate one
 /// `content/trench_templates/*.trench.ron` file through the cf-content
 /// loader. Unknown segment variants + unknown fortification ids fail
 /// with typed errors; optional fortification placeholders that resolve

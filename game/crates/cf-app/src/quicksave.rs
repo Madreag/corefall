@@ -46,9 +46,7 @@ pub enum QuicksaveOutcomeUi {
         migrated_from: Option<String>,
         migrated_to: Option<String>,
     },
-    /// **M4B § "Save corruption is detectable"** — corruption modal text.
     ChecksumMismatch { expected: String, actual: String },
-    /// **M4B § "Save from a future version is rejected clearly"**.
     UnsupportedFutureVersion {
         found: String,
         max_supported: String,
@@ -83,7 +81,6 @@ impl QuicksaveOutcomeUi {
         }
     }
 
-    /// **M4B § "cf-app renders the plain-language modal"** — the exact
     /// string the corruption / future-version modal displays.
     pub fn modal_plain_language(&self) -> Option<String> {
         match self {
@@ -101,7 +98,6 @@ impl QuicksaveOutcomeUi {
         }
     }
 
-    /// **M4B § "Replay migrated banner"** — the one-line banner the viewer
     /// header renders when a load triggered a migration step.
     pub fn migration_banner(&self) -> Option<String> {
         match self {
@@ -179,7 +175,6 @@ mod tests {
             next_action(&state, false, false, 60 * 60, 60),
             QuicksaveAction::Autosave
         ));
-        // **M4B Notes**: 60-second timer honors tick_rate_hz.
         assert!(matches!(
             next_action(&state, false, false, 120 * 60, 120),
             QuicksaveAction::Autosave

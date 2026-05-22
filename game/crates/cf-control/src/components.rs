@@ -22,7 +22,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M8A**: marker types only at M8A. The actual sub-state lives in
 /// `cf_control::EngineMutable` until M9+ engine-host refactor migrates
 /// each subsystem one at a time.
 ///

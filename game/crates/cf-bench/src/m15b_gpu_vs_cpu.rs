@@ -35,19 +35,15 @@ use cf_terrain::heat::HeatField;
 
 use crate::{BenchArgs, PerfReport, SubsystemPerf};
 
-/// **M15B** § spec literal: "10000 active material-CA pixels".
 pub const ACTIVE_PIXELS: u32 = 10_000;
 
-/// **M15B** § spec literal: GPU p99 budget.
 pub const GPU_P99_BUDGET_US: u64 = 1_500;
 
-/// **M15B** § spec literal: CPU baseline budget (lower bound of the
 /// 12-18 ms range cited by the spec). We assert the CPU p99 stays
 /// below 18 ms (upper bound) to gate against the 30+ ms regression
 /// case.
 pub const CPU_P99_BUDGET_US: u64 = 18_000;
 
-/// **M15B** § spec literal: headroom budget the CPU + GPU paths must
 /// not consume more than. Tracks the M15 HARD GATE 4 ms tick budget
 /// from cf-bench::m15_ca_burst.
 pub const HEADROOM_BUDGET_US: u64 = 4_000;

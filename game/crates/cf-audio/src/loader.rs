@@ -35,7 +35,6 @@ pub struct SfxEntry {
     pub size_bytes: u64,
 }
 
-/// **M12A** § cf-audio playback pool. Owned at cf-app startup; the Bevy
 /// `AudioPlayer` adapter consults this for the canonical name → path
 /// mapping.
 #[derive(Debug, Default, Clone)]
@@ -121,7 +120,6 @@ impl SfxPool {
         self.entries.values()
     }
 
-    /// **M12A** § Hot-reload audio in dev mode.
     ///
     /// Walks every entry, stats the on-disk path, and updates the cached
     /// mtime. Returns the list of canonical names whose mtime changed —

@@ -49,7 +49,6 @@ impl M0Engine {
             ("snapshot", "snapshot.snapshot_actor"),
             ("determinism", "determinism.sim_checksum"),
             ("system", "system.run_started"),
-            // **M14 audit pass 2 (GAP-M4-01 CRITICAL fix)**: `body` was
             // duplicated here with two different `first_event_type`s
             // (`actor.actor_status_changed` from M1 + `body.gib_created`
             // from M14). The M4 § Event taxonomy invariant requires
@@ -62,17 +61,14 @@ impl M0Engine {
             ("accessibility", "accessibility.settings_changed"),
             ("performance", "performance.tick_cost_sample"),
             ("physics", "physics.authority_changed"),
-            // **M9** § Internal organ + circuit damage + concussion bands +
             // reactor armor cascade — all now fire from production code,
             // so the categories are promoted from `registered` to `active`.
             ("internal", "internal.organ_damaged"),
             ("concussion", "concussion.dose_changed"),
             ("armor", "armor.layer_hp_changed"),
             ("thermal", "thermal.signature_changed"),
-            // **M14** § Full collision + impulse routing — attachable.*
             // ladder up from `registered` to `active`.
             ("attachable", "attachable.detached"),
-            // **M14 audit pass 2 (GAP-M4-03 MEDIUM fix)**: `hazard` +
             // `affliction` were `registered` but engine.rs emits
             // `hazard.spawned` + `affliction.tick` from production. Promote
             // both to active.
@@ -84,7 +80,6 @@ impl M0Engine {
         // spec § Out of scope rule (M4 locks schemas; producers ladder up).
         let registered_categories: &[(&str, &str)] = &[
             ("mind", "M23"),
-            // **M14 audit pass 2 (GAP-M4-04 MEDIUM fix)**: M4 baseline
             // explicitly lists `collision` as registered with
             // `ladder_at: "M14"`. Restored here per spec § Event taxonomy.
             ("collision", "M14"),
@@ -262,7 +257,6 @@ impl M0Engine {
                     }),
                     parent_event_id.map(|s| s.to_string()),
                 );
-                // **M6 § Tank slot reservation**: emit one
                 // `inventory.tank_slot_reserved` event per reserved tank
                 // slot at actor spawn so the M17 unlock can rely on the
                 // spec-required event surface being present from M6 onward.
@@ -282,7 +276,6 @@ impl M0Engine {
                 }
             }
         }
-        // **M6**: emit one `squad.member_added` per actor in the squad
         // roster declared by the scenario manifest. The Squad struct is
         // already populated in `M0Engine::new` from
         // `config.initial_squad_members`.
@@ -303,7 +296,6 @@ impl M0Engine {
         }
         if let Some(reactors) = reactor_world {
             for r in reactors.iter() {
-                // **M9** (audit fix gap 5): scene-start reactor snapshot
                 // includes the M9 surface fields per spec § Crates /
                 // modules touched / cf-actor: "actor.snapshot includes
                 // reactor's hp + per-layer hp + pressure_state +
@@ -437,7 +429,6 @@ impl M0Engine {
                 parent_event_id.map(|s| s.to_string()),
             );
         }
-        // **M4 § snapshot_chassis (M13 forward-compat placeholder)**: emit
         // a placeholder snapshot event so M10's replay viewer and any
         // chassis-aware tooling can pre-bind to the surface. M13 fills the
         // payload with per-zone HP, module states, pilot lifecycle. At M4
@@ -455,7 +446,6 @@ impl M0Engine {
             }),
             parent_event_id.map(|s| s.to_string()),
         );
-        // **M4 § M9 firehose surface — what M4 MUST handle without
         // renaming**: emit the 10 placeholder snapshots so M9 producers
         // ladder up additively. Schemas are locked at M4 in
         // `cf-replay/schemas/event/snapshot_<kind>.json`. Payloads carry
@@ -488,14 +478,12 @@ impl M0Engine {
                 parent_event_id.map(|s| s.to_string()),
             );
         }
-        // **M7-B**: scenario-start emission of personality + faction +
         // initial mood/stress baselines. The 4 events below give every
         // M7-B-spec-mandated event family a deterministic production
         // emission site at run start. Subsequent runtime mutations
         // (mood/stress decay, faction adjustments) wire in at M13+ when
         // the campaign retention loop ships.
         self.emit_m7b_personality_faction_baselines(tick, sim_time_ms, parent_event_id);
-        // **M7 director v0.5 (audit gaps A12 + A16)**: scenario-start
         // emission of the initial mission phase + boss state baselines
         // when the scenario opts into v0.5. Each event ships a
         // `cause = "scenario_start"` discriminator so replay viewers can

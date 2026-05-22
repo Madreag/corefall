@@ -49,7 +49,6 @@ pub mod action_prompt;
 pub mod branching_banner;
 pub mod compass;
 pub mod cover_indicator;
-/// **M9C** § cf-ui::fortification_hud — per-fortification HP bar +
 /// ammo state + spotlight preview + minefield-warning banner.
 pub mod fortification_hud;
 pub mod cover_pip;
@@ -67,12 +66,10 @@ pub mod stamina_bar;
 pub mod stealth_meter;
 pub mod weapon_swap_overlay;
 
-// **M9** § HUD readability + observability — reactor zone widgets.
 pub mod reactor_hp_bar;
 pub mod reactor_pressure_line;
 pub mod timer_warnings;
 
-// **M11** § HUD readability + ACC-A floor — dedicated widget modules per
 // spec § Files. lib.rs hosted earlier versions of these surfaces; the M11
 // modules below carry the dedicated state structs + helpers cf-app's
 // bridge can mirror per frame.
@@ -89,20 +86,16 @@ pub mod surgery_panel;
 pub mod triage_panel;
 pub mod triage_window;
 
-// **M12** § cinematic story beats + juice + comic-style overlay (optional).
-// Per spec § Crates / modules touched: cf-ui::animation (NEW), cf-ui::slideshow
 // (NEW), cf-ui::comic_overlay (NEW optional rendering layer).
 pub mod animation;
 pub mod comic_overlay;
 pub mod slideshow;
 
-// **M12C** § In-engine cinematic UI surfaces — distinct from M12's painted
 // slideshow. Per spec § Crates / modules touched.
 pub mod briefing_card;
 pub mod caption_ribbon;
 pub mod codex_cinematics_tab;
 
-// **M7B**: Tab tactical overlay + Q-hold context wheel — both enumerate
 // from the cf-ai squad-command grammar verb registry + formation catalog
 // so the wheel + overlay stay in lockstep with the canonical registry
 // (spec § "Tab tactical overlay reads verb registry + formation registry;
@@ -110,7 +103,6 @@ pub mod codex_cinematics_tab;
 pub mod context_wheel;
 pub mod tactical_overlay;
 
-// **M14A** § "Crates / modules touched — cf-ui (MODIFY)" — new widgets:
 // quick_action_bar, quick_action_radial, mass_indicator, jetpack_fuel_meter,
 // walk_strip.
 pub mod jetpack_fuel_meter;
@@ -119,10 +111,8 @@ pub mod quick_action_bar;
 pub mod quick_action_radial;
 pub mod walk_strip;
 
-// **M14G** § per-zone wound silhouette badges.
 pub mod wound_strip;
 
-// **M14I** § per-veteran narrative tab (consumed by M48C pilot dossier).
 pub mod veteran_dossier;
 
 pub use mission_resolved_modal::{
@@ -219,7 +209,6 @@ pub struct HudState {
     pub tool_validity: Option<HudToolValidity>,
     /// W1.3: stability scalar (0.0=disrupted, 1.0=stable) from actor state.
     pub stability: f32,
-    /// **M1 / Gap D3**: when `Some(label)` the CONTROLS CAPTURED HUD zone
     /// renders with `CONTROLS CAPTURED: <label>`; hidden when `None`.
     pub controls_captured_by: Option<String>,
 }
@@ -242,18 +231,15 @@ pub struct HudSettings {
     /// M4A: id of the currently-focused HUD node (drives the visible focus
     /// ring). `None` when focus is cleared (default + after F1).
     pub focused_node: Option<String>,
-    /// **M1.5**: when true, the AI debug overlay renders a floating
     /// intent label above every reactive guard. When false the overlay
     /// is hidden (default). cf-app forwards the `--ai-debug` CLI flag
     /// into this field; `act.settings.set { ai_debug: ... }` mutates it
     /// at runtime.
     pub ai_debug: bool,
-    /// **M12**: comic-style overlay mode mirror — `"full" | "subtle" | "off"`.
     /// cf-app writes this from `cf_control::settings::ComicStyleOverlay::as_str()`.
     /// cf-ui's `ComicOverlayState` reads it to gate speech bubbles +
     /// onomatopoeia stamps + comic death-recap renderer.
     pub comic_style_overlay: String,
-    /// **M12**: comic death-recap toggle mirror. Drives the
     /// `ComicSurface::DeathRecap` allow-check.
     pub comic_death_recap: bool,
 }
@@ -357,7 +343,6 @@ pub struct HudMission {
     pub ticks_remaining: Option<u64>,
     pub active_objective: Option<String>,
     pub last_event_label: String,
-    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor for the
     /// mission-resolved modal. cf-ui surfaces a CTA button when
     /// `show_replay_cta` is true; the click handler hands the
     /// `show_me_why_event_id` to M3B's replay viewer (M3B owns the
@@ -374,11 +359,9 @@ pub struct HudEnemy {
     pub hp: f32,
     pub hp_max: f32,
     pub status: String,
-    /// **M1.5**: floating intent label rendered above the guard's sprite
     /// when `HudSettings.ai_debug == true`. Empty string when no label is
     /// available.
     pub intent_label: String,
-    /// **M1.5**: world position of the guard (in scene coords) so the
     /// floating label can be projected onto the HUD overlay. `None` when
     /// the engine did not provide a position.
     pub world_position: Option<[f32; 2]>,
@@ -437,7 +420,6 @@ pub struct BreachStripText;
 #[derive(Component, Debug)]
 pub struct LastEventStripText;
 
-/// **M1 / Gap D3**: text component for the CONTROLS CAPTURED HUD zone.
 /// Hidden when no overlay has captured controls; shown with the capturer
 /// label when `controls_capture.captured=true`.
 #[derive(Component, Debug)]
@@ -476,7 +458,6 @@ impl Plugin for StatusStripPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HudState>()
             .init_resource::<HudSettings>()
-            // **M9** § HUD readability + observability — reactor zone resources.
             // cf-app's `sync_reactor_state_to_widgets` writes these per frame
             // from the engine's `ActorRenderSnapshot::reactor / timer`.
             .init_resource::<ReactorHpBarState>()
@@ -498,7 +479,6 @@ impl Plugin for StatusStripPlugin {
     }
 }
 
-/// **M1 / Gap D3**: keep the CONTROLS CAPTURED HUD line in sync with
 /// `HudState::controls_captured_by`. When `None`, the text is empty (hides
 /// the line visually because the BorderColor stays transparent and the row
 /// renders zero-content). When `Some(name)`, the text reads
@@ -791,7 +771,6 @@ fn spawn_caption_strip(mut commands: Commands) {
 }
 
 /// M4A: high-contrast palette swap. Honors `HudSettings.high_contrast` per
-/// DR-012 closure (200% scale + contrast). The accessibility floor requires
 /// every state label to remain readable in high contrast, so this swaps the
 /// strip background to fully opaque pure-black + text to pure white.
 fn palette_text(high_contrast: bool) -> Color {
@@ -1197,7 +1176,6 @@ fn update_status_strip(
     }
     if let Some((mut text, mut text_color)) = mission_query.iter_mut().next() {
         **text = mission_line(state.mission.as_ref(), state.tick_rate_hz);
-        // M2 audit pass 5 (2026-05-13): spec literal — TIMER turns yellow
         // at <30s, red at <10s. Default to the high-contrast-aware base
         // palette when no mission OR mission is not active.
         *text_color = TextColor(mission_timer_color(
@@ -1279,7 +1257,6 @@ pub fn stance_line(stance: &str, player: Option<&ActorObservation>) -> String {
 /// with a readable label so the player knows WHY they feel sluggish, inaccurate,
 /// or vulnerable. This is the A-FEEL-06 "damage cause explanation" surface.
 ///
-/// **M1 re-audit (2026-05-13)**: when the actor is in a knockdown stun
 /// (`knockdown_ticks_remaining > 0`), the descriptor reads "KNOCKED_DOWN"
 /// instead of cycling through the stability percentage labels. This closes
 /// the M1 spec drift item where the HUD STANCE stability descriptor was
@@ -1384,7 +1361,6 @@ pub fn tool_line(validity: Option<&HudToolValidity>) -> String {
     }
 }
 
-/// **M2 audit pass 5 (2026-05-13)**: return the TIMER text color per spec
 /// "TIMER turns yellow at <30s, red at <10s". Green for >30s remaining;
 /// yellow for 10..=30s; red for <10s. Inactive mission OR no time limit
 /// returns the default base-palette color so the strip stays readable.
@@ -1416,7 +1392,6 @@ pub fn mission_line(mission: Option<&HudMission>, tick_rate_hz: u32) -> String {
     };
     let rate = tick_rate_hz.max(1) as f32;
     let elapsed_s = m.elapsed_ticks as f32 / rate;
-    // M2 audit pass 7 (2026-05-13): TIMER countdown in MM:SS form per spec
     // literal "TIMER shows MM:SS countdown". Active missions: show
     // remaining time as countdown; Won/Lost: show elapsed.
     let in_progress = matches!(m.result.as_str(), "in_progress" | "active");
@@ -1466,7 +1441,6 @@ pub fn enemy_line(enemy: Option<&HudEnemy>) -> String {
     )
 }
 
-/// **M1.5**: format the floating AI debug intent label rendered above the
 /// guard sprite when `Settings.ai_debug == true`. Returns `None` when the
 /// overlay is disabled OR no enemy is available so cf-app can despawn the
 /// text node. Acceptance criterion 'AI debug labels'.
@@ -1481,7 +1455,6 @@ pub fn ai_debug_label(enemy: Option<&HudEnemy>, settings: &HudSettings) -> Optio
     Some(e.intent_label.clone())
 }
 
-/// **M1.5**: spec says the mission-resolved modal renders a "Show me why"
 /// CTA button when the mission was lost. Returns the divergence event_id
 /// the CTA should hand to M3B's replay viewer when clicked, or `None` if
 /// the CTA should be hidden. Acceptance criterion 'Win/loss outcome modal
@@ -1584,7 +1557,6 @@ mod tests {
 
     #[test]
     fn mission_line_formats_active_with_timer() {
-        // M2 audit pass 7 (2026-05-13): active missions now show
         // remaining time as MM:SS countdown per spec literal.
         let m = HudMission {
             result: "active".to_string(),

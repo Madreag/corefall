@@ -51,7 +51,6 @@ pub const CHRONIC_DEPRESSION_REFUSE_ORDER_CHANCE: f32 = 0.10;
 /// In `dose_units`; matches M17 cumulative-dose granularity (1.0 = 1 Sv).
 pub const RADIATION_CANCER_THRESHOLD: f32 = 6.0;
 
-/// **M14I** § per-zone severed-limb record. Captures whether an actor's
 /// limb was severed via attachable.detached so the post-survival pass
 /// can promote it to `phantom_limb` once.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -67,7 +66,6 @@ pub struct SeveredLimbRecord {
     pub panic_rolls_fired: u32,
 }
 
-/// **M14I** § per-zone long-term state — derived from
 /// [`LongTermState::severed_limbs`] + [`LongTermState::prosthetics`].
 /// Consumers (cf-actor sim, cf-ui silhouette, AI doctrine) read this
 /// instead of poking the raw maps.
@@ -106,7 +104,6 @@ impl SeveredLimbRecord {
     }
 }
 
-/// **M14I** § per-actor long-term-consequence aggregate.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LongTermState {
@@ -162,7 +159,6 @@ impl LongTermState {
             && !self.retired
     }
 
-    /// **M14I** § resolve the long-term state of a single zone.
     /// Consumers (sim, UI, AI) should treat the per-zone return as the
     /// canonical answer to "is this limb intact / severed / fitted with a
     /// prosthetic?".
@@ -176,7 +172,6 @@ impl LongTermState {
         }
     }
 
-    /// **M14I** § list every (zone, state) pair the actor currently
     /// reports. Skips Intact entries so the caller only sees mutations.
     pub fn zone_states(&self) -> Vec<(ZoneId, ZoneLongTermState)> {
         let mut out: BTreeMap<ZoneId, ZoneLongTermState> = BTreeMap::new();
@@ -189,7 +184,6 @@ impl LongTermState {
         out.into_iter().collect()
     }
 
-    /// **M14I** § scenario 9 — chronic_depression "Refuse non-essential
     /// order" roll. Returns true ~10% of the time once the actor has the
     /// `chronic_depression` trait; always false otherwise.
     ///
@@ -206,7 +200,6 @@ impl LongTermState {
         roll < crate::long_term::CHRONIC_DEPRESSION_REFUSE_ORDER_CHANCE
     }
 
-    /// **M14I** § true when this actor currently carries any
     /// `chronic_<condition>` trait.
     pub fn has_chronic_condition(&self) -> bool {
         self.traits.has_chronic()
@@ -265,7 +258,6 @@ impl LongTermState {
     }
 }
 
-/// **M14I** § pre-resolved aggregate of every functional debuff on an
 /// actor. Refreshed on scar acquisition + prosthetic install/maintain.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]

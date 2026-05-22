@@ -33,11 +33,9 @@ pub struct ViewerState {
     /// human / agent readers can confirm the state. The actual stepping is
     /// driven by re-invoking the CLI with a higher `at_tick`.
     pub paused: bool,
-    /// **M10 § View subcommand**: filter to events whose envelope
     /// `actor_id`/`source_id`/payload-`actor_id` matches the requested
     /// integer. `None` means no actor filter.
     pub actor_id_filter: Option<u64>,
-    /// **M10 § View subcommand**: filter to events whose `event_type`
     /// matches the requested string. `None` means no type filter.
     pub event_type_filter: Option<String>,
 }
@@ -110,7 +108,6 @@ pub fn render_markdown(bundle: &Bundle, state: &ViewerState) -> String {
             .map(|t| t.to_string())
             .unwrap_or_else(|| "n/a".into()),
     );
-    // **M4B § "Cross-version replay viewer surfaces migration banner"** —
     // when the recorded save_schema_version differs from the current
     // build's, the viewer header renders a single-line migration banner.
     let recorded = bundle.manifest.save_schema_version;
@@ -123,7 +120,6 @@ pub fn render_markdown(bundle: &Bundle, state: &ViewerState) -> String {
             cf_save::CURRENT_SAVE_SCHEMA_VERSION.as_string()
         );
     }
-    // **M4B § "viewer header — delta depth: N + last baseline at tick: T"**.
     let delta_summary = crate::delta_reconstructor::summarize(bundle);
     if delta_summary.baseline_count > 0 {
         let last_baseline = delta_summary
@@ -292,7 +288,6 @@ pub(crate) fn event_matches_actor(event: &cf_replay::Event, actor_id: u64) -> bo
     false
 }
 
-/// **M10 § View subcommand — Watch mode**: tail an active `events.jsonl`
 /// + print new events as plain-language sentences as they appear.
 ///
 /// `max_iterations` caps the poll loop so tests + finite runs terminate
@@ -310,7 +305,6 @@ pub fn watch_tail<W: std::io::Write>(
     use std::time::Duration;
     let mut printed: u64 = 0;
     let mut file = File::open(events_path)?;
-    // **M14 audit fix** (pre-existing M8 bug): when invoked in bounded test
     // mode (`max_iterations.is_some()`), start at offset 0 so existing
     // events in the file are printed too. When in unbounded "live tail"
     // mode (`None`), keep the original end-of-file seek so only new appends

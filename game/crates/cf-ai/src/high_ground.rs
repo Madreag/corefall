@@ -6,7 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7-A**: high-ground event payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HighGroundEvent {
     pub actor_id: u64,
@@ -14,7 +13,6 @@ pub struct HighGroundEvent {
     pub elevation_gain: f32,
 }
 
-/// **M7-A**: pure helper — pick the highest elevation among candidates that
 /// is reachable within `max_range`. Returns the candidate position + the
 /// elevation gain over `self_pos.y`.
 pub fn pick_high_ground(self_pos: [f32; 2], candidates: &[[f32; 2]], max_range: f32) -> Option<([f32; 2], f32)> {

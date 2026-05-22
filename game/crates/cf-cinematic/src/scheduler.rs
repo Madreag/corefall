@@ -205,7 +205,6 @@ impl CinematicEventKind {
     }
 }
 
-/// **M12C**: Bevy-free snapshot of the renderer-side camera takeover
 /// state. Cinematic kernel composes this each tick; cf-app's bridge
 /// mirrors it into `cf-render-2d::camera_takeover::CinematicCameraTakeover`.
 ///
@@ -421,7 +420,6 @@ impl CinematicKernel {
         &self.policy.seen
     }
 
-    /// Per spec § "the cinematic is suppressed entirely / the player is
     /// dropped directly into gameplay UI / `cinematic.skipped` is
     /// emitted for replay parity".
     ///
@@ -635,7 +633,6 @@ impl CinematicKernel {
         }
     }
 
-    /// Per spec § Notes: "The cinematic camera REPLACES the gameplay
     /// camera at the render layer". `true` when the renderer should
     /// pick up the cinematic camera transform.
     #[must_use]

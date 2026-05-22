@@ -18,7 +18,6 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-/// **M9B** § VAL-M9B-AUDIO-001 — four trench audio cues registered in
 /// the audio family. Spec § Crates / modules touched:
 ///
 /// > Trench cues: `duckboard_step`, `mud_squelch`, `entrenching_dig`,
@@ -34,7 +33,6 @@ pub const TRENCH_AUDIO_CUES: &[&str] = &[
     "drainage_drip",
 ];
 
-/// **M9C** § VAL-M9C-052 — six fortification audio cues registered in
 /// the audio family. Spec § Crates / modules touched:
 ///
 /// > New cues: `mg_nest_burst`, `mine_arming_beep`, `wire_snag_pain`,
@@ -198,7 +196,6 @@ impl AudioRegistry {
         (self.voice.len(), self.sfx.len(), self.music.len())
     }
 
-    /// **M9B** § VAL-M9B-AUDIO-001 — return the static cue-id list for
     /// the named family. Cue ids are owned by [`TRENCH_AUDIO_CUES`] and
     /// peer constants; the registry only owns the family → static
     /// list mapping so the ledger never has to know about gameplay
@@ -279,7 +276,6 @@ mod tests {
         assert!(reg.music_variant_for("music_unknown", 0.5).is_none());
     }
 
-    /// VAL-M9B-AUDIO-001: registry exposes the four trench cues under
     /// the `trench` family.
     #[test]
     fn registry_contains_trench_cues() {
@@ -306,7 +302,6 @@ mod tests {
         registry_contains_trench_cues();
     }
 
-    /// VAL-M9C-052: registry exposes the six fortification cues under
     /// the `fortification` family.
     #[test]
     fn registry_contains_m9c_cues() {

@@ -190,7 +190,6 @@ pub fn wall_rupture_roll(rng_draw: f32, unsupported_span_px: u32, vibration_modi
     }
 }
 
-/// **M14F § VAL-M14F-018**: pressure-differential blowout predicate.
 /// Returns `true` when the lateral pressure delta × wall area exceeds
 /// the wall's lateral yield × wall area threshold:
 ///
@@ -220,7 +219,6 @@ pub fn pressure_blowout_triggers(
     force > threshold
 }
 
-/// **M14F** § Cumulative-stress accumulator for a perimeter wall. Each
 /// impact adds `damage` to a counter; the wall ruptures when the
 /// accumulator crosses `lateral_yield_strength` (VAL-M14F-030).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -250,7 +248,6 @@ impl CumulativeStress {
     }
 }
 
-/// **M14F** § Snapshot payload for the four wall events. Mirrors
 /// `CaveInPayload`; the per-event JSON layer keeps just the bbox +
 /// chunk + debris field per VAL-M14F-027 + VAL-M14F-019.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -276,7 +273,6 @@ pub struct WallCollapsePayload {
 }
 
 impl WallCollapsePayload {
-    /// **M14F** § Construct a `wall_bulging` payload.
     #[must_use]
     pub fn bulging(
         chunk_id: (i32, i32),
@@ -297,7 +293,6 @@ impl WallCollapsePayload {
         }
     }
 
-    /// **M14F** § Construct a `wall_crack_advanced` payload.
     #[must_use]
     pub fn crack_advanced(
         chunk_id: (i32, i32),
@@ -318,7 +313,6 @@ impl WallCollapsePayload {
         }
     }
 
-    /// **M14F** § Construct a `wall_rupture` payload with the canonical
     /// `chunk_id + bbox + falling_debris_count` triple per VAL-M14F-027.
     #[must_use]
     pub fn rupture(
@@ -349,7 +343,6 @@ impl WallCollapsePayload {
     }
 }
 
-/// **M14F § VAL-M14F-026**: cascade neighbor detection for lateral
 /// walls. Mirrors `cave_in::cascade_neighbors_for_chunk` so the lateral
 /// cascade picks up the same chunk-coord ordering.
 #[must_use]
@@ -361,7 +354,6 @@ pub fn lateral_cascade_neighbors_for_chunk(cx: i32, cy: i32) -> [CascadeNeighbor
 mod tests {
     use super::*;
 
-    /// VAL-M14F-001: wall_bulging chance is 0 for narrow shafts.
     #[test]
     fn bulging_holds_at_or_below_16_px_floor() {
         for span in [0u32, 1, 8, 11, 16] {
@@ -372,7 +364,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14F-002: a 24-px-wide shaft has non-zero bulging chance.
     #[test]
     fn bulging_fires_above_floor() {
         let chance = wall_bulging_chance_per_tick(24, 1.0);
@@ -385,7 +376,6 @@ mod tests {
         );
     }
 
-    /// VAL-M14F-012: crack-advanced fires faster than bulging once
     /// unlocked.
     #[test]
     fn crack_advanced_chance_exceeds_bulging() {
@@ -394,7 +384,6 @@ mod tests {
         assert!(crack > bulging, "crack ({crack}) must exceed bulging ({bulging})");
     }
 
-    /// VAL-M14F-012: rupture fires faster than crack-advanced.
     #[test]
     fn rupture_chance_exceeds_crack_advanced() {
         let crack = wall_crack_advanced_chance_per_tick(24, 1.0);
@@ -402,7 +391,6 @@ mod tests {
         assert!(rupture > crack, "rupture ({rupture}) must exceed crack ({crack})");
     }
 
-    /// VAL-M14F-013: same input → same outcome on every call.
     #[test]
     fn roll_is_deterministic_for_fixed_inputs() {
         for draw in [0.0_f32, 0.0001, 0.001, 0.5, 0.999] {
@@ -416,7 +404,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14F-018: pressure-differential blowout requires
     /// `delta > lateral_yield`. Wall area cancels on both sides so the
     /// predicate reduces to a per-kPa-vs-yield comparison.
     #[test]
@@ -427,7 +414,6 @@ mod tests {
         assert!(pressure_blowout_triggers(50.0, 30, 256));
     }
 
-    /// VAL-M14F-018: pressure delta below threshold yields no rupture.
     #[test]
     fn pressure_blowout_below_threshold() {
         // 25 kPa delta vs concrete (50) → hold.
@@ -439,13 +425,11 @@ mod tests {
         assert!(!pressure_blowout_triggers(f32::NAN, 50, 256));
     }
 
-    /// VAL-M14F-018: zero wall area → no rupture (sentinel guard).
     #[test]
     fn pressure_blowout_zero_area_holds() {
         assert!(!pressure_blowout_triggers(1000.0, 1, 0));
     }
 
-    /// VAL-M14F-027: `terrain.wall_rupture` payload carries chunk_id,
     /// bbox, and falling_debris_count.
     #[test]
     fn rupture_payload_carries_required_fields() {
@@ -458,7 +442,6 @@ mod tests {
         assert!(p.cascade_primary);
     }
 
-    /// VAL-M14F-027: payload stages cover all three event tiers.
     #[test]
     fn payload_stage_helpers_cover_three_tiers() {
         let b = WallCollapsePayload::bulging((0, 0), [0, 0], [16, 16], 24, 1.0);
@@ -472,7 +455,6 @@ mod tests {
         assert!(r.falling_debris_count > 0);
     }
 
-    /// VAL-M14F-027: cascade flag distinguishes primary vs secondary
     /// events.
     #[test]
     fn rupture_payload_into_cascade_clears_primary() {
@@ -480,7 +462,6 @@ mod tests {
         assert!(!p.cascade_primary);
     }
 
-    /// VAL-M14F-026: cascade neighbors match the M14E canonical
     /// ordering (north, south, west, east).
     #[test]
     fn lateral_cascade_returns_four_side_neighbors_in_canonical_order() {
@@ -496,7 +477,6 @@ mod tests {
         );
     }
 
-    /// VAL-M14F-030: cumulative-stress accumulator monotonically
     /// decreases the integrity sample on successive hits.
     #[test]
     fn cumulative_stress_monotonically_drops_integrity() {
@@ -512,7 +492,6 @@ mod tests {
         assert_eq!(s.hits, 4);
     }
 
-    /// VAL-M14F-030: cumulative-stress accumulator saturates at 255
     /// integrity floor and never panics on overflow.
     #[test]
     fn cumulative_stress_saturates_at_floor() {
@@ -525,7 +504,6 @@ mod tests {
         assert_eq!(final_i, 0);
     }
 
-    /// VAL-M14F-027: debris count caps at 200.
     #[test]
     fn wall_rupture_debris_count_caps_at_200() {
         assert_eq!(wall_rupture_debris_count(24, 4), 96);
@@ -533,7 +511,6 @@ mod tests {
         assert_eq!(wall_rupture_debris_count(u32::MAX, 1), WALL_RUPTURE_DEBRIS_CAP);
     }
 
-    /// VAL-M14F-028: no `thread_rng` import in this module — pure
     /// helpers. Compile-time test that the public surface uses
     /// `f32` draw, not `rand::thread_rng`.
     #[test]
@@ -545,7 +522,6 @@ mod tests {
         ));
     }
 
-    /// VAL-M14F-023: material lateral-yield ordering is observable —
     /// the rupture chance under identical pressure differs because
     /// the per-pixel threshold differs. We assert the threshold-
     /// triggered-flag transitions in yield order.
@@ -559,7 +535,6 @@ mod tests {
         assert!(!pressure_blowout_triggers(pressure, 200, area), "steel holds");
     }
 
-    /// VAL-M14F-027: render_level on each stage maps to L1/L2/L3.
     #[test]
     fn stage_render_level_pairs_with_crack_decal_level() {
         assert_eq!(WallCollapseStage::Bulging.render_level(), "l1");
@@ -567,7 +542,6 @@ mod tests {
         assert_eq!(WallCollapseStage::Rupture.render_level(), "l3");
     }
 
-    /// VAL-M14F-027: stage as_str maps to canonical event names.
     #[test]
     fn stage_as_str_matches_event_names() {
         assert_eq!(WallCollapseStage::Bulging.as_str(), "wall_bulging");

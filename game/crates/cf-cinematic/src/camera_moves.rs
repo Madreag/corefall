@@ -288,12 +288,10 @@ pub fn compose_offset(mv: &ShotMove, t_in_shot_ms: u32, seed: u64) -> ComposedOf
     out
 }
 
-/// **M12C** § Camera shake amplitude curve — exponential decay from
 /// `amplitude_px_0` toward zero with time-constant `decay_s`. Matches
 /// `cf-render-2d::juice::camera_shake_amplitude` so the M12 critical-
 /// hit shake and the M12C cinematic shake share the same envelope.
 ///
-/// Per spec § "Shake — perlin-noise additive offset, parameterized by
 /// amplitude_px + frequency_hz + decay_s; reuses M12's
 /// `cf-render-2d::juice::camera_shake_amplitude` curve."
 #[must_use]

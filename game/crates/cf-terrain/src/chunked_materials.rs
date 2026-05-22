@@ -21,7 +21,6 @@ pub const MATERIAL_HAZARD: MaterialId = 4;
 pub const MATERIAL_LOOSE_FILL: MaterialId = 5;
 pub const MATERIAL_REPAIR_FILL: MaterialId = 6;
 pub const MATERIAL_ANCHOR: MaterialId = 7;
-/// **M14E** § Per-pixel structural integrity. Player-placed load-bearing
 /// reinforcement (T1 craftable, 2 iron + 1 wood per beam). Anchorable,
 /// non-piling, hardness=200 — locks the ±8-pixel integrity field around
 /// it to integrity 500 so cave-in roll is suppressed.
@@ -78,7 +77,6 @@ pub struct MaterialAffordance {
     /// penetrate, a roll < stickiness draws it into the terrain instead of
     /// bouncing (CCCP `Material.Stickiness`). M2 uses engine RNG.
     ///
-    /// **M14 audit pass 3 (GAP-M3-01)**: the canonical source for these
     /// values is `content/materials/material_registry.json` (each material
     /// entry carries `"stickiness": <f32>`). The const `MATERIAL_TABLE`
     /// below mirrors the JSON. When editing one, edit the other —
@@ -116,7 +114,7 @@ impl MaterialAffordance {
 /// `material_affordance(id)`. Add entries here when introducing new
 /// kernel-reactive materials; absence yields transparent render +
 /// air-like physics.
-const MATERIAL_TABLE: [MaterialAffordance; 21] = [
+const MATERIAL_TABLE: [MaterialAffordance; 27] = [
     MaterialAffordance {
         id: MATERIAL_AIR,
         name: "air",
@@ -220,7 +218,6 @@ const MATERIAL_TABLE: [MaterialAffordance; 21] = [
         spawn_material: None,
         path_cost: 999.0,
         overlay_rgba: [80, 100, 140, 0xFF],
-        // M3 audit pass 5 (2026-05-13): spec literal demands
         // `reason="material_not_diggable"` for all non-diggable carve refusals.
         // Concrete `material_<name>` strings are kept as the structured
         // `material` field on the event payload; this is the stable reason
@@ -256,7 +253,6 @@ const MATERIAL_TABLE: [MaterialAffordance; 21] = [
         spawn_material: Some(MATERIAL_LOOSE_FILL),
         path_cost: 10.0,
         overlay_rgba: [200, 60, 60, 0xFF],
-        // M3 audit pass 5 (2026-05-13): non-diggable carve refusals route
         // through the stable `material_not_diggable` reason; the specific
         // material is on the payload's `material` field.
         refusal_reason: Some("material_not_diggable"),
@@ -336,12 +332,10 @@ const MATERIAL_TABLE: [MaterialAffordance; 21] = [
         spawn_material: Some(MATERIAL_LOOSE_FILL),
         path_cost: 1.0,
         overlay_rgba: [60, 60, 200, 0xFF],
-        // M3 audit pass 5 (2026-05-13): non-diggable carve refusals route
         // through the stable `material_not_diggable` reason; the specific
         // material is on the payload's `material` field.
         refusal_reason: Some("material_not_diggable"),
     },
-    // **M14E** § Per-pixel structural integrity. Player-placed support
     // beam (T1 craftable). Hardness=200 + anchorable=true; non-piling so
     // it doesn't pile-fill its neighbors. Locks the ±8-pixel structural
     // integrity field around itself to 500 (load-bearing). Diggable so the
@@ -662,6 +656,150 @@ const MATERIAL_TABLE: [MaterialAffordance; 21] = [
         overlay_rgba: [180, 240, 100, 200],
         refusal_reason: None,
     },
+    MaterialAffordance {
+        id: 60,
+        name: "chlorine",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 3.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 3.21,
+        spawn_material: None,
+        path_cost: 3.0,
+        overlay_rgba: [180, 240, 130, 120],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 61,
+        name: "ammonia",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 2.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 0.73,
+        spawn_material: None,
+        path_cost: 3.0,
+        overlay_rgba: [220, 240, 170, 110],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 63,
+        name: "electric_arc",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 15.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 0.0,
+        spawn_material: None,
+        path_cost: 5.0,
+        overlay_rgba: [200, 230, 255, 220],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 64,
+        name: "lightning",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 30.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 0.0,
+        spawn_material: None,
+        path_cost: 8.0,
+        overlay_rgba: [255, 255, 255, 240],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 66,
+        name: "polluted_water",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 1.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.06,
+        restitution: 0.0,
+        friction: 0.12,
+        density: 1.05,
+        spawn_material: None,
+        path_cost: 3.0,
+        overlay_rgba: [70, 90, 40, 200],
+        refusal_reason: None,
+    },
+    MaterialAffordance {
+        id: 25,
+        name: "mercury",
+        solid: false,
+        diggable: false,
+        hardness: 0.0,
+        anchorable: false,
+        hazard: true,
+        damage_per_tick: 1.5,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.02,
+        restitution: 0.0,
+        friction: 0.05,
+        density: 13.5,
+        spawn_material: None,
+        path_cost: 4.0,
+        overlay_rgba: [180, 180, 185, 230],
+        refusal_reason: None,
+    },
 ];
 
 /// Look up a material affordance by id. `None` if the id is outside the launch
@@ -682,7 +820,6 @@ pub fn material_name_from_id(id: MaterialId) -> &'static str {
 /// match the DR-007 launch set verbatim. `concrete_soft` is a deprecated M1.5
 /// alias of `concrete` retained for backward compat with `micro_breach.ron`.
 ///
-/// **M15B** extension: scenarios can now stamp the precipitation chain
 /// materials directly (`water`, `steam`, `cloud`, `rain`, `acid_droplet`)
 /// so the m15b_water_cycle_demo + m15b_acid_rain_vulcan scenarios load
 /// without engine-side seeding.
@@ -698,21 +835,74 @@ pub fn material_id_from_name(name: &str) -> Option<MaterialId> {
         "repair_fill" => Some(MATERIAL_REPAIR_FILL),
         "anchor" => Some(MATERIAL_ANCHOR),
         "support_beam" => Some(MATERIAL_SUPPORT_BEAM),
-        // **M15B** § precipitation chain stampable ids.
         "water" => Some(13),
         "steam" => Some(50),
         "cloud" => Some(71),
         "rain" => Some(87),
         "acid_droplet" => Some(88),
-        // **M15** § active material set — names from
-        // `content/materials/material_registry.json`.
         "oil" => Some(19),
         "acid" => Some(21),
+        "alkali" => Some(22),
         "lava" => Some(26),
         "iron" => Some(68),
-        "co2" => Some(43),
+        "ore_iron" => Some(34),
+        "ore_gold" => Some(35),
+        "ore_copper" => Some(36),
+        "ore_uranium" => Some(37),
+        "gold" => Some(73),
+        "copper" => Some(74),
+        "obsidian" => Some(70),
+        "salt" => Some(42),
+        "sugar" => Some(43),
+        "gunpowder" => Some(48),
+        "fabric" => Some(49),
+        "ash" => Some(40),
+        "charcoal" => Some(41),
+        "oxygen" => Some(51),
+        "nitrogen" => Some(52),
+        "co2" => Some(53),
+        "methane" => Some(54),
+        "hydrogen" => Some(55),
+        "nitrous_oxide" => Some(56),
+        "helium" => Some(57),
+        "ozone" => Some(58),
+        "ethanol_vapor" => Some(59),
+        "chlorine" => Some(60),
+        "ammonia" => Some(61),
         "smoke" => Some(62),
+        "electric_arc" => Some(63),
+        "lightning" => Some(64),
         "fire_intense" => Some(65),
+        "polluted_water" => Some(66),
+        "neutralized_brine" => Some(67),
+        "frozen_blood" => Some(72),
+        "blood" => Some(23),
+        "alcohol" => Some(24),
+        "mercury" => Some(25),
+        "rust" => Some(38),
+        "mud" => Some(39),
+        "paper" => Some(47),
+        "wood" => Some(8),
+        "cloth" => Some(9),
+        "glass" => Some(10),
+        "cardboard" => Some(11),
+        "snow" => Some(12),
+        "sand" => Some(14),
+        "ice" => Some(15),
+        "rock" => Some(16),
+        "foam_insulation" => Some(17),
+        "vegetation" => Some(18),
+        "slime" => Some(27),
+        "basalt" => Some(28),
+        "brick" => Some(29),
+        "marble" => Some(30),
+        "sandstone" => Some(31),
+        "granite" => Some(32),
+        "coal" => Some(33),
+        "rubber" => Some(44),
+        "plastic" => Some(45),
+        "leather" => Some(46),
+        "pollutant_x" => Some(83),
         _ => None,
     }
 }

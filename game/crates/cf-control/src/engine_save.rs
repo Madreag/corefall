@@ -98,7 +98,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14G § VAL-CROSS-029**: restore engine state from a previously
     /// captured [`cf_save::WorldSave`]. Reverses [`Self::snapshot_world_save`]:
     /// rewires every per-actor field captured in the SaveBlob (HP, status,
     /// position, chassis incl. M14C ERA flags) AND the M14C/D/E/F/G runtime
@@ -152,7 +151,6 @@ impl M0Engine {
         true
     }
 
-    /// **M4B § F5 quicksave**: write the current world to `dir/quicksave.cfsave`
     /// and emit `system.save_completed`. On success, pushes the
     /// "Quicksaved" HUD banner; on failure, pushes the
     /// [`Self::push_save_failure_banner`] plain-language modal-style
@@ -177,7 +175,6 @@ impl M0Engine {
         result
     }
 
-    /// **M4B § F9 quickload**: read `dir/quicksave.cfsave`, migrate it to
     /// the current schema, emit `system.save_loaded` (and `save_migrated` if
     /// the load triggered a migration step). On corruption surfaces the
     /// plain-language modal `"Save file appears corrupted ..."` per spec
@@ -200,7 +197,6 @@ impl M0Engine {
         result
     }
 
-    /// **M4B § cfctl save autosave-now**: same as `quicksave` but tags the
     /// emitted event with `kind: "autosave"`.
     pub fn autosave(&self, dir: &std::path::Path) -> Result<cf_save::quicksave::QuicksaveOutcome, cf_save::SaveError> {
         let save = self.snapshot_world_save();
@@ -222,7 +218,6 @@ impl M0Engine {
         result
     }
 
-    /// **M4B**: push a transient "Quicksaved (Nms)" / "Quickloaded" /
     /// "Autosaved" banner into the HUD queue. cf-app's HUD renders this
     /// in the standard banner stack.
     pub(crate) fn push_save_success_banner(&self, id: &str, label: &str, wall_clock_ms: u32, tick: u64) {
@@ -243,7 +238,6 @@ impl M0Engine {
         );
     }
 
-    /// **M4B § "Save corrupted modal in plain language"** + § "Future
     /// version save modal" — push a critical-severity HUD banner whose
     /// label matches the spec's prescribed modal text for each
     /// [`cf_save::SaveError`] variant.
@@ -287,7 +281,6 @@ impl M0Engine {
         );
     }
 
-    /// **M4B § "Replay migrated banner"** — push the single-line "Replay
     /// migrated from vA -> vB" banner. The viewer header already surfaces
     /// this for replay bundles; the cf-app HUD surfaces it after a F9
     /// quickload that triggered a migration step.
@@ -310,7 +303,6 @@ impl M0Engine {
         );
     }
 
-    /// **M4B § cfctl save migrate**: in-place migrate a `<dir>/quicksave.cfsave`.
     pub fn save_migrate(
         &self,
         dir: &std::path::PathBuf,
@@ -336,7 +328,6 @@ pub struct HudCachesSnapshot {
     pub tool_validity: crate::state::ToolValidityView,
     pub focused_node: Option<String>,
     pub focus_cycle: u64,
-    /// **M1 / Gap D3**: mirrors `EngineMutable::controls_captured_by` so
     /// cf-app can update the CAPTURED HUD zone without an async snapshot.
     pub controls_captured_by: Option<String>,
 }
@@ -358,17 +349,14 @@ pub struct ActorRenderSnapshot {
     pub extraction_zone: Option<ExtractionZoneView>,
     /// M1.5: per-enemy state + tactic projection so the HUD doesn't fabricate values.
     pub enemies: Vec<EnemyHudView>,
-    /// **M9** § HUD readability + observability — reactor HUD projection
     /// for the reactor zone widgets. `None` when no reactor world is
     /// loaded.
     pub reactor: Option<ReactorHudView>,
-    /// **M9** § Player narrative flow — mission timer projection for the
     /// timer-warning HUD + countdown color. `None` when no mission is
     /// loaded.
     pub timer: Option<TimerHudView>,
 }
 
-/// **M9** § HUD readability + observability — projection of the reactor
 /// for cf-app's reactor HP bar, pressure line, and VFX sprite. Mirrors
 /// the `observe.mission.reactor` cfctl surface so cf-app does not have
 /// to call the async path each frame.
@@ -386,7 +374,6 @@ pub struct ReactorHudView {
     pub armor_layers: Vec<ReactorArmorLayerView>,
 }
 
-/// **M9** § Layered reactor armor — one armor pip projection per layer
 /// (External / Internal / Core). cf-app maps `hp_percent` to the 5-tier
 /// integrity band when rendering pips.
 #[derive(Debug, Clone)]
@@ -398,7 +385,6 @@ pub struct ReactorArmorLayerView {
     pub hardness: f32,
 }
 
-/// **M9** § Player narrative flow — projection of `observe.mission.timer`
 /// for the cf-ui timer-warning widget. cf-app reads `remaining_seconds`
 /// to push warnings + update the color band per frame.
 #[derive(Debug, Clone, Default)]
@@ -410,7 +396,6 @@ pub struct TimerHudView {
     pub mission_terminal: bool,
 }
 
-/// **M2**: render-side snapshot of the chunked terrain. Carries the
 /// terrain anchor, every dirty chunk's pixel data (then clears the dirty
 /// set), the active material-overlay mode, and a tool-validity probe at
 /// the player's aim direction.
@@ -423,7 +408,6 @@ pub struct TerrainRenderSnapshot {
     pub dig_preview: Option<TerrainDigPreview>,
 }
 
-/// **M2**: one chunk's pixel grid + dirty rect for render upload.
 #[derive(Debug, Clone)]
 pub struct TerrainChunkUpdate {
     pub cx: i32,
@@ -432,7 +416,6 @@ pub struct TerrainChunkUpdate {
     pub pixels: Vec<cf_terrain::MaterialId>,
 }
 
-/// **M2**: tool-validity probe at the player's aim direction.
 #[derive(Debug, Clone, Copy)]
 pub struct TerrainDigPreview {
     pub position: [f32; 2],
@@ -447,11 +430,9 @@ pub struct EnemyHudView {
     pub actor: u64,
     pub state: String,
     pub last_tactic: String,
-    /// **M1.5**: floating AI debug intent label ("ALERT: heard_shot",
     /// "ENGAGED", "RELOADING"). cf-app surfaces this above the guard's
     /// sprite when `Settings.ai_debug == true`.
     pub intent_label: String,
-    /// **M1.5**: world position of the guard at observation time so the
     /// AI debug label can anchor to the sprite. `None` when the actor
     /// world isn't loaded yet (boot).
     pub position: Option<[f32; 2]>,
@@ -485,7 +466,6 @@ pub struct MissionHudView {
     pub ticks_remaining: Option<u64>,
     pub active_objective: Option<String>,
     pub last_event_label: String,
-    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor surfaced
     /// for the mission-resolved modal. cf-ui renders the CTA button
     /// when `show_replay_cta == true`.
     pub show_me_why_event_id: Option<String>,

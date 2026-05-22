@@ -28,37 +28,30 @@ use crate::{
     ActorState,
 };
 
-/// **M14J** § per-tick stride period (ms) for the swim limb path. Spec § "stroke
 /// rate consumes M16 swim-stamina" — 4-stroke cycle ≈ 800 ms baseline.
 pub const SWIM_STROKE_PERIOD_MS: u32 = 800;
 
-/// **M14J** § per-tick swim breath drain (seconds of breath per simulation
 /// second) for a submerged actor. Spec § "swim-stamina drains at race-aware
 /// rate (Human 1.0×, Aqueous 0.5×, Robotic = sinks)".
 pub const SWIM_BREATH_DRAIN_SECONDS_PER_SEC: f32 = 1.0;
 
-/// **M14J** § ladder/cable/vine vertical climb speed (m/s). Spec § "the
 /// actor advances at 1 m/s vertical".
 pub const CLIMB_VERTICAL_SPEED_M_PER_S: f32 = 1.0;
 
-/// **M14J** § maximum breath reservoir (seconds) — baseline for a Human
 /// origin. Race-aware scaling lives on `ActorState::swim_drain_multiplier`
 /// (M17 origin reaction table); when the actor is at surface this is the
 /// cap that breath recovers toward. Spec § "breath_held_s reaching 0 →
 /// drowning" + "drains at race-aware rate". Audit finding #5a/#8 fix.
 pub const SWIM_MAX_BREATH_SECONDS: f32 = 30.0;
 
-/// **M14J § swim stamina per stroke** — fraction of stamina drained per
 /// stroke cycle, scaled by `swim_drain_multiplier`. Spec § "stroke rate
 /// consumes M16 swim-stamina". Audit finding #5a/#8 fix.
 pub const SWIM_STAMINA_PER_STROKE: f32 = 0.05;
 
-/// **M14J § climb path tick scaling** — fraction of a stride cycle advanced
 /// per ms on the Climb limb path while `climb_active`. Spec § "climbs a
 /// ladder rung-by-rung". Audit finding #5a/#8 fix.
 pub const CLIMB_PATH_PROGRESS_DIVISOR_MS: f32 = 350.0;
 
-/// **M14J** § "stamina_remaining" payload value: the `actor.stamina.current`
 /// surface scaled to a unit interval. Surfaced via [`M14jTickEvents`] for the
 /// `swim.stroke` event payload.
 fn stamina_unit(actor: &ActorState) -> f32 {
@@ -67,7 +60,6 @@ fn stamina_unit(actor: &ActorState) -> f32 {
     (cur / max).clamp(0.0, 1.0)
 }
 
-/// **M14J** § per-tick events emitted by the M14J integration pass. The
 /// engine consumes these and turns them into recorder envelopes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct M14jTickEvents {
@@ -90,15 +82,12 @@ pub struct M14jTickEvents {
     /// True when the actor's wall-jump chain reset this tick (e.g. landed
     /// on ground).
     pub wall_jump_chain_reset: bool,
-    /// **M14J** § `swim_drain_multiplier` snapshot for the `swim.stroke`
     /// payload (so consumers see the live multiplier per-stroke).
     pub swim_drain_multiplier_snapshot: f32,
-    /// **M14J** § `stamina_remaining` snapshot (unit interval) for the
     /// `swim.stroke` payload.
     pub stamina_remaining_snapshot: f32,
 }
 
-/// **M14J § "actor.swim_kind = Surface → SwimSurface stance"**. Routes the
 /// active limb path based on the M14J state. Returns the canonical
 /// swim limb path keyed by `SwimKind`, falling back to the M14A Walk path
 /// for legacy registries that haven't registered the M14J swim paths yet.
@@ -119,7 +108,6 @@ fn active_swim_path(actor: &mut ActorState) -> Option<&mut LimbPath> {
     actor.limb_paths.get_mut(fallback_state, PathSide::Fg)
 }
 
-/// **M14J** § "Auto-vault clears chest-high crate at full run" + spec § "Per-
 /// stance limb path swap" + spec § "Swim refinement supersedes M16
 /// placeholder".
 ///
@@ -259,7 +247,6 @@ pub fn tick_m14j_actor(actor: &mut ActorState, dt_ms: u32, tick: u64) -> M14jTic
     events
 }
 
-/// **M14J** § "helmet seal" — true when the actor wears a sealed helmet
 /// (M19C PPE / body armor slot helmet). Defensive default: returns true
 /// only when the body_armor slot has an active helmet seal.
 #[must_use]
@@ -267,14 +254,12 @@ pub fn actor_has_helmet_seal(actor: &ActorState) -> bool {
     actor.body_armor.helmet_seal_active()
 }
 
-/// **M14J** § "M19C dive-suit shell" — true when the actor wears a dive
 /// suit on the body armor slot.
 #[must_use]
 pub fn actor_has_dive_suit(actor: &ActorState) -> bool {
     actor.body_armor.dive_suit_equipped()
 }
 
-/// **M14J** § "Mounted rider fires one-handed weapon at gallop" — extra
 /// firing aim spread when the actor is mounted on a moving critter. Returns
 /// the bonus penalty in radians. Pure helper; engine sums with the base
 /// `M14A` aim spread.
@@ -287,7 +272,6 @@ pub fn mount_motion_aim_penalty(actor: &ActorState, critter_speed: f32) -> f32 {
     }
 }
 
-/// **M14J** § "VaultCandidate from a chunked-terrain swept query". Convenience
 /// helper for engine + test code: populates the actor's
 /// `parkour_signal.vault_candidate` field when a candidate is detected,
 /// clears it when the predicate returns no candidate.
@@ -306,7 +290,6 @@ pub fn populate_vault_candidate(
     candidate
 }
 
-/// **M14J** § "Wall-detect within 250 ms of contact" — populate the actor's
 /// `parkour_signal.wall_candidate` + reset/refresh the grace window. Returns
 /// the live candidate so the caller can mirror it to the dispatch layer.
 pub fn populate_wall_candidate(
@@ -327,7 +310,6 @@ pub fn populate_wall_candidate(
     cand
 }
 
-/// **M14J § "wall-jump-detect helper" — combined per-tick populate + tick
 /// helper. Pure / deterministic. Returns the resolved `M14jTickEvents`.
 pub fn tick_m14j_full(
     actor: &mut ActorState,

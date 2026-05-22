@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::producers::TreatmentKind;
 
-/// **M14H** § decision-tree current step.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -39,7 +38,6 @@ impl DecisionStep {
     }
 }
 
-/// **M14H** § per-tick action the AI medic doctrine should execute.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "action")]
 pub enum MedicAction {
@@ -66,7 +64,6 @@ pub enum MedicAction {
     },
 }
 
-/// **M14H** § per-wound treatment ranking input.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WoundPriority {
     /// Arterial-bleed flag — tourniquet first.
@@ -109,7 +106,6 @@ impl WoundPriority {
         s
     }
 
-    /// **M14H** Field-medic decision-tree step 3 (Stabilize): pick the
     /// highest-priority treatment.
     ///
     /// Gherkin scenario 5: arterial bleed → tourniquet first.
@@ -139,7 +135,6 @@ impl WoundPriority {
     }
 }
 
-/// **M14H** § a single patient's snapshot consumed by the decision tree.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatientSnapshot {
     pub actor_id: u64,
@@ -168,7 +163,6 @@ impl PatientSnapshot {
     }
 }
 
-/// **M14H** § decision-tree FSM.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldMedicDecisionTree {
     pub medic_actor_id: u64,
@@ -281,7 +275,6 @@ impl FieldMedicDecisionTree {
 mod tests {
     use super::*;
 
-    /// **M14H** Gherkin scenario 5: Field Medic AI auto-treats per decision
     /// tree. Given a Medic NPC + ally with compound TTD 10s and 3 wounds,
     /// when the AI tick fires, the Medic moves to the ally, applies the
     /// highest-priority treatment first (tourniquet for arterial bleed),

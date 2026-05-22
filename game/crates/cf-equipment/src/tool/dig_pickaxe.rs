@@ -217,7 +217,6 @@ mod tests {
         assert_eq!(v[2].id, PICKAXE_DIG_T3_ID);
     }
 
-    /// VAL-M9B-PICKAXE-001: dig-time decreases with tier.
     #[test]
     fn pickaxe_dig_time_scales_with_tier() {
         let baseline = baseline_standard();

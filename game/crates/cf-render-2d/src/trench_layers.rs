@@ -144,7 +144,6 @@ mod tests {
         }
     }
 
-    /// VAL-M9B-RENDER-001: per-variant sprite layers contain the
     /// expected subset (duckboard for non-shallow; fire-step for
     /// fire_step; drainage for deep; revetment when the module is
     /// placed).

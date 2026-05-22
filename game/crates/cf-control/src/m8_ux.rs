@@ -485,7 +485,6 @@ impl M0Engine {
         let composed_payload = json!({"actor_id": actor_id, "step_count": count, "steps": label_steps});
         #[rustfmt::skip]
         let _ = self.recorder.record(tick, sim_time_ms, "ai", "plan_composed", composed_payload.clone(), None);
-        // **M14 audit pass 3 (GAP-M8-01)**: M8 spec § Event families lists
         // `ux.plan_composed/plan_executed/plan_aborted`. Dual-emit under
         // the spec-canonical `ux.*` category so spec-literal-checking
         // consumers find the event under either namespace.
@@ -668,7 +667,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M8**: open the T-key 8-slice pie menu with target context per
     /// spec § Pie menu. Slows sim to 20% in single-player; 100% in
     /// multiplayer. Emits `ux.pie_menu_opened`.
     pub(crate) fn dispatch_pie_menu_open(
@@ -727,7 +725,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M8**: select a slot on the open pie menu. Valid slot + no
     /// reason → `ux.pie_menu_slice_chosen`. Valid slot + supplied
     /// `reason` → `ux.pie_menu_slice_rejected { slice, reason }`.
     pub(crate) fn dispatch_pie_menu_select(
@@ -826,7 +823,6 @@ impl M0Engine {
         }
     }
 
-    /// **M8**: close the pie menu (idempotent). Emits
     /// `ux.pie_menu_closed` with the open duration in ticks. The
     /// `slice_chosen` field is `null` when closed without a selection.
     pub(crate) fn dispatch_pie_menu_close(
@@ -874,7 +870,6 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
-    /// **M8 helper**: trigger the slow-mo cinematic kill cam (boss final
     /// blow) from any engine site that detects the boss-down condition.
     /// Honors `Settings.cinematic_kills`. Emits
     /// `slow_mo.kill_cam_triggered` on success.
@@ -905,7 +900,6 @@ impl M0Engine {
         }
     }
 
-    /// **M8 helper**: trigger a regular killcam on player death.
     /// Honors `Settings.killcam_enabled`. Emits `killcam.played` on
     /// success or `killcam.skipped` on opt-out.
     pub(crate) fn trigger_killcam_on_death(
@@ -974,7 +968,6 @@ impl M0Engine {
         let _ = state.tag_state.expire_old(current_tick_value);
     }
 
-    /// **M8**: helper for cfctl `observe.camera`.
     pub(crate) fn snapshot_camera_state(&self) -> Value {
         let s = self.state.read().expect("engine state poisoned");
         let cam = &s.camera_state;
@@ -991,7 +984,6 @@ impl M0Engine {
         })
     }
 
-    /// **M8**: helper for cfctl `observe.localization.current_language`.
     pub(crate) fn snapshot_localization_language(&self) -> Value {
         let s = self.state.read().expect("engine state poisoned");
         json!({
@@ -1001,7 +993,6 @@ impl M0Engine {
         })
     }
 
-    /// **M8**: helper for cfctl `observe.debug.overlays`.
     pub(crate) fn snapshot_debug_overlays(&self) -> Value {
         let s = self.state.read().expect("engine state poisoned");
         let enabled: Vec<&str> = s.debug_state.enabled_ids();
@@ -1014,7 +1005,6 @@ impl M0Engine {
         })
     }
 
-    /// **M8**: helper for cfctl `observe.tactical_overlay`.
     pub(crate) fn snapshot_tactical_overlay(&self) -> Value {
         let s = self.state.read().expect("engine state poisoned");
         json!({
@@ -1026,7 +1016,6 @@ impl M0Engine {
         })
     }
 
-    /// **M8**: helper for cfctl `observe.tags`.
     pub(crate) fn snapshot_tags(&self) -> Value {
         let s = self.state.read().expect("engine state poisoned");
         let tagged: Vec<Value> = s

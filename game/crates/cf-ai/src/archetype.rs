@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use crate::priority::PriorityTable;
 use crate::task::TaskType;
 
-/// **M7-A**: 6 enemy archetypes. Drives FOV / range / reaction time / HP +
 /// Priority Table role template + behavior tree library.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Default)]

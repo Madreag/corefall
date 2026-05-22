@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerAnchorParams",
-  "description": "**M3 re-open (2026-05-13)**: `act.player.anchor` — attempt to place a\ntether / anchor / rope-grapple at world-space `(x, y)`. The engine samples\nthe material at the target and emits `terrain.anchor_material_result`:\n- `anchorable=true` (dirt, concrete, anchor) → `result=\"accepted\"`\n- `anchorable=false` (metal_nohook, hazard, loose_fill) → `result=\"refused\"`\n  with `reason=\"material_<name>\"`\n\n`tool_id` is optional (\"grapple\" / \"tether_gun\" / \"rope_anchor\"); defaults\nto `\"anchor_tool\"`. Spec ref: `specs/active/M3.md` § Re-opened gaps, MAT-T-06.",
+  "description": "tether / anchor / rope-grapple at world-space `(x, y)`. The engine samples\nthe material at the target and emits `terrain.anchor_material_result`:\n- `anchorable=true` (dirt, concrete, anchor) → `result=\"accepted\"`\n- `anchorable=false` (metal_nohook, hazard, loose_fill) → `result=\"refused\"`\n  with `reason=\"material_<name>\"`\n\n`tool_id` is optional (\"grapple\" / \"tether_gun\" / \"rope_anchor\"); defaults\nto `\"anchor_tool\"`. Spec ref: `specs/active/M3.md` § Re-opened gaps, MAT-T-06.",
   "type": "object",
   "properties": {
     "schema_version": {

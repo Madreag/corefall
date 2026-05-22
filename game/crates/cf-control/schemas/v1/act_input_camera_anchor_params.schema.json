@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActInputCameraAnchorParams",
-  "description": "**M13** § \"Cockpit camera anchor\" — switch between third-person follow and\nfirst-person cockpit camera anchors.",
+  "description": "first-person cockpit camera anchors.",
   "type": "object",
   "properties": {
     "mode": {

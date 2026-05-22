@@ -356,18 +356,15 @@ mod tests {
         assert!(chassis_spec("nonexistent").is_none());
     }
 
-    /// **M13** § "Chassis archetypes — M13 ships 5": crab + drone archetypes
     /// must be in the canonical registry alongside the 3 humanoid kinds.
     #[test]
     fn registry_ships_six_chassis_archetypes() {
         assert!(chassis_spec(CRAB_QUADRUPED_ID).is_some());
         assert!(chassis_spec(DRONE_ID).is_some());
-        // **M14A** ships the 6th archetype — Heavy Trooper.
         assert!(chassis_spec(HEAVY_TROOPER_ID).is_some());
         assert_eq!(chassis_specs().len(), 6, "M14A ships 6 chassis archetypes");
     }
 
-    /// **M14A** § "Heavy Armor" — heavy trooper spec contract.
     #[test]
     fn heavy_trooper_spec_has_tank_grade_zones() {
         let s = heavy_trooper_spec();
@@ -384,7 +381,6 @@ mod tests {
         assert!(torso.gib_impulse_limit >= 3200.0);
     }
 
-    /// **M13** § "Quadruped=11 zones": crab body graph zone count contract.
     #[test]
     fn crab_quadruped_has_eleven_zones() {
         let s = crab_quadruped_spec();
@@ -407,7 +403,6 @@ mod tests {
         assert_eq!(jet.state, ModuleStateKind::NotPresent);
     }
 
-    /// **M13** § "Drone=4 zones": drone body graph zone count contract.
     #[test]
     fn drone_has_four_zones() {
         let s = drone_spec();
@@ -423,7 +418,6 @@ mod tests {
         }
     }
 
-    /// **M13** § "Armor mounting angles per chassis archetype": per-chassis
     /// angles match the spec table.
     #[test]
     fn armor_mount_angles_match_spec() {
@@ -437,7 +431,6 @@ mod tests {
         assert_eq!(drone_spec().armor_angles, ArmorMountAngles::new(0.0, 0.0, 0.0));
     }
 
-    /// **M13** § "Chassis ability slots": per-chassis slot count + activate.
     #[test]
     fn chassis_ability_slots_count_per_kind() {
         assert_eq!(ChassisKind::Infantry.ability_slot_count(), 1);
@@ -463,7 +456,6 @@ mod tests {
         assert_eq!(err, AbilityRejectReason::OnCooldown);
     }
 
-    /// **M13** § "Weapon modifier slots": attach/detach respects max slot count.
     #[test]
     fn weapon_modifier_slot_count_per_chassis_tier() {
         let mut set = WeaponModifierSet::new(ChassisKind::Infantry);
@@ -479,7 +471,6 @@ mod tests {
         assert!(mech.attach(WeaponModifier::ChainLightning).is_err());
     }
 
-    /// **M13** § "30+ launch modifiers": registry has at least 30 modifiers.
     #[test]
     fn weapon_modifier_registry_has_thirty_plus() {
         assert!(WeaponModifier::all().len() >= 30);
@@ -487,7 +478,6 @@ mod tests {
         assert_eq!(WeaponModifier::parse("nonsense"), None);
     }
 
-    /// **M13** § "Drone allies — 4 modes": parse + fuel drain.
     #[test]
     fn drone_modes_round_trip_and_drain_fuel() {
         assert_eq!(DroneMode::parse("auto_mine"), Some(DroneMode::AutoMine));
@@ -500,7 +490,6 @@ mod tests {
         assert!(drone.fuel < 1.0, "5 minutes of fuel drain should reduce charge");
     }
 
-    /// **M13** § "Cockpit camera anchor — Medium + Heavy classes only".
     #[test]
     fn cockpit_anchor_rejects_unsupported_chassis() {
         let mut infantry = ChassisState::from_spec(&infantry_spec(), 60, false);
@@ -510,7 +499,6 @@ mod tests {
         assert_eq!(mech.camera_anchor, CameraAnchor::Cockpit);
     }
 
-    /// **M13** § "Boarding / disembarking transitions": 1500ms transitions
     /// are tick-rate-stable.
     #[test]
     fn boarding_transitions_match_1500ms_at_any_tick_rate() {
@@ -532,7 +520,6 @@ mod tests {
         let _ = at_120;
     }
 
-    /// **M13** § "Hit reactions per body part": tabulated reactions per zone.
     #[test]
     fn hit_reactions_match_spec_table() {
         let head = HitReaction::for_zone(BodyZone::Head);
@@ -548,7 +535,6 @@ mod tests {
         assert_eq!(head_ticks, 30);
     }
 
-    /// **M13** § "Critical chassis modules with full mechanics": ammo rack
     /// cooking + detonation cascade.
     #[test]
     fn ammo_rack_cascade_cooks_then_detonates() {
@@ -568,7 +554,6 @@ mod tests {
         assert_eq!(state.stage, ChassisStage::Gibbed);
     }
 
-    /// **M13** § "Spalling integration": deterministic fragment routing.
     #[test]
     fn spalling_fragments_are_deterministic_given_same_seed() {
         let mut a = ChassisState::from_spec(&light_mech_spec(), 60, false);
@@ -583,7 +568,6 @@ mod tests {
         }
     }
 
-    /// **M13** § "Limb loss functional consequences" — head destruction
     /// flags `lethal=true` (instant death per CCCP decapitation rule).
     #[test]
     fn head_destruction_flags_lethal_when_not_tutorial_safe() {
@@ -594,7 +578,6 @@ mod tests {
         assert!(outcome.lethal, "head destruction must flag lethal=true");
     }
 
-    /// **M13** § "Tutorial-safety scenario variant" — head destruction does
     /// NOT flag lethal when tutorial_safety=true.
     #[test]
     fn head_destruction_skips_lethal_in_tutorial_safety() {
@@ -605,7 +588,6 @@ mod tests {
         assert!(!outcome.lethal, "tutorial_safety must suppress lethal");
     }
 
-    /// **M13** § "Torso loss = INSTANT DEATH": torso destruction flags lethal.
     #[test]
     fn torso_destruction_flags_lethal() {
         let spec = powered_armor_spec();
@@ -615,7 +597,6 @@ mod tests {
         assert!(outcome.lethal);
     }
 
-    /// **M13** § "Arm loss" — destroying an arm does NOT flag lethal (only
     /// head/torso do).
     #[test]
     fn arm_destruction_does_not_flag_lethal() {
@@ -626,7 +607,6 @@ mod tests {
         assert!(!outcome.lethal, "arm destruction must NOT flag lethal");
     }
 
-    /// **M13** § "Engineer auto-repair contract" — per-module repair cost
     /// table matches the spec values.
     #[test]
     fn engineer_auto_repair_table_matches_spec() {

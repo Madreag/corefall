@@ -409,7 +409,6 @@ fn default_hostname() -> String {
         .unwrap_or_else(|_| "unknown".to_string())
 }
 
-/// **M4A determinism contract**: when `CF_DETERMINISTIC_LEDGER=1`, both
 /// `generated_at_iso` and `generated_on_machine` default to deterministic
 /// placeholder strings rather than wall-clock / hostname. Makes the
 /// ledger.jsonl file byte-reproducible across CI runs.
@@ -505,7 +504,6 @@ mod tests {
         assert_eq!(ASSET_ENTRY_SCHEMA_VERSION, "1.0.0");
     }
 
-    /// **M4A § Schema design / Mod-extension fields**: mods stash custom
     /// metadata in `extension_fields: HashMap<String, Value>` and the
     /// engine round-trips it opaquely. This test pins the contract:
     /// build with extension fields → serialize → deserialize → fields
@@ -549,7 +547,6 @@ mod tests {
         assert_eq!(tags.len(), 3);
     }
 
-    /// **M4A determinism**: `CF_DETERMINISTIC_LEDGER=1` makes the builder
     /// pin `generated_at_iso` + `generated_on_machine` to deterministic
     /// values derived from the entry's blake3 instead of wall-clock /
     /// hostname. Tests that the env flag is honored.

@@ -48,7 +48,6 @@ const CHUNK_PIXELS: usize = (CHUNK_SIZE as usize) * (CHUNK_SIZE as usize);
 /// NOT stored at all — `ChunkedTerrain::material_at` returns the default in
 /// that case.
 ///
-/// **M3 re-open (2026-05-13) fix #7**: forward-compat fields for M14 (sub-rect
 /// upload) + M15 (active material kernel). All four extra fields are
 /// `serde(default)` so legacy v0.1 snapshots round-trip cleanly:
 /// - `active_region: bool` — M15 active-cell hint; true when any cell in this
@@ -72,7 +71,6 @@ pub struct Chunk {
     pub dirty_rect: Option<DirtyRect>,
 }
 
-/// **M3 re-open (2026-05-13) fix #7 + fix #6**: per-chunk dirty AABB for
 /// sub-rect upload (M14 forward-compat). Coordinates are LOCAL to the chunk
 /// (0..CHUNK_SIZE). `min`/`max` inclusive. None means "no pending dirty
 /// region"; the chunk is considered up-to-date.
@@ -116,7 +114,6 @@ impl Chunk {
     }
 
     /// Set the material at `(lx, ly)`; returns true if the cell changed.
-    /// **M3 re-open fix #6/#7**: also extends `dirty_rect` to cover this pixel
     /// and bumps `last_modified_tick` (caller is responsible for passing the
     /// current tick via `set_pixel_at_tick`). For backward compat, this
     /// 3-arg form leaves `last_modified_tick` alone.
@@ -137,7 +134,6 @@ impl Chunk {
         true
     }
 
-    /// **M3 re-open fix #6/#7**: M15 forward-compat — set the material AND
     /// stamp `last_modified_tick`. Returns true if the cell changed.
     pub fn set_pixel_at_tick(&mut self, lx: u32, ly: u32, mat: MaterialId, tick: u64) -> bool {
         if self.set_pixel(lx, ly, mat) {
@@ -148,7 +144,6 @@ impl Chunk {
         }
     }
 
-    /// **M3 re-open fix #6**: drain the per-chunk dirty rect (consumes it).
     /// Returns `None` when the chunk has nothing pending. Caller uploads the
     /// returned sub-rect through the render bridge.
     pub fn take_dirty_rect(&mut self) -> Option<DirtyRect> {
@@ -343,13 +338,11 @@ pub struct ChunkedTerrain {
     pub carve_count: u64,
     pub refusal_count: u64,
     pub registry: MaterialRegistry,
-    /// **M3 re-audit pass 4 (2026-05-13)**: most-recent sim tick stamped
     /// onto chunks that were modified this tick. Engine calls
     /// `set_current_tick` from `drive_tick` so every subsequent pixel
     /// write updates the affected chunk's `last_modified_tick`. Default
     /// 0 (chunks never modified). Not serialized (transient runtime state).
     pub current_tick: u64,
-    /// **M9 § Destructible terrain — 5-tier per-pixel integrity grid**.
     /// Sparse: only damaged pixels appear. Air pixels are never tracked.
     /// Pristine (1.0) pixels are implicit — they only get an entry once
     /// damage lands. Layout-stable across runs (BTreeMap ordering) so
@@ -377,7 +370,6 @@ impl ChunkedTerrain {
         }
     }
 
-    /// **M3 re-audit pass 4 (2026-05-13)**: engine calls this each tick so
     /// the next pixel write stamps the right `last_modified_tick` on the
     /// affected chunk.
     pub fn set_current_tick(&mut self, tick: u64) {
@@ -449,7 +441,6 @@ impl ChunkedTerrain {
         let min = [cx - r, cy - r];
         let max = [cx + r, cy + r];
         let (x0, y0, x1, y1) = self.aabb_to_pixels(min, max);
-        // Bugbot 3212180092: convert center world-space → pixel-space so
         // the circle test matches the iteration bounds (which are
         // pixel-space coming out of `aabb_to_pixels`).
         let center_px_x = cx - self.anchor[0];
@@ -506,7 +497,6 @@ impl ChunkedTerrain {
         let min = [origin[0] - r, origin[1] - r];
         let max = [origin[0] + r, origin[1] + r];
         let (x0, y0, x1, y1) = self.aabb_to_pixels(min, max);
-        // Bugbot 3212180092: `aabb_to_pixels` subtracts the terrain anchor
         // when converting world → pixel space, so `px` / `py` iterate in
         // pixel-space. `origin` is world-space. Compare in pixel-space by
         // pre-subtracting the anchor from the origin so the carve circle
@@ -597,7 +587,6 @@ impl ChunkedTerrain {
         let min = [origin[0] - r, origin[1] - r];
         let max = [origin[0] + r, origin[1] + r];
         let (x0, y0, x1, y1) = self.aabb_to_pixels(min, max);
-        // Bugbot 3212180092: same world→pixel anchor subtraction as
         // try_carve. The blast circle test must compare px (pixel-space)
         // against an anchor-subtracted origin so non-zero anchors don't
         // off-center the blast.
@@ -724,7 +713,6 @@ impl ChunkedTerrain {
         self.dirty_chunks.clear();
     }
 
-    /// **M3 re-open (2026-05-13) fix #6**: take + clear the per-chunk
     /// `dirty_rect`. Returns `None` when the chunk has been reclaimed
     /// (uniform default) OR when no pixel writes have landed since the last
     /// take. Caller uses this to upload only the affected sub-rect through
@@ -734,7 +722,6 @@ impl ChunkedTerrain {
         self.chunks.get_mut(&coord).and_then(Chunk::take_dirty_rect)
     }
 
-    /// **M2 contract**: mark every chunk whose pixels intersect the closed
     /// pixel-space AABB as dirty. This is the canonical "I just touched the
     /// terrain at this region" path — any caller that mutates pixels via a
     /// shortcut (door stamp, fluid kernel, future repair tool that doesn't
@@ -788,7 +775,6 @@ impl ChunkedTerrain {
         }
     }
 
-    /// **M3 re-audit pass 4 (2026-05-13)**: read the chunk's current
     /// `dirty_rect` without taking it. Returns `None` when the chunk is
     /// unallocated OR has no pending dirty rect. Used by
     /// `inspect.terrain.chunk` so cfctl consumers can see in-flight dirt
@@ -798,7 +784,6 @@ impl ChunkedTerrain {
         self.chunks.get(&ChunkCoord::new(cx, cy)).and_then(|c| c.dirty_rect)
     }
 
-    /// **M3 re-audit pass 4 (2026-05-13)**: read the chunk's
     /// `last_modified_tick` stamp. Returns 0 for unallocated chunks (they
     /// have never been modified).
     #[must_use]
@@ -901,7 +886,6 @@ impl ChunkedTerrain {
         self.chunks.len()
     }
 
-    /// **M15** § enumerate every allocated chunk's `(cx, cy)` in
     /// `(cx, cy)` ascending order. The CA stepper iterates this list
     /// per tick to apply Margolus rules.
     pub fn allocated_chunk_coords(&self) -> Vec<(i32, i32)> {
@@ -943,7 +927,6 @@ impl ChunkedTerrain {
         true
     }
 
-    /// **M15** § enumerate awake chunks only (`active_region == true`)
     /// in `(cx, cy)` ascending order. Per the M15 spec § "Per-pixel
     /// cellular automata (Noita chunking)" rule: "Per-tick: only active
     /// chunks simulated (dirty regions + nearby chunks)". The CA stepper
@@ -956,7 +939,6 @@ impl ChunkedTerrain {
             .collect()
     }
 
-    /// **M15** § set the `active_region` flag on a single allocated
     /// chunk. Per M15 spec § Preservation rule 4: "M3 always writes
     /// false; M15 sets true for chunks with falling materials". Returns
     /// true if the chunk existed; false if no chunk is allocated at
@@ -973,7 +955,6 @@ impl ChunkedTerrain {
         }
     }
 
-    /// **M15** § read the `active_region` flag on a chunk. Returns
     /// `false` for unallocated chunks (they are implicitly sleeping).
     #[must_use]
     pub fn chunk_active_region(&self, cx: i32, cy: i32) -> bool {
@@ -983,7 +964,6 @@ impl ChunkedTerrain {
             .unwrap_or(false)
     }
 
-    /// **M15** § wake the chunk at `(cx, cy)` plus its 1-chunk-radius
     /// neighborhood (3×3 = 9 chunks total) to `active_region = true`.
     /// Per M15 spec § "active-chunk wake/sleep gating" + M8A's
     /// `wake_chunk_and_neighbors` semantics. Only updates already-
@@ -1005,7 +985,6 @@ impl ChunkedTerrain {
         transitioned
     }
 
-    /// **M15** § transition chunks that have been idle for at least
     /// `idle_threshold_ticks` to `active_region = false`. Per the M15
     /// spec § "Per Noita pattern: most of world sleeping; only chunks
     /// with falling materials wake up". Returns the chunks that just
@@ -1023,7 +1002,6 @@ impl ChunkedTerrain {
         transitioned
     }
 
-    /// **M15** § set the material at world-space pixel `(px, py)` with
     /// an explicit tick stamp. Routes through the canonical
     /// `set_pixel_at_tick` path so the per-chunk `last_modified_tick`,
     /// `dirty_rect`, and `dirty_chunks` set all stay coherent. Per the
@@ -1039,7 +1017,6 @@ impl ChunkedTerrain {
         changed
     }
 
-    /// **M3 audit pass 5 (2026-05-13)**: per-chunk blake3 hex summaries for
     /// every allocated chunk. Used by the engine to populate the
     /// `chunk_summary` field on `determinism.sim_checksum` payloads per
     /// spec literal "And it appears in the determinism.sim_checksum
@@ -1158,7 +1135,6 @@ impl ChunkedTerrain {
         }
     }
 
-    /// **M9 § Destructible terrain — 5-tier per-pixel integrity**: read
     /// the integrity at `(px, py)`. Returns `1.0` (Pristine) when the
     /// pixel has no metadata entry — Pristine pixels are implicit. Air
     /// pixels also return `1.0` so callers don't need to special-case them
@@ -1176,14 +1152,12 @@ impl ChunkedTerrain {
         }
     }
 
-    /// **M9 § Destructible terrain — 5-tier per-pixel integrity**: derive
     /// the band at `(px, py)`. Untouched pixels report Pristine.
     #[must_use]
     pub fn pixel_band(&self, px: i64, py: i64) -> IntegrityBand {
         IntegrityBand::from_integrity(self.pixel_integrity(px, py))
     }
 
-    /// **M9 § Destructible terrain — per-pixel integrity damage**.
     ///
     /// Apply `impact_energy` damage to a single pixel under the per-material
     /// hardness curve (`damage = impact_energy * (1 - hardness) / hardness`,
@@ -1259,7 +1233,6 @@ impl ChunkedTerrain {
         })
     }
 
-    /// **M9 § Cascade rule** for digger / blast carves: after a multi-pixel
     /// carve, walk the perimeter of the destroyed bbox and apply cascade
     /// decay to any solid pixel adjacent to a freshly-cleared pixel whose
     /// normalized hardness is at or below the cascade threshold. Returns
@@ -1310,7 +1283,6 @@ impl ChunkedTerrain {
         events
     }
 
-    /// **M9 § Cascade rule**: when a pixel reaches Destroyed, decay direct
     /// 4-neighbors whose normalized hardness is at or below
     /// `cascade_threshold` (default 0.6). Each affected neighbor loses
     /// `DEFAULT_CASCADE_DECAY_PCT` (default 0.1) integrity, clamped to

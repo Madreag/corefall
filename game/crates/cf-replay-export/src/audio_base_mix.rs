@@ -245,7 +245,6 @@ mod tests {
         }
     }
 
-    /// VAL-M10B-DEFAULT-AUDIO-MIX: peaks > -60 dBFS at audio.event_played
     /// tick offsets; ≤ -60 dBFS elsewhere.
     #[test]
     fn default_audio_mix_from_audio_event_played() {
@@ -272,7 +271,6 @@ mod tests {
         );
     }
 
-    /// VAL-CROSS-013: audio mix carries M9C cues at correct tick
     /// offsets — `mg_nest_burst`, `mine_arming_beep`,
     /// `electrified_shock_zap` all > -60 dBFS.
     #[test]
@@ -321,7 +319,6 @@ mod tests {
         assert!(linear_to_dbfs(0.0) <= -100.0);
     }
 
-    /// VAL-M10B-NO-AUDIO-BASE: `--no-audio-base` mutes base SFX/music
     /// (peak ≤ -90 dBFS) while preserving buffer length so commentary
     /// can still be mixed over silence.
     #[test]

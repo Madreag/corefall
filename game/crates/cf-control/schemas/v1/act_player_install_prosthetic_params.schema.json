@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerInstallProstheticParams",
-  "description": "**M14I** § `act.player.install_prosthetic` — install one prosthetic on\na target actor. Requires medic_t2 + surgery table; runs the 60s install\nsequence inline + emits `prosthetic.installed` on completion.",
+  "description": "a target actor. Requires medic_t2 + surgery table; runs the 60s install\nsequence inline + emits `prosthetic.installed` on completion.",
   "type": "object",
   "properties": {
     "kind": {

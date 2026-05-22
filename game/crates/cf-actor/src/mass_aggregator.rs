@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::ActorState;
 
-/// **M6B**: per-source breakdown of [`total_mass`]. Surfaced through
 /// `observe.actor.mass_breakdown` so HUD + replay tools can render
 /// the per-source contribution.
 ///
@@ -57,17 +56,14 @@ impl MassBreakdown {
     }
 }
 
-/// **M6B**: compute the per-source mass breakdown for `actor`. The
 /// inventory contribution comes from
 /// [`ActorState::inventory_grid_total_mass_kg`], with a fallback to the
 /// legacy `inventory_weight_kg` when no grid is attached.
 ///
-/// **M14A** fills the held / jetpack-fuel / wound slots so `total()`
 /// matches the per-source breakdown for the HUD MASS line.
 pub fn breakdown(actor: &ActorState) -> MassBreakdown {
     let inventory_kg = actor.inventory_grid_total_mass_kg();
 
-    // **M14A** § "held_devices_mass": currently-equipped rifle / pistol.
     // M6B's inventory grid already accounts for stored items; here we add
     // the *equipped* weapon if it's not double-counted in the grid.
     let held_kg = if actor.inventory_grid.is_some() {
@@ -81,11 +77,9 @@ pub fn breakdown(actor: &ActorState) -> MassBreakdown {
         }
     };
 
-    // **M14A** § "Jetpack fuel mass decreases as fuel burns".
     let jetpack_fuel_kg = actor.jetpack.as_ref().map_or(0.0, |j| j.fuel_mass_kg());
     let jetpack_dry_kg = actor.jetpack.as_ref().map_or(0.0, |j| j.dry_mass_kg);
 
-    // **M14A** § "Wound mass from lodged pixels".
     let wound_kg = actor.wound_mass_kg.max(0.0);
 
     MassBreakdown {
@@ -98,12 +92,10 @@ pub fn breakdown(actor: &ActorState) -> MassBreakdown {
     }
 }
 
-/// **M14A** § "Mass aggregation system" — aggregated total actor mass in kg.
 pub fn total_mass(actor: &ActorState) -> f32 {
     breakdown(actor).total()
 }
 
-/// **M14A** § "Mass factor" — walk speed multiplier from total mass.
 ///
 /// `(BASELINE_MASS_KG / total_mass).clamp(MASS_FACTOR_MIN, MASS_FACTOR_MAX)`.
 pub fn mass_factor(actor: &ActorState) -> f32 {
@@ -132,7 +124,6 @@ mod tests {
         // Default infantry = 80 kg chassis baseline; legacy rifle adds 3.5 kg held.
         assert!((bd.chassis_kg - 80.0).abs() < 1e-6);
         assert!((bd.inventory_kg - 0.0).abs() < 1e-6);
-        // **M14A** legacy path: held rifle (3.5 kg) counts as held device.
         assert!((bd.held_kg - 3.5).abs() < 1e-6);
         assert!((bd.total() - 83.5).abs() < 1e-6);
     }
@@ -157,7 +148,6 @@ mod tests {
         actor.inventory_weight_kg = 12.0;
         let bd = breakdown(&actor);
         assert!((bd.inventory_kg - 12.0).abs() < 1e-6);
-        // **M14A** held rifle: 3.5 kg added separately.
         assert!((bd.held_kg - 3.5).abs() < 1e-6);
         assert!((bd.total() - 95.5).abs() < 1e-6);
     }

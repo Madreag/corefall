@@ -105,7 +105,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14G § VAL-M14G-029**: per-tick material-contact pass. Fires
     /// each scenario-authored material contact once at its `fire_tick`
     /// via [`cf_material::classify_reaction`].
     pub(crate) fn tick_m14g_material_contacts(&self, tick: Tick, sim_time_ms: f64) {
@@ -139,7 +138,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14G § VAL-M14G-025 / VAL-M14G-046 / VAL-M14G-033**: per-tick
     /// wound aging pass. Increments `age_ticks` every tick + commits
     /// visible-state mutations every 5 ticks. Emits `wound.aged` /
     /// `wound.scabbed` / `wound.scarred` events. Does NOT roll
@@ -220,7 +218,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14G § VAL-M14G-027** + producer surface for `wound.created`.
     ///
     /// Pushes a typed wound onto the actor's `m14g_wound_list` and emits a
     /// `wound.created` event with the canonical payload (actor_id, tick,
@@ -289,7 +286,6 @@ impl M0Engine {
         let event_id = self
             .recorder
             .record(tick, sim_time_ms, "wound", "created", payload, parent);
-        // **M14I**: Concussion wounds at KO-threshold severity (>= 0.5)
         // increment the actor's concussion_count + may emit
         // memory_loss.minor/major.
         if matches!(wound_kind, cf_wound::WoundKind::Concussion) && severity >= 0.5 {
@@ -298,7 +294,6 @@ impl M0Engine {
         Some(event_id)
     }
 
-    /// **M14G § VAL-M14G-013 / VAL-M14G-014 / VAL-M14G-036**: upgrade an
     /// existing wound on `(actor_id, zone)` from `old_kind` to
     /// `new_kind` and emit a `wound.escalated` event. Used by the
     /// per-tick thermal pass when a sustained burn / frostbite contact

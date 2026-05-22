@@ -174,7 +174,6 @@ impl TreatmentDifficulty {
     }
 }
 
-/// **M14G** per-wound contract record loaded from `content/wound_specs/*.ron`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WoundSpec {
     pub kind: WoundKind,
@@ -204,7 +203,6 @@ impl WoundSpec {
     }
 }
 
-/// **M14G** WoundSpec registry, keyed by `WoundKind`. Provides 1:1
 /// kind→spec lookup with deterministic iteration order.
 #[derive(Debug, Clone, Default)]
 pub struct WoundSpecRegistry {
@@ -763,7 +761,6 @@ pub fn resolve_emit_kind(
 ) -> Option<WoundKind> {
     if let Some(spec) = registry.get(candidate) {
         if spec.forbids_origin(actor_origin) {
-            // VAL-M14G-021: substitute LacerationLight on robots with CrushLimb.
             if matches!(
                 candidate,
                 WoundKind::LacerationLight
@@ -785,7 +782,6 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    /// VAL-M14G-002: WoundSpec round-trips through RON.
     #[test]
     fn woundspec_round_trip_ron() {
         for kind in WoundKind::ALL.iter() {
@@ -796,7 +792,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14G-003: registry baked default has one spec per WoundKind.
     #[test]
     fn baked_registry_has_one_spec_per_kind() {
         let registry = WoundSpecRegistry::baked_default();
@@ -806,7 +801,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14G-040: every decal_id in the registry is pairwise distinct.
     #[test]
     fn decal_id_one_to_one_mapping() {
         let registry = WoundSpecRegistry::baked_default();
@@ -817,7 +811,6 @@ mod tests {
         assert_eq!(seen.len(), WoundKind::COUNT);
     }
 
-    /// VAL-M14G-021: per-origin forbiddance on robots → substitution to CrushLimb.
     #[test]
     fn origin_forbidden_robot_no_lacerations() {
         let registry = WoundSpecRegistry::baked_default();
@@ -826,7 +819,6 @@ mod tests {
         assert_eq!(kind, Some(WoundKind::CrushLimb));
     }
 
-    /// VAL-M14G-032: tunable defaults table.
     #[test]
     fn tunable_defaults_match_spec() {
         let registry = WoundSpecRegistry::baked_default();
@@ -844,7 +836,6 @@ mod tests {
         assert!((BLEED_RATE_BASE_ML_PER_S_AT_SEVERITY_HALF - 2.0).abs() < 1e-6);
     }
 
-    /// VAL-M14G-045: heal_time_at_band returns the array element at the
     /// band's discriminant.
     #[test]
     fn heal_time_at_band_index_alignment() {
@@ -858,7 +849,6 @@ mod tests {
         assert!((spec.heal_time_at_band(SeverityBand::Lethal) - 6.0).abs() < 1e-6);
     }
 
-    /// VAL-M14G-044: WoundSpec.allowed_zones gates producer emit.
     #[test]
     fn producer_respects_allowed_zones() {
         let registry = WoundSpecRegistry::baked_default();

@@ -10,7 +10,6 @@ use crate::result::MissionResult;
 use crate::state::MissionState;
 use crate::tick::{MissionTickInputs, MissionTickReport, ObjectiveProgressUpdate};
 
-/// **M1.5**: progress quartiles for `mission.objective_updated`. Stable
 /// vocabulary so the run-bundle viewer can render a progress bar.
 const PROGRESS_QUARTILES: [f32; 4] = [0.25, 0.5, 0.75, 1.0];
 
@@ -22,7 +21,6 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
     if state.result.is_terminal() {
         return report;
     }
-    // **M1.5**: while paused (tutorial modal), suspend objective progress
     // AND timer accounting. The caller is responsible for calling
     // `MissionState::resume` to lift the gate.
     if state.paused {
@@ -66,7 +64,6 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
             return report;
         }
     }
-    // **M13** § "Brain hopping" — brain death = mission lost regardless of
     // which actor is currently being puppeted. Scans every actor flagged
     // `is_brain == true` and checks for `Dead` status / hp ≤ 0. This runs
     // BEFORE reactor_destroyed because brain death is mission-critical
@@ -96,7 +93,6 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
     // objective's `status` to `Failed` so `MissionView::from_state` reports
     // `failed` in the observe envelope (Devin review BUG_pr-review-job
     // -8dddb0ae78c7456997c4d2dc7aade217_0001).
-    // Bugbot 3212230553 (Low): scan Active OR Pending defend_reactor
     // objectives. If a defend_reactor is queued behind another objective
     // (Pending status) and its reactor is destroyed in the meantime, the
     // mission MUST resolve as Lost { ReactorDestroyed } immediately rather
@@ -126,7 +122,6 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
         return report;
     }
 
-    // **M14 audit pass 4 (Finding 4)**: DefendActor loss-on-destroyed path.
     // When `loss_on_destroyed` is true (schema default) and the defended
     // actor is destroyed before the deadline, immediately resolve the
     // mission as Lost. Reactors map to `LossReason::ReactorDestroyed`;
@@ -242,7 +237,6 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
             }
             return report;
         }
-        // M2 audit pass 5 (2026-05-13): spec literal — "mission.objective_failed
         // fires with objective_id='reach_extraction', reason='timer_expired'"
         // when the timer expires while any Active objective is incomplete.
         // Iterate every Active objective and flip it to Failed so the engine
@@ -314,12 +308,10 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
                 // above; passive ticks never auto-complete it.
                 false
             }
-            // **M14 audit pass 3 (GAP-M9-01)**: DefendActor completes when
             // current_tick >= until_tick (or mission time_limit_ticks when
             // until_tick is None) AND the defended actor is still alive.
             // Loss-on-destroy is handled in the fail-sensor pre-pass.
             //
-            // **M14 audit pass 4 (Finding 4)**: actor_id is a String per
             // schema; resolve via reactors_destroyed map first (M9
             // command-core / reactor case), then fall back to parsing as
             // a u64 actor id (M25+ turret / chassis-module case).

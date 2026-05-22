@@ -10,7 +10,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M7-A**: per-actor autonomy mode. Set once per actor or globally; persists
 /// across mission saves in M25 campaign.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Default)]
@@ -57,7 +56,6 @@ impl AutonomyMode {
     }
 }
 
-/// **M7**: per-squad doctrine. Biases every member's Utility scorer.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]

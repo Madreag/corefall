@@ -18,7 +18,6 @@ use cf_wound::{ActorWoundList, Wound, WoundKind, WoundVisibleState};
 
 pub const MAX_BADGES_PER_ZONE: usize = 5;
 
-/// **M14G** wound-strip badge.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WoundBadge {
     pub zone: ZoneId,
@@ -157,7 +156,6 @@ mod tests {
         Wound::new(WoundId(id), kind, severity, ZoneId::from(zone))
     }
 
-    /// VAL-M14G-020: severity 0.85 surfaces `[!!] CRITICAL` caption and the
     /// medic auto-triage delta is 0.4.
     #[test]
     fn critical_badge_caption_and_triage() {
@@ -168,7 +166,6 @@ mod tests {
         assert!((badges[0].medic_utility_delta - 0.4).abs() < 1e-6);
     }
 
-    /// VAL-M14G-026: per-zone overflow collapse at 6 wounds → 5 badges + `+1`.
     #[test]
     fn per_zone_overflow_collapse() {
         let zone = ZoneId::from("arm_left");
@@ -191,7 +188,6 @@ mod tests {
         assert_eq!(badges10.last().unwrap().overflow_count, 5);
     }
 
-    /// VAL-M14G-049: mixed-kind overflow collapse renders identically to
     /// same-kind overflow.
     #[test]
     fn mixed_kind_overflow_collapse() {
@@ -211,7 +207,6 @@ mod tests {
         assert_eq!(overflow.overflow_count, 1);
     }
 
-    /// VAL-M14G-050: deterministic ordering when n > 5 — two identical
     /// inputs return byte-identical badge buffers.
     #[test]
     fn overflow_selection_deterministic() {
@@ -228,7 +223,6 @@ mod tests {
         assert_eq!(first, second);
     }
 
-    /// VAL-M14G-031: badge decal_id is taken from the spec mapping.
     #[test]
     fn badge_decal_id_and_caption_mapping() {
         let zone = ZoneId::from("torso_front");
@@ -245,7 +239,6 @@ mod tests {
         assert_eq!(badges[1].decal_id, "decal.LacerationLight");
     }
 
-    /// VAL-M14G-042: each of the 6 visible states produces a distinct
     /// `WoundBadgeVariant`.
     #[test]
     fn six_visible_states_distinct_badges() {
@@ -272,7 +265,6 @@ mod tests {
         assert_eq!(set.len(), 6);
     }
 
-    /// VAL-M14G-012: through-and-through emits 2 badges on the silhouette.
     #[test]
     fn through_and_through_bleed_sums_and_badge_count() {
         let mut list = ActorWoundList::new();

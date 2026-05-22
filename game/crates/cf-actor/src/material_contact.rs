@@ -25,7 +25,6 @@ pub struct MaterialContact {
     pub walk_speed_mult: f32,
 }
 
-/// **M14A** § "Per-stride material contact resolver" — apply a single
 /// stride's worth of material contact effects.
 ///
 /// `friction_mult` and `speed_mult` come from

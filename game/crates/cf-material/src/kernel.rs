@@ -148,7 +148,6 @@ pub struct KernelStepReport {
     pub slept_chunks: Vec<(i32, i32)>,
 }
 
-/// **M15** § the canonical per-tick orchestrator. Drives every active-
 /// material kernel concern in one deterministic call.
 ///
 /// ## Order of operations (locked by the M15 acceptance scenarios)
@@ -472,7 +471,6 @@ fn dispatch_reactions_in_chunk(
 /// Attempt to fire one reaction between pixels `pa_pos` (material `pa`)
 /// and `pb_pos` (material `pb`). Returns true if a reaction fired.
 ///
-/// **M15B** § This also spawns every material in `reaction.emissions`
 /// into an adjacent air cell. The search walks NESW deterministically
 /// starting at `input_a`'s neighbors, then `input_b`'s neighbors. Each
 /// emission consumes one air cell; subsequent emissions don't overlap.
@@ -510,7 +508,6 @@ fn try_fire_reaction(
     if let Some(byproduct) = rxn.byproduct {
         terrain.set_material_pixel(b_pos[0], b_pos[1], byproduct, tick);
     }
-    // **M15B** § spawn tertiary emissions into adjacent air cells.
     let mut emission_positions: Vec<[i32; 2]> = Vec::with_capacity(rxn.emissions.len());
     let mut occupied: std::collections::BTreeSet<(i64, i64)> = std::collections::BTreeSet::new();
     // Don't spawn an emission ON the pixels we just rewrote.
@@ -561,14 +558,12 @@ fn try_fire_reaction(
     true
 }
 
-/// **M15B** § Local re-export shim for the EMISSION_DROPPED sentinel so
 /// the orchestrator can spell it without leaking the crate-public name
 /// into every match arm. Kept private to this module.
 mod cf_material_internal {
     pub const EMISSION_DROPPED_REEXPORT: i32 = crate::reactions::EMISSION_DROPPED;
 }
 
-/// **M15B** § Find an adjacent air cell to spawn an emission into. The
 /// search walks NESW (north → east → south → west) starting at
 /// `a_pos`'s neighbors, then `b_pos`'s neighbors. `occupied` lists
 /// cells already taken by THIS reaction's output/byproduct/prior
@@ -966,7 +961,6 @@ mod tests {
         assert!(terrain.dirty_chunk_count() > 0, "dirty chunk set must be populated");
     }
 
-    /// **M15B** § VAL-M15B-emissions-001: wood + fire reaction emits
     /// smoke + CO2 into adjacent air cells (the cascade-friendly
     /// tertiary-output path). The wood pixel becomes charcoal; the
     /// fire pixel stays as fire (cascade); smoke + CO2 appear in
@@ -1018,7 +1012,6 @@ mod tests {
         assert_eq!(terrain.material_at(p1[0] as i64, p1[1] as i64), 53, "co2 placed");
     }
 
-    /// **M15B** § VAL-M15B-emissions-002: cascade preservation —
     /// emissions don't kill the fire cascade. The CRITICAL property:
     /// after a wood+fire reaction fires (with emissions), the fire
     /// pixel MUST still be fire (so adjacent wood pixels can also
@@ -1053,7 +1046,6 @@ mod tests {
         assert_eq!(terrain.material_at(5, 5), 41, "wood pixel became charcoal");
     }
 
-    /// **M15B** § VAL-M15B-emissions-003: emission drop sentinel —
     /// when no adjacent air cell is available, the emission is dropped
     /// + the event records the sentinel position.
     #[test]
@@ -1093,7 +1085,6 @@ mod tests {
         }
     }
 
-    /// **M15B** § VAL-M15B-emissions-004: gunpowder + fire explosion
     /// emits a dense smoke cloud (2× smoke + CO2). The reaction's
     /// emissions vec has length 3.
     #[test]

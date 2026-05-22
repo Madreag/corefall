@@ -6,9 +6,7 @@
 //! below when no override is set. This keeps the binding mappable by the
 //! player while still pinning the spec's reserved default keys.
 
-/// **M4B § F5 quicksave**.
 pub const ACTION_QUICKSAVE: &str = "save.quicksave";
-/// **M4B § F9 quickload**.
 pub const ACTION_QUICKLOAD: &str = "save.quickload";
 
 /// Default KeyCode-name string for the quicksave action (matches the

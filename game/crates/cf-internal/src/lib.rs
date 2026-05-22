@@ -43,7 +43,6 @@ pub const HEAVY_DAMAGE_THRESHOLD: f32 = 5.0;
 /// when an internal-shock roll succeeds.
 pub const DEFAULT_INTERNAL_DAMAGE_MODIFIER: f32 = 0.6;
 
-/// **M14**: kind discriminator on the actor's body. Drives the
 /// routing path (organ graph vs circuit graph).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -54,7 +53,6 @@ pub enum InternalGraphKind {
     Robot,
 }
 
-/// **M14**: organ catalog matching the locked
 /// `internal_organ_damaged.json` schema enum.
 ///
 /// Names mirror the schema literal so producer + validator agree.
@@ -76,7 +74,6 @@ pub const HUMANOID_ORGANS: &[&str] = &[
     "pancreas",
 ];
 
-/// **M14**: circuit catalog matching the locked
 /// `internal_circuit_damaged.json` schema enum.
 pub const ROBOT_CIRCUITS: &[&str] = &[
     "power_core",
@@ -93,7 +90,6 @@ pub const ROBOT_CIRCUITS: &[&str] = &[
     "comm_relay",
 ];
 
-/// **M14**: organ kind for the event payload (`organ_kind` field).
 pub fn organ_kind(organ_id: &str) -> &'static str {
     match organ_id {
         "brain" | "spine" => "central_nervous",
@@ -106,7 +102,6 @@ pub fn organ_kind(organ_id: &str) -> &'static str {
     }
 }
 
-/// **M14**: circuit kind for the event payload (`circuit_kind` field).
 pub fn circuit_kind(circuit_id: &str) -> &'static str {
     match circuit_id {
         "power_core" | "fuel_tank" | "oil_reservoir" => "power",
@@ -117,7 +112,6 @@ pub fn circuit_kind(circuit_id: &str) -> &'static str {
     }
 }
 
-/// **M14**: weighted candidate for routing. Higher `weight` ⇒ more likely
 /// to be selected. The engine builds the candidate list from the hit zone
 /// + the graph, then [`select_weighted`] picks one deterministically.
 #[derive(Debug, Clone, Copy)]
@@ -126,7 +120,6 @@ pub struct WeightedCandidate {
     pub weight: f32,
 }
 
-/// **M14**: humanoid organ weights per spec § "Pipeline → Iterate
 /// stance-specific zone AABB table" — the hit zone determines which
 /// organs are statistically near the impact point.
 #[must_use]
@@ -189,7 +182,6 @@ pub fn humanoid_organ_weights(hit_zone: &str) -> Vec<WeightedCandidate> {
     out
 }
 
-/// **M14**: robot circuit weights mirroring [`humanoid_organ_weights`].
 #[must_use]
 pub fn robot_circuit_weights(hit_zone: &str) -> Vec<WeightedCandidate> {
     let mut out: Vec<WeightedCandidate> = Vec::with_capacity(ROBOT_CIRCUITS.len());
@@ -241,7 +233,6 @@ pub fn robot_circuit_weights(hit_zone: &str) -> Vec<WeightedCandidate> {
     out
 }
 
-/// **M14**: deterministic weighted selection. `rng_roll` is a [0, 1)
 /// draw from the engine's seeded RNG. Returns `None` only when the
 /// candidate list is empty.
 ///
@@ -267,11 +258,9 @@ pub fn select_weighted(candidates: &[WeightedCandidate], rng_roll: f32) -> Optio
     Some(candidates[candidates.len() - 1].id)
 }
 
-/// **M14**: full internal-damage routing decision. Returns the selected
 /// id + applied damage when the heavy-damage threshold was crossed, else
 /// `None`.
 ///
-/// Per spec § "Per-organ internal damage routing":
 ///   - When passthrough_damage > heavy_damage_threshold (5 HP):
 ///     - Roll internal_shock_probability based on (passthrough, impulse, ap_factor)
 ///     - Select random organ/circuit weighted by hit_zone proximity to organ's mount_point
@@ -305,7 +294,6 @@ pub fn route_internal_damage(
     })
 }
 
-/// **M14**: HE / explosion variant — route damage to up to 3 unique
 /// organs / circuits in the affected radius. Returns the selected ids in
 /// the order they were drawn. Uses `rng_rolls` as a slice of independent
 /// `[0, 1)` draws from the engine RNG; consumes up to 3 rolls.

@@ -27,7 +27,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::echo::{dominant_band, weighted_mean_coefficient, DecayBand};
 
-/// **M12B** § Resolved per-room reverb profile.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ReverbProfile {
     /// Reverb-tail decay time in seconds.
@@ -70,7 +69,6 @@ impl ReverbProfile {
     }
 }
 
-/// **M12B** § Per-room wall composition row. `surface_area_m2` is the
 /// area fraction (in m²) of this wall in the room; the reverb derivation
 /// uses area as the weight in [`weighted_mean_coefficient`] +
 /// [`dominant_band`].
@@ -84,7 +82,6 @@ pub struct WallComposition {
     pub surface_area_m2: f32,
 }
 
-/// **M12B** § Derive a [`ReverbProfile`] from room volume + wall
 /// composition + aperture state.
 ///
 /// `volume_m3` is the M19 `room.volume_m3` (existing field).
@@ -134,7 +131,6 @@ pub fn derive_reverb_profile(
     }
 }
 
-/// **M12B** § Aperture state contribution. Spec § "fraction_of_walls_open
 /// = open apertures / total wall surface area; an open door drops
 /// `wet_dry_mix` toward dry.".
 #[must_use]

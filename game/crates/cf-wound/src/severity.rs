@@ -125,7 +125,6 @@ impl SeverityBand {
 mod tests {
     use super::*;
 
-    /// VAL-M14G-004: SeverityBand boundary classification.
     #[test]
     fn band_boundary_table() {
         let cases: &[(f32, SeverityBand)] = &[
@@ -148,7 +147,6 @@ mod tests {
         }
     }
 
-    /// VAL-M14G-005: each band exposes label, color, auto-triage threshold,
     /// and treatment-difficulty curve with pairwise distinctness and
     /// monotonic thresholds.
     #[test]

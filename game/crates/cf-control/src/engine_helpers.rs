@@ -193,7 +193,6 @@ pub(crate) fn hud_focusable_nodes() -> Vec<String> {
     HUD_FOCUSABLE_NODES.iter().map(|s| (*s).to_string()).collect()
 }
 
-/// **M1.5**: compose the AI-debug intent label rendered above the guard
 /// sprite when `Settings.ai_debug == true`. Format mirrors the spec text
 /// ("ALERT: heard_shot", "ENGAGED", "RELOADING", "STUCK: blocked"). The
 /// label is also produced when ai_debug is disabled so the run bundle
@@ -208,7 +207,6 @@ pub(crate) fn ai_intent_label(guard: &cf_ai::ReactiveGuard) -> String {
         cf_ai::GuardState::Dying => "DYING",
         cf_ai::GuardState::Dead => "DEAD",
     };
-    // M2 audit pass 7 (2026-05-13): spec literal — label shows
     // "{STATE}: {REASON}" (e.g. "ALERT: heard shot", "ENGAGING",
     // "RELOADING", "STUCK: blocked"). Reason is the most recent
     // state-change cause. Fall back to the chosen-tactic vocabulary when
@@ -269,7 +267,6 @@ pub(crate) fn build_mission_view(state: &cf_mission::MissionState, current_tick:
 /// append-only relative to M1 so the `sim_state_v1` suffix stays valid:
 /// `(M0 prefix) || (M1 actor bytes) || (M1.5 breach + guards + mission) ||
 /// (M2 chunked terrain) || (M2.5 reactor world)`.
-/// **M5**: parse a body zone name (`head`, `torso`, ...) into a `cf_chassis::BodyZone`.
 pub(crate) fn parse_body_zone(s: &str) -> Option<cf_chassis::BodyZone> {
     match s {
         "head" => Some(cf_chassis::BodyZone::Head),
@@ -297,7 +294,6 @@ pub(crate) fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
         out.extend_from_slice(&g.checksum_bytes());
     }
     if let Some(mission) = state.mission.as_ref() {
-        // **M4 § Checksum scope sim_state_v1** — element #17 spec literal:
         // `mission_state (current_phase, timer_remaining_ticks,
         // objective_states[])`. Previously only objective status was
         // hashed, so two missions with identical objective statuses but
@@ -319,7 +315,6 @@ pub(crate) fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
     if let Some(reactors) = state.reactor_world.as_ref() {
         out.extend_from_slice(&reactors.checksum_bytes());
     }
-    // **M14B § Checksum**: include the gravity field + wind force + gas
     // stratification producer state so any non-determinism in the
     // DamagedGrav wave-front growth, transient wind apertures, or
     // stratification deltas surfaces as a checksum drift instead of
@@ -356,7 +351,6 @@ pub(crate) fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
         out.extend_from_slice(&id.to_le_bytes());
         out.extend_from_slice(&ttl.to_le_bytes());
     }
-    // **M14G § VAL-CROSS-029**: hash the M14E + M14F transient state that
     // ships with this mission so save → load → save round-trips byte-
     // identically. Append-only — never reorder existing fields.
     out.extend_from_slice(&(state.m14e_chunks.len() as u64).to_le_bytes());
@@ -430,14 +424,12 @@ pub(crate) fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
     out
 }
 
-/// **M14G § VAL-CROSS-029**: mod-payload key under which
 /// [`M0Engine::snapshot_world_save`] stashes the M14C/D/E/F/G runtime
 /// state in [`cf_save::WorldSave::mod_payload`]. Append-only — readers
 /// that don't understand this key still round-trip the value verbatim
 /// per the SaveBlob "Mod-extending fields survive migration" contract.
 pub(crate) const M14_SAVE_EXTENSION_KEY: &str = "corefall.m14_state";
 
-/// **M14G § VAL-CROSS-029**: serializable wrapper around the M14C/D/E/F/G
 /// engine state that participates in the save/load round-trip.
 /// `capture` reads from a read-locked [`EngineMutable`] reference;
 /// `apply` writes back into a write-locked one. Both round-trip through
@@ -501,7 +493,6 @@ pub(crate) struct M14SaveExtension {
     pub m14g_thermal_emitted_kind: Vec<((u64, String), cf_wound::WoundKind)>,
     /// M14G material-contact one-shot fired set.
     pub m14g_material_contacts_fired: Vec<usize>,
-    /// **M14G**: per-actor rifle state at save tick — `(actor_id,
     /// rifle_preset, ammo_in_mag, reload_remaining_ticks,
     /// fire_cooldown_ticks)`. Restored alongside the SaveBlob's
     /// per-actor rifle fields so the loaded engine's `sim.rifles`
@@ -509,7 +500,6 @@ pub(crate) struct M14SaveExtension {
     pub rifle_states: Vec<RifleStateSnapshot>,
 }
 
-/// **M14G § VAL-CROSS-029**: serializable view of one `cf_equipment::RifleState`
 /// stamp used by [`M14SaveExtension`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct RifleStateSnapshot {
@@ -667,7 +657,6 @@ pub(crate) enum ToolValidityUpdate {
     Refuse { reason: String, target: Option<String> },
 }
 
-/// **M11 / DR-012**: resolve which HUD focusable node lives under a logical
 /// pointer position. cf-app owns the actual hit-box geometry; this server-
 /// side helper provides a deterministic mapping based on a normalized
 /// 0..1 layout grid so cfctl `act.input.mouse_click` can target any node
@@ -714,7 +703,6 @@ pub(crate) fn push_caption(queue: &mut VecDeque<crate::state::CaptionView>, capt
     }
 }
 
-/// **M5**: build a HUD banner for a chassis stage transition.
 pub(crate) fn chassis_stage_banner(stage: cf_chassis::ChassisStage, now_tick: u64) -> Option<crate::state::HudBannerView> {
     let (id, severity, label) = match stage {
         cf_chassis::ChassisStage::Nominal => return None,
@@ -740,7 +728,6 @@ pub(crate) fn chassis_stage_banner(stage: cf_chassis::ChassisStage, now_tick: u6
     })
 }
 
-/// **M5**: build a HUD banner for a pilot-state transition (eject/extract/lost).
 pub(crate) fn chassis_pilot_banner(state: cf_chassis::PilotState, now_tick: u64) -> Option<crate::state::HudBannerView> {
     let (id, severity, label) = match state {
         cf_chassis::PilotState::Bound => return None,
@@ -771,7 +758,6 @@ pub(crate) fn chassis_pilot_banner(state: cf_chassis::PilotState, now_tick: u64)
 /// cause discriminant rather than relying on a generic catch-all label here, so
 /// the cause-chain stays semantically correct for replay analysis.
 ///
-/// **M1 audit pass 6 (2026-05-13)**: recognize the `travel_impulse_damage`
 /// flag (latched by `cf-actor::sim` when an UNSTABLE actor takes
 /// travel-impulse damage per CCCP `Actor.cpp:1199`).
 pub(crate) fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
@@ -904,7 +890,6 @@ pub(crate) fn prototype_slice_for_milestone(milestone: &str) -> String {
     if normalized.is_empty() {
         return "M0".to_string();
     }
-    // Bugbot 3212491755 + Devin 3212416493 both caught: the prior
     // `format!("M{rest}")` produced lowercase letter suffixes (`m3a` → `M3a`)
     // because `rest` retained the lowercased form from `normalized`. Letter-
     // suffixed milestones (M3A/M3B/M4A/M4B) must produce uppercase suffixes
@@ -949,7 +934,6 @@ pub(crate) fn next_actions_for_milestone(milestone: &str) -> Vec<String> {
 /// for M3A+).
 pub(crate) fn notes_addendum_for_milestone(milestone: &str) -> String {
     let normalized = milestone.trim().to_lowercase();
-    // Devin 3212580450 caught the source-truthful evidence bug here: claiming
     // ALL 12 event categories ship at every milestone is wrong (M0 only ships
     // system / control / determinism; terrain / material / mission / ai are
     // M1.5+; snapshot is M3A+). Build the per-milestone category list so the
@@ -957,7 +941,6 @@ pub(crate) fn notes_addendum_for_milestone(milestone: &str) -> String {
     // across the whole roadmap. Layer is append-only: each milestone inherits
     // every prior category.
     //
-    // Devin 3212593186 follow-up: refactor from explicit per-milestone match
     // arms (which silently broke for M3B / M4A / M4B / M6+ that weren't
     // enumerated) to an ordering-based comparison via `milestone_order_index`.
     // The order index is the canonical roadmap progression and any new
@@ -998,7 +981,6 @@ pub(crate) fn notes_addendum_for_milestone(milestone: &str) -> String {
     s.push_str(
         "- Localization deferred to M4 — the discipline rule (no baked English-only player-facing strings) applies.\n",
     );
-    // DR-007 launch material set is reference documentation for what the
     // material system shape is. Every M2+ bundle that has material events
     // in events.jsonl benefits from seeing it, including milestones that
     // RUN ON TOP OF chunked terrain (M3B replay viewer, M4A readability)
@@ -1006,7 +988,6 @@ pub(crate) fn notes_addendum_for_milestone(milestone: &str) -> String {
     // material kernel, M6.6 AI material competence, M7.5 base atmospherics,
     // M8.5 material lab, M8.6 mining + refining).
     //
-    // Bugbot 3212607793 + Devin 3212623450 caught the prior explicit
     // allowlist that stopped at M5.10 — when M6.6 / M7.5 / M8.5 / M8.6
     // (all of which clearly extend or work with materials) ship, they
     // would have silently missed the addendum. The fix matches the
@@ -1149,7 +1130,6 @@ pub(crate) fn discover_run_artifacts(run_bundle_dir: &Path) -> (Vec<ArtifactItem
     (items, link)
 }
 
-/// **M8 game_speed_assist + pie-menu sim-speed composition.** Returns the
 /// effective sim-speed percentage (0..=100) the per-tick scheduler honors
 /// for the current tick. Composes:
 ///
@@ -1591,7 +1571,6 @@ pub(crate) fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatc
     changed
 }
 
-// **M12C**: Cinematic kernel integration helpers — inherent methods on
 // `M0Engine` (sync; called by cf-shell mission-load hooks + the cf-app
 // per-frame loop). The async dispatch methods (`act_player_*` /
 // `dump_cinematic_state`) live in the `EngineHandle` trait impl below.

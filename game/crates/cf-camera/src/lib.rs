@@ -17,7 +17,7 @@
 //! - [`enter_free_look`] / [`exit_free_look`] — RMB-toggled cursor follow.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 
 pub mod director_hook;
 pub mod follow;

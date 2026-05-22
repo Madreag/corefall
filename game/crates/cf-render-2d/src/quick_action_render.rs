@@ -31,7 +31,6 @@ pub struct RadialRenderData {
     pub slot_render: Vec<SlotRenderData>,
 }
 
-/// **M14A** § "Time-slow vignette when QAB radial open" — vignette opacity
 /// derived from the radial sim time multiplier. Returns 0..1 alpha.
 pub fn time_slow_vignette_alpha(sim_time_multiplier: f32, reduce_motion: bool) -> f32 {
     if reduce_motion {

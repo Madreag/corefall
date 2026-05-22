@@ -116,7 +116,6 @@ pub(crate) fn run_paced_loop(engine: &Arc<M0Engine>, target_ticks: u64, tick_rat
     bundle_written
 }
 
-/// **M1 R2 / Blocker 3b**: race `engine.drive_tick()` as fast as possible
 /// while the control API processes commands on its own tokio runtime. When
 /// the engine's clock budget is exhausted, sleep briefly so the control
 /// server can dispatch the next `sim.run_for_ticks` / `sim.step` command.

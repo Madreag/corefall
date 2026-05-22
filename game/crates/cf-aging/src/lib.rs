@@ -84,7 +84,6 @@ pub const HUMAN_RETIREMENT_AGE: f32 = 55.0;
 /// Default human terminal age (in-game years).
 pub const HUMAN_TERMINAL_AGE: f32 = 80.0;
 
-/// **M14I** § aging origin — gates the per-year degradation pass.
 ///
 /// `Biological` origins (humans, android_organic_side, powered_organic,
 /// heavy_biomech) tick the age clock. `Mechanical` origins (robots,
@@ -141,7 +140,6 @@ impl AgingOrigin {
     }
 }
 
-/// **M14I** § per-actor biological age + degradation accumulators.
 ///
 /// Carried on `cf-actor::ActorState.long_term.biological_age`. Mutated
 /// by [`BiologicalAge::tick`] once per simulation tick.
@@ -305,7 +303,6 @@ impl BiologicalAge {
     }
 }
 
-/// **M14I** § typed result of one [`BiologicalAge::tick`] call.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AgingTickResult {
     pub year_advanced: bool,
@@ -315,14 +312,12 @@ pub struct AgingTickResult {
     pub terminal_roll: Option<TerminalRoll>,
 }
 
-/// **M14I** § resolvable per-week terminal-mortality roll.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TerminalRoll {
     pub probability_x1000: u32,
     pub tick: u64,
 }
 
-/// **M14I** § per-cycle aging event payload, surfaced via cf-replay.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum AgingEvent {

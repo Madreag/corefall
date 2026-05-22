@@ -6,7 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14A** § "CCCP MovementState enum → Corefall MoveState enum".
 ///
 /// CCCP source: `Entities/Actor.h:33` (NOMOVE..MOVEMENTSTATECOUNT) + AHuman
 /// extends with CROUCH/CRAWL/ARMCRAWL/CLIMB. Hover is Corefall-only for
@@ -84,7 +83,6 @@ impl MoveState {
     pub const COUNT: usize = 10;
 }
 
-/// **M14A** § "Prone state machine" — CCCP `AHuman.cpp:2674-2691`.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -113,7 +111,6 @@ impl ProneState {
     }
 }
 
-/// **M14A** § "ArmsState" — what the upper body is doing this tick. Used by
 /// the held-device sway + 2-handed weapon support detection.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -152,7 +149,6 @@ impl UpperBodyState {
     }
 }
 
-/// **M14J** § "swim refinement supersedes M16's `swim` placeholder" — the
 /// actor's per-tick aquatic locomotion mode. `None` when the actor is not
 /// in a water tile. `Surface*` variants are above the surface using
 /// horizontal strokes; `Dive` / `Tread` are submerged.

@@ -50,12 +50,10 @@ pub use cf_ai::{
     ENGINEER_AUTO_REPAIR_FIRST_TICK_SECONDS, ENGINEER_AUTO_REPAIR_REACH_SECONDS, MEDIC_AUTO_TRIAGE_APPLY_SECONDS,
     MEDIC_AUTO_TRIAGE_REACH_SECONDS,
 };
-// **M7-B**: chatter cooldown is 4.0 seconds per `(actor, category)` per
 /// spec § Chatter scaffold cooldown table. Re-exported so the audit greps
 /// can find the constant on the cf-control side.
 pub use cf_ai::CHATTER_COOLDOWN_SECONDS;
 
-/// **M7-A**: per-actor AI state. **M7-B** adds `personality_modifier`
 /// (one of Aggressive / Cautious / Loyal / LoneWolf / Neutral) which
 /// re-weights the priority table on top of the role template.
 #[derive(Debug, Clone)]
@@ -63,9 +61,7 @@ pub struct BotState {
     pub archetype: Archetype,
     pub stack: ThinkingStack,
     pub personality: PersonalityProfile,
-    /// **M7-B**: personality modifier driving the priority re-weight.
     pub personality_modifier: PersonalityModifier,
-    /// **M7-B**: per-faction allegiance assignment (defaults to AiEnemy
     /// for spawned guards). Drives friendly-fire decisions + the matrix
     /// when relationships shift.
     pub faction: FactionId,
@@ -73,45 +69,36 @@ pub struct BotState {
     pub auto_triage: Option<AutoTriageMission>,
     /// In-flight auto-repair mission (Engineer).
     pub auto_repair: Option<AutoRepairMission>,
-    /// **M7-A fix-round-2**: previous tick's chosen task. Used by
     /// `detect_behavior_transitions` to fire one event per transition INTO
     /// a sub-plan task family (cover / suppression / retreat) instead of
     /// once per tick the bot remains in that task.
     pub last_chosen_task: Option<TaskType>,
-    /// **M7-A fix-round-2**: patrol route (waypoint loop + idle countdown).
     /// Auto-seeded with a 2-waypoint loop on bot creation; scenarios
     /// override via `set_patrol_route`.
     pub patrol: PatrolRoute,
-    /// **M7-A fix-round-2**: pending squad-comm relays this bot owes its
     /// squadmates. Each entry fires `ai.squad_comm_relayed` once its
     /// `relay_tick` is reached (0.5 s delay per spec § Squad communication).
     pub squad_comm_pending: Vec<SquadCommPending>,
-    /// **M7-A fix-round-2**: tracks the previous tick's player-visibility
     /// flag so we can detect the *transition* from "lost the player" to
     /// "spotted the player" and schedule one squad-comm relay per fresh
     /// detection, not one per tick the player stays visible.
     pub had_player_visibility: bool,
-    /// **M7-A fix-round-2**: tracks the last elevation gain we emitted a
     /// `ai.high_ground_preference_applied` for. Re-emit only when the
     /// chosen task transitions back into the high-ground task family.
     pub last_high_ground_emission_task: Option<TaskType>,
-    /// **M7-A fix-round-2**: tracks the last friendly-fire-avoidance
     /// emission tick so we don't spam events while the friendly stays in
     /// the line of fire. One emission per (actor, friendly) until the
     /// friendly clears the LOS.
     pub last_friendly_fire_avoidance_friendly: Option<ActorId>,
-    /// **M7-B fix-round-2 (audit gap A18)**: sliding window of shot ticks
     /// fired by this bot. Trimmed to the last
     /// [`SUSTAINED_COMBAT_WINDOW_SECONDS`] each time the bot fires. Drives
     /// the sustained-combat stress accumulator (10+ shots in 5s pumps
     /// stress one band per burst).
     pub recent_shot_ticks: Vec<u64>,
-    /// **M7-B fix-round-2 (audit gap A18)**: stress band the bot currently
     /// occupies. Transitions are surfaced as `ai.stress_threshold_crossed`
     /// events. Initialised to [`StressThreshold::Calm`] so the first
     /// upward crossing (Calm → Stressed) fires once at the right boundary.
     pub last_stress_band: StressThreshold,
-    /// **M7-B fix-round-2 (audit gap A18)**: latch toggled true the first
     /// tick the sliding window contains [`SUSTAINED_COMBAT_SHOT_COUNT`]
     /// shots and reset to false when the window drops back below the
     /// threshold. Prevents repeated stress pumping on every shot inside a
@@ -141,7 +128,6 @@ impl BotState {
         }
     }
 
-    /// **M7-A fix-round-2**: replace the bot's patrol route. Scenarios that
     /// declare an explicit waypoint list call this; otherwise the default
     /// 2-waypoint loop seeded by `BotState::new` ticks the patrol contract.
     pub fn set_patrol_route(&mut self, waypoints: Vec<[f32; 2]>) {
@@ -149,7 +135,6 @@ impl BotState {
     }
 }
 
-/// **M7-A**: world-level AI surface owned by the engine. **M7-B** adds the
 /// chatter cooldown table so production paths can rate-limit chatter
 /// emission without duplicating per-actor state across call sites.
 #[derive(Debug, Clone, Default)]
@@ -159,29 +144,23 @@ pub struct M7AiWorld {
     pub phase: Option<PhaseState>,
     pub reinforcements: ReinforcementRegistry,
     pub boss: Option<BossState>,
-    /// **M7-B**: per-actor per-category chatter cooldown gate.
     pub chatter_cooldowns: ChatterCooldownTable,
-    /// **M7 (audit gap A15)**: cumulative count of enemy actors that
     /// transitioned to DYING since scenario start. Drives the
     /// reinforcement wave trigger condition `(phase + kill_count)`.
     pub kill_count: u32,
-    /// **M7 (audit gap A17)**: per-phase latch tracking which boss
     /// phases have already fired their canonical
     /// `boss.special_ability_triggered` event. Prevents duplicate
     /// emissions across ticks while the boss remains in the same phase.
     pub boss_abilities_emitted: std::collections::BTreeSet<u8>,
-    /// **M7 (audit gap A13/A14)**: optional v0.5 mission objective graph.
     /// When `Some`, the engine ticks `tick_objective_graph` per frame to
     /// surface `mission.objective_branched` and `mission.optional_offered`
     /// emissions when active set transitions land. `None` means the
     /// scenario opts out of the v0.5 graph (M2 single-vec objective list
     /// continues unchanged).
     pub objective_graph: Option<ObjectiveGraph>,
-    /// **M7 (audit gap A14)**: per-objective latch for
     /// `mission.optional_offered` so each optional objective surfaces
     /// exactly once when its dependencies clear.
     pub optionals_offered: std::collections::BTreeSet<String>,
-    /// **M7 (audit gap A13)**: per-branching-point latch so the
     /// `mission.objective_branched` event fires exactly once per chosen
     /// branch (the `chosen_branch` write to `BranchingPoint` is the
     /// authoritative trigger).
@@ -232,7 +211,6 @@ impl M7AiWorld {
         }
     }
 
-    /// **M7-B**: set a single task weight on an actor's PriorityTable.
     /// Clamps `weight` to `0..=9`. Returns `(old, new)` weights on success
     /// or `Err(reason)` if the actor has no `BotState`.
     pub fn set_priority(&mut self, actor: ActorId, task: TaskType, weight: u8) -> Result<(u8, u8), &'static str> {
@@ -246,7 +224,6 @@ impl M7AiWorld {
         Ok((old, clamped))
     }
 
-    /// **M7-B**: set an actor's autonomy mode. Returns `Some(old)` on
     /// success, `None` if the actor has no `BotState`.
     pub fn set_autonomy(&mut self, actor: ActorId, mode: AutonomyMode) -> Option<AutonomyMode> {
         let bot = self.bots.get_mut(&actor)?;
@@ -255,7 +232,6 @@ impl M7AiWorld {
         Some(old)
     }
 
-    /// **M7-B**: replace an actor's PriorityTable with one of the 6
     /// spec-mandated role templates (also re-applies the archetype +
     /// behavior tree library). Returns `Some(())` on success.
     pub fn apply_role_template(&mut self, actor: ActorId, template: RoleTemplate) -> Option<()> {
@@ -266,7 +242,6 @@ impl M7AiWorld {
         Some(())
     }
 
-    /// **M7-B**: apply a quick preset to an actor's PriorityTable. The
     /// preset shifts task families ±2 per spec § Quick presets. Returns
     /// `Some(())` on success.
     pub fn apply_quick_preset(&mut self, actor: ActorId, preset: QuickPresetId) -> Option<()> {
@@ -276,7 +251,6 @@ impl M7AiWorld {
         Some(())
     }
 
-    /// **M7-B**: apply a personality modifier on top of the actor's
     /// current PriorityTable. Updates `bot.personality_modifier` for
     /// future round-trips through snapshot/restore.
     pub fn apply_personality_modifier(&mut self, actor: ActorId, modifier: PersonalityModifier) -> Option<()> {
@@ -287,7 +261,6 @@ impl M7AiWorld {
         Some(())
     }
 
-    /// **M7-B**: build the JSON view of an actor's PriorityTable for the
     /// `observe.priority_table` cfctl method. Returns `None` if the actor
     /// has no `BotState`.
     pub fn priority_table_view(&self, actor: ActorId) -> Option<Value> {
@@ -304,7 +277,6 @@ impl M7AiWorld {
         }))
     }
 
-    /// **M7-B**: build the JSON view of an actor's autonomy state for the
     /// `observe.autonomy` cfctl method.
     pub fn autonomy_view(&self, actor: ActorId) -> Option<Value> {
         let bot = self.bots.get(&actor)?;
@@ -317,7 +289,6 @@ impl M7AiWorld {
         }))
     }
 
-    /// **M7-B**: build a JSON snapshot of every actor's PriorityTable for
     /// the snapshot/restore round-trip contract. The map keys are
     /// stringified actor ids (deterministic via BTreeMap iteration).
     pub fn snapshot_actor_priorities(&self) -> Value {
@@ -331,7 +302,6 @@ impl M7AiWorld {
         Value::Object(map)
     }
 
-    /// **M7-B**: restore PriorityTables previously captured via
     /// `snapshot_actor_priorities`. Missing actors are skipped (the
     /// caller is expected to assign archetypes first). Returns the
     /// number of tables restored.
@@ -359,7 +329,6 @@ impl M7AiWorld {
         count
     }
 
-    /// **M7-B**: try to emit a chatter event for `(actor, category)` at
     /// `current_tick`. Returns the event payload + caption text iff the
     /// cooldown is open. The engine records the event via cf-replay AND
     /// surfaces the caption via `HudState.captions`.
@@ -406,7 +375,6 @@ pub enum AssignmentResult {
     Changed { previous: Archetype },
 }
 
-/// **M7-A**: pure helper — find the nearest live Medic-role ally to a
 /// downed actor, returning its actor id (and squared distance). Walks the
 /// `bots` map deterministically (BTreeMap key order). Skips bots whose
 /// archetype is not Medic or whose status is Dying/Dead.
@@ -445,13 +413,11 @@ pub fn nearest_medic(
     best
 }
 
-/// **M7-A**: returns true if a status represents a bot that can still
 /// engage in combat / dispatch missions.
 pub fn is_combat_ready(status: Status) -> bool {
     matches!(status, Status::Stable | Status::Unstable)
 }
 
-/// **M7-A**: pure helper — find the nearest live Engineer-role ally near a
 /// chassis module that needs repair.
 pub fn nearest_engineer(
     bots: &BTreeMap<ActorId, BotState>,
@@ -488,14 +454,12 @@ pub fn nearest_engineer(
     best
 }
 
-/// **M7-A**: pure helper to determine if a bot's HP is below their
 /// archetype's effective retreat threshold (factoring personality traits).
 pub fn should_retreat(bot: &BotState, hp_fraction: f32) -> bool {
     let threshold = cf_ai::effective_retreat_threshold(&bot.personality);
     hp_fraction <= threshold
 }
 
-/// **M7-A**: build a `ThinkingContext` snapshot from current world state.
 ///
 /// The engine constructs one of these per-bot per-tick and feeds it to
 /// `ThinkingStack::tick`. World-state booleans are deterministic functions
@@ -541,7 +505,6 @@ pub fn build_context<'a>(
     ctx
 }
 
-/// **M7-A**: build a JSON payload for `ai.reason_label_changed`.
 pub fn reason_label_changed_payload(actor_id: u64, output: &AiTickOutput) -> Value {
     let label = &output.reason_label;
     json!({
@@ -557,7 +520,6 @@ pub fn reason_label_changed_payload(actor_id: u64, output: &AiTickOutput) -> Val
     })
 }
 
-/// **M7-A**: build a JSON payload for `ai.thinking_layer_invoked`.
 pub fn thinking_layer_invoked_payload(actor_id: u64, output: &AiTickOutput) -> Value {
     let layers: Vec<&'static str> = output.layers_invoked.iter().map(|l| l.as_str()).collect();
     json!({
@@ -568,7 +530,6 @@ pub fn thinking_layer_invoked_payload(actor_id: u64, output: &AiTickOutput) -> V
     })
 }
 
-/// **M7-A**: build a JSON payload for `ai.archetype_chosen`.
 pub fn archetype_chosen_payload(actor_id: u64, archetype: Archetype) -> Value {
     json!({
         "actor_id": actor_id,
@@ -576,7 +537,6 @@ pub fn archetype_chosen_payload(actor_id: u64, archetype: Archetype) -> Value {
     })
 }
 
-/// **M7-A**: build a JSON payload for `ai.auto_triage_initiated`.
 pub fn auto_triage_initiated_payload(event: &AutoTriageInitiatedEvent) -> Value {
     json!({
         "medic_actor_id": event.medic_actor_id,
@@ -589,7 +549,6 @@ pub fn auto_triage_initiated_payload(event: &AutoTriageInitiatedEvent) -> Value 
     })
 }
 
-/// **M7-A**: build a JSON payload for `ai.auto_triage_applied`.
 pub fn auto_triage_applied_payload(event: &AutoTriageAppliedEvent) -> Value {
     json!({
         "medic_actor_id": event.medic_actor_id,
@@ -600,7 +559,6 @@ pub fn auto_triage_applied_payload(event: &AutoTriageAppliedEvent) -> Value {
     })
 }
 
-/// **M7-A**: build a JSON payload for `ai.auto_repair_initiated`.
 pub fn auto_repair_initiated_payload(event: &AutoRepairInitiatedEvent) -> Value {
     json!({
         "engineer_actor_id": event.engineer_actor_id,
@@ -614,7 +572,6 @@ pub fn auto_repair_initiated_payload(event: &AutoRepairInitiatedEvent) -> Value 
     })
 }
 
-/// **M7-A**: build a JSON payload for `ai.auto_repair_progressed`.
 pub fn auto_repair_progressed_payload(event: &AutoRepairProgressedEvent) -> Value {
     json!({
         "engineer_actor_id": event.engineer_actor_id,
@@ -626,7 +583,6 @@ pub fn auto_repair_progressed_payload(event: &AutoRepairProgressedEvent) -> Valu
     })
 }
 
-/// **M7**: build a JSON payload for `mission.phase_changed`.
 pub fn phase_changed_payload(event: &PhaseChangedEvent) -> Value {
     json!({
         "from": event.from.as_str(),
@@ -636,7 +592,6 @@ pub fn phase_changed_payload(event: &PhaseChangedEvent) -> Value {
     })
 }
 
-/// **M7**: build a JSON payload for `mission.reinforcement_wave_spawned`.
 pub fn reinforcement_wave_spawned_payload(event: &ReinforcementWaveSpawnedEvent) -> Value {
     json!({
         "wave_id": event.wave_id,
@@ -647,7 +602,6 @@ pub fn reinforcement_wave_spawned_payload(event: &ReinforcementWaveSpawnedEvent)
     })
 }
 
-/// **M7**: build a JSON payload for `boss.phase_changed`.
 pub fn boss_phase_changed_payload(event: &BossPhaseChangedEvent) -> Value {
     json!({
         "actor_id": event.actor_id,
@@ -658,7 +612,6 @@ pub fn boss_phase_changed_payload(event: &BossPhaseChangedEvent) -> Value {
     })
 }
 
-/// **M7**: build a JSON payload for `boss.special_ability_triggered`.
 pub fn boss_special_ability_payload(event: &BossSpecialAbilityEvent) -> Value {
     json!({
         "actor_id": event.actor_id,
@@ -668,7 +621,6 @@ pub fn boss_special_ability_payload(event: &BossSpecialAbilityEvent) -> Value {
     })
 }
 
-/// **M7 (audit gap A13)**: build a JSON payload for
 /// `mission.objective_branched`.
 pub fn objective_branched_payload(event: &ObjectiveBranchedEvent) -> Value {
     json!({
@@ -679,7 +631,6 @@ pub fn objective_branched_payload(event: &ObjectiveBranchedEvent) -> Value {
     })
 }
 
-/// **M7 (audit gap A14)**: build a JSON payload for
 /// `mission.optional_offered`.
 pub fn optional_offered_payload(event: &OptionalOfferedEvent) -> Value {
     json!({
@@ -688,7 +639,6 @@ pub fn optional_offered_payload(event: &OptionalOfferedEvent) -> Value {
     })
 }
 
-/// **M7 (audit gap A17)**: canonical phase ability mapping per spec
 /// § Mission director v0.5 → Mini-boss. Phase 1 has no special ability
 /// (ranged baseline); Phase 2 raises a shield; Phase 3 enters enraged
 /// final stand. The string is the wire form embedded in
@@ -702,7 +652,6 @@ pub fn boss_ability_for_phase(phase: BossPhase) -> Option<&'static str> {
 }
 
 // ---------------------------------------------------------------------------
-// **M7-A fix-round-2**: payload helpers for the 7 behavior sub-plan events
 // (cover_seeking_started / suppression_started / retreat_decision /
 // squad_comm_relayed / patrol_waypoint_reached / friendly_fire_avoidance /
 // high_ground_preference_applied). Each helper accepts the canonical cf-ai
@@ -710,7 +659,6 @@ pub fn boss_ability_for_phase(phase: BossPhase) -> Option<&'static str> {
 // schema in `cf-replay/schemas/event/ai_<event>.json`.
 // ---------------------------------------------------------------------------
 
-/// **M7-A fix-round-2**: build a JSON payload for `ai.cover_seeking_started`.
 pub fn cover_seeking_started_payload(event: &CoverSeekingEvent) -> Value {
     json!({
         "actor_id": event.actor_id,
@@ -721,7 +669,6 @@ pub fn cover_seeking_started_payload(event: &CoverSeekingEvent) -> Value {
     })
 }
 
-/// **M7-A fix-round-2**: build a JSON payload for `ai.suppression_started`.
 pub fn suppression_started_payload(event: &SuppressionEvent) -> Value {
     json!({
         "actor_id": event.actor_id,
@@ -731,7 +678,6 @@ pub fn suppression_started_payload(event: &SuppressionEvent) -> Value {
     })
 }
 
-/// **M7-A fix-round-2**: build a JSON payload for `ai.retreat_decision`.
 pub fn retreat_decision_payload(event: &RetreatDecisionEvent) -> Value {
     json!({
         "actor_id": event.actor_id,
@@ -741,7 +687,6 @@ pub fn retreat_decision_payload(event: &RetreatDecisionEvent) -> Value {
     })
 }
 
-/// **M7-A fix-round-2**: build a JSON payload for `ai.squad_comm_relayed`.
 pub fn squad_comm_relayed_payload(event: &SquadCommRelayedEvent) -> Value {
     json!({
         "originator_actor_id": event.originator_actor_id,
@@ -752,7 +697,6 @@ pub fn squad_comm_relayed_payload(event: &SquadCommRelayedEvent) -> Value {
     })
 }
 
-/// **M7-A fix-round-2**: build a JSON payload for `ai.patrol_waypoint_reached`.
 pub fn patrol_waypoint_reached_payload(event: &PatrolWaypointReachedEvent) -> Value {
     json!({
         "actor_id": event.actor_id,
@@ -762,7 +706,6 @@ pub fn patrol_waypoint_reached_payload(event: &PatrolWaypointReachedEvent) -> Va
     })
 }
 
-/// **M7-A fix-round-2**: build a JSON payload for `ai.friendly_fire_avoidance`.
 pub fn friendly_fire_avoidance_payload(event: &FriendlyFireAvoidanceEvent) -> Value {
     json!({
         "actor_id": event.actor_id,
@@ -771,7 +714,6 @@ pub fn friendly_fire_avoidance_payload(event: &FriendlyFireAvoidanceEvent) -> Va
     })
 }
 
-/// **M7-A fix-round-2**: build a JSON payload for
 /// `ai.high_ground_preference_applied`.
 pub fn high_ground_preference_applied_payload(event: &HighGroundEvent) -> Value {
     json!({
@@ -781,7 +723,6 @@ pub fn high_ground_preference_applied_payload(event: &HighGroundEvent) -> Value 
     })
 }
 
-/// **M7-A fix-round-2**: world-state snapshot the engine collects each
 /// AI tick to drive `detect_behavior_transitions`. All fields are owned
 /// snapshots so the engine can release the world borrow before the
 /// detector mutates `BotState` (cursor advance, squad-comm scheduling,
@@ -819,7 +760,6 @@ pub struct BehaviorSignals {
     pub tick_rate_hz: u32,
 }
 
-/// **M7-A fix-round-2**: behavior-transition emission bundle. Each field
 /// holds an optional ready-to-record JSON payload for the corresponding
 /// `ai.*` event, or `None` if the transition didn't fire this tick.
 /// `squad_comm_relayed` is `Vec` because a single tick may flush multiple
@@ -835,7 +775,6 @@ pub struct BotBehaviorEmit {
     pub high_ground_preference_applied: Option<Value>,
 }
 
-/// **M7-A fix-round-2**: detect behavior-sub-plan transitions for one bot
 /// from the per-tick chosen task + `BehaviorSignals` snapshot, emitting
 /// payloads for the 7 events covered by audit gaps A1-A7. Mutates the
 /// bot's tracking state (`last_chosen_task`, patrol cursor, squad-comm
@@ -1021,7 +960,6 @@ fn quantize(value: f32) -> f32 {
     (value * 100.0).round() / 100.0
 }
 
-/// **M7-A**: outcome of `tick_bot` — what events the engine should emit.
 #[derive(Debug, Clone)]
 pub struct BotTickEmit {
     pub reason_label_changed: Option<Value>,
@@ -1049,7 +987,6 @@ impl BotTickEmit {
     }
 }
 
-/// **M7-A**: drive the per-bot thinking-stack tick and surface event
 /// payloads the engine should emit. Pure-ish: takes &mut bot and a context
 /// snapshot, returns the emit bundle. Auto-triage / auto-repair lifecycle
 /// transitions are detected here and surfaced as `Some(payload)` for the
@@ -1065,7 +1002,6 @@ pub fn tick_bot(bot: &mut BotState, ctx: ThinkingContext<'_>) -> BotTickEmit {
     emit
 }
 
-/// **M7-A**: spawn an auto-triage mission for the Medic-role bot.
 ///
 /// Returns the initiated payload + initiates the mission. cf-control emits
 /// `ai.auto_triage_initiated` with the returned payload AND, on subsequent
@@ -1090,7 +1026,6 @@ pub fn begin_auto_triage(
     Some(payload)
 }
 
-/// **M7-A**: apply stabilization — mark the auto-triage mission as applied
 /// AND return the corresponding event payload. Returns `None` if there's
 /// no active mission or it already terminated.
 pub fn complete_auto_triage(bot: &mut BotState, tick: u64, tick_rate_hz: u32) -> Option<Value> {
@@ -1110,7 +1045,6 @@ pub fn complete_auto_triage(bot: &mut BotState, tick: u64, tick_rate_hz: u32) ->
     Some(auto_triage_applied_payload(&event))
 }
 
-/// **M7-A**: spawn an auto-repair mission for the Engineer-role bot.
 pub fn begin_auto_repair(
     bot: &mut BotState,
     engineer_id: ActorId,
@@ -1131,7 +1065,6 @@ pub fn begin_auto_repair(
     Some(payload)
 }
 
-/// **M7-A**: record a repair-tick on the Engineer's active mission. Emits
 /// `ai.auto_repair_progressed` payload.
 pub fn progress_auto_repair(bot: &mut BotState, tick: u64, repair_amount: f32) -> Option<Value> {
     let mission = bot.auto_repair.as_mut()?;
@@ -1151,7 +1084,6 @@ pub fn progress_auto_repair(bot: &mut BotState, tick: u64, repair_amount: f32) -
 }
 
 // ---------------------------------------------------------------------------
-// **M7-A fix-round-2 (audit gaps A8-A11)**: per-tick checks the engine runs
 // after the actor pipeline to drive `ai.auto_triage_applied` and
 // `ai.auto_repair_progressed` emissions. The scan helpers identify
 // ready-to-complete missions; the engine then calls
@@ -1159,13 +1091,11 @@ pub fn progress_auto_repair(bot: &mut BotState, tick: u64, repair_amount: f32) -
 // verification grep finds the literal call sites in `engine.rs`.
 // ---------------------------------------------------------------------------
 
-/// **M7-A fix-round-2 (audit gap A11)**: per-repair-tick HP restored to the
 /// damaged module. Spec § Auto-repair Gherkin: "module HP +N per second".
 /// N is unspecified by the spec; cf-control picks a moderate baseline so
 /// the repair contract terminates within a couple of progress events.
 pub const AUTO_REPAIR_AMOUNT_PER_TICK: f32 = 5.0;
 
-/// **M7-A fix-round-2 (audit gap A9)**: walk every bot and surface the
 /// `(medic_id, target_id)` pairs whose auto-triage missions have reached
 /// their `reach_deadline_tick` this tick. Engine-side caller invokes
 /// `complete_auto_triage` directly on each medic bot to mark the mission
@@ -1183,7 +1113,6 @@ pub fn ready_triage_completions(world: &M7AiWorld, current_tick: u64) -> Vec<(Ac
     out
 }
 
-/// **M7-A fix-round-2 (audit gap A11)**: walk every bot and surface the
 /// `(engineer_id, target_id, module_id)` triples whose auto-repair
 /// missions have reached `first_tick_deadline_tick` AND not yet recorded
 /// any repair tick. Engine-side caller invokes `progress_auto_repair`
@@ -1208,7 +1137,6 @@ pub fn ready_repair_progressions(world: &M7AiWorld, current_tick: u64) -> Vec<(A
     out
 }
 
-/// **M7**: advance the 4-phase mission director, emitting
 /// `mission.phase_changed` when a transition fires. **M9** extends this
 /// to drive the 7-phase reactor-defense pacer; the
 /// `mission.director_phase_change` companion payload is surfaced through
@@ -1217,7 +1145,6 @@ pub fn advance_phase(world: &mut M7AiWorld, tick: u64, tick_rate_hz: u32, cause:
     advance_phase_with_director_event(world, tick, tick_rate_hz, cause).map(|(legacy, _director)| legacy)
 }
 
-/// **M9** (audit fix gap 3): advance the pacer and surface BOTH the M7
 /// `mission.phase_changed` payload (back-compat) AND the M9
 /// `mission.director_phase_change` payload (with `duration_seconds` of
 /// the just-completed phase). Returns `Some((legacy_payload,
@@ -1257,7 +1184,6 @@ pub fn advance_phase_with_director_event(
     ))
 }
 
-/// **M9**: build a JSON payload for `mission.director_phase_change`. The
 /// `phases_completed` list mirrors `PhaseState::phases_completed` so the
 /// M10 viewer can render the in-order pacer timeline without
 /// reconstructing it from the event stream.
@@ -1273,7 +1199,6 @@ pub fn director_phase_change_payload(event: &DirectorPhaseChangeEvent, phases_co
     })
 }
 
-/// **M9** (audit fix gap 3): event-driven advance — used by the engine
 /// to drive BuildUp → SustainPeak (when reactor pressure crosses into
 /// Critical), SustainPeak → Relax (when guard dies), and Relax →
 /// Debrief (when mission resolves). Unlike `advance_phase`, this does
@@ -1305,7 +1230,6 @@ pub fn force_advance_phase(world: &mut M7AiWorld, tick: u64, tick_rate_hz: u32, 
     ))
 }
 
-/// **M7**: check whether any registered reinforcement wave should spawn
 /// for the active phase + kill count, returning an event payload if so.
 pub fn try_spawn_reinforcement(world: &mut M7AiWorld, kill_count: u32, tick: u64) -> Option<Value> {
     let phase = world.phase.as_ref()?.current;
@@ -1313,7 +1237,6 @@ pub fn try_spawn_reinforcement(world: &mut M7AiWorld, kill_count: u32, tick: u64
     Some(reinforcement_wave_spawned_payload(&event))
 }
 
-/// **M7**: apply damage to the mini-boss + return `boss.phase_changed`
 /// payload if a phase transition fired.
 pub fn apply_boss_damage(world: &mut M7AiWorld, damage: f32, tick: u64) -> Option<Value> {
     let boss = world.boss.as_mut()?;
@@ -1329,7 +1252,6 @@ pub fn apply_boss_damage(world: &mut M7AiWorld, damage: f32, tick: u64) -> Optio
     Some(boss_phase_changed_payload(&event))
 }
 
-/// **M7**: emit a `boss.special_ability_triggered` payload when the boss
 /// activates a phase-specific ability (e.g. shield on Phase2).
 pub fn boss_special_ability(world: &M7AiWorld, ability: &str, tick: u64) -> Option<Value> {
     let boss = world.boss.as_ref()?;
@@ -1342,7 +1264,6 @@ pub fn boss_special_ability(world: &M7AiWorld, ability: &str, tick: u64) -> Opti
     Some(boss_special_ability_payload(&event))
 }
 
-/// **M7 (audit gap A17)**: per-tick check of the boss state. Returns the
 /// canonical ability payload for the current phase iff that phase has not
 /// yet emitted its `boss.special_ability_triggered` event since scenario
 /// start. The world's `boss_abilities_emitted` latch is updated so the
@@ -1358,7 +1279,6 @@ pub fn drain_boss_phase_ability(world: &mut M7AiWorld, tick: u64) -> Option<Valu
     boss_special_ability(world, ability, tick)
 }
 
-/// **M7 (audit gap A13/A14)**: per-tick scan of the v0.5 objective
 /// graph. Returns ready-to-record payloads for every optional objective
 /// that just became reachable (its dependencies cleared) and every
 /// branching point whose `chosen_branch` was set since the last scan.
@@ -1411,7 +1331,6 @@ pub fn drain_objective_graph_emissions(world: &mut M7AiWorld, tick: u64) -> Obje
     emit
 }
 
-/// **M7 (audit gap A13/A14)**: bundle of objective-graph payloads
 /// surfaced by [`drain_objective_graph_emissions`].
 #[derive(Debug, Clone, Default)]
 pub struct ObjectiveGraphEmit {
@@ -1419,7 +1338,6 @@ pub struct ObjectiveGraphEmit {
     pub objective_branched: Vec<Value>,
 }
 
-/// **M7 (audit gap A15)**: walk the per-tick `entered_dying` outcomes
 /// and add one to `world.kill_count` for each enemy actor that is NOT
 /// the controllable player. Returns the new cumulative count. The
 /// reinforcement registry consumes this count via
@@ -1440,14 +1358,12 @@ where
     world.kill_count
 }
 
-/// **M7 (audit gap A12/A15)**: ensures the phase pacer is initialised at
 /// the first tick the engine drives. Idempotent — once `world.phase` is
 /// `Some`, subsequent calls are a no-op.
 pub fn ensure_phase_initialised(world: &mut M7AiWorld, tick: u64) {
     world.init_phase(tick);
 }
 
-/// **M7 (audit gap A16)**: convenience helper that combines
 /// [`apply_boss_damage`] with [`drain_boss_phase_ability`] so the engine
 /// can emit both `boss.phase_changed` and `boss.special_ability_triggered`
 /// for a single damage application in one call.
@@ -1461,7 +1377,6 @@ pub fn apply_boss_damage_and_ability(world: &mut M7AiWorld, damage: f32, tick: u
     BossDamageEmit { phase_changed, ability }
 }
 
-/// **M7 (audit gap A16/A17)**: result bundle from
 /// [`apply_boss_damage_and_ability`]. `phase_changed` carries the
 /// `boss.phase_changed` payload when the damage crossed a threshold.
 /// `ability` carries the `boss.special_ability_triggered` payload when
@@ -1472,7 +1387,6 @@ pub struct BossDamageEmit {
     pub ability: Option<Value>,
 }
 
-/// **M7 (audit gap A12)**: scenario-side declaration of a v0.5
 /// reinforcement wave. The engine flattens these into the
 /// [`ReinforcementRegistry`] at construction time.
 #[derive(Debug, Clone, PartialEq)]
@@ -1493,7 +1407,6 @@ impl InitialReinforcementWave {
     }
 }
 
-/// **M7 (audit gap A12)**: scenario-side declaration of the v0.5
 /// 4-phase pacing parameters. Defaults match `PhaseState::new` (30 / 60
 /// / 120 seconds). The engine consumes this in `M0Engine::new` to seed
 /// `world.phase`.
@@ -1524,7 +1437,6 @@ impl InitialPhaseState {
     }
 }
 
-/// **M7 (audit gap A16)**: scenario-side declaration of the mini-boss
 /// state. The engine consumes this at construction to seed `world.boss`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InitialBossState {
@@ -1548,11 +1460,9 @@ impl InitialBossState {
     }
 }
 
-// **M7-B**: event payload helpers for the 9 NEW ai.* schemas. Each helper
 // is a pure function that the engine calls right before
 // `recorder.record(tick, sim_time_ms, "ai", "<event_type>", payload, parent)`.
 
-/// **M7-B**: build a JSON payload for `ai.priority_table_changed`.
 pub fn priority_table_changed_payload(actor_id: u64, task: TaskType, old_weight: u8, new_weight: u8) -> Value {
     json!({
         "actor_id": actor_id,
@@ -1562,7 +1472,6 @@ pub fn priority_table_changed_payload(actor_id: u64, task: TaskType, old_weight:
     })
 }
 
-/// **M7-B**: build a JSON payload for `ai.autonomy_mode_changed`.
 pub fn autonomy_mode_changed_payload(actor_id: u64, from: AutonomyMode, to: AutonomyMode) -> Value {
     json!({
         "actor_id": actor_id,
@@ -1571,7 +1480,6 @@ pub fn autonomy_mode_changed_payload(actor_id: u64, from: AutonomyMode, to: Auto
     })
 }
 
-/// **M7-B**: build a JSON payload for `ai.role_template_applied`.
 pub fn role_template_applied_payload(actor_id: u64, template: RoleTemplate) -> Value {
     json!({
         "actor_id": actor_id,
@@ -1579,7 +1487,6 @@ pub fn role_template_applied_payload(actor_id: u64, template: RoleTemplate) -> V
     })
 }
 
-/// **M7-B**: build a JSON payload for `ai.quick_preset_applied`.
 pub fn quick_preset_applied_payload(actor_id: u64, preset: QuickPresetId) -> Value {
     json!({
         "actor_id": actor_id,
@@ -1587,7 +1494,6 @@ pub fn quick_preset_applied_payload(actor_id: u64, preset: QuickPresetId) -> Val
     })
 }
 
-/// **M7-B**: build a JSON payload for `ai.chatter_emitted`. Surfaces the
 /// `ChatterEmittedEvent` shape in cf-replay's wire form.
 pub fn chatter_emitted_payload(event: &ChatterEmittedEvent) -> Value {
     json!({
@@ -1599,7 +1505,6 @@ pub fn chatter_emitted_payload(event: &ChatterEmittedEvent) -> Value {
     })
 }
 
-/// **M7-B**: build a JSON payload for `ai.personality_changed`. `traits`
 /// is the list of `PersonalityTrait` snake_case ids; `modifier` is the
 /// optional active `PersonalityModifier`.
 pub fn personality_changed_payload(
@@ -1617,7 +1522,6 @@ pub fn personality_changed_payload(
     })
 }
 
-/// **M7-B**: build a JSON payload for `ai.mood_changed`.
 pub fn mood_changed_payload(actor_id: u64, delta: f32, new_mood: f32, cause: &str) -> Value {
     json!({
         "actor_id": actor_id,
@@ -1627,7 +1531,6 @@ pub fn mood_changed_payload(actor_id: u64, delta: f32, new_mood: f32, cause: &st
     })
 }
 
-/// **M7-B**: stress threshold the actor crossed. Names match the spec
 /// step changes (mood < -75 = depressed; stress > 75 = broken).
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum StressThreshold {
@@ -1648,7 +1551,6 @@ impl StressThreshold {
     }
 }
 
-/// **M7-B**: build a JSON payload for `ai.stress_threshold_crossed`.
 pub fn stress_threshold_crossed_payload(
     actor_id: u64,
     threshold: StressThreshold,
@@ -1663,7 +1565,6 @@ pub fn stress_threshold_crossed_payload(
     })
 }
 
-/// **M7-B**: build a JSON payload for `ai.faction_allegiance_changed`.
 pub fn faction_allegiance_changed_payload(
     a: FactionId,
     b: FactionId,
@@ -1681,7 +1582,6 @@ pub fn faction_allegiance_changed_payload(
 }
 
 // ---------------------------------------------------------------------------
-// **M7-B fix-round-2 (audit gap A18)**: per-event mood / stress / faction
 // delta helpers. M7-B already shipped baseline emission at scenario start;
 // these helpers wire the spec's Gherkin "ally killed → -15", "kill scored →
 // +5", "wounded → -10", "sustained combat pumps stress", and "friendly fire
@@ -1691,7 +1591,6 @@ pub fn faction_allegiance_changed_payload(
 // ready-to-record `serde_json::Value` payload for the engine to dispatch.
 // ---------------------------------------------------------------------------
 
-/// **M7-B fix-round-2 (audit gap A18)**: spec constants for the
 /// sustained-combat stress accumulator. The bot enters sustained combat
 /// once `SUSTAINED_COMBAT_SHOT_COUNT` shots land inside the sliding
 /// `SUSTAINED_COMBAT_WINDOW_SECONDS` window, and each entry pumps stress
@@ -1700,7 +1599,6 @@ pub const SUSTAINED_COMBAT_SHOT_COUNT: usize = 10;
 pub const SUSTAINED_COMBAT_WINDOW_SECONDS: f32 = 5.0;
 pub const STRESS_BAND_STEP: f32 = 25.0;
 
-/// **M7-B fix-round-2 (audit gap A18)**: spec deltas for the per-event
 /// mood accumulator. Mirrors spec § Personality traits + mood/stress
 /// "events that affect mood: ally killed (-15), kill landed (+5),
 /// mission progress (+5), wounded (-10)".
@@ -1708,13 +1606,11 @@ pub const MOOD_DELTA_ALLY_KILLED: f32 = -15.0;
 pub const MOOD_DELTA_ALLY_KILL: f32 = 5.0;
 pub const MOOD_DELTA_WOUNDED: f32 = -10.0;
 
-/// **M7-B fix-round-2 (audit gap A18)**: spec delta for the
 /// friendly-fire faction-allegiance shift. Spec § Faction relationship
 /// dynamic shift: "Given player kills allied faction member / Then
 /// faction.relationship_changed fires with delta=-30".
 pub const FACTION_DELTA_FRIENDLY_FIRE: i16 = -30;
 
-/// **M7-B fix-round-2 (audit gap A18)**: classify a stress accumulator
 /// value into one of the four bands. Boundaries: ≥75 = Broken; ≥50 =
 /// Depressed; ≥25 = Stressed; otherwise Calm.
 pub fn stress_band_for(stress: f32) -> StressThreshold {
@@ -1729,7 +1625,6 @@ pub fn stress_band_for(stress: f32) -> StressThreshold {
     }
 }
 
-/// **M7-B fix-round-2 (audit gap A18)**: resolve the [`FactionId`] of an
 /// actor for friendly-fire / kill-observer routing. Tracked bots carry
 /// their faction directly; the player actor (identified by
 /// `player_actor`) is always [`FactionId::Player`]. Returns `None` for
@@ -1744,7 +1639,6 @@ pub fn faction_for_actor(world: &M7AiWorld, actor: ActorId, player_actor: Option
     None
 }
 
-/// **M7-B fix-round-2 (audit gap A18)**: apply a mood delta to one bot
 /// and return the matching `ai.mood_changed` payload. The clamp to
 /// `[-100, +100]` lives on [`PersonalityProfile::adjust_mood`]. Returns
 /// `None` when the actor is not a tracked bot (e.g. the player or a
@@ -1756,7 +1650,6 @@ pub fn adjust_actor_mood(world: &mut M7AiWorld, actor: ActorId, delta: f32, caus
     Some(mood_changed_payload(actor.0, delta, new_mood, cause))
 }
 
-/// **M7-B fix-round-2 (audit gap A18)**: per-bot stress accumulator
 /// driven by sustained combat. Appends `current_tick` to the bot's
 /// sliding window, trims entries older than
 /// `SUSTAINED_COMBAT_WINDOW_SECONDS`, and (when the window just crossed
@@ -1796,7 +1689,6 @@ pub fn record_shot_for_stress(
     Some(stress_threshold_crossed_payload(actor.0, new_band, true, stress_value))
 }
 
-/// **M7-B fix-round-2 (audit gap A18)**: apply a faction-relationship
 /// delta to the world matrix and return a ready-to-record
 /// `ai.faction_allegiance_changed` payload. Adjust is symmetric (per
 /// [`FactionRelationships::adjust`]). Self-pairs are never adjusted
@@ -1823,7 +1715,6 @@ pub fn adjust_faction_relationships(
     Some(faction_allegiance_changed_payload(a, b, actual_delta, new_value, cause))
 }
 
-/// **M7-B fix-round-2 (audit gap A18)**: convenience predicate the
 /// engine uses to decide whether a (shooter, target) hit counts as
 /// friendly fire. Returns true when the two factions are the same, OR
 /// when the current matrix entry between them is strictly positive

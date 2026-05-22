@@ -847,7 +847,6 @@ pub fn begin_ied_chain_cascade(
             if !neighbor.armed || neighbor.kind != MineKind::IedChain {
                 continue;
             }
-            // VAL-M9C-IED-COOKOFF: emit the M14J cookoff intermediary
             // event between this hop and the next. The recorder writes
             // it between adjacent `mine_triggered` records.
             emissions.push(IedChainEmission::Cookoff(IedCookoffEvent {
@@ -1048,7 +1047,6 @@ mod tests {
         }
     }
 
-    /// VAL-M9C-007: unknown enum values reject at parse time.
     #[test]
     fn unknown_mine_kind_rejected_at_parse() {
         let result: Result<MineKind, _> = ron::from_str("\"definitely_not_a_real_mine\"");
@@ -1180,7 +1178,6 @@ mod tests {
         );
     }
 
-    /// VAL-M9C-028: pressure mine triggers on Standing/Crouched actor
     /// over its tile; baseline yield 120 J HE.
     #[test]
     fn pressure_mine_baseline_yield_and_radius() {
@@ -1191,13 +1188,11 @@ mod tests {
         );
     }
 
-    /// VAL-M9C-029: tripwire mine baseline yield 60 J HE.
     #[test]
     fn tripwire_mine_baseline_yield() {
         assert_eq!(MineKind::TripwireMine.baseline_yield_joules(), 60);
     }
 
-    /// VAL-M9C-025: minesweeper detection flips per-faction bit; one
     /// event per newly-revealed mine; revealed-to enemy stays false
     /// after a player-faction ping.
     #[test]
@@ -1261,7 +1256,6 @@ mod tests {
         assert!(again.events.is_empty());
     }
 
-    /// VAL-M9C-026: manual disarm — 6s hold → mine_disarmed{ok} + 1
     /// explosive recovered.
     #[test]
     fn manual_disarm() {
@@ -1300,7 +1294,6 @@ mod tests {
         panic!("disarm hold did not complete after {required} ticks");
     }
 
-    /// VAL-M9C-027: manual disarm failure cases — movement / damage /
     /// release each emit `mine_disarm_failed` with the matching cause.
     #[test]
     fn mine_disarm_interrupt_fails() {
@@ -1454,7 +1447,6 @@ mod tests {
         assert!(outcome.window_ticks <= max_window_ticks);
     }
 
-    /// VAL-M9C-IED-COOKOFF: between any two adjacent `mine_triggered`
     /// events of `trigger_kind=ied_chain`, at least one cookoff
     /// intermediary fires referencing the bridging IED's mine_id.
     #[test]
@@ -1507,7 +1499,6 @@ mod tests {
         }
     }
 
-    /// VAL-M9C-MINE-ARMED-EMIT: deploying a minefield template emits
     /// exactly one `mine_armed` event per placed mine; events fire
     /// before any `mine_triggered` for those mines.
     #[test]
@@ -1583,7 +1574,6 @@ mod tests {
         assert_eq!(trip.tripwire_endpoints, Some(((102, 50), (102, 52))));
     }
 
-    /// VAL-M9C-MINEFIELD-DEPLOY-BEHAVIOR: wired_links in a template
     /// resolve to actual FortificationId values once mines are placed.
     #[test]
     fn template_wired_links_resolve_post_id_allocation() {
@@ -1628,7 +1618,6 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../content/mine_fields")
     }
 
-    /// VAL-M9C-006: all 4 minefield templates parse without errors.
     #[test]
     fn mine_fields_load_all() {
         for name in [

@@ -3,7 +3,6 @@
 //! Owned by `docs/plan/spec/perf-budget-contract.md`. Downstream
 //! milestones must not re-tune.
 
-/// **M8A**: per-tick projectile sim p99 latency budget (milliseconds).
 ///
 /// The projectile sweep + terrain penetration runs `par_iter` over the
 /// projectile pool with snapshotted terrain reads (previous-tick state).

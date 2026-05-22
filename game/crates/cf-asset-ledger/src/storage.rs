@@ -176,7 +176,6 @@ impl LedgerHandle {
     /// Re-writes the ledger file in place under an exclusive advisory lock.
     /// One of two sanctioned post-write mutation surfaces (the other is
     /// `regenerator::rewrite_with_status` for the auto-stale-mark flow).
-    /// Per the spec, re-generation appends a NEW entry then back-fills the
     /// old entry's `superseded_by` field.
     ///
     /// When `superseded_id == new_id` (the same logical asset has been
@@ -451,7 +450,6 @@ pub struct LedgerSummary {
     pub by_category: BTreeMap<String, u64>,
     pub by_tier: BTreeMap<String, u64>,
     pub by_status: BTreeMap<String, u64>,
-    /// **M4A spec literal** "per-pipeline-tier counts" — per-pipeline-id
     /// breakdown (e.g. `M9A_svg_v1`, `M32A_comfyui_v1`).
     #[serde(default)]
     pub by_pipeline: BTreeMap<String, u64>,

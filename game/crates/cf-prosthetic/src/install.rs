@@ -20,7 +20,6 @@ pub const PROSTHETIC_MAINTENANCE_INTERVAL_SECONDS: f32 = 7.0 * 3600.0 / 365.25;
 /// "Threshold 0.6" is the locked malfunction trigger.
 pub const PROSTHETIC_MALFUNCTION_THRESHOLD: f32 = 0.6;
 
-/// **M14I** § installed prosthetic instance on an actor.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProstheticInstance {
     pub kind: ProstheticKind,
@@ -101,7 +100,6 @@ impl ProstheticInstance {
     }
 }
 
-/// **M14I** § install-session state machine.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstallSession {
     pub actor_id: u64,
@@ -183,7 +181,6 @@ impl InstallSession {
     }
 }
 
-/// **M14I** § maintenance pass error.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum MaintenanceError {
     #[error("no prosthetic installed on the target zone")]
@@ -192,7 +189,6 @@ pub enum MaintenanceError {
     MissingSkill,
 }
 
-/// **M14I** § maintenance outcome.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MaintenanceOutcome {
     /// Wear reset to 0; malfunction flag cleared.
@@ -201,7 +197,6 @@ pub enum MaintenanceOutcome {
     NoOp,
 }
 
-/// **M14I** § run a maintenance pass on a prosthetic instance. Returns
 /// `Restored` when the wear/malfunction was reset, `NoOp` if there was
 /// nothing to fix.
 pub fn maintain_prosthetic(

@@ -12,7 +12,6 @@ use crate::reactor;
 /// projects current hp + destroyed flag into [`MissionTickInputs::reactors`] so
 /// `defend_reactor` objectives can detect destruction.
 ///
-/// **M9** extends the reactor with the surface DR-027's command-core inherits:
 /// pressure-state ladder, 3-layer armor cascade (External / Internal / Core),
 /// mission_critical flag, role tag, heat signature, and a set of
 /// `serde(default)` forward-compat fields for M13+ chassis modules / M25+
@@ -27,7 +26,6 @@ pub struct Reactor {
     /// True once `hp <= 0.0`. Latched: a reactor cannot un-destroy itself.
     #[serde(default)]
     pub destroyed: bool,
-    // **M9** live fields below.
     /// Pressure-state ladder. Advances with HP-percent thresholds per M9 spec
     /// (Nominal > 75%, Stressed 50-75%, Critical 25-50%, Venting 0-25%,
     /// Destroyed = 0). Defaults to Nominal at scenario load.
@@ -41,7 +39,6 @@ pub struct Reactor {
     pub mission_critical: bool,
     /// Identifies the reactor's downstream role. M9 ships
     /// `"command_core_predecessor"`; M25+ flips to `"command_core"` per
-    /// DR-027 without renaming the actor kind.
     #[serde(default = "default_reactor_role")]
     pub role: String,
     /// Forward-compat thermal field for the M16/M19 thermal kernel.
@@ -53,7 +50,6 @@ pub struct Reactor {
     /// invokes [`Reactor::ensure_armor_layers`] at scenario load to populate.
     #[serde(default)]
     pub armor_layers: Vec<reactor::LayerState>,
-    // **M9** forward-compat fields. M25+ command-core / DR-027 fills these
     // without bumping the schema. Audit Pass 7 verifies the placeholder
     // shape matches the spec's declared "Forward-compat (None / empty at M9)"
     // contract.
@@ -123,7 +119,6 @@ impl Reactor {
         x >= min_x && x <= max_x && y >= min_y && y <= max_y
     }
 
-    /// **M9**: HP-percent over `max_hp`, clamped to `[0.0, 1.0]`.
     pub fn hp_percent(&self) -> f32 {
         if self.max_hp <= 0.0 {
             0.0
@@ -132,7 +127,6 @@ impl Reactor {
         }
     }
 
-    /// **M9**: ensure the reactor has the canonical 3-layer External/Internal/
     /// Core armor cascade. Idempotent; safe to call at scenario load (when the
     /// `.ron` may have omitted `armor_layers: []`).
     pub fn ensure_armor_layers(&mut self) {
@@ -150,7 +144,6 @@ impl Reactor {
     /// Apply `damage` to this reactor's hp; returns the post-damage view.
     /// Damage is clamped at zero; `destroyed` flips true when hp hits zero.
     ///
-    /// **M9**: routes damage through the 3-layer armor cascade and advances
     /// the pressure-state ladder. The legacy single-HP signature is preserved
     /// for callers that only need to mutate hp; the richer cascade output
     /// lives in [`Reactor::apply_damage_cascade`].
@@ -158,7 +151,6 @@ impl Reactor {
         let _ = self.apply_damage_cascade(damage);
     }
 
-    /// **M9**: cascade `damage` through External → Internal → Core armor
     /// layers and advance the pressure-state ladder. Returns a structured
     /// report the engine reads to fire `armor.layer_hp_changed` /
     /// `armor.layer_destroyed` / `mission.reactor_hp_changed` /
@@ -167,7 +159,6 @@ impl Reactor {
         self.apply_damage_cascade_with_safety(damage, false)
     }
 
-    /// **M9** (audit fix gap 6): cascade `damage` through External →
     /// Internal → Core armor layers and advance the pressure-state ladder,
     /// honoring the scenario's `tutorial_safety` flag. When
     /// `tutorial_safety = true` AND the cascade would drop the reactor's
@@ -221,7 +212,6 @@ impl Reactor {
         }
         let absorbed_total = damage.max(0.0) - remaining;
         self.hp = (self.hp - absorbed_total).max(0.0);
-        // **M9** spec § Tutorial safety caps reactor at 1 HP: when the
         // cascade would otherwise destroy the reactor, hold HP at 1.0
         // and stamp `pressure_state = Critical` instead. Restore the
         // Core layer to at least 1 HP so subsequent damage applications
@@ -297,7 +287,6 @@ impl Reactor {
         v.extend_from_slice(&quantize(self.hp).to_le_bytes());
         v.extend_from_slice(&quantize(self.max_hp).to_le_bytes());
         v.push(u8::from(self.destroyed));
-        // **M9** determinism scope extensions: include pressure_state +
         // per-layer hp so per-tick checksum byte-matches across host
         // implementations + re-runs.
         v.push(self.pressure_state as u8);

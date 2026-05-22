@@ -125,7 +125,6 @@ pub enum GravityField {
 }
 
 impl GravityField {
-    /// **M14B** § sample the gravity vector at a world position. Returns a
     /// typed [`GravityVec`] (magnitude + direction). For `Uniform(g)` the
     /// magnitude is `|g|` and the direction is `[0, sign(g)]` — preserving
     /// the legacy pixel-scale convention where `g = -980.0` means
@@ -492,7 +491,6 @@ pub fn apply_recoil(velocity_x: f32, aim_x: f32, recoil_impulse: f32) -> f32 {
     velocity_x - aim_x * recoil_impulse
 }
 
-/// **M1 re-audit (2026-05-13)**: F=ma form of recoil application. The
 /// `recoil_impulse` is treated as an actual impulse (kg·m/s) and divided by
 /// the actor mass to produce a Δv. Result: a heavy actor (mass=160 kg) gets
 /// half the velocity delta of a baseline actor (mass=80 kg) from the same
@@ -509,7 +507,6 @@ pub fn apply_recoil_with_mass(velocity_x: f32, aim_x: f32, recoil_impulse: f32, 
     velocity_x - delta_v
 }
 
-/// **M2**: projectile-vs-pixel penetration parameters. Mirrors CCCP
 /// `SceneMan::TryPenetrate` (`SceneMan.cpp:544-686`). The formula uses
 /// `impulse² > integrity²` (CCCP `:571`) so the hot path stays sqrt-free.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -536,7 +533,6 @@ pub struct PenetrationInputs {
     pub rng_roll: f32,
 }
 
-/// **M2**: projectile-vs-pixel penetration outcome.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct PenetrationOutcome {
     /// True if the projectile passed through (the pixel is cleared to air
@@ -553,12 +549,10 @@ pub struct PenetrationOutcome {
     pub impulse_squared: f32,
     /// Squared integrity used by the formula (cached for the event).
     pub integrity_squared: f32,
-    /// **M3 audit pass 5 (2026-05-13)**: unsquared impulse
     /// (= mass × velocity × sharpness). Spec literal payload field;
     /// retained alongside `impulse_squared` for replay-verification
     /// convenience.
     pub impulse: f32,
-    /// **M3 audit pass 5 (2026-05-13)**: unsquared integrity (material
     /// hardness). Spec literal payload field.
     pub integrity: f32,
 }

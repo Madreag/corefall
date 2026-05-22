@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerScanParams",
-  "description": "**M14H** § `act.player.scan` — start a 30s Medical Scanner read.",
   "type": "object",
   "properties": {
     "schema_version": {

@@ -15,7 +15,6 @@ use crate::priority::PriorityTable;
 use crate::task::TaskType;
 use crate::thinking_stack::{Layer, LayerKind, LayerOutput, ThinkingContext};
 
-/// **M7-A**: one scored task in the Utility output.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoredTask {
     pub task: TaskType,
@@ -25,7 +24,6 @@ pub struct ScoredTask {
     pub tag_bonus: f32,
 }
 
-/// **M7-A**: Layer 2 scorer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UtilityLayer {
     pub priority: PriorityTable,
@@ -100,7 +98,6 @@ impl Layer for UtilityLayer {
     }
 }
 
-/// **M7-A**: pure base-utility function. Maps (task, world state) → `[0, 1]`
 /// score. World state is whatever the engine packed onto `ThinkingContext`.
 ///
 /// Tuning per spec § Smart commandable AI — Utility scorer. The numbers are
@@ -266,7 +263,6 @@ pub fn base_utility(task: TaskType, ctx: &ThinkingContext<'_>) -> f32 {
     }
 }
 
-/// **M7-A**: situational multipliers beyond the role template. Examples:
 /// player MMB-tag (+0.5 multiplier on tasks targeting the tagged actor),
 /// mood/stress modifier (low mood reduces aggressive task multipliers),
 /// doctrine bias.

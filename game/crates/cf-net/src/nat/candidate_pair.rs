@@ -76,7 +76,6 @@ pub struct CandidatePairOutcome {
     pub attempts: usize,
 }
 
-/// **M8B § Acceptance "ICE-lite candidate-pair connectivity check"**:
 /// run all pairs "in parallel" and pick the first one that succeeds.
 /// In this model the checker is a callback so tests can simulate
 /// success / failure / timeout per pair.

@@ -12,24 +12,18 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14J** § "T2 equipment id" for the grapple gun.
 pub const GRAPPLE_GUN_T2_ID: &str = "grapple_gun_t2";
 
-/// **M14J** § "Fire a grappling-hook gun (T2 equipment, 20 steel + 5
 /// motor + 10 rope; built at T2 fabricator) at any surface within 30 m".
 pub const GRAPPLE_MAX_RANGE_M: f32 = 30.0;
 
-/// **M14J** § "Rope climb hand-over-hand toward the anchor" — 0.8 m/s.
 pub const ROPE_CLIMB_SPEED_M_PER_S: f32 = 0.8;
 
-/// **M14J** § "Rappel away from the anchor" — 1.5 m/s.
 pub const ROPE_RAPPEL_SPEED_M_PER_S: f32 = 1.5;
 
-/// **M14J** § "Storyteller hooks: `grapple_embedded` (long-distance shot
 /// ≥ 25 m) registers as an M25 story-grade event".
 pub const GRAPPLE_LONG_DISTANCE_M: f32 = 25.0;
 
-/// **M14J** § per-shot grapple result. Either `Embedded` (the hook stuck)
 /// or `Missed` (out of range or non-anchorable material).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum GrappleFireOutcome {
@@ -44,7 +38,6 @@ pub enum GrappleFireOutcome {
     Missed { reason: &'static str },
 }
 
-/// **M14J** § "Fire a grappling-hook gun at any surface within 30 m" —
 /// resolve a fire attempt. Pure / deterministic. Caller supplies the
 /// `material_anchorable(x, y)` predicate (chunked terrain anchor lookup).
 #[must_use]
@@ -76,7 +69,6 @@ where
     }
 }
 
-/// **M14J** § "Saddle universal" — T2 equipment id.
 pub const SADDLE_UNIVERSAL_ID: &str = "saddle_universal";
 
 #[cfg(test)]

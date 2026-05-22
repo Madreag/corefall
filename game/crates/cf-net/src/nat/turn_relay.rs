@@ -38,7 +38,6 @@ pub struct TurnRelayOutcome {
 }
 
 impl TurnRelayClient {
-    /// **M8B § Acceptance "TURN relay engages when ICE-lite fails"**:
     /// allocate a relayed address; in test scenarios the caller
     /// supplies the allocation outcome.
     pub fn allocate<F>(&self, mut allocate_fn: F) -> TurnRelayOutcome

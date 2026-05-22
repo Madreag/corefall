@@ -34,7 +34,6 @@ pub use retirement_event::{
 
 use serde::{Deserialize, Serialize};
 
-/// **M14I** § locked narrative-event kinds. Extended by downstream
 /// milestones (M48 storyteller) without breaking serde compatibility.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

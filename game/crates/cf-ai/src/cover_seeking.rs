@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::archetype::Archetype;
 
-/// **M7-A**: classification of why the bot is seeking cover.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoverSeekingReason {
@@ -34,7 +33,6 @@ impl CoverSeekingReason {
     }
 }
 
-/// **M7-A**: cover-seek event payload. cf-control consumes this and emits
 /// `ai.cover_seeking_started` with the exact shape.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoverSeekingEvent {
@@ -45,7 +43,6 @@ pub struct CoverSeekingEvent {
     pub distance: f32,
 }
 
-/// **M7-A**: helper — pure deterministic search for the nearest cover cell
 /// the bot can move to within `max_distance`. Pure for unit-test seedability;
 /// real engine integration uses the perception grid in `BotMemory`.
 pub fn nearest_cover(self_pos: [f32; 2], candidates: &[[f32; 2]], max_distance: f32) -> Option<[f32; 2]> {

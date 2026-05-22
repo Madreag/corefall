@@ -61,7 +61,6 @@ pub mod migration;
 pub mod migration_v1_to_v2;
 pub mod quicksave;
 
-/// **M4B**: explicit semver `{major, minor, patch}` for the `.cfsave` schema.
 ///
 /// Serialized as a 3-element JSON array `[major, minor, patch]` so canonical
 /// JSON BLAKE3 is unambiguous (whitespace + key ordering of an object body
@@ -235,7 +234,6 @@ pub struct SaveBlob {
     pub climb_active: bool,
     #[serde(default)]
     pub jet_active: bool,
-    /// **M4B § "Mod-extending fields survive migration"**: opaque passthrough
     /// for third-party mods to attach extension data under their own
     /// namespace. Builds without the mod installed MUST round-trip this map
     /// verbatim through migration.
@@ -284,7 +282,6 @@ impl SaveBlob {
     }
 }
 
-/// **M4B**: per-projectile snapshot. M4B treats projectiles as opaque JSON
 /// so mods can add fields. The delta encoder operates on these maps.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct ProjectileSnapshot {
@@ -292,7 +289,6 @@ pub struct ProjectileSnapshot {
     pub state: serde_json::Value,
 }
 
-/// **M4B**: per-terrain-chunk snapshot. M4B treats chunks as opaque JSON
 /// (RLE encoding done at the chunk level; M4B only stores the canonical
 /// `serde_json::Value` so delta encoding is uniform).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -301,7 +297,6 @@ pub struct TerrainChunkSnapshot {
     pub state: serde_json::Value,
 }
 
-/// **M4B**: whole-world save container. The `.cfsave` file format. Owns
 /// the SaveSchemaVersion at the top level + the mod-payload passthrough +
 /// the list of per-actor [`SaveBlob`]s + terrain chunks + projectiles.
 ///
@@ -319,7 +314,6 @@ pub struct WorldSave {
     /// In-flight projectiles at save time.
     #[serde(default)]
     pub projectiles: Vec<ProjectileSnapshot>,
-    /// **M4B § "Mod-extending fields survive migration"**: opaque passthrough
     /// for third-party mod extensions at the whole-world level.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub mod_payload: BTreeMap<String, serde_json::Value>,
@@ -401,7 +395,6 @@ impl WorldSave {
     }
 }
 
-/// **M4B**: structured save errors. These map cleanly to the cf-app modal
 /// strings + the cfctl JSON-RPC error responses.
 #[derive(Debug, Error)]
 pub enum SaveError {
@@ -409,10 +402,8 @@ pub enum SaveError {
     SerializeJson(#[source] serde_json::Error),
     #[error("deserialize save blob from json failed: {0}")]
     DeserializeJson(#[source] serde_json::Error),
-    /// **M4B § "Corrupted save surfaces a clean error, never panics"**.
     #[error("save blob checksum mismatch: expected {expected}, got {actual}")]
     ChecksumMismatch { expected: String, actual: String },
-    /// **M4B § "Save from a future version is rejected clearly"**.
     #[error(
         "save written by a newer game version ({}); this build supports up to {}",
         found.as_string(),
@@ -422,7 +413,6 @@ pub enum SaveError {
         found: SaveSchemaVersion,
         max_supported: SaveSchemaVersion,
     },
-    /// **M4B § "Save written under v1 loads under current build via migration"** —
     /// surfaces when the registry walks `from -> to` and a handler
     /// short-circuits with `reason`.
     #[error("migration failed: from={} to={} reason={reason}", from.as_string(), to.as_string())]
@@ -431,7 +421,6 @@ pub enum SaveError {
         to: SaveSchemaVersion,
         reason: String,
     },
-    /// **M4B § "no payload field is silently dropped"** — surfaces when a
     /// handler discovers an unknown required field on the input that has
     /// no `defaults_for_missing` rule in the migration registry.
     #[error(
@@ -442,7 +431,6 @@ pub enum SaveError {
         version: SaveSchemaVersion,
         field: String,
     },
-    /// **M5 backcompat** — kept so existing match arms continue to compile.
     /// Returned only when the per-actor SaveBlob deserializer sees a numeric
     /// `schema_version` that maps to a version this build cannot migrate.
     #[error("save blob schema version mismatch: expected {}, got {}", expected.as_string(), actual.as_string())]
@@ -566,7 +554,6 @@ mod tests {
         assert_eq!(recovered.afflictions, vec!["bleeding", "concussion"]);
     }
 
-    /// **M4B** § "Save written under v1 loads under current build via
     /// migration" — the numeric compat path. Old saves wrote
     /// `"schema_version": 1`, and the new SaveSchemaVersion deserializer
     /// MUST parse that as v1.0.0 cleanly (then the migration registry walks
@@ -596,7 +583,6 @@ mod tests {
         assert_eq!(recovered.schema_version, V1_0_0);
     }
 
-    /// **M4B** § "SaveSchemaVersion is a 3-element JSON array" — round-trip
     /// the canonical array form so the migration registry never has to
     /// guess what shape `schema_version` is on disk.
     #[test]

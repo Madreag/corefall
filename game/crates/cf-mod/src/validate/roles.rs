@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use crate::report::ValidationReport;
 
-/// **M13**: validate the `content/equipment/roles.json` mod-tooling export.
 /// Authoritative roles live in `cf_equipment::role_records()`; the JSON file
 /// is presentation-only. Validation only checks well-formed JSON with a
 /// top-level `schema_version` integer + a `roles` array.

@@ -68,7 +68,6 @@ pub fn REGISTRY() -> Vec<Box<dyn SaveMigration>> {
     registry()
 }
 
-/// **M4B Notes for the implementer**: "A missing intermediate handler is a
 /// build-time panic". Rust traits can't enforce the contiguity at the type
 /// system level (it depends on runtime construction order); this function
 /// is the next best thing — a `#[test]` calls it to assert the chain is
@@ -237,7 +236,6 @@ mod tests {
         }
     }
 
-    /// **M4B Notes**: registry chain must be contiguous + terminate at
     /// CURRENT_SAVE_SCHEMA_VERSION. This is the build-time equivalent of
     /// the "missing intermediate handler is a panic" guarantee.
     #[test]
@@ -308,7 +306,6 @@ mod tests {
         assert!(matches!(err, SaveError::UnsupportedFutureVersion { .. }));
     }
 
-    /// **M4B spec § SaveError variants** — `MissingRequiredField` is the
     /// variant a handler MUST return when its input has no explicit
     /// `defaults_for_missing` rule for a required field. Future schema
     /// bumps may exercise this; the current v1→v2 handler has no
@@ -325,7 +322,6 @@ mod tests {
         assert!(msg.contains("v1.0.0"));
     }
 
-    /// **M4B § "Mod-extending fields survive migration"** — both per-world
     /// and per-actor `mod_payload` MUST round-trip verbatim through any
     /// migration handler in the registry.
     #[test]

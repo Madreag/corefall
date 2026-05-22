@@ -138,7 +138,6 @@ pub fn step_ca(terrain: &mut ChunkedTerrain, stepper: &mut CaStepperState) -> Ca
     step_ca_filtered(terrain, stepper, /* awake_only = */ false)
 }
 
-/// **M15** § same as [`step_ca`] but when `awake_only=true` the stepper
 /// only visits chunks whose `active_region == true`. Per spec § "Per-
 /// tick: only active chunks simulated (dirty regions + nearby chunks)".
 /// Engines that have opted into wake/sleep gating call this entry

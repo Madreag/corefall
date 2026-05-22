@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ArmorLayerKind, BodyZone, ChassisStage, ModuleKind, ModuleStateKind};
 
-/// **M13** § "Critical chassis modules with full mechanics" — typed cascade
 /// event surfaced by [`crate::ChassisState::apply_critical_module_damage`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum CriticalModuleEvent {
@@ -40,7 +39,6 @@ pub struct CriticalModuleOutcome {
     pub cascade_events: Vec<CriticalModuleEvent>,
 }
 
-/// **M13** § "Spalling integration with chassis modules" — per-fragment outcome.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpallingFragmentOutcome {
     pub fragment_id: String,
@@ -49,7 +47,6 @@ pub struct SpallingFragmentOutcome {
     pub transition: Option<ModuleTransition>,
 }
 
-/// **M13** § "Boarding / disembarking transitions" — which side of the
 /// transition completed this tick.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TransitionCompleted {
@@ -66,7 +63,6 @@ impl TransitionCompleted {
     }
 }
 
-/// **M13** § "Hit reactions per body part (per CCCP MOSRotating::CollideAtPoint)".
 /// Tabulated per-zone reaction (kind label + duration in seconds + concussion dose).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HitReaction {
@@ -274,7 +270,6 @@ pub struct ZoneDamageOutcome {
     pub module_transitions: Vec<ModuleTransition>,
     pub joints_severed: Vec<String>,
     pub actor_hp_damage: f32,
-    /// **M13** § "Limb loss functional consequences" — head/torso loss is
     /// INSTANT DEATH (per CCCP decapitation rule). True iff the destroyed
     /// zone is `Head` or `Torso` and the chassis is NOT tutorial-safe.
     /// Engine consumers should set actor.hp = 0 immediately.

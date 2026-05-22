@@ -9,7 +9,6 @@
 use crate::behavior_tree::BtNode;
 use crate::task::TaskType;
 
-/// **M7B**: enumerated leaf node ids the Rifleman BT can emit. Stable
 /// across milestones; downstream tooling indexes by exact string match.
 pub const NODES: &[&str] = &[
     "rifleman_idle",
@@ -51,7 +50,6 @@ pub const NODES: &[&str] = &[
     "rifleman_track_mover",
 ];
 
-/// **M7B**: list of squad verbs the Rifleman exposes as distinct BT
 /// subtrees per spec § "Suppress vs Overwatch vs Cover Me are distinct BT
 /// subtrees." Ordered for stable RON round-trip.
 pub const SQUAD_VERB_IDS: &[&str] = &[
@@ -61,7 +59,6 @@ pub const SQUAD_VERB_IDS: &[&str] = &[
     "cover_me",
 ];
 
-/// **M7B**: per-squad-verb BT expansion. Returns `None` for verbs that
 /// don't need a distinct subtree (engine falls back to `bt_for_task`).
 pub fn bt_for_squad_verb(verb_id: &str) -> Option<BtNode> {
     match verb_id {
@@ -125,7 +122,6 @@ pub fn bt_for_squad_verb(verb_id: &str) -> Option<BtNode> {
     }
 }
 
-/// **M7B**: Rifleman per-task BT expansion. Falls through to M7-A defaults
 /// for unrelated tasks.
 pub fn bt_for_task(task: TaskType) -> BtNode {
     match task {

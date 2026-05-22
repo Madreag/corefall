@@ -152,7 +152,6 @@ pub fn evaluate_joint(joint: Joint, impulse_in: f32) -> JointEval {
     }
 }
 
-/// **M14**: falling-damage impulse chain. Given a landing velocity (m/s)
 /// plus actor mass (kg) plus a chain of joints (in body-graph order,
 /// foot to leg to torso), return per-joint evaluations. The first joint
 /// that detaches or gibs is the "severance point"; later joints in the
@@ -173,7 +172,6 @@ pub fn fall_impulse_chain(landing_velocity: f32, mass_kg: f32, joints: &[(String
     out
 }
 
-/// **M14**: heavy-melee severance probability. Returns a [0, 1] probability
 /// that a melee weapon strike severs the limb at this joint. Roll an engine
 /// RNG sample uniform in [0, 1] and compare: if `roll < severance_probability`,
 /// severance fires + a `attachable.detached` event emits with cause `"melee_severance"`.
@@ -189,7 +187,6 @@ pub fn severance_probability(severance_chance: f32, joint_strength: f32, referen
     (chance * (1.0 - normalized)).clamp(0.0, 1.0)
 }
 
-/// **M14**: deterministic severance roll. Takes a [0, 1) RNG draw from the
 /// engine's seeded RNG and a probability from [`severance_probability`].
 /// Returns `true` when `roll < probability` (severance fires).
 #[must_use]
@@ -197,7 +194,6 @@ pub fn severance_roll(rng_roll: f32, probability: f32) -> bool {
     rng_roll < probability.clamp(0.0, 1.0)
 }
 
-/// **M14**: explosion proximity severance impulse. Impulse on actor falls
 /// off as `base_impulse / (1 + distance²)` (inverse-square, regularized so
 /// callers don't divide by zero at `distance == 0`). Used to evaluate every
 /// joint against the same impulse-at-actor; the nearest zone severs first.

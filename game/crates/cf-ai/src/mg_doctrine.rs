@@ -267,7 +267,6 @@ mod tests {
         }
     }
 
-    /// VAL-M9C-044: 3 AI defenders + 3 empty MG nests → 3 AI crew the
     /// 3 nests. The 4th AI (extra defender) falls through to
     /// `Overwatch`.
     #[test]

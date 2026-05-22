@@ -17,7 +17,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14** per-zone limb state. Single source of truth for whether a zone
 /// is functional (Intact/Damaged), bleeding (Critical), or lost
 /// (Severed/Destroyed).
 #[repr(u8)]
@@ -43,13 +42,11 @@ impl ZoneState {
         }
     }
 
-    /// Per the spec § Limb-loss state machine — functional consequence
     /// (arm-disabled / leg-limp / etc.) activates at Severed or Destroyed.
     pub fn functional_consequence_active(self) -> bool {
         matches!(self, ZoneState::Severed | ZoneState::Destroyed)
     }
 
-    /// Per the spec § "Critical: near severance; high bleed rate" — only
     /// Critical AND Severed/Destroyed zones bleed at M14. Intact/Damaged
     /// don't bleed.
     pub fn bleeds(self) -> bool {
@@ -92,7 +89,6 @@ pub fn classify(integrity: f32, severed: bool, destroyed: bool) -> ZoneState {
     }
 }
 
-/// **M14**: bleed-out per-tick damage. Per CCCP `Actor::Update` the bleed
 /// rate is 6 HP/sec at full effect; M14 scales by the number of lost zones
 /// (multiple limbs lost = compounding bleed).
 ///

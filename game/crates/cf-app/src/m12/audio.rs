@@ -7,7 +7,6 @@ use crate::app::resources::{
     M12bHrirAdapterRes, M12bReverbSendBusRes, WorkspaceAssetRoot,
 };
 
-/// **M12A** § cf-audio playback engine plugin. Inserts the
 /// `AudioRegistry`, `SfxPool`, `CaptionRegistry`, `AudioReplayQueue`,
 /// and `MixBuses` resources + the per-frame settings-sync + replay-drain
 /// systems.
@@ -32,7 +31,6 @@ impl Plugin for M12aAudioPlugin {
     }
 }
 
-/// **M12B** § Load the HRIR table from
 /// `game/content/audio/hrtf/mit_kemar_subset.bin`, falling back to the
 /// placeholder table when the file is unavailable.
 fn load_m12b_hrir_table() -> cf_audio::HrirTable {
@@ -159,13 +157,11 @@ pub(crate) fn hydrate_audio_registries_from_ledger(
     }
 }
 
-/// **M12A** § Mirror `cf-control::Settings.audio.*_volume` sliders into
 /// the live `MixBuses` resource.
 pub(crate) fn m12a_sync_mix_buses_from_settings(holder: Res<EngineHolder>, buses: Res<M12aMixBusesRes>) {
     let _ = (holder, buses);
 }
 
-/// **M12A** § Drain audio replay queue per Bevy frame.
 pub(crate) fn m12a_drain_audio_replay_queue(
     holder: Res<EngineHolder>,
     mut queue: ResMut<M12aAudioQueueRes>,

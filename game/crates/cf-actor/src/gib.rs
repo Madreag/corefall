@@ -138,7 +138,6 @@ impl GibSpawn {
     }
 }
 
-/// **M14**: cascade chain from a parent zone to every child attachable
 /// that gibs when the parent gibs (per CCCP `RemoveAttachablesWhenGibbing`).
 ///
 /// The map is `parent_zone → list_of_child_zones`. For the default
@@ -166,7 +165,6 @@ pub fn default_cascade_chain(parent_zone: &str) -> &'static [&'static str] {
     }
 }
 
-/// **M14**: deterministic per-particle angle computation for [`SpreadMode`].
 /// `index` is the 0-based particle within the batch; `count` is the total;
 /// `spread` is the angular spread in radians; `rng_roll` is a [0, 1) draw
 /// (used only by [`SpreadMode::SpreadRandom`]).

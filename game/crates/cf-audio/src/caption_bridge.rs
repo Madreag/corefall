@@ -70,7 +70,6 @@ pub struct CaptionTemplate {
     pub categories: Vec<String>,
 }
 
-/// **M12A** § Caption registry — `sfx_id → CaptionTemplate`. Hydrated
 /// from `tools/audio_gen/caption_templates.ron` at startup.
 #[derive(Debug, Default, Clone)]
 pub struct CaptionRegistry {
@@ -134,7 +133,6 @@ pub fn resolve_template(template: &str, ctx: &BTreeMap<String, String>) -> Strin
     out
 }
 
-/// **M12A** § Render the final caption line for an SFX firing event.
 /// Returns `None` if no template exists for the SFX id (every M12A SFX
 /// MUST have a caption per the spec; missing templates are bugs at
 /// authoring time).
@@ -152,7 +150,6 @@ pub fn render_caption_for_sfx(
     Some(resolve_template(&t.template, &ctx))
 }
 
-/// **M12A** § Whether the caption should surface given the live caption
 /// mode + category filter. Maps `cf-control::settings::CaptionMode` to
 /// severity gates:
 ///

@@ -50,7 +50,6 @@ impl TitleMenuOption {
         }
     }
 
-    /// **M12**: convert a title-screen menu click into the matching
     /// `ShellApiCommand`. Per spec § CCCP-style intro slideshow,
     /// "New Game" routes to the 8-slide intro slideshow (first-launch
     /// slot) before the FRE wizard / mission selector.

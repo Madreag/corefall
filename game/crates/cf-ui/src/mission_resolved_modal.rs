@@ -394,7 +394,6 @@ mod tests {
     }
 }
 
-/// **M12** § Player death recap (optional comic flavor). Renders the same
 /// cause chain that [`render_recap_text`] produces but framed as a
 /// **4-panel comic-style cause chain** suitable for a comic-toggle modal
 /// rendering. Each panel maps to one chain link (root cause → terminal
@@ -461,14 +460,12 @@ pub fn render_comic_death_recap(events: &[RecapEvent], divergence_event_id: Opti
     lines.join("\n")
 }
 
-/// **M12**: comic death recap is exactly 4 panels per spec § Story-telling
 /// surfaces → "4-panel comic-style cause chain".
 pub const COMIC_DEATH_RECAP_PANELS: usize = 4;
 
 /// Internal chain-walk depth limit — same as the renderer's panel count.
 const COMIC_DEATH_RECAP_MAX_DEPTH: usize = COMIC_DEATH_RECAP_PANELS;
 
-/// **M12** § Death recap view mode. The Gherkin scenario "Death recap
 /// default is timeline (M10), not comic" specifies:
 ///
 /// - When `settings.ux.comic_death_recap = false` (default): render the
@@ -521,7 +518,6 @@ impl DeathRecapViewMode {
     }
 }
 
-/// **M12** § Death recap renderer entry point that honors the
 /// [`DeathRecapViewMode`] override. cf-app's death-recap modal calls
 /// this with the live view-mode + the live `Settings.comic_death_recap`
 /// flag; the helper picks between [`render_recap_text`] (timeline) and

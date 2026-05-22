@@ -41,7 +41,6 @@ impl M0Engine {
         }
     }
 
-    /// **M14D § VAL-M14D-020** snapshot of the most recent schedule-trace
     /// markers. Surfaces the ordered ring buffer for engine integration
     /// tests asserting pass invocation ordering.
     pub fn m14d_schedule_trace_snapshot(&self) -> Vec<&'static str> {
@@ -51,12 +50,10 @@ impl M0Engine {
             .unwrap_or_default()
     }
 
-    /// **M14D § VAL-M14D-020** schedule-trace invocation counter.
     pub fn m14d_pair_pass_invocations(&self) -> u64 {
         self.state.read().map(|s| s.m14d_pair_pass_invocations).unwrap_or(0)
     }
 
-    /// **M14D § VAL-M14D-008/009/010** trace from the most recent
     /// projectile-pair pass.
     pub fn m14d_last_pair_pass_trace(&self) -> cf_physics::ProjectilePairPassTrace {
         self.state
@@ -65,13 +62,11 @@ impl M0Engine {
             .unwrap_or_default()
     }
 
-    /// **M14D § VAL-M14D-019** per-player `replay_intercepts` setting
     /// surfaced to consumers (cf-killcam).
     pub fn m14d_replay_intercepts(&self) -> bool {
         self.state.read().map(|s| s.m14d_replay_intercepts).unwrap_or(false)
     }
 
-    /// **M14D § VAL-M14D-006** C-RAM cooldown snapshot for the given
     /// owner actor id (or 0 for base-mounted units). Returns the
     /// default idle [`cf_equipment::Cram`] if no intercept has ever
     /// engaged this owner. Callers should observe
@@ -85,7 +80,6 @@ impl M0Engine {
             .unwrap_or_default()
     }
 
-    /// **M14D** snapshot of the current projectile-pair pool length —
     /// used by integration tests to verify projectile consumption.
     pub fn m14d_projectile_pair_pool_len(&self) -> usize {
         self.state
@@ -94,7 +88,6 @@ impl M0Engine {
             .unwrap_or(0)
     }
 
-    /// **M14D § VAL-M14D-002** snapshot of the projectile-pair pool.
     /// Returns a deep copy of every active projectile so tests can
     /// assert per-projectile state without holding the state lock.
     pub fn m14d_projectile_pair_pool_snapshot(&self) -> Vec<cf_physics::ProjectileSnapshot> {
@@ -104,7 +97,6 @@ impl M0Engine {
             .unwrap_or_default()
     }
 
-    /// **M14D § VAL-M14D-001..016 + VAL-M14D-020** per-tick projectile-
     /// projectile CCD pass — STRICTLY between the actor-collision pass
     /// and the terrain pass. Drives the `cf_physics::projectile`
     /// broadphase + narrowphase against the projectile-pair pool
@@ -150,7 +142,6 @@ impl M0Engine {
             let pair_event_id = self
                 .recorder
                 .record(tick, sim_time_ms, "collision", "projectile_pair_contact", payload, None);
-            // **M14G § VAL-CROSS-009**: a fuze-triggered grenade
             // detonation at the intercept point emits a 3× ShrapnelEmbedded
             // cluster on actors within blast radius (3 m / 96 px). Per
             // VAL-M14G-018 each fragment lands on `torso_front` and

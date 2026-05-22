@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use crate::report::ValidationReport;
 
-/// **M5**: identifies a per-event schema file living at
 /// `<.../schemas/event/<family>_<type>.json>`. Used by `walk()` to pick the
 /// file up and by `validate_one()` to route it to `validate_event_schema_file`.
 pub(crate) fn is_event_schema_file(path: &Path) -> bool {
@@ -18,7 +17,6 @@ pub(crate) fn is_event_schema_file(path: &Path) -> bool {
     parent.parent().and_then(|gp| gp.file_name()).and_then(|s| s.to_str()) == Some("schemas")
 }
 
-/// **M5**: identifies an envelope schema file under
 /// `<.../schemas/v0_1/*.schema.json>` or `<.../schemas/v1/*.schema.json>`.
 pub(crate) fn is_envelope_schema_file(path: &Path) -> bool {
     if path.extension().and_then(|s| s.to_str()) != Some("json") {
@@ -36,7 +34,6 @@ pub(crate) fn is_envelope_schema_file(path: &Path) -> bool {
     parent.parent().and_then(|gp| gp.file_name()).and_then(|s| s.to_str()) == Some("schemas")
 }
 
-/// **M5-A1**: matches a version-suffixed envelope directory like `v0_1`,
 /// `v1`, `v0_2`, `v2_5`. Strictly: `^v[0-9]+(_[0-9]+)?$`. Widens the legacy
 /// `v0_1`/`v1` literal match so future M4 envelope-bump migration directories
 /// (BP6+) are picked up automatically.
@@ -65,7 +62,6 @@ pub(crate) fn is_envelope_version_dir(name: &str) -> bool {
     current_segment_has_digit
 }
 
-/// **M5**: validate a per-event JSON schema file under
 /// `cf-replay/schemas/event/`. Two shapes are accepted:
 ///
 /// 1. **M5 envelope-shaped schemas** (new at M5): MUST declare
@@ -223,7 +219,6 @@ pub(crate) fn validate_event_schema_value(path: &Path, value: &serde_json::Value
     messages
 }
 
-/// **M5**: validate an envelope schema file under
 /// `cf-replay/schemas/v0_1/` or `cf-replay/schemas/v1/`. These pre-date M5 —
 /// the validator just confirms well-formed JSON.
 pub(crate) fn validate_envelope_schema_file(path: &Path, report: &mut ValidationReport) {
@@ -256,7 +251,6 @@ mod tests {
     use crate::test_helpers::next_seq;
     use std::path::PathBuf;
 
-    /// **M5**: an M5 envelope-shaped schema passes validation when every const
     /// + required field is in place.
     #[test]
     fn m5_event_schema_valid_envelope_passes() {
@@ -425,7 +419,6 @@ mod tests {
         assert!(messages.is_empty(), "expected pass, got {messages:?}");
     }
 
-    /// **M5**: every shipped M5 schema under cf-replay/schemas/event/ passes
     /// the validator end-to-end. This is the spec scenario:
     /// "cf-mod validate game/crates/cf-replay/schemas/ exits 0".
     #[test]

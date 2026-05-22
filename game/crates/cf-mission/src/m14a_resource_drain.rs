@@ -8,7 +8,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// **M14A** § "Per-origin resource overlay" — per-stride drain rate per
 /// origin class. Spec-locked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -60,14 +59,12 @@ pub fn stride_drain_for_origin(o: OriginClass) -> StrideDrain {
     }
 }
 
-/// **M14A** § "Helmet O2 drain via Stationeers math" — `inhaled_mol_per_tick =
 /// 0.0048 · BreathingRate · BreathingEfficiency`. Returns mol/tick.
 pub fn helmet_o2_inhaled_mol_per_tick(breathing_rate: f32, breathing_efficiency: f32) -> f32 {
     let base = 0.0048;
     base * breathing_rate.max(0.0) * breathing_efficiency.clamp(0.0, 2.0)
 }
 
-/// **M14A** § "Per-origin DYING / UNSTABLE thresholds" — robots skip UNSTABLE.
 pub fn skips_unstable_for_origin(o: OriginClass) -> bool {
     matches!(o, OriginClass::Robot)
 }

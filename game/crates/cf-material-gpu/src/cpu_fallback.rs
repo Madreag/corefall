@@ -61,7 +61,6 @@ mod tests {
     use cf_material::reactions::default_reaction_registry;
     use cf_terrain::chunked::{ChunkedTerrain, MATERIAL_AIR};
 
-    /// VAL-M15B-012: CPU fallback step matches the canonical kernel
     /// report shape.
     #[test]
     fn cpu_kernel_step_matches_kernel_step() {
@@ -77,7 +76,6 @@ mod tests {
         assert_eq!(terrain.material_at(3, 3), 38, "iron→rust on CPU fallback");
     }
 
-    /// VAL-M15B-013: post-step checksum is stable across identical runs.
     #[test]
     fn cpu_kernel_step_checksum_deterministic() {
         fn one_run() -> [u8; 32] {
