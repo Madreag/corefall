@@ -94,6 +94,14 @@ pub mod parkour;
 pub mod quick_action;
 pub mod resource_drain;
 pub mod sim;
+pub mod sim_deps;
+pub mod sim_outcomes;
+pub mod sim_state;
+pub mod sim_step_actor;
+pub mod sim_step_loose;
+pub mod sim_step_projectile;
+#[cfg(test)]
+mod sim_tests;
 pub mod sim_overlay;
 pub mod stamina;
 pub mod stance;
