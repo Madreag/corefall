@@ -1160,4 +1160,94 @@ mod tests {
         );
         assert_eq!(v.get("comic_death_recap").and_then(|x| x.as_bool()), Some(false));
     }
+
+    #[test]
+    fn load_from_content_dir_returns_defaults_when_empty() {
+        let tmp = std::env::temp_dir().join(format!(
+            "cf_settings_test_{}_{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        std::fs::create_dir_all(tmp.join("content/settings")).unwrap();
+        let s = Settings::load_from_content_dir(&tmp);
+        assert_eq!(s, Settings::default());
+    }
+
+    #[test]
+    fn load_from_content_dir_applies_topical_overrides() {
+        let tmp = std::env::temp_dir().join(format!(
+            "cf_settings_test_{}_{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let dir = tmp.join("content/settings");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("accessibility.json"),
+            r#"{"schema_version":1,"ui_scale":1.5,"captions":false}"#,
+        )
+        .unwrap();
+        let s = Settings::load_from_content_dir(&tmp);
+        assert!((s.ui_scale - 1.5).abs() < 1e-6);
+        assert!(!s.captions);
+    }
+}
+
+impl Settings {
+    /// Read every `content/settings/*.json` file under `root` and overlay
+    /// its top-level keys onto `Settings::default()`. Files whose schema
+    /// fails to parse log a `tracing::warn!` and are skipped. Topical
+    /// files (graphics, audio, controls, gameplay, accessibility, network,
+    /// debug) may each override any field that matches a `Settings`
+    /// member; non-matching keys are ignored. Order is alphabetical by
+    /// filename — later files win conflicts.
+    pub fn load_from_content_dir(root: &std::path::Path) -> Self {
+        let dir = root.join("content").join("settings");
+        let defaults = Self::default();
+        let mut merged = match serde_json::to_value(&defaults) {
+            Ok(v) => v,
+            Err(_) => return defaults,
+        };
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => return defaults,
+        };
+        let mut files: Vec<std::path::PathBuf> = entries
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("json"))
+            .collect();
+        files.sort();
+        for path in files {
+            let text = match std::fs::read_to_string(&path) {
+                Ok(t) => t,
+                Err(err) => {
+                    tracing::warn!(?path, %err, "content/settings: cannot read");
+                    continue;
+                }
+            };
+            let overlay: serde_json::Value = match serde_json::from_str(&text) {
+                Ok(v) => v,
+                Err(err) => {
+                    tracing::warn!(?path, %err, "content/settings: cannot parse json");
+                    continue;
+                }
+            };
+            if let (Some(merged_obj), Some(overlay_obj)) = (merged.as_object_mut(), overlay.as_object()) {
+                for (k, v) in overlay_obj {
+                    if k == "schema_version" {
+                        continue;
+                    }
+                    merged_obj.insert(k.clone(), v.clone());
+                }
+            }
+        }
+        match serde_json::from_value::<Settings>(merged) {
+            Ok(s) => s,
+            Err(err) => {
+                tracing::warn!(%err, "content/settings: merged json failed to deserialize; using defaults");
+                defaults
+            }
+        }
+    }
 }

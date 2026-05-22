@@ -15,6 +15,7 @@
 pub mod components;
 pub mod engine;
 pub mod engine_audio;
+pub mod engine_config;
 pub mod engine_baselines;
 pub mod engine_new;
 #[cfg(test)]
