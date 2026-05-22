@@ -63,8 +63,6 @@
     clippy::uninlined_format_args
 )]
 
-use serde::{Deserialize, Serialize};
-
 use cf_actor::{ActorState, Status, Vec2};
 use cf_sim_core::Rng;
 
@@ -80,6 +78,7 @@ pub mod perception;
 pub mod reactive_guard;
 pub mod reactive_guard_params;
 pub mod systems;
+pub mod tick_io;
 
 // 5-layer thinking stack (Reactive / Utility / BehaviorTree / HTN / LLM
 // prior) is composable + testable in isolation; the engine drives the
@@ -239,157 +238,10 @@ pub use difficulty::DifficultyPreset;
 pub use guard_state::{GuardState, GuardStateTransition, Tactic};
 pub use perception::PerceptionRecord;
 pub use reactive_guard::{ReactiveGuard, ReactiveGuardView};
-
-/// Inputs for one [`step`] call.
-#[derive(Debug, Clone, Copy)]
-pub struct GuardTickInputs<'a> {
-    pub tick: u64,
-    pub tick_rate_hz: u32,
-    pub self_actor: &'a ActorState,
-    pub player: Option<&'a ActorState>,
-    /// (typically the player's `equipment.alarm_registered` from rifle fire).
-    /// The guard consumes alarms inside its `hearing_radius`. Multiple
-    /// alarms within range collapse to one perception_signal per tick
-    /// (closest-source wins).
-    pub alarms: &'a [AlarmInput],
-    /// Engine populates from `last_damage_source_actor_id` so the
-    /// Dying transition cause reads `killed_by_<actor_id>` instead of the
-    /// hardcoded `killed_by_player`. `None` when no recorded source.
-    pub last_damage_source: Option<u64>,
-}
-
-#[derive(Debug, Clone)]
-pub struct AlarmInput {
-    pub source_actor: u64,
-    pub source_position: [f32; 2],
-    pub loudness_radius: f32,
-    /// `equipment.alarm_registered` event (None when staged by code paths
-    /// that don't capture the event id). Threaded into the resulting
-    /// `ai.perception_signal {kind:"hearing"}` event's `parent_event_id`
-    /// so M10 walkers can hop `state_changed → perception_signal → alarm_registered`.
-    pub alarm_event_id: Option<String>,
-}
-
-/// Outcomes of one [`step`] call.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct EnemyTickReport {
-    /// multiple state transitions (Idle→Alert via heard_shot, then
-    /// Alert→Engaged via target_acquired on the same tick, plus an
-    /// Engaged→Engaged "reloading" reason-update). The engine emits one
-    /// `ai.state_changed` event per entry in spec order.
-    pub state_changes: Vec<GuardStateTransition>,
-    pub perception: Option<PerceptionRecord>,
-    pub tactic_chosen: Option<TacticRecord>,
-    pub fire: Option<FireRecord>,
-    pub reload_started: bool,
-    pub reload_completed: bool,
-    pub dry_fire: bool,
-    /// (sight, sight_lost, hearing, memory_decayed). One step may produce
-    /// multiple signals; the engine emits one `ai.perception_signal` event
-    /// per entry. The legacy `perception` field stays the dominant sight
-    /// summary so existing replay consumers don't break.
-    pub perception_signals: Vec<PerceptionSignal>,
-    /// AND the miss roll landed above the threshold.
-    pub missed_shot_reason: Option<MissedShotReason>,
-    /// the stuck-tick threshold.
-    pub stuck_recovery: Option<StuckRecoveryRecord>,
-    pub target_acquired: Option<TargetAcquiredRecord>,
-    pub target_lost: Option<TargetLostRecord>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PerceptionSignal {
-    /// One of `"sight"`, `"sight_lost"`, `"hearing"`, `"memory_decayed"`.
-    pub kind: &'static str,
-    /// Source actor id (player = the only signal source at M1.5).
-    pub source_actor: Option<u64>,
-    /// World position where the signal originated.
-    pub source_position: Option<[f32; 2]>,
-    /// Confidence in `[0.0, 1.0]`. Hearing decays linearly with distance.
-    pub confidence: f32,
-    /// Tick the signal fired. Useful for replay-viewer time-anchoring.
-    pub tick: u64,
-    /// the originating `equipment.alarm_registered` event. Threaded by
-    /// the engine into the `ai.perception_signal.parent_event_id` so M10
-    /// walkers can hop `state_changed → perception_signal → alarm_registered`.
-    /// None for non-hearing signals.
-    #[serde(default)]
-    pub alarm_event_id: Option<String>,
-}
-
-/// the replay viewer can render an icon set without string-typing.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MissedShotReason {
-    /// Roll exceeded the configured miss_chance.
-    RecoilDeviation,
-    /// The target moved between aim and trigger.
-    TargetMoved,
-    /// Occlusion entered the line between the guard and target.
-    Occlusion,
-    /// Player invoked something that made the shot lucky (sharp aim, dodge).
-    LuckyDodge,
-}
-
-impl MissedShotReason {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            MissedShotReason::RecoilDeviation => "recoil_deviation",
-            MissedShotReason::TargetMoved => "target_moved",
-            MissedShotReason::Occlusion => "occlusion",
-            MissedShotReason::LuckyDodge => "lucky_dodge",
-        }
-    }
-}
-
-/// crosses the stuck-tick threshold. `action` is the chosen recovery
-/// strategy from the M1.5 set (M2+ adds `dig_through`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StuckRecoveryRecord {
-    pub stuck_ticks: u32,
-    pub blocker: &'static str,
-    pub action: &'static str,
-    pub reason: &'static str,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TargetAcquiredRecord {
-    pub target_actor: u64,
-    pub via: &'static str,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TargetLostRecord {
-    pub target_actor: u64,
-    pub reason: &'static str,
-}
-
-/// Recorded `ai.tactic_chosen` payload. `score_*` fields are the utility scores
-/// the scorer evaluated this tick — exposed so the run-bundle viewer can show
-/// the AI's reasoning.
-#[derive(Debug, Clone, PartialEq)]
-pub struct TacticRecord {
-    pub tactic: Tactic,
-    pub reason: &'static str,
-    pub score_attack: f32,
-    pub score_reload: f32,
-    pub score_hold: f32,
-    pub score_search: f32,
-}
-
-/// Recorded enemy weapon fire. The engine spawns a projectile the player can
-/// actually be hit by.
-#[derive(Debug, Clone, PartialEq)]
-pub struct FireRecord {
-    pub muzzle_origin: [f32; 2],
-    pub velocity: [f32; 2],
-    pub aim: [f32; 2],
-    pub damage: f32,
-    pub miss_roll: f32,
-    pub miss_threshold: f32,
-    pub will_miss: bool,
-    pub lifetime_ticks: u32,
-}
+pub use tick_io::{
+    AlarmInput, EnemyTickReport, FireRecord, GuardTickInputs, MissedShotReason, PerceptionSignal,
+    StuckRecoveryRecord, TacticRecord, TargetAcquiredRecord, TargetLostRecord,
+};
 
 /// One reactive-guard tick. Returns a structured report the engine turns into
 /// recorder events; the engine is responsible for spawning the projectile and
