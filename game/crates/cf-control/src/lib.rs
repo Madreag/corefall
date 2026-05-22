@@ -28,6 +28,7 @@ pub mod engine_chassis_emit;
 pub mod engine_cinematic;
 pub mod engine_dirty_flush;
 pub mod engine_dispatch;
+pub mod engine_dispatch_m6;
 pub mod engine_dispatch_router;
 pub mod engine_drive_tick;
 pub mod engine_emit_actor;
