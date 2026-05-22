@@ -20,6 +20,26 @@ use cf_mission::{
 };
 use cf_terrain::{material_id_from_name, BreachStrip, ChunkedTerrain, MaterialId, TerrainStamp};
 
+pub use crate::scenario_actor::{
+    ScenarioActor, ScenarioChassis, ScenarioEnemy, ScenarioExtraModule, ScenarioInventory,
+};
+pub use crate::scenario_m14d::{
+    LateralWallSpan, ScenarioM14dProjectile, ScenarioMaterialContact, ScenarioThermalZone,
+    ScenarioTunnelSpan,
+};
+pub use crate::scenario_mission::{
+    ScenarioBossState, ScenarioMission, ScenarioMissionPhase, ScenarioPhaseState,
+    ScenarioReinforcementWave,
+};
+pub use crate::scenario_objective::{
+    ScenarioExtendedObjectiveKind, ScenarioObjective, ScenarioObjectiveGraph,
+    ScenarioObjectiveGraphBranch, ScenarioObjectiveGraphNode, ScenarioObjectiveKind,
+};
+pub use crate::scenario_script::ScenarioScriptStep;
+pub use crate::scenario_terrain::{
+    ScenarioBreach, ScenarioChunkedTerrain, ScenarioReactor, ScenarioTerrainStamp,
+};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
     pub schema_version: u32,
@@ -184,397 +204,59 @@ pub struct Scenario {
     pub m14g_material_contacts: Vec<ScenarioMaterialContact>,
 }
 
-/// Mirrors [`cf_physics::ProjectileSnapshot`] but uses serde-friendly
-/// types for RON. The engine converts these to runtime snapshots at
-/// scenario load via `build_m14d_projectile_snapshot`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioM14dProjectile {
-    /// Stable id (must be unique across the pool).
-    pub id: u64,
-    /// Kind discriminator (`kinetic_rifle` / `explosive_grenade` /
-    /// `energy_beam` / `heat_round` / `apfsds_round` / `aps_laser`).
-    pub kind: cf_physics::ProjectileKind,
-    /// World position (px) at scenario init.
-    pub position: (f32, f32),
-    /// Velocity in world units per second.
-    pub velocity: (f32, f32),
-    /// Effective collision radius. Default 1.0.
-    #[serde(default = "default_m14d_radius")]
-    pub radius: f32,
-    /// Scalar mass (kg). Default 0.01.
-    #[serde(default = "default_m14d_mass_kg")]
-    pub mass_kg: f32,
-    /// Owner actor id (0 for base-mounted modules like C-RAM).
-    #[serde(default)]
-    pub owner_actor_id: u64,
-}
 
-fn default_m14d_radius() -> f32 {
+pub(crate) fn default_m14d_radius() -> f32 {
     1.0
 }
 
-fn default_m14d_mass_kg() -> f32 {
+pub(crate) fn default_m14d_mass_kg() -> f32 {
     0.01
 }
 
-/// Drives the per-tick collapse-check pass on a single chunk per
-/// VAL-M14E-001..VAL-M14E-018.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioTunnelSpan {
-    /// Stable id for diagnostics + replay matching.
-    pub id: String,
-    /// Chunk coordinate the tunnel ceiling occupies.
-    pub chunk_id: (i32, i32),
-    /// Pixel-space AABB of the unsupported ceiling region.
-    pub bbox_min: (i64, i64),
-    pub bbox_max: (i64, i64),
-    /// Unsupported tunnel span (pixels). The cave-in roll consumes this
-    /// alongside `vibration_modifier`.
-    pub unsupported_span_px: u32,
-    /// Ceiling thickness (pixels). Used in
-    /// `falling_debris_count(span_px, ceiling_thickness)`.
-    #[serde(default = "default_ceiling_thickness")]
-    pub ceiling_thickness_px: u32,
-    /// Vibration modifier (1.0 baseline; 2.0 plasma cutter).
-    #[serde(default = "default_vibration_modifier")]
-    pub vibration_modifier: f32,
-    /// True when the tunnel has at least one anchored support beam
-    /// covering the span. At init the integrity field locks the ±8 px
-    /// around the beam to integrity 500.
-    #[serde(default)]
-    pub anchored: bool,
-    /// Optional cascade-neighbor chunk ids that should re-run the
-    /// integrity pass when this tunnel cave-in fires.
-    #[serde(default)]
-    pub cascade_neighbors: Vec<(i32, i32)>,
-    /// True when a downstream actor should receive cave-in falling
-    /// debris (drives the fall_impulse_chain → KnockedDown wiring per
-    /// VAL-M14E-027).
-    #[serde(default)]
-    pub damage_actor_id: Option<u64>,
-}
 
-fn default_ceiling_thickness() -> u32 {
+pub(crate) fn default_ceiling_thickness() -> u32 {
     4
 }
 
-fn default_vibration_modifier() -> f32 {
+pub(crate) fn default_vibration_modifier() -> f32 {
     1.0
 }
 
-/// authored by the scenario manifest. Drives the per-tick lateral
-/// integrity pass + the bulging → crack_advanced → rupture cascade.
-/// The chunk's integrity field is shared with the M14E ceiling pass
-/// (per VAL-CROSS-005); this row only carries the lateral-axis
-/// metadata (wall span, yield strength, topology tag).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LateralWallSpan {
-    /// Stable id for diagnostics + replay matching.
-    pub id: String,
-    /// Chunk coordinate the sidewall occupies.
-    pub chunk_id: (i32, i32),
-    /// Pixel-space AABB of the lateral wall region.
-    pub bbox_min: (i64, i64),
-    pub bbox_max: (i64, i64),
-    /// Unsupported lateral span (pixels) driving the bulging/rupture
-    /// roll.
-    pub unsupported_span_px: u32,
-    /// Wall thickness (pixels). Drives the falling-debris cone size
-    /// on rupture.
-    #[serde(default = "default_wall_thickness")]
-    pub wall_thickness_px: u32,
-    /// Per-material lateral yield strength (concrete=50, brick=30,
-    /// steel=200, wood=15, dirt=10). Drives the lateral-pass decay
-    /// rate + the pressure-blowout threshold.
-    #[serde(default = "default_lateral_yield_strength")]
-    pub lateral_yield_strength: u16,
-    /// Vibration modifier driving the bulging chance (1.0 baseline).
-    #[serde(default = "default_vibration_modifier")]
-    pub vibration_modifier: f32,
-    /// Lateral cascade neighbors that re-run the integrity pass when
-    /// this chunk's rupture fires (VAL-M14F-026).
-    #[serde(default)]
-    pub cascade_neighbors: Vec<(i32, i32)>,
-    /// Optional downstream-actor id that registers submerged / damp
-    /// after a dam rupture (VAL-M14F-009) or vacuum exposure after a
-    /// sealed-room rupture (VAL-M14F-011).
-    #[serde(default)]
-    pub downstream_actor_id: Option<u64>,
-    /// Optional topology tag — `"mineshaft"` (default integrity-decay
-    /// cascade), `"dam"` (drives M15 fluid + sets the downstream
-    /// actor's submerged flag), or `"sealed_room"` (drives M19
-    /// pressure equalization + M19C vacuum exposure on the actor
-    /// inside the sealed room).
-    #[serde(default = "default_lateral_topology")]
-    pub topology: String,
-    /// Initial sealed-room pressure (kPa). Defaults to 101 (Earth
-    /// ambient). Used by VAL-M14F-008 / VAL-M14F-011 to compute the
-    /// pressure equalization curve through the breach.
-    #[serde(default = "default_sealed_room_pressure")]
-    pub sealed_room_pressure_kpa: f32,
-    /// **VAL-CROSS-024**: opts the lateral wall into the composite-
-    /// cascade topology. When `true`, a `terrain.wall_rupture` on this
-    /// chunk also drives M14E cave-in emit on every `cascade_neighbors`
-    /// chunk that has an `m14e_tunnel_spans` row. The default `false`
-    /// keeps standalone mineshafts / dams / sealed-rooms isolated from
-    /// the ceiling pass — only explicit dam-above-tunnel / lateral-
-    /// adjacent-to-tunnel scenarios opt in. Also flips the per-chunk
-    /// `m14f_owns_rupture_emit` flag on the M14E chunk state for this
-    /// chunk (when false) → the lateral pass owns the rupture surface
-    /// and the M14E cave-in roll is suppressed; setting this `true`
-    /// keeps the M14E roll surface available so the composite scenario
-    /// can express both ceilings AND walls on the same chunk_id.
-    #[serde(default)]
-    pub m14e_composite_cascade_allowed: bool,
-}
 
-fn default_wall_thickness() -> u32 {
+pub(crate) fn default_wall_thickness() -> u32 {
     4
 }
 
-fn default_lateral_yield_strength() -> u16 {
+pub(crate) fn default_lateral_yield_strength() -> u16 {
     50
 }
 
-fn default_lateral_topology() -> String {
+pub(crate) fn default_lateral_topology() -> String {
     "mineshaft".to_string()
 }
 
-fn default_sealed_room_pressure() -> f32 {
+pub(crate) fn default_sealed_room_pressure() -> f32 {
     101.0
 }
 
-/// Models an actor zone resting against a tile at a steady temperature
-/// so the engine can fire the burn / frostbite escalation ladder
-/// deterministically.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioThermalZone {
-    /// Actor id receiving the thermal contact.
-    pub actor_id: u64,
-    /// Body zone tag (e.g. `"foot_right"`, `"hand_left"`).
-    pub zone: String,
-    /// Steady tile temperature in Kelvin. ≥ 320 K = hot ladder, ≤ 260 K
-    /// = cold ladder, otherwise safe band (no emit).
-    pub temperature_k: f32,
-    /// Optional tick at which the dwell counter starts (the actor must
-    /// actually be on the tile from `start_tick` onward). Default 0.
-    #[serde(default)]
-    pub start_tick: u64,
-    /// Optional tick at which the contact ends (inclusive). `None`
-    /// means the contact persists for the rest of the scenario run.
-    #[serde(default)]
-    pub end_tick: Option<u64>,
-}
 
-/// an actor zone touching a hazardous material (acid / refrigerant /
-/// ammonia / chlorine) at constant intensity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioMaterialContact {
-    /// Actor id receiving the material contact.
-    pub actor_id: u64,
-    /// Body zone tag.
-    pub zone: String,
-    /// Material name (canonical lowercase: `"acid"`, `"refrigerant"`,
-    /// etc.).
-    pub material: String,
-    /// Contact intensity ∈ [0, 1]; passed to
-    /// [`cf_material::classify_reaction`].
-    #[serde(default = "default_material_intensity")]
-    pub intensity: f32,
-    /// Tick on which the wound is emitted. The engine fires the
-    /// classify_reaction call once on this tick (mirrors a one-frame
-    /// chemistry contact). Default 0 = first tick after init.
-    #[serde(default)]
-    pub fire_tick: u64,
-}
 
-fn default_material_intensity() -> f32 {
+pub(crate) fn default_material_intensity() -> f32 {
     0.5
 }
 
-/// tick against `tick`; on the matching tick it patches `pending_intent`
-/// on the player actor with the provided overrides (aim / fire /
-/// ammo_kind) before the actor sim runs.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct ScenarioScriptStep {
-    /// Tick on which to inject the intent. The engine drives this
-    /// exactly once; subsequent ticks see `clear_edges` clear the
-    /// edge-triggered fields.
-    pub tick: u64,
-    /// Optional aim vector `(x, y)` to assign to `pending_intent.aim`
-    /// before the fire/reload edges fire. The actor sim normalizes the
-    /// vector so any non-zero direction is accepted.
-    #[serde(default)]
-    pub aim: Option<(f32, f32)>,
-    /// True = set `pending_intent.fire = true` and `fire_held = true`.
-    /// One-shot edge — cleared by `ControlIntent::clear_edges` at end-of-tick.
-    #[serde(default)]
-    pub fire: bool,
-    /// Per-shot ammo kind override (mirrors
-    /// `cfctl.act.player.fire { ammo_kind: ... }`). Accepted snake_case
-    /// values: `regular` / `tracer` / `high_explosive` / `pellet` /
-    /// `heat` / `apfsds`. Unknown values are dropped at scenario-load
-    /// time so a typo doesn't silently fail at runtime.
-    #[serde(default)]
-    pub ammo_kind: Option<String>,
-    /// Optional `pending_intent.reload = true` edge.
-    #[serde(default)]
-    pub reload: bool,
-}
 
-impl ScenarioScriptStep {
-    /// Returns `None` for empty / unknown values so the engine falls back
-    /// to the weapon's `RifleSpec::primary_round`.
-    pub fn resolved_ammo_kind(&self) -> Option<cf_equipment::RoundKind> {
-        self.ammo_kind
-            .as_deref()
-            .and_then(cf_equipment::RoundKind::from_str_snake)
-    }
-}
 
-/// One actor entry in `Scenario.actors`. M1 only models the player + simple dummies
-/// (target practice, friendlies). M1.5 adds an optional `enemy` block that turns
-/// the actor into a reactive guard. **M5** adds an optional `chassis` block that
-/// attaches a full chassis grammar to the actor.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioActor {
-    pub id: u64,
-    pub team: String,
-    pub spawn: (f32, f32),
-    #[serde(default)]
-    pub controllable: bool,
-    pub hp: f32,
-    #[serde(default)]
-    pub inventory: ScenarioInventory,
-    /// Half-extents (width, height) of the actor's collision proxy. Defaults to 8x16.
-    /// When `chassis` is set, the chassis kind overrides these defaults to fit
-    /// the actor silhouette.
-    #[serde(default)]
-    pub half_extents: Option<(f32, f32)>,
-    /// M1.5: optional initial aim direction (defaults to `(1.0, 0.0)`). Reactive
-    /// guards face this direction; the AI updates aim every tick from there.
-    #[serde(default)]
-    pub aim: Option<(f32, f32)>,
-    /// M1.5: optional reactive-guard configuration. When `Some`, the engine
-    /// drives this actor through `cf-ai::ReactiveGuard`.
-    #[serde(default)]
-    pub enemy: Option<ScenarioEnemy>,
-    /// `light_mech` or a mod-supplied spec id).
-    #[serde(default)]
-    pub chassis: Option<ScenarioChassis>,
-    #[serde(default)]
-    pub origin_id: Option<String>,
-    /// the [`cf_squad::Squad`] at scenario init and emits one
-    /// `squad.member_added` event. Accepted values: `"leader"` /
-    /// `"follower"`. `None` for non-squad actors (enemies, dummies).
-    #[serde(default)]
-    pub squad_role: Option<String>,
-    /// squad followers. Currently unused beyond influencing the bot's
-    /// default `current_command` (FollowLeader); M7 expands to full
-    /// archetypes. Free-form string tag (`"rifleman"` / `"medic"` /
-    /// `"engineer"` etc).
-    #[serde(default)]
-    pub squad_archetype: Option<String>,
-}
 
-/// runtime [`cf_chassis::ChassisState`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioChassis {
-    pub spec_id: String,
-    #[serde(default)]
-    pub tutorial_safety: bool,
-    /// spec. Each entry maps `kind` (snake_case `ModuleKind` discriminator
-    /// — currently only `"era"` is honored) to a `BodyZone` + per-panel
-    /// HP + ERA charge. Used by `m14c_heat_vs_era.ron` to bolt an ERA
-    /// panel onto the Heavy Trooper torso so the M14C HEAT producer
-    /// emits `armor.era_pre_detonated` strictly before
-    /// `armor.heat_jet_traversed` (VAL-M14C-009/011).
-    #[serde(default)]
-    pub extra_modules: Vec<ScenarioExtraModule>,
-    /// Optional initial stage override. Accepts `"nominal" | "degraded" |
-    /// "critical" | "wreck" | "disabled" | "salvaged"`. When set to `"wreck"`
-    /// or `"disabled"`, `act.chassis.salvage` becomes immediately valid against
-    /// the spawned chassis. Default = scenario seeds a Nominal chassis.
-    #[serde(default)]
-    pub initial_stage: Option<String>,
-}
 
-impl ScenarioChassis {
-    pub fn build_state(&self, tick_rate_hz: u32) -> Option<cf_chassis::ChassisState> {
-        let mut state = cf_chassis::chassis_spec(&self.spec_id)
-            .map(|spec| cf_chassis::ChassisState::from_spec(&spec, tick_rate_hz, self.tutorial_safety))?;
-        // `era` kind is honored — the panel is bolted onto the configured
-        // body zone with the requested HP + era_charge_kg + one-shot
-        // consumable flag set true so HEAT impacts trigger ERA
-        // pre-detonation.
-        for extra in &self.extra_modules {
-            if let Some(module) = extra.build_module() {
-                state.modules.push(module);
-            }
-        }
-        if let Some(stage) = self.initial_stage.as_deref() {
-            let target = match stage.to_ascii_lowercase().as_str() {
-                "nominal" => Some(cf_chassis::ChassisStage::Nominal),
-                "degraded" => Some(cf_chassis::ChassisStage::Degraded),
-                "module_warning" => Some(cf_chassis::ChassisStage::ModuleWarning),
-                "module_failed" => Some(cf_chassis::ChassisStage::ModuleFailed),
-                "weapon_jammed" => Some(cf_chassis::ChassisStage::WeaponJammed),
-                "armor_cracked" => Some(cf_chassis::ChassisStage::ArmorCracked),
-                "disabled" => Some(cf_chassis::ChassisStage::Disabled),
-                "pilot_injured" => Some(cf_chassis::ChassisStage::PilotInjured),
-                "eject" => Some(cf_chassis::ChassisStage::Eject),
-                "bail_too_late" => Some(cf_chassis::ChassisStage::BailTooLate),
-                "wreck" | "wrecked" => Some(cf_chassis::ChassisStage::Wreck),
-                "gibbed" => Some(cf_chassis::ChassisStage::Gibbed),
-                _ => None,
-            };
-            if let Some(target_stage) = target {
-                state.force_stage(target_stage);
-            }
-        }
-        Some(state)
-    }
-}
 
-/// on top of the base spec. M14C ships exactly one kind — `era` — for the
-/// HEAT-vs-ERA scenario.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioExtraModule {
-    /// Snake-case `ModuleKind` discriminator (`"era"`, `"ammo_rack"`, etc.).
-    pub kind: String,
-    /// Stable module id used as the event payload `module_id`.
-    pub id: String,
-    /// Body zone the module is bound to (`"torso"`, `"head"`, etc.).
-    pub zone: String,
-    /// Module HP at spawn time.
-    #[serde(default = "default_extra_module_hp")]
-    pub hp_max: f32,
-    /// `era_charge_kg × 0.7` HEAT penetration reduction formula.
-    #[serde(default)]
-    pub era_charge_kg: Option<f32>,
-}
 
-fn default_extra_module_hp() -> f32 {
+pub(crate) fn default_extra_module_hp() -> f32 {
     30.0
 }
 
-impl ScenarioExtraModule {
-    /// Build the matching [`cf_chassis::ChassisModule`]. Returns `None` for
-    /// unknown kind / zone identifiers so the scenario loader can reject
-    /// the manifest cleanly.
-    pub fn build_module(&self) -> Option<cf_chassis::ChassisModule> {
-        let kind = parse_module_kind(&self.kind)?;
-        let zone = parse_body_zone(&self.zone)?;
-        let mut module = cf_chassis::ChassisModule::new(&self.id, kind, zone, self.hp_max);
-        if matches!(kind, cf_chassis::ModuleKind::Era) {
-            module = module.with_era(self.era_charge_kg.unwrap_or(1.0), true);
-        }
-        Some(module)
-    }
-}
 
-fn parse_module_kind(s: &str) -> Option<cf_chassis::ModuleKind> {
+pub(crate) fn parse_module_kind(s: &str) -> Option<cf_chassis::ModuleKind> {
     match s.to_ascii_lowercase().as_str() {
         "era" => Some(cf_chassis::ModuleKind::Era),
         "ammo_rack" => Some(cf_chassis::ModuleKind::AmmoRack),
@@ -589,7 +271,7 @@ fn parse_module_kind(s: &str) -> Option<cf_chassis::ModuleKind> {
     }
 }
 
-fn parse_body_zone(s: &str) -> Option<cf_chassis::BodyZone> {
+pub(crate) fn parse_body_zone(s: &str) -> Option<cf_chassis::BodyZone> {
     match s.to_ascii_lowercase().as_str() {
         "head" => Some(cf_chassis::BodyZone::Head),
         "torso" => Some(cf_chassis::BodyZone::Torso),
@@ -610,592 +292,69 @@ fn parse_body_zone(s: &str) -> Option<cf_chassis::BodyZone> {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ScenarioInventory {
-    /// Optional rifle preset id; resolved against `cf-equipment::rifle_preset`.
-    #[serde(default)]
-    pub rifle: Option<String>,
-}
 
-/// Reactive-guard parameters for one actor. Defaults match
-/// [`ReactiveGuardParams::default`] so scenarios can override only the fields
-/// they need.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct ScenarioEnemy {
-    pub kind: Option<String>,
-    pub sight_radius: Option<f32>,
-    pub sight_cone_degrees: Option<f32>,
-    pub aim_settle_seconds: Option<f32>,
-    pub miss_chance: Option<f32>,
-    pub alert_dwell_seconds: Option<f32>,
-    pub burst_shots: Option<u32>,
-    pub burst_pause_seconds: Option<f32>,
-    pub damage_per_hit: Option<f32>,
-    pub projectile_speed: Option<f32>,
-    pub projectile_lifetime_seconds: Option<f32>,
-    pub mag_capacity: Option<u32>,
-    pub reload_seconds: Option<f32>,
-    pub muzzle_forward_offset: Option<f32>,
-    pub muzzle_vertical_offset: Option<f32>,
-    /// pipeline. The engine recognises `"AI-TRENCH-A-01"` (M9B trench
-    /// garrison doctrine); other values are forward-compat placeholders
-    /// and are ignored by the current engine.
-    pub doctrine: Option<String>,
-}
 
-impl ScenarioEnemy {
-    pub fn build_params(&self) -> ReactiveGuardParams {
-        let mut p = ReactiveGuardParams::default();
-        if let Some(v) = self.sight_radius {
-            p.sight_radius = v;
-        }
-        if let Some(v) = self.sight_cone_degrees {
-            p.sight_cone_degrees = v;
-        }
-        if let Some(v) = self.aim_settle_seconds {
-            p.aim_settle_seconds = v;
-        }
-        if let Some(v) = self.miss_chance {
-            p.miss_chance = v;
-        }
-        if let Some(v) = self.alert_dwell_seconds {
-            p.alert_dwell_seconds = v;
-        }
-        if let Some(v) = self.burst_shots {
-            p.burst_shots = v;
-        }
-        if let Some(v) = self.burst_pause_seconds {
-            p.burst_pause_seconds = v;
-        }
-        if let Some(v) = self.damage_per_hit {
-            p.damage_per_hit = v;
-        }
-        if let Some(v) = self.projectile_speed {
-            p.projectile_speed = v;
-        }
-        if let Some(v) = self.projectile_lifetime_seconds {
-            p.projectile_lifetime_seconds = v;
-        }
-        if let Some(v) = self.mag_capacity {
-            p.mag_capacity = v;
-        }
-        if let Some(v) = self.reload_seconds {
-            p.reload_seconds = v;
-        }
-        if let Some(v) = self.muzzle_forward_offset {
-            p.muzzle_forward_offset = v;
-        }
-        if let Some(v) = self.muzzle_vertical_offset {
-            p.muzzle_vertical_offset = v;
-        }
-        p
-    }
-}
 
-/// One M1.5 objective row. Discriminator strings match `cf-mission::ObjectiveKind`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioObjective {
-    pub id: String,
-    pub kind: ScenarioObjectiveKind,
-    #[serde(default)]
-    pub optional: bool,
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum ScenarioObjectiveKind {
-    BreachBarrier { target: String },
-    NeutralizeActor { target: u64 },
-    ReachZone { min: (f32, f32), max: (f32, f32) },
-    DefendReactor { target: String },
-}
 
-impl ScenarioObjective {
-    pub fn into_objective(self) -> Objective {
-        let kind = match self.kind {
-            ScenarioObjectiveKind::BreachBarrier { target } => ObjectiveKind::BreachBarrier { target },
-            ScenarioObjectiveKind::NeutralizeActor { target } => ObjectiveKind::NeutralizeActor { target },
-            ScenarioObjectiveKind::ReachZone { min, max } => ObjectiveKind::ReachZone {
-                min: [min.0, min.1],
-                max: [max.0, max.1],
-            },
-            ScenarioObjectiveKind::DefendReactor { target } => ObjectiveKind::DefendReactor { target },
-        };
-        Objective {
-            id: self.id,
-            kind,
-            optional: self.optional,
-            status: ObjectiveStatus::Pending,
-            progress_milestone_index: 0,
-            // M2 re-audit (2026-05-13): new continuous progress + fail_sensor
-            // fields. Default progress=0.0 + None fail_sensor; the engine
-            // populates progress as the objective advances.
-            progress: 0.0,
-            fail_sensor: None,
-        }
-    }
-}
 
-/// M2 chunked terrain manifest entry. The terrain is constructed by:
-///
-/// 1. Allocate a `ChunkedTerrain` of size `width_px × height_px`.
-/// 2. Set the default material from `default_material` (string name).
-/// 3. Apply each stamp in declaration order.
-///
-/// Stamps share the discriminator vocabulary with `cf-terrain::TerrainStamp`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioChunkedTerrain {
-    pub width_px: u32,
-    pub height_px: u32,
-    #[serde(default)]
-    pub anchor: Option<(f32, f32)>,
-    #[serde(default = "default_material_air")]
-    pub default_material: String,
-    #[serde(default)]
-    pub stamps: Vec<ScenarioTerrainStamp>,
-}
 
-fn default_material_air() -> String {
+pub(crate) fn default_material_air() -> String {
     "air".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum ScenarioTerrainStamp {
-    FillAabb {
-        min: (f32, f32),
-        max: (f32, f32),
-        material: String,
-    },
-    FillCircle {
-        center: (f32, f32),
-        radius: f32,
-        material: String,
-    },
-}
 
-impl From<ScenarioTerrainStamp> for TerrainStamp {
-    fn from(s: ScenarioTerrainStamp) -> Self {
-        match s {
-            ScenarioTerrainStamp::FillAabb { min, max, material } => TerrainStamp::FillAabb {
-                min: [min.0, min.1],
-                max: [max.0, max.1],
-                material,
-            },
-            ScenarioTerrainStamp::FillCircle {
-                center,
-                radius,
-                material,
-            } => TerrainStamp::FillCircle {
-                center: [center.0, center.1],
-                radius,
-                material,
-            },
-        }
-    }
-}
 
-impl ScenarioChunkedTerrain {
-    /// Build a runtime [`ChunkedTerrain`] from this manifest. Returns an error
-    /// if `default_material` or any stamp material name is not in the launch
-    /// material set.
-    ///
-    /// `path` is the scenario file path (used in error messages so reviewers
-    /// can find the offending file). Production callers go through
-    /// `Scenario::load_from_file -> validate -> for_loaded_scenario` which
-    /// already validates materials with the correct path; this method's
-    /// strictness exists so direct callers (tests, future tools) never
-    /// silently fall back to AIR for unknown defaults.
-    pub fn build_terrain(&self, path: &str) -> Result<ChunkedTerrain, ScenarioLoadError> {
-        // Devin BUG_pr-review-job 3212186926 (yellow): no `unwrap_or(MATERIAL_AIR)`
-        // — return a structured error if the manifest names an unknown
-        // material. This matches the strict stamp-material check below.
-        let default_id: MaterialId =
-            material_id_from_name(&self.default_material).ok_or_else(|| ScenarioLoadError::UnknownTerrainMaterial {
-                path: path.to_string(),
-                material: self.default_material.clone(),
-            })?;
-        let mut terrain = ChunkedTerrain::new(self.width_px.max(1), self.height_px.max(1), default_id);
-        if let Some((ax, ay)) = self.anchor {
-            terrain.anchor = [ax, ay];
-        }
-        // Validate each stamp's material name first so we fail at load time.
-        for stamp in &self.stamps {
-            let mat_name = match stamp {
-                ScenarioTerrainStamp::FillAabb { material, .. } => material,
-                ScenarioTerrainStamp::FillCircle { material, .. } => material,
-            };
-            if material_id_from_name(mat_name).is_none() {
-                // Devin BUG_pr-review-job 3212186980 (yellow): thread the
-                // scenario path through so the error message names the
-                // offending file instead of producing the previous
-                // "scenario  terrain stamp ..." with a blank path.
-                return Err(ScenarioLoadError::UnknownTerrainMaterial {
-                    path: path.to_string(),
-                    material: mat_name.clone(),
-                });
-            }
-        }
-        let stamps: Vec<TerrainStamp> = self.stamps.iter().cloned().map(Into::into).collect();
-        terrain.apply_stamps(&stamps);
-        Ok(terrain)
-    }
-}
 
-/// M2.5 reactor manifest entry. Becomes a `cf_mission::Reactor` at runtime.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioReactor {
-    pub id: String,
-    pub position: (f32, f32),
-    pub half_extents: (f32, f32),
-    pub hp: f32,
-}
 
-impl ScenarioReactor {
-    pub fn build_reactor(&self) -> Reactor {
-        let mut r = Reactor {
-            id: self.id.clone(),
-            position: [self.position.0, self.position.1],
-            half_extents: [self.half_extents.0, self.half_extents.1],
-            hp: self.hp.max(0.0),
-            max_hp: self.hp.max(0.0),
-            destroyed: false,
-            ..Reactor::default()
-        };
-        // engine never has to lazy-init it on the first projectile hit.
-        r.ensure_armor_layers();
-        r
-    }
-}
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ScenarioMission {
-    /// Time limit in ticks (`0` = no limit). At 60 Hz, 5400 = 90 seconds.
-    #[serde(default)]
-    pub time_limit_ticks: u64,
-    #[serde(default = "default_true")]
-    pub player_dead_loses: bool,
-}
 
-fn default_true() -> bool {
+pub(crate) fn default_true() -> bool {
     true
 }
 
-impl ScenarioMission {
-    pub fn loss_conditions(&self) -> LossConditions {
-        LossConditions {
-            player_dead: self.player_dead_loses,
-            time_limit_ticks: self.time_limit_ticks,
-        }
-    }
-}
 
-/// One soft-breach strip. M2 will replace these with real chunked terrain.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioBreach {
-    pub id: String,
-    pub bbox_min: (f32, f32),
-    pub bbox_max: (f32, f32),
-    pub material: String,
-    #[serde(default)]
-    pub max_hp: Option<f32>,
-    #[serde(default)]
-    pub hardness: Option<f32>,
-    #[serde(default)]
-    pub dig_range: Option<f32>,
-    /// Set when the strip is permanently un-diggable (e.g. `metal_nohook`). The
-    /// dig path emits `terrain.tool_refused` with reason `material_<name>`.
-    #[serde(default)]
-    pub refusal_reason: Option<String>,
-}
 
-impl ScenarioBreach {
-    pub fn build_strip(&self) -> BreachStrip {
-        let max_hp = self.max_hp.unwrap_or(60.0);
-        BreachStrip {
-            id: self.id.clone(),
-            bbox_min: [self.bbox_min.0, self.bbox_min.1],
-            bbox_max: [self.bbox_max.0, self.bbox_max.1],
-            material: self.material.clone(),
-            max_hp,
-            hp: max_hp,
-            hardness: self.hardness.unwrap_or(20.0),
-            dig_range: self.dig_range.unwrap_or(48.0),
-            refusal_reason: self.refusal_reason.clone(),
-            broken: false,
-        }
-    }
-}
 
-/// the 4-phase pacing parameters consumed by `M7AiWorld.phase`. All
-/// three durations default to spec defaults (30s / 60s / 120s).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioPhaseState {
-    #[serde(default = "default_setup_seconds")]
-    pub setup_seconds: f32,
-    #[serde(default = "default_buildup_seconds")]
-    pub buildup_seconds: f32,
-    #[serde(default = "default_climax_seconds")]
-    pub climax_seconds: f32,
-}
 
-fn default_setup_seconds() -> f32 {
+pub(crate) fn default_setup_seconds() -> f32 {
     30.0
 }
 
-fn default_buildup_seconds() -> f32 {
+pub(crate) fn default_buildup_seconds() -> f32 {
     60.0
 }
 
-fn default_climax_seconds() -> f32 {
+pub(crate) fn default_climax_seconds() -> f32 {
     120.0
 }
 
-impl ScenarioPhaseState {
-    pub fn build_phase_state(&self) -> PhaseState {
-        let mut s = PhaseState::new(0);
-        s.setup_seconds = self.setup_seconds.max(0.0);
-        s.buildup_seconds = self.buildup_seconds.max(0.0);
-        s.climax_seconds = self.climax_seconds.max(0.0);
-        s
-    }
-}
 
-/// one reinforcement wave. Waves trigger when the active phase + the
-/// cumulative kill count both match the wave's spec.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioReinforcementWave {
-    pub id: String,
-    pub phase: ScenarioMissionPhase,
-    pub trigger_kill_count: u32,
-    pub dropship_zone: (f32, f32),
-    #[serde(default = "default_spawn_count")]
-    pub spawn_count: u32,
-}
 
-fn default_spawn_count() -> u32 {
+pub(crate) fn default_spawn_count() -> u32 {
     3
 }
 
-impl ScenarioReinforcementWave {
-    pub fn build_wave(&self) -> ReinforcementWave {
-        let mut w = ReinforcementWave::new(
-            self.id.clone(),
-            self.phase.into_phase(),
-            self.trigger_kill_count,
-            [self.dropship_zone.0, self.dropship_zone.1],
-        );
-        w.spawn_count = self.spawn_count.max(1);
-        w
-    }
-}
 
-/// so RON manifests can author phases without depending on cf-mission.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ScenarioMissionPhase {
-    Setup,
-    Buildup,
-    Climax,
-    Debrief,
-}
 
-impl ScenarioMissionPhase {
-    pub fn into_phase(self) -> MissionPhase {
-        match self {
-            ScenarioMissionPhase::Setup => MissionPhase::Setup,
-            ScenarioMissionPhase::Buildup => MissionPhase::Buildup,
-            ScenarioMissionPhase::Climax => MissionPhase::Climax,
-            ScenarioMissionPhase::Debrief => MissionPhase::Debrief,
-        }
-    }
-}
 
-/// of the mini-boss state. The engine seeds `M7AiWorld.boss` from this
-/// at scenario start and routes hits whose `target == actor_id` into
-/// `apply_boss_damage`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioBossState {
-    pub actor_id: u64,
-    pub display_name: String,
-    pub max_hp: f32,
-    #[serde(default = "default_boss_phase_2_threshold")]
-    pub phase_2_hp_threshold: f32,
-    #[serde(default = "default_boss_phase_3_threshold")]
-    pub phase_3_hp_threshold: f32,
-}
 
-fn default_boss_phase_2_threshold() -> f32 {
+pub(crate) fn default_boss_phase_2_threshold() -> f32 {
     0.75
 }
 
-fn default_boss_phase_3_threshold() -> f32 {
+pub(crate) fn default_boss_phase_3_threshold() -> f32 {
     0.25
 }
 
-impl ScenarioBossState {
-    pub fn build_boss_state(&self) -> BossState {
-        let mut b = BossState::new(self.actor_id, self.display_name.clone(), self.max_hp.max(0.001));
-        b.phase_2_hp_threshold = self.phase_2_hp_threshold.clamp(0.0, 1.0);
-        b.phase_3_hp_threshold = self.phase_3_hp_threshold.clamp(0.0, 1.0);
-        b
-    }
-}
 
-/// of the v0.5 objective DiGraph. Nodes carry their `kind` + dependency
-/// list + optional/parallel/branch-label flags. Branching points are
-/// listed separately so the engine knows which `(branch_a, branch_b)`
-/// pairs are mutually exclusive.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ScenarioObjectiveGraph {
-    #[serde(default)]
-    pub nodes: Vec<ScenarioObjectiveGraphNode>,
-    #[serde(default)]
-    pub branches: Vec<ScenarioObjectiveGraphBranch>,
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioObjectiveGraphNode {
-    pub id: String,
-    pub kind: ScenarioExtendedObjectiveKind,
-    #[serde(default)]
-    pub depends_on: Vec<String>,
-    #[serde(default)]
-    pub parallel: bool,
-    #[serde(default)]
-    pub optional: bool,
-    #[serde(default)]
-    pub branch_label: String,
-}
 
-impl ScenarioObjectiveGraphNode {
-    pub fn build_node(&self) -> ObjectiveNode {
-        ObjectiveNode {
-            id: self.id.clone(),
-            kind: self.kind.clone().build_kind(),
-            depends_on: self.depends_on.clone(),
-            parallel: self.parallel,
-            optional: self.optional,
-            branch_label: self.branch_label.clone(),
-            status: ObjectiveNodeStatus::Pending,
-        }
-    }
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum ScenarioExtendedObjectiveKind {
-    KillN {
-        target_class: String,
-        count: u32,
-    },
-    DefendActor {
-        target: u64,
-        survive_ticks: u64,
-    },
-    RetrieveItem {
-        item_id: String,
-    },
-    PlantItem {
-        item_id: String,
-        target_zone: (f32, f32, f32, f32),
-    },
-    DetectAlarm {
-        alarm_id: String,
-    },
-    SneakStealth {
-        zone_id: String,
-        no_alarm_within_ticks: u64,
-    },
-    RescueDowned {
-        target: u64,
-    },
-    BreachContainer {
-        container_id: String,
-    },
-    Optional {
-        inner_id: String,
-    },
-    Branching {
-        branch_a_id: String,
-        branch_b_id: String,
-    },
-}
 
-impl ScenarioExtendedObjectiveKind {
-    pub fn build_kind(self) -> ExtendedObjectiveKind {
-        match self {
-            ScenarioExtendedObjectiveKind::KillN { target_class, count } => {
-                ExtendedObjectiveKind::KillN { target_class, count }
-            }
-            ScenarioExtendedObjectiveKind::DefendActor { target, survive_ticks } => {
-                ExtendedObjectiveKind::DefendActor { target, survive_ticks }
-            }
-            ScenarioExtendedObjectiveKind::RetrieveItem { item_id } => ExtendedObjectiveKind::RetrieveItem { item_id },
-            ScenarioExtendedObjectiveKind::PlantItem { item_id, target_zone } => ExtendedObjectiveKind::PlantItem {
-                item_id,
-                target_zone: [target_zone.0, target_zone.1, target_zone.2, target_zone.3],
-            },
-            ScenarioExtendedObjectiveKind::DetectAlarm { alarm_id } => ExtendedObjectiveKind::DetectAlarm { alarm_id },
-            ScenarioExtendedObjectiveKind::SneakStealth {
-                zone_id,
-                no_alarm_within_ticks,
-            } => ExtendedObjectiveKind::SneakStealth {
-                zone_id,
-                no_alarm_within_ticks,
-            },
-            ScenarioExtendedObjectiveKind::RescueDowned { target } => ExtendedObjectiveKind::RescueDowned { target },
-            ScenarioExtendedObjectiveKind::BreachContainer { container_id } => {
-                ExtendedObjectiveKind::BreachContainer { container_id }
-            }
-            ScenarioExtendedObjectiveKind::Optional { inner_id } => ExtendedObjectiveKind::Optional { inner_id },
-            ScenarioExtendedObjectiveKind::Branching {
-                branch_a_id,
-                branch_b_id,
-            } => ExtendedObjectiveKind::Branching {
-                branch_a_id,
-                branch_b_id,
-            },
-        }
-    }
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioObjectiveGraphBranch {
-    pub id: String,
-    pub branch_a_id: String,
-    pub branch_b_id: String,
-    #[serde(default)]
-    pub chosen_branch: Option<String>,
-    #[serde(default)]
-    pub offered_tick: Option<u64>,
-}
 
-impl ScenarioObjectiveGraphBranch {
-    pub fn build_branch(&self) -> BranchingPoint {
-        BranchingPoint {
-            id: self.id.clone(),
-            branch_a_id: self.branch_a_id.clone(),
-            branch_b_id: self.branch_b_id.clone(),
-            chosen_branch: self.chosen_branch.clone(),
-            offered_tick: self.offered_tick,
-        }
-    }
-}
 
-impl ScenarioObjectiveGraph {
-    pub fn build_graph(&self) -> ObjectiveGraph {
-        let mut g = ObjectiveGraph::default();
-        for node in &self.nodes {
-            g.push(node.build_node());
-        }
-        for branch in &self.branches {
-            g.branches.push(branch.build_branch());
-        }
-        g
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScenarioRegion {
