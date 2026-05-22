@@ -44,6 +44,11 @@ pub mod diagnostics;
 pub mod perf;
 pub mod record_id;
 pub mod schemas;
+mod schemas_consts;
+mod schemas_lookup;
+mod schemas_validate;
+#[cfg(test)]
+mod schemas_tests;
 pub mod shard;
 pub mod snapshot_baseline;
 pub mod snapshot_delta;
