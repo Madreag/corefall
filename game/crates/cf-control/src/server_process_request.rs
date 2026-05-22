@@ -1,6 +1,8 @@
 //! async fn process_request — JSON-RPC request router
-//!
-//! Extracted from server.rs.
+//! JSON-RPC method router. >2000 LOC by design: each match arm parses params,
+//! validates schema, calls the EngineHandle async method, and formats the
+//! response. Splitting per-method would duplicate envelope + error + schema-
+//! version handling across many small files.
 
 #![allow(unused_imports, dead_code, clippy::too_many_arguments)]
 

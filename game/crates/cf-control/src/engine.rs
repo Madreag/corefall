@@ -283,13 +283,22 @@ pub use crate::engine_save::{
 };
 pub(crate) use crate::engine_save::ActorWorldSnapshot;
 pub(crate) use crate::engine_helpers::{
-    ai_intent_label, apply_settings_patch, build_checksum_bytes, build_mission_view,
-    build_module_strip_view, build_test_records, chassis_pilot_banner, chassis_stage_banner,
-    discover_run_artifacts, effective_sim_speed_pct, hud_focusable_nodes, milestone_order_index,
-    next_actions_for_milestone, notes_addendum_for_milestone, parse_body_zone,
-    prototype_slice_for_milestone, push_banner, push_banner_dedup, push_caption,
-    resolve_hud_node_at, status_change_cause, DigEvent, GuardFireRecord, M14SaveExtension,
-    ToolValidityUpdate, M14_SAVE_EXTENSION_KEY,
+    DigEvent, GuardFireRecord, M14SaveExtension, ToolValidityUpdate, M14_SAVE_EXTENSION_KEY,
+};
+pub(crate) use crate::engine_helpers_checksum::build_checksum_bytes;
+pub(crate) use crate::engine_helpers_hud::{
+    chassis_pilot_banner, chassis_stage_banner, push_banner, push_banner_dedup, push_caption,
+    resolve_hud_node_at, status_change_cause,
+};
+pub(crate) use crate::engine_helpers_milestone::{
+    milestone_order_index, next_actions_for_milestone, notes_addendum_for_milestone,
+    prototype_slice_for_milestone,
+};
+pub(crate) use crate::engine_helpers_settings::{apply_settings_patch, effective_sim_speed_pct};
+pub(crate) use crate::engine_helpers_test_records::{build_test_records, discover_run_artifacts};
+pub(crate) use crate::engine_helpers_views::{
+    ai_intent_label, build_mission_view, build_module_strip_view, hud_focusable_nodes,
+    parse_body_zone,
 };
 
 /// gravity + wind force corrections without holding the read lock.

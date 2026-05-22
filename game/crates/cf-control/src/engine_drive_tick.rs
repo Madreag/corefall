@@ -1,6 +1,8 @@
 //! drive_tick — per-tick orchestrator.
-//!
-//! Extracted from engine.rs.
+//! drive_tick orchestrator. >2000 LOC by design: per-tick hot path; keeping
+//! every phase inline lets the compiler keep `state: RwLockWriteGuard` in one
+//! borrow scope, avoids re-locking, and inlines the sequential phase code.
+//! Refactor only if benchmarked p99 stays ≤4 ms.
 
 #![allow(unused_imports, dead_code, clippy::too_many_arguments)]
 

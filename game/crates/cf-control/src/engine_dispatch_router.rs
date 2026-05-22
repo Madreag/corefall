@@ -1,4 +1,7 @@
-//! Router for `EngineHandle::dispatch`. Body extracted from engine_handle.rs.
+//! cfctl command router. >2000 LOC by design: holds one state write-lock for
+//! the whole dispatch to keep per-request mutations atomic + determinism-safe.
+//! Splitting per-variant would force re-locking per arm and break the
+//! single-write-guard invariant. Refactor only with a paired determinism test.
 
 #![allow(unused_imports, dead_code, clippy::too_many_arguments)]
 
