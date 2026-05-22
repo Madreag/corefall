@@ -57,10 +57,14 @@ pub mod envelope;
 pub mod m4b_save;
 pub mod m6_actions;
 pub mod m7_ai;
+#[cfg(test)]
+mod m7_ai_tests;
 pub mod m7b_squad;
 pub mod m8_ux;
 pub mod m8b_net_admin;
 pub mod m9b_trench;
+#[cfg(test)]
+mod m9b_trench_tests;
 pub mod m14h_treatment;
 pub mod m14i_long_term;
 pub mod m14j_mobility;
