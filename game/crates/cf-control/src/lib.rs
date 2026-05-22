@@ -70,6 +70,13 @@ pub mod envelope;
 pub mod m4b_save;
 pub mod m6_actions;
 pub mod m7_ai;
+pub mod m7_ai_behavior;
+pub mod m7_ai_payloads;
+pub mod m7_ai_phase;
+pub mod m7_ai_stress;
+pub mod m7_ai_thinking;
+pub mod m7_ai_triage;
+pub mod m7_ai_types;
 #[cfg(test)]
 mod m7_ai_tests;
 pub mod m7b_squad;
