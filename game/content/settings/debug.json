@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "tracing_level": "info",
+  "show_perf_overlay": false,
+  "show_tactical_overlay": false,
+  "show_chassis_silhouette": false,
+  "show_path_invalidation": false,
+  "show_thermal_field": false,
+  "show_material_overlay": "off",
+  "dev_cheats_enabled": false,
+  "headless_smoke_writes_bundle": false,
+  "ledger_chain_enabled": false
+}

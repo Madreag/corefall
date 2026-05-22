@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "master_volume": 1.0,
+  "sfx_volume": 1.0,
+  "music_volume": 0.7,
+  "voice_volume": 1.0,
+  "ambient_volume": 0.8,
+  "ui_volume": 0.7,
+  "captions": true,
+  "captions_size": "medium",
+  "captions_background": true,
+  "spatial_audio": true,
+  "reverb_enabled": true,
+  "doppler_enabled": true,
+  "occlusion_enabled": true,
+  "audio_accessibility_mode": "off"
+}

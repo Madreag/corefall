@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "vsync": true,
+  "frame_cap_hz": 60,
+  "resolution_scale": 1.0,
+  "ui_scale": 1.0,
+  "render_quality": "high",
+  "particle_density": 1.0,
+  "decals_enabled": true,
+  "screen_shake_intensity": 1.0,
+  "motion_blur": false,
+  "bloom": true,
+  "comic_style_overlay": "subtle",
+  "show_fps": false,
+  "show_debug_overlay": false
+}

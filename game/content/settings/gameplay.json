@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "difficulty": "normal",
+  "slowdown_assist_enabled": false,
+  "slowdown_assist_strength": 0.25,
+  "sharp_aim_build_ticks": 30,
+  "recoil_decay_rate": 1.0,
+  "autonomy_default": "balanced",
+  "pie_menu_speed_pct": 100,
+  "multiplayer_session": false,
+  "permadeath": false,
+  "auto_save_interval_ticks": 1800,
+  "show_damage_numbers": true,
+  "show_objective_hints": true,
+  "objective_marker_distance_m": 50.0
+}

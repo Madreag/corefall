@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "server_address": "127.0.0.1",
+  "server_port": 17890,
+  "lobby_discovery": false,
+  "max_players": 4,
+  "anti_cheat_enabled": false,
+  "rate_limit_msgs_per_sec": 60,
+  "observe_subscribe_hz_max": 30,
+  "shutdown_grace_seconds": 5
+}

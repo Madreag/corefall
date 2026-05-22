@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "colorblind_palette": "off",
+  "high_contrast": false,
+  "larger_font": false,
+  "reduced_motion": false,
+  "screen_shake_disabled": false,
+  "focus_outline_intensity": 1.0,
+  "audio_only_cues": false,
+  "captions": true,
+  "subtitle_speakers": true,
+  "ui_scale": 1.0
+}
