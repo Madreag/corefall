@@ -5,6 +5,7 @@ use crate::dig_preview::DigPreviewPlugin;
 use crate::live_camera_effects::{CameraFollow, CameraShake, HitStop};
 use crate::live_sprite_image::spawn_camera;
 use crate::overlay::OverlayModePlugin;
+use crate::chem_flash::ChemFlashState;
 use crate::reactor_explosion::ExplosionState;
 use crate::reactor_sparks::SparkEmitterState;
 use crate::reactor_sprite::ReactorSpriteState;
@@ -63,17 +64,24 @@ impl Plugin for ReactorVfxPlugin {
         app.init_resource::<ReactorSpriteState>()
             .init_resource::<SparkEmitterState>()
             .init_resource::<ExplosionState>()
+            .init_resource::<ChemFlashState>()
             .add_systems(Update, tick_reactor_vfx);
     }
 }
 
-fn tick_reactor_vfx(time: Res<Time>, mut sparks: ResMut<SparkEmitterState>, mut explosion: ResMut<ExplosionState>) {
+fn tick_reactor_vfx(
+    time: Res<Time>,
+    mut sparks: ResMut<SparkEmitterState>,
+    mut explosion: ResMut<ExplosionState>,
+    mut chem_flash: ResMut<ChemFlashState>,
+) {
     let dt_ms = (time.delta_secs() * 1000.0).clamp(0.0, 1000.0) as u32;
     if dt_ms == 0 {
         return;
     }
     sparks.tick(dt_ms);
     explosion.tick(dt_ms);
+    chem_flash.tick(dt_ms);
 }
 
 #[cfg(test)]

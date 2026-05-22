@@ -168,6 +168,7 @@ pub(crate) fn pump_recorder_events_into_render_effects(
     mut debris_queue: ResMut<DebrisSpawnQueue>,
     mut sparks: ResMut<SparkEmitterState>,
     mut explosion: ResMut<ExplosionState>,
+    mut chem_flash: ResMut<cf_render_2d::ChemFlashState>,
     mut cursor: ResMut<RenderEffectsCursor>,
     juice_acc: Res<JuiceAccessibility>,
     mut juice_state: ResMut<JuiceState>,
@@ -264,6 +265,26 @@ pub(crate) fn pump_recorder_events_into_render_effects(
                 explosion.spawn([x, y], EXPLOSION_DEBRIS_CAP_PER_HIT, settings.reduce_camera_shake_pct);
                 let shake_scale = (1.0 - settings.reduce_camera_shake_pct.clamp(0.0, 1.0)).max(0.0);
                 shake.magnitude_px = (shake.magnitude_px + 18.0 * shake_scale).clamp(0.0, 40.0);
+            }
+            ("material", "violent_burst") => {
+                let pos = ev.payload.get("pos").and_then(|v| v.as_array());
+                let x = pos.and_then(|arr| arr.first()).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let y = pos.and_then(|arr| arr.get(1)).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let energy = ev
+                    .payload
+                    .get("energy_release_j")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0) as f32;
+                let color = ev
+                    .payload
+                    .get("flash_color_hex")
+                    .and_then(|v| v.as_str())
+                    .and_then(cf_render_2d::parse_flash_color_hex)
+                    .unwrap_or([255, 255, 255, 255]);
+                chem_flash.spawn([x, y], color, energy);
+                let shake_scale = (1.0 - settings.reduce_camera_shake_pct.clamp(0.0, 1.0)).max(0.0);
+                let mag = (energy.abs() / 200000.0).clamp(0.0, 6.0) * shake_scale;
+                shake.magnitude_px = (shake.magnitude_px + mag).clamp(0.0, 40.0);
             }
             _ => {}
         }

@@ -84,6 +84,8 @@ pub mod terrain;
 
 // bullet-impact sparks on hit, explosion VFX on destruction.
 #[cfg(feature = "bevy_render")]
+pub mod chem_flash;
+#[cfg(feature = "bevy_render")]
 pub mod reactor_explosion;
 #[cfg(feature = "bevy_render")]
 pub mod reactor_sparks;
@@ -142,6 +144,11 @@ pub use overlay::{
 pub use palette_swap::{
     build_role_swap, parse_hex_rgb, Palette, PaletteEntry, PaletteRegistry, PaletteSwap, OVERLAY_TINT_BUILD_REPAIR,
     OVERLAY_TINT_HAZARD, OVERLAY_TINT_INTEGRITY, OVERLAY_TINT_MOBILITY, OVERLAY_TINT_PATHABILITY,
+};
+#[cfg(feature = "bevy_render")]
+pub use chem_flash::{
+    parse_flash_color_hex, ChemFlash, ChemFlashState, CHEM_FLASH_MAX_DURATION_MS,
+    CHEM_FLASH_PEAK_RADIUS_PX,
 };
 #[cfg(feature = "bevy_render")]
 pub use reactor_explosion::{
