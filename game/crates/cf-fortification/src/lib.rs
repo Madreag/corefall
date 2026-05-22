@@ -57,6 +57,14 @@ pub mod camo;
 pub mod common;
 pub mod mg_nest;
 pub mod minefield;
+mod minefield_chain;
+mod minefield_disarm;
+mod minefield_sweep;
+mod minefield_template;
+mod minefield_trigger;
+mod minefield_types;
+#[cfg(test)]
+mod minefield_tests;
 pub mod sandbag;
 pub mod spec;
 pub mod watchtower;
