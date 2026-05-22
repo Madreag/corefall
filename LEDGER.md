@@ -90,6 +90,15 @@ Last updated: 5/21/2026 5:30 PM MST (Session 12 in flight)
 
 **Final state after audit**: 4302 workspace tests pass (+4 from chem_flash). Player can now SEE + take damage from + interact with every reaction product + see violent reactions with their proper flash colors at intensity scaled to energy release.
 
+### Second-pass audit (rate gating attempt)
+
+| Audit area | Finding | Status |
+|---|---|---|
+| Arrhenius / pressure / rate gating actually enforced in kernel | `MaterialReaction::effective_rate_per_tick` + `fires_at` exist and are mathematically correct, but the kernel `try_fire_reaction` paths bypassed them — every matched reaction fired at MAX rate every tick regardless of `rate_per_s` / `activation_k` / `pressure_order` | DEFERRED — attempted to wire it; broke 6 fire-on-contact tests; reverted. Framework is in place + callable for tooling/UI/future enforcement. Real enforcement requires paired GPU+CPU determinism work + test fixture redesign (multi-tick scenarios with explicit timing checks). |
+| Material loader silent-fallback | Compliant: all loaders warn on parse failure | CLEAN |
+| Hardcoded magic numbers | Audit deferred to follow-up | OPEN |
+| GPU+CPU determinism contract | Currently aligned by both paths having NO rate gating; once rate gating ships, paired byte-identical tests must be re-validated | OPEN |
+
 ### Audit findings (cumulative; new findings appended as I work)
 
 | # | Finding | Severity | Status |
