@@ -68,6 +68,8 @@ pub mod checksum;
 pub mod chunk;
 pub mod chunked;
 pub mod chunked_materials;
+#[cfg(test)]
+mod chunked_tests;
 pub mod constants;
 pub mod dirty;
 pub mod heat;
