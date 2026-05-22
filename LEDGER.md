@@ -72,7 +72,9 @@ Last updated: 5/21/2026 5:30 PM MST (Session 12 in flight)
 - **Files 1500-2000 LOC:** dropped from 18 → 5 (engine_emit_actor 1811, engine_handle 1784, scenario 1738, m7_ai 1729, engine 1725) — each will be split in a follow-up.
 - **Chemistry**: 55 reactions, 32 phase transitions, 6 new hazards (chlorine/ammonia/electric_arc/lightning/polluted_water/mercury), MATERIAL_TABLE co2 id bug fixed, material_id_from_name 20 → 60+ names.
 - **Comments**: 3764 narrative lines dropped across 447 files; 14 crates relaxed from `deny(missing_docs)` to `allow`. Schemas regenerated.
-- **Settings**: `content/settings/` skeleton with topical JSON files for player/admin/modder access.
+- **Settings**: `content/settings/` skeleton with topical JSON files for player/admin/modder access. `Settings::load_from_content_dir(root)` JSON-overlay loader wired with 2 tests (empty-dir defaults + topical override).
+- **Round 2 splits (in addition to closing summary)**: scenario.rs 1738 → 877 (6 siblings), m7_ai.rs 1729 → 491 (7 siblings), engine.rs 1725 → 1225 (engine_config.rs extracted). reaction_registry.json: tuned 28 pre-existing reactions with realistic activation_k (1500-8400K) + pressure_order (0.0-1.5).
+- **Final**: 4298 workspace tests pass (was 4295 entering session 12, net +3). 0 clippy errors workspace-wide.
 
 ### Audit findings (cumulative; new findings appended as I work)
 
