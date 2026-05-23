@@ -1,0 +1,23 @@
+// M15D § rxn.combustion.diesel_o2 — C16H34 + 24.5 O2 -> 16 CO2 + 17 H2O
+(
+    id: "rxn.combustion.diesel_o2",
+    display_name: "Diesel Combustion",
+    inputs: [
+        (material: "diesel", moles: 1.0,  molar_mass_g_per_mol: Some(226.443)),
+        (material: "oxygen", moles: 24.5, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "co2",   moles: 16.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "steam", moles: 17.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -10000.0,
+    activation_energy_kj_per_mol: 78.0,
+    rate_constant_per_s: 0.83,
+    min_temperature_k: Some(483.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

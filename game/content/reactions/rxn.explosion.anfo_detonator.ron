@@ -1,0 +1,25 @@
+// M15D § rxn.explosion.anfo_detonator — 3 NH4NO3 + CH2 -> 7 H2O + CO2 + 3 N2
+// Mining demolition charge; oil + ammonium nitrate.
+(
+    id: "rxn.explosion.anfo_detonator",
+    display_name: "ANFO Detonation",
+    inputs: [
+        (material: "ammonium_nitrate", moles: 3.0, molar_mass_g_per_mol: Some(80.043)),
+        (material: "anfo_fuel",        moles: 1.0, molar_mass_g_per_mol: Some(14.027)),
+    ],
+    outputs: [
+        (material: "steam",    moles: 7.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "co2",      moles: 1.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "nitrogen", moles: 3.0, molar_mass_g_per_mol: Some(28.014)),
+    ],
+    delta_h_kj_per_mol: -940.0,
+    activation_energy_kj_per_mol: 12.0,
+    rate_constant_per_s: 30.0,
+    min_temperature_k: Some(533.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

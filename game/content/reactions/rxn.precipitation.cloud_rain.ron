@@ -1,0 +1,21 @@
+// M15D § rxn.precipitation.cloud_rain — cloud(sat>0.8) -> rain (M15B rainfall)
+(
+    id: "rxn.precipitation.cloud_rain",
+    display_name: "Cloud Releases Rain",
+    inputs: [
+        (material: "cloud", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    outputs: [
+        (material: "rain", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -41.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.05,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerCell,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

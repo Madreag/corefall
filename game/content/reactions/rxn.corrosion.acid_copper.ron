@@ -1,0 +1,26 @@
+// M15D § rxn.corrosion.acid_copper — 2 H2SO4 + Cu -> CuSO4 + 2 H2O + SO2
+(
+    id: "rxn.corrosion.acid_copper",
+    display_name: "Sulfuric Acid on Copper",
+    // CA semantics: copper is input_a so the copper pixel transforms
+    // to the polluted_water visual proxy (carrying CuSO4's molar mass).
+    inputs: [
+        (material: "copper",        moles: 1.0, molar_mass_g_per_mol: Some(63.546)),
+        (material: "sulfuric_acid", moles: 2.0, molar_mass_g_per_mol: Some(98.079)),
+    ],
+    outputs: [
+        (material: "polluted_water", moles: 1.0, molar_mass_g_per_mol: Some(159.610)),
+        (material: "steam",          moles: 2.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "sulfur_dioxide", moles: 1.0, molar_mass_g_per_mol: Some(64.066)),
+    ],
+    delta_h_kj_per_mol: -130.0,
+    activation_energy_kj_per_mol: 22.0,
+    rate_constant_per_s: 0.4,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

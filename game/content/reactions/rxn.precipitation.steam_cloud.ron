@@ -1,0 +1,22 @@
+// M15D § rxn.precipitation.steam_cloud — steam + cold_air -> cloud (nucleation)
+// cold_air is the thermal sink, not matter.
+(
+    id: "rxn.precipitation.steam_cloud",
+    display_name: "Steam Nucleates Cloud",
+    inputs: [
+        (material: "steam", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    outputs: [
+        (material: "cloud", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -41.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.1,
+    min_temperature_k: None,
+    min_pressure_kpa: None,
+    catalyst: Some("cold_air"),
+    variant: PerCell,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

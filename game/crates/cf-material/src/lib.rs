@@ -50,11 +50,13 @@ use std::{collections::BTreeMap, path::Path};
 use serde::{Deserialize, Serialize};
 
 pub mod alchemy;
+pub mod arrhenius;
 pub mod kernel;
 pub(crate) mod kernel_parallel;
 pub mod loader;
 pub mod phase;
 pub mod precipitation;
+pub mod reaction_registry;
 pub mod reactions;
 pub mod registry;
 pub mod schema_m15c;
@@ -85,9 +87,22 @@ pub use precipitation::{
     PRESSURE_MULTIPLIER_RANGE, REFERENCE_PRESSURE_KPA,
 };
 pub use reactions::{
-    classify_reaction, default_reaction_registry, evaluate_reaction_pair, reaction_event,
-    reaction_event_with_emissions, MaterialReaction, ReactionRegistry, ReactionTriggeredEvent, ReactionWoundEmit,
-    EMISSION_DROPPED,
+    classify_reaction, default_reaction_registry, derive_m15d_events, evaluate_reaction_pair,
+    load_m15d_projection_default, reaction_autoignited_event, reaction_chain_propagated_event,
+    reaction_completed_event, reaction_event, reaction_event_with_emissions,
+    reaction_mass_balance_violation_event, reaction_quenched_event, DerivedM15dEvents, MaterialReaction,
+    QuenchCause, ReactionAutoignitedEvent, ReactionChainPropagatedEvent, ReactionCompletedEvent,
+    ReactionMassBalanceViolationEvent, ReactionQuenchedEvent, ReactionRegistry, ReactionTriggeredEvent,
+    ReactionWoundEmit, EMISSION_DROPPED,
+};
+
+pub use arrhenius::{arrhenius_rate, arrhenius_rate_per_tick, GAS_CONSTANT_R_KJ_PER_MOL_K};
+
+pub use reaction_registry::{
+    compile_gpu_reaction_table, load_default_dir, load_registry_dir, locate_default_dir,
+    project_to_legacy_registry, registry_molar_mass_lookup, validate_mass_balance, GpuReactionRow, M15DLoadError,
+    M15DLoadReport, M15DReactionRegistry, MassBalanceViolation, ReactionDef, ReactionInput, ReactionOutput,
+    ReactionVariant,
 };
 
 /// Material schema version stamped into every registry JSON file. M2 ships

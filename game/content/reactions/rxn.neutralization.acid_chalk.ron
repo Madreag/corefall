@@ -1,0 +1,24 @@
+// M15D § rxn.neutralization.acid_chalk — 2 HCl + CaCO3 -> CaCl2 + H2O + CO2
+(
+    id: "rxn.neutralization.acid_chalk",
+    display_name: "Acid + Limestone",
+    inputs: [
+        (material: "acid",    moles: 2.0, molar_mass_g_per_mol: Some(36.461)),
+        (material: "calcium_carbonate", moles: 1.0, molar_mass_g_per_mol: Some(100.087)),
+    ],
+    outputs: [
+        (material: "calcium_chloride", moles: 1.0, molar_mass_g_per_mol: Some(110.984)),
+        (material: "water",            moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "co2",              moles: 1.0, molar_mass_g_per_mol: Some(44.009)),
+    ],
+    delta_h_kj_per_mol: -180.0,
+    activation_energy_kj_per_mol: 8.0,
+    rate_constant_per_s: 2.0,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

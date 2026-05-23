@@ -1,0 +1,21 @@
+// M15D § rxn.thermal.ice_melt — ice + ΔQ -> water (snow-melt cycle)
+(
+    id: "rxn.thermal.ice_melt",
+    display_name: "Ice Melt",
+    inputs: [
+        (material: "ice", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    outputs: [
+        (material: "water", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: 6.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.3,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

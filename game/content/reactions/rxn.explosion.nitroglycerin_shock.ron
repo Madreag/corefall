@@ -1,0 +1,25 @@
+// M15D § rxn.explosion.nitroglycerin_shock — 4 C3H5N3O9 -> 12 CO2 + 10 H2O + 6 N2 + O2
+// Shock-sensitive; minimum activation energy in the matrix.
+(
+    id: "rxn.explosion.nitroglycerin_shock",
+    display_name: "Nitroglycerin Detonation",
+    inputs: [
+        (material: "nitroglycerin", moles: 4.0, molar_mass_g_per_mol: Some(227.087)),
+    ],
+    outputs: [
+        (material: "co2",      moles: 12.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "steam",    moles: 10.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "nitrogen", moles: 6.0,  molar_mass_g_per_mol: Some(28.014)),
+        (material: "oxygen",   moles: 1.0,  molar_mass_g_per_mol: Some(31.998)),
+    ],
+    delta_h_kj_per_mol: -1530.0,
+    activation_energy_kj_per_mol: 5.0,
+    rate_constant_per_s: 100.0,
+    min_temperature_k: Some(323.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

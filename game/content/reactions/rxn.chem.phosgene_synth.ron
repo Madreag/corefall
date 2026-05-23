@@ -1,0 +1,22 @@
+// M15D § rxn.chem.phosgene_synth — CO + Cl2 -> COCl2 (chemical-weapon gate M48)
+(
+    id: "rxn.chem.phosgene_synth",
+    display_name: "Phosgene Synthesis",
+    inputs: [
+        (material: "carbon_monoxide", moles: 1.0, molar_mass_g_per_mol: Some(28.010)),
+        (material: "chlorine",        moles: 1.0, molar_mass_g_per_mol: Some(70.906)),
+    ],
+    outputs: [
+        (material: "phosgene", moles: 1.0, molar_mass_g_per_mol: Some(98.916)),
+    ],
+    delta_h_kj_per_mol: -108.0,
+    activation_energy_kj_per_mol: 30.0,
+    rate_constant_per_s: 0.2,
+    min_temperature_k: Some(313.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

@@ -1,0 +1,23 @@
+// M15D § rxn.combustion.methane_o2 — CH4 + 2 O2 -> CO2 + 2 H2O(g)
+(
+    id: "rxn.combustion.methane_o2",
+    display_name: "Methane + Oxygen",
+    inputs: [
+        (material: "methane", moles: 1.0, molar_mass_g_per_mol: Some(16.043)),
+        (material: "oxygen",  moles: 2.0, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "co2",   moles: 1.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "steam", moles: 2.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -890.4,
+    activation_energy_kj_per_mol: 60.0,
+    rate_constant_per_s: 0.9,
+    min_temperature_k: Some(573.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

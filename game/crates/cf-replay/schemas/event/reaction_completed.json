@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/reaction.completed.v0.1",
+  "title": "reaction.completed",
+  "description": "M15D § fires when an in-flight reaction finishes — all input moles consumed and outputs placed. Carries the reaction id, total moles reacted, cumulative ΔH (J), and the per-pixel or per-cell scope. Lets cfctl + telemetry distinguish 'fire spreading' (chain of `triggered` events) from 'reaction depleted'. Producer: cf-material reaction evaluator on the final tick of a multi-tick reaction. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "reaction" },
+    "event_type": { "const": "completed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reaction_id": { "type": "string" },
+        "pos": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
+        "total_moles_reacted": { "type": "number" },
+        "cumulative_delta_h_j": { "type": "number" },
+        "duration_ticks": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["reaction_id", "total_moles_reacted", "cumulative_delta_h_j", "duration_ticks"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

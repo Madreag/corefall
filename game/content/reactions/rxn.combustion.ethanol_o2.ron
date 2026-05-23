@@ -1,0 +1,23 @@
+// M15D § rxn.combustion.ethanol_o2 — C2H6O + 3 O2 -> 2 CO2 + 3 H2O
+(
+    id: "rxn.combustion.ethanol_o2",
+    display_name: "Ethanol Combustion",
+    inputs: [
+        (material: "alcohol", moles: 1.0, molar_mass_g_per_mol: Some(46.068)),
+        (material: "oxygen",  moles: 3.0, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "co2",   moles: 2.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "steam", moles: 3.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -1367.0,
+    activation_energy_kj_per_mol: 45.0,
+    rate_constant_per_s: 0.9,
+    min_temperature_k: Some(638.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

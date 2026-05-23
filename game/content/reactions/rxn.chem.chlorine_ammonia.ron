@@ -1,0 +1,24 @@
+// M15D § rxn.chem.chlorine_ammonia — 3 Cl2 + 8 NH3 -> 6 NH4Cl + N2
+// Toxic cloud (M48 gate).
+(
+    id: "rxn.chem.chlorine_ammonia",
+    display_name: "Chlorine + Ammonia",
+    inputs: [
+        (material: "chlorine", moles: 3.0, molar_mass_g_per_mol: Some(70.906)),
+        (material: "ammonia",  moles: 8.0, molar_mass_g_per_mol: Some(17.031)),
+    ],
+    outputs: [
+        (material: "ammonium_chloride", moles: 6.0, molar_mass_g_per_mol: Some(53.492)),
+        (material: "nitrogen",          moles: 1.0, molar_mass_g_per_mol: Some(28.014)),
+    ],
+    delta_h_kj_per_mol: -460.0,
+    activation_energy_kj_per_mol: 25.0,
+    rate_constant_per_s: 0.3,
+    min_temperature_k: Some(293.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

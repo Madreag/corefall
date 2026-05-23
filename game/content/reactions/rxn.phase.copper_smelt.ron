@@ -1,0 +1,21 @@
+// M15D § rxn.phase.copper_smelt — Cu(s) + ΔQ -> Cu(l) (alloy feedstock)
+(
+    id: "rxn.phase.copper_smelt",
+    display_name: "Copper Smelt",
+    inputs: [
+        (material: "copper", moles: 1.0, molar_mass_g_per_mol: Some(63.546)),
+    ],
+    outputs: [
+        (material: "molten_copper", moles: 1.0, molar_mass_g_per_mol: Some(63.546)),
+    ],
+    delta_h_kj_per_mol: 207.0,
+    activation_energy_kj_per_mol: 90.0,
+    rate_constant_per_s: 0.22,
+    min_temperature_k: Some(1358.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerCell,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/reaction.mass_balance_violation.v0.1",
+  "title": "reaction.mass_balance_violation",
+  "description": "M15D § Diagnostic event fired by cf-mod / cf-material registry loader when a reaction's input mass does not equal its output mass within the 0.01 g/mol tolerance. Used to reject broken mods and to surface registry-authoring mistakes. Per acceptance scenario 9: 'Given a mod ships content/reactions/custom_alchemy.ron with inputs_mass != outputs_mass / When cf-mod validation runs / Then reaction_mass_balance_violation fires with a diagnostic on stderr / And the mod's reaction is excluded / And the launch 55-reaction registry remains intact'.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "reaction" },
+    "event_type": { "const": "mass_balance_violation" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reaction_id": { "type": "string" },
+        "input_mass_g_per_mol": { "type": "number" },
+        "output_mass_g_per_mol": { "type": "number" },
+        "delta_g_per_mol": { "type": "number" },
+        "tolerance_g_per_mol": { "type": "number" },
+        "source_file": { "type": ["string", "null"] }
+      },
+      "required": ["reaction_id", "input_mass_g_per_mol", "output_mass_g_per_mol", "delta_g_per_mol", "tolerance_g_per_mol"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

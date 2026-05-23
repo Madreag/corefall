@@ -92,6 +92,36 @@ impl ReactionEntryGpu {
             padding: 0,
         }
     }
+
+    /// Build from the M15D `GpuReactionRow` (per M15D § cf-material-gpu
+    /// reaction_table MODIFY). Truncates 16-bit material ids to 8 bits
+    /// for the launch GPU schema; material ids above 255 are not yet
+    /// supported on the GPU path (use the CPU path).
+    #[must_use]
+    pub fn from_m15d_row(row: cf_material::GpuReactionRow) -> Self {
+        Self::new(
+            (row.input_a & 0xff) as u8,
+            (row.input_b & 0xff) as u8,
+            (row.output & 0xff) as u8,
+            row.byproduct.map(|b| (b & 0xff) as u8),
+            row.min_temperature_k,
+        )
+    }
+
+    /// Compile a complete M15D registry into the GPU table. Skips rows
+    /// whose inputs can't be resolved against the supplied lookup; per
+    /// spec § "cf-material-gpu::reaction_table — Compile 55 entries
+    /// into wgsl reaction-table struct".
+    #[must_use]
+    pub fn compile_m15d_table(
+        registry: &cf_material::M15DReactionRegistry,
+        name_to_id: &dyn Fn(&str) -> Option<u16>,
+    ) -> Vec<Self> {
+        cf_material::compile_gpu_reaction_table(registry, name_to_id)
+            .into_iter()
+            .map(Self::from_m15d_row)
+            .collect()
+    }
 }
 
 /// the chunked terrain + heat field + reaction registry, hands it to

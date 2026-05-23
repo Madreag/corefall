@@ -1124,6 +1124,73 @@ impl EngineHandle for M0Engine {
         Some(payload)
     }
 
+    /// **M15D § F8 tile inspect — live-terrain override.** Filters the
+    /// M15D registry against the actual material at `(x, y)` AND its 4
+    /// cardinal neighbors, returning only reactions whose pair-match
+    /// AND temperature gate are open right now. Each row carries the
+    /// Arrhenius rate at the tile's current temperature so the player
+    /// sees the live per-second rate, not a static stub.
+    async fn observe_tile_reactions(&self, x: f32, y: f32) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let terrain = state.chunked_terrain.as_ref()?;
+        let center_mat = terrain.material_at_world(x, y);
+        let temp_k = state.heat_field.temperature_at_world(x, y);
+        let pressure_kpa = cf_terrain::air::AMBIENT_PRESSURE_KPA;
+        let mut neighbor_mats: Vec<u16> = Vec::with_capacity(4);
+        for (dx, dy) in &[(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)] {
+            neighbor_mats.push(terrain.material_at_world(x + dx, y + dy));
+        }
+        drop(state);
+        let (registry, _) = cf_material::load_default_dir()?;
+        let mut rows: Vec<serde_json::Value> = Vec::new();
+        let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        for r in &registry.reactions {
+            if !r.emits_event {
+                continue;
+            }
+            if cf_material::M15DReactionRegistry::is_reactor_only(&r.id) {
+                continue;
+            }
+            let a = r.inputs.first().and_then(|i| i.material_id);
+            let b = r.inputs.get(1).and_then(|i| i.material_id);
+            let (Some(a), Some(b)) = (a, b) else { continue };
+            let matches_center = (center_mat == a && neighbor_mats.iter().any(|&n| n == b))
+                || (center_mat == b && neighbor_mats.iter().any(|&n| n == a));
+            if !matches_center {
+                continue;
+            }
+            if let Some(min_t) = r.min_temperature_k {
+                if temp_k < min_t {
+                    continue;
+                }
+            }
+            if seen.insert(r.id.clone()) {
+                let rate = r.effective_rate_per_s(temp_k);
+                let eta = if rate > 0.0 { Some((1.0 / rate.max(1e-9) * 60.0) as u64) } else { None };
+                rows.push(serde_json::json!({
+                    "reaction_id": r.id,
+                    "display_name": r.display_name,
+                    "rate_per_s": rate,
+                    "eta_ticks": eta,
+                    "cumulative_delta_h_kj": 0.0,
+                    "delta_h_kj_per_mol": r.delta_h_kj_per_mol,
+                    "variant": format!("{:?}", r.variant),
+                    "auto_ignite": r.auto_ignite,
+                    "propagates": r.propagates,
+                }));
+            }
+        }
+        Some(serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "x": x,
+            "y": y,
+            "material_id": center_mat,
+            "temperature_k": temp_k,
+            "pressure_kpa": pressure_kpa,
+            "active_reactions": rows,
+        }))
+    }
+
     async fn dispatch(&self, command: ControlCommand) -> CommandResult {
         self.dispatch_command(command).await
     }

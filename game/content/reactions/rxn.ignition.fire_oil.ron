@@ -1,0 +1,27 @@
+// M15D § rxn.ignition.fire_oil — fire + oil -> larger_fire + smoke (cascade 0.8/s)
+// Fire stays as cascade catalyst; oil burns to smoke residue carrying
+// the full oil mass per the soot-equivalent accounting.
+(
+    id: "rxn.ignition.fire_oil",
+    display_name: "Oil Catches Fire",
+    // CA semantics: oil is input_a so the oil pixel transforms to
+    // smoke; fire_intense is input_b (catalyst) so it stays.
+    inputs: [
+        (material: "oil",          moles: 1.0, molar_mass_g_per_mol: Some(114.230)),
+        (material: "fire_intense", moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+    ],
+    outputs: [
+        (material: "smoke",        moles: 1.0, molar_mass_g_per_mol: Some(114.230)),
+        (material: "fire_intense", moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+    ],
+    delta_h_kj_per_mol: -200.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.8,
+    min_temperature_k: Some(533.0),
+    min_pressure_kpa: None,
+    catalyst: Some("fire_intense"),
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

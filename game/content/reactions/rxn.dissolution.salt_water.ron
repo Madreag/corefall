@@ -1,0 +1,22 @@
+// M15D § rxn.dissolution.salt_water — NaCl + H2O -> brine (salinity tracking)
+(
+    id: "rxn.dissolution.salt_water",
+    display_name: "Salt + Water",
+    inputs: [
+        (material: "salt",  moles: 1.0, molar_mass_g_per_mol: Some(58.443)),
+        (material: "water", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    outputs: [
+        (material: "neutralized_brine", moles: 1.0, molar_mass_g_per_mol: Some(76.458)),
+    ],
+    delta_h_kj_per_mol: 4.0,
+    activation_energy_kj_per_mol: 5.0,
+    rate_constant_per_s: 0.5,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

@@ -1,0 +1,26 @@
+// M15D § rxn.explosion.gunpowder_spark — 2 KNO3 + S + 3 C -> K2S + N2 + 3 CO2
+// Radius scales at 2 tiles/kg per M15D player-facing behavior.
+(
+    id: "rxn.explosion.gunpowder_spark",
+    display_name: "Gunpowder Detonation",
+    inputs: [
+        (material: "saltpeter", moles: 2.0, molar_mass_g_per_mol: Some(101.103)),
+        (material: "sulfur",    moles: 1.0, molar_mass_g_per_mol: Some(32.065)),
+        (material: "coal",      moles: 3.0, molar_mass_g_per_mol: Some(12.011)),
+    ],
+    outputs: [
+        (material: "potassium_sulfide", moles: 1.0, molar_mass_g_per_mol: Some(110.262)),
+        (material: "nitrogen",          moles: 1.0, molar_mass_g_per_mol: Some(28.014)),
+        (material: "co2",               moles: 3.0, molar_mass_g_per_mol: Some(44.009)),
+    ],
+    delta_h_kj_per_mol: -1850.0,
+    activation_energy_kj_per_mol: 25.0,
+    rate_constant_per_s: 5.0,
+    min_temperature_k: Some(573.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

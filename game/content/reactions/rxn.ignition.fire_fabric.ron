@@ -1,0 +1,25 @@
+// M15D § rxn.ignition.fire_fabric — fire + fabric -> fire + ash (drapery hazard)
+(
+    id: "rxn.ignition.fire_fabric",
+    display_name: "Fabric Catches Fire",
+    // CA semantics: fabric is input_a so the fabric pixel transforms
+    // to ash; fire_intense is input_b (catalyst).
+    inputs: [
+        (material: "fabric",       moles: 1.0, molar_mass_g_per_mol: Some(162.140)),
+        (material: "fire_intense", moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+    ],
+    outputs: [
+        (material: "ash",          moles: 1.0, molar_mass_g_per_mol: Some(162.140)),
+        (material: "fire_intense", moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+    ],
+    delta_h_kj_per_mol: -150.0,
+    activation_energy_kj_per_mol: 3.0,
+    rate_constant_per_s: 0.85,
+    min_temperature_k: Some(510.0),
+    min_pressure_kpa: None,
+    catalyst: Some("fire_intense"),
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

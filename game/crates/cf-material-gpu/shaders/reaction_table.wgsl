@@ -1,17 +1,24 @@
-// **M15B** § GPU reaction-table compute shader.
+// **M15B + M15D** § GPU reaction-table compute shader.
 //
 // Per the M15B spec § "Notes for the implementer":
 // > Material reactions on the GPU require deterministic ordering — use a
 // > per-chunk Margolus checker-pattern shader pass + atomic merge step.
 // > NO atomic-CAS loops on shared sim state.
 //
+// M15D extends the host-side feed: `compile_gpu_reaction_table` walks
+// the 55-reaction M15D registry and emits a `Vec<ReactionEntryGpu>` —
+// one per reaction whose inputs resolve to launch-registry material
+// ids. Reactions referencing abstract reagents (KNO3, tritium, etc.)
+// run on the CPU-only path until M15C adds the matching entries.
+//
 // Iterates every reactive pixel in the chunk; for each pixel, checks the
 // right + below neighbors against the reaction lookup table.
 //
 // The reaction table is stored as a flat array of MaterialReactionEntry
 // records — one per registered reaction. The lookup is a linear scan;
-// the M15 launch set has ~32 reactions, so a per-pixel O(n) scan is
-// budget-friendly and avoids the determinism complications of a hash
+// the M15 launch set + M15D extension lands at ~55 reactions, so a per-
+// pixel O(n) scan stays under the M15B perf gate (<1.5 ms/tick on the
+// reference GPU) and avoids the determinism complications of a hash
 // map.
 //
 // Reaction record layout (matches host-side `MaterialReactionEntry`):

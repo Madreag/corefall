@@ -1,0 +1,22 @@
+// M15D § rxn.corrosion.rust_o2 — 4 Fe + 3 O2 -> 2 Fe2O3 (ambient slow oxidation)
+(
+    id: "rxn.corrosion.rust_o2",
+    display_name: "Iron Ambient Rusting",
+    inputs: [
+        (material: "iron",   moles: 4.0, molar_mass_g_per_mol: Some(55.845)),
+        (material: "oxygen", moles: 3.0, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "rust", moles: 2.0, molar_mass_g_per_mol: Some(159.687)),
+    ],
+    delta_h_kj_per_mol: -1648.0,
+    activation_energy_kj_per_mol: 50.0,
+    rate_constant_per_s: 0.001,
+    min_temperature_k: Some(293.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

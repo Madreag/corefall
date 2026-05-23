@@ -1807,6 +1807,74 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "unknown_material_id")),
             }
         }
+        "query.material.reactions" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            Some(success_response(request.id, engine.query_material_reactions().await))
+        }
+        "query.material.reaction_by_id" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                id: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.query_material_reaction_by_id(&p.id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "unknown_reaction_id")),
+            }
+        }
+        "observe.tile.reactions" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                x: f32,
+                y: f32,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite_coords"));
+            }
+            match engine.observe_tile_reactions(p.x, p.y).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_terrain_world")),
+            }
+        }
+        "act.dev.force_reaction" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                id: String,
+                #[serde(default)]
+                x: f32,
+                #[serde(default)]
+                y: f32,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite_coords"));
+            }
+            match engine.act_dev_force_reaction(&p.id, p.x, p.y).await {
+                Ok(value) => Some(success_response(request.id, value)),
+                Err(reason) => Some(invalid_param_reason(request.id, &reason)),
+            }
+        }
         "act.player.toggle_material_overlay" => {
             let p: crate::schemas::ActToggleMaterialOverlayParams = match serde_json::from_value(params) {
                 Ok(v) => v,

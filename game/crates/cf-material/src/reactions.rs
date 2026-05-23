@@ -414,11 +414,19 @@ impl ReactionRegistry {
     /// falling back to the hardcoded set. Without this, modders making
     /// a JSON typo would silently get hardcoded behavior with no
     /// indication their file was rejected.
+    ///
+    /// **M15D § canonical ownership**: when `content/reactions/*.ron` is
+    /// present, the M15D 55-reaction matrix is merged on top of the
+    /// legacy hardcoded list. M15D entries override any legacy entry
+    /// with the same `id` (replay-compatible: existing IDs never
+    /// mutate semantics); new M15D IDs append. The merge guarantees
+    /// the registry never SHRINKS as M15D ships, so existing CA
+    /// kernel paths keep firing.
     #[must_use]
     pub fn load_default_or_hardcoded() -> Self {
-        if let Some(path) = Self::locate_default() {
+        let mut base = if let Some(path) = Self::locate_default() {
             match Self::load_from_file(&path) {
-                Ok(r) => return r,
+                Ok(r) => r,
                 Err(err) => {
                     tracing::warn!(
                         target: "cf_material::reactions",
@@ -426,10 +434,19 @@ impl ReactionRegistry {
                         error = ?err,
                         "reaction_registry.json present but failed to load — falling back to hardcoded defaults"
                     );
+                    default_reaction_registry()
                 }
             }
+        } else {
+            default_reaction_registry()
+        };
+        if let Some(m15d) = load_m15d_projection_default() {
+            let m15d_ids: std::collections::BTreeSet<String> =
+                m15d.reactions.iter().map(|r| r.id.clone()).collect();
+            base.reactions.retain(|r| !m15d_ids.contains(&r.id));
+            base.reactions.extend(m15d.reactions);
         }
-        default_reaction_registry()
+        base
     }
 }
 
@@ -475,6 +492,27 @@ pub fn evaluate_reaction_pair(
     temperature_k: f32,
 ) -> Option<&MaterialReaction> {
     registry.evaluate(a, b, temperature_k)
+}
+
+/// **M15D § canonical ownership** — load + project the M15D 55-reaction
+/// matrix into the legacy [`ReactionRegistry`] shape. Returns `None`
+/// when `content/reactions/` isn't reachable (test boot, no content
+/// dir).
+///
+/// Per spec § "Canonical ownership": M15 / M15B / M15C / M19 / M19B /
+/// M3B read from the M15D registry; they do not redefine reactions
+/// locally. This is the projection that feeds the legacy CA kernel
+/// from the M15D source of truth.
+#[must_use]
+pub fn load_m15d_projection_default() -> Option<ReactionRegistry> {
+    let (m15d_reg, _report) = crate::reaction_registry::load_default_dir()?;
+    let mat_path = crate::MaterialRegistry::locate_default()?;
+    let (mat_reg, _) = crate::loader::load_registry_from_file(&mat_path).ok()?;
+    let name_to_id = mat_reg.name_to_id();
+    let lookup = |n: &str| name_to_id.get(n).copied();
+    Some(crate::reaction_registry::project_to_legacy_registry(
+        &m15d_reg, &lookup,
+    ))
 }
 
 /// spanning corrosion / combustion / phase / neutralization / explosion
@@ -1349,6 +1387,269 @@ pub fn reaction_event_with_emissions(
 /// `pos == [EMISSION_DROPPED, EMISSION_DROPPED]` to detect dropped
 /// emissions.
 pub const EMISSION_DROPPED: i32 = i32::MIN;
+
+/// **M15D § Reaction completed** — fires when an in-flight reaction
+/// finishes (all input moles consumed; outputs placed). Schema mirror:
+/// `schemas/event/reaction_completed.json`. Producer: cf-material on
+/// the final tick of a multi-tick reaction.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReactionCompletedEvent {
+    pub reaction_id: String,
+    pub pos: [i32; 2],
+    pub total_moles_reacted: f32,
+    pub cumulative_delta_h_j: f32,
+    pub duration_ticks: u64,
+    pub tick: u64,
+}
+
+/// **M15D § Reaction chain propagated** — fires when a `propagates:
+/// true` reaction spreads from one pixel to an adjacent compatible
+/// neighbor (gunpowder chain detonation, oil-fire cascade, contact
+/// freeze). Schema mirror: `schemas/event/reaction_chain_propagated.json`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReactionChainPropagatedEvent {
+    pub reaction_id: String,
+    pub from_pos: [i32; 2],
+    pub to_pos: [i32; 2],
+    pub chain_depth: u32,
+    pub tick: u64,
+}
+
+/// **M15D § Reaction autoignited** — fires when an `auto_ignite: true`
+/// reaction's `min_temperature_k` threshold is first crossed (or
+/// pressure threshold for PV-gated entries). Schema mirror:
+/// `schemas/event/reaction_autoignited.json`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReactionAutoignitedEvent {
+    pub reaction_id: String,
+    pub pos: [i32; 2],
+    pub temperature_k: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pressure_kpa: Option<f32>,
+    pub delta_h_kj: f32,
+    pub moles_reacted: f32,
+    pub tick: u64,
+}
+
+/// **M15D § Reaction quenched** — fires when an in-flight reaction stops
+/// short of completion (water extinguishes fire, gas mix drops below
+/// LFL, catalyst removed). Schema mirror: `schemas/event/reaction_quenched.json`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReactionQuenchedEvent {
+    pub reaction_id: String,
+    pub pos: [i32; 2],
+    pub cause: QuenchCause,
+    pub moles_unreacted: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature_k: Option<f32>,
+    pub tick: u64,
+}
+
+/// Reasons a reaction can be quenched before completion. Mirrors the
+/// JSON-schema enum in `schemas/event/reaction_quenched.json`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QuenchCause {
+    TemperatureDrop,
+    PressureDrop,
+    FuelDepleted,
+    OxidizerDepleted,
+    QuenchingAgent,
+    CatalystRemoved,
+}
+
+/// **M15D § Reaction mass-balance violation** — diagnostic event fired
+/// by the cf-mod validator + the registry loader when a reaction's
+/// input mass does not equal its output mass within 0.01 g/mol. Schema
+/// mirror: `schemas/event/reaction_mass_balance_violation.json`. Per
+/// acceptance scenario 9.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReactionMassBalanceViolationEvent {
+    pub reaction_id: String,
+    pub input_mass_g_per_mol: f32,
+    pub output_mass_g_per_mol: f32,
+    pub delta_g_per_mol: f32,
+    pub tolerance_g_per_mol: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_file: Option<String>,
+    pub tick: u64,
+}
+
+/// Construct a completed event from a reaction's final-tick state.
+#[must_use]
+pub fn reaction_completed_event(
+    reaction_id: &str,
+    pos: [i32; 2],
+    total_moles_reacted: f32,
+    cumulative_delta_h_j: f32,
+    duration_ticks: u64,
+    tick: u64,
+) -> ReactionCompletedEvent {
+    ReactionCompletedEvent {
+        reaction_id: reaction_id.to_string(),
+        pos,
+        total_moles_reacted,
+        cumulative_delta_h_j,
+        duration_ticks,
+        tick,
+    }
+}
+
+#[must_use]
+pub fn reaction_chain_propagated_event(
+    reaction_id: &str,
+    from_pos: [i32; 2],
+    to_pos: [i32; 2],
+    chain_depth: u32,
+    tick: u64,
+) -> ReactionChainPropagatedEvent {
+    ReactionChainPropagatedEvent {
+        reaction_id: reaction_id.to_string(),
+        from_pos,
+        to_pos,
+        chain_depth,
+        tick,
+    }
+}
+
+#[must_use]
+pub fn reaction_autoignited_event(
+    reaction_id: &str,
+    pos: [i32; 2],
+    temperature_k: f32,
+    pressure_kpa: Option<f32>,
+    delta_h_kj_per_mol: f32,
+    moles_reacted: f32,
+    tick: u64,
+) -> ReactionAutoignitedEvent {
+    ReactionAutoignitedEvent {
+        reaction_id: reaction_id.to_string(),
+        pos,
+        temperature_k,
+        pressure_kpa,
+        delta_h_kj: delta_h_kj_per_mol * moles_reacted,
+        moles_reacted,
+        tick,
+    }
+}
+
+#[must_use]
+pub fn reaction_quenched_event(
+    reaction_id: &str,
+    pos: [i32; 2],
+    cause: QuenchCause,
+    moles_unreacted: f32,
+    temperature_k: Option<f32>,
+    tick: u64,
+) -> ReactionQuenchedEvent {
+    ReactionQuenchedEvent {
+        reaction_id: reaction_id.to_string(),
+        pos,
+        cause,
+        moles_unreacted,
+        temperature_k,
+        tick,
+    }
+}
+
+#[must_use]
+pub fn reaction_mass_balance_violation_event(
+    reaction_id: &str,
+    input_mass_g_per_mol: f32,
+    output_mass_g_per_mol: f32,
+    tolerance_g_per_mol: f32,
+    source_file: Option<String>,
+    tick: u64,
+) -> ReactionMassBalanceViolationEvent {
+    let delta = input_mass_g_per_mol - output_mass_g_per_mol;
+    ReactionMassBalanceViolationEvent {
+        reaction_id: reaction_id.to_string(),
+        input_mass_g_per_mol,
+        output_mass_g_per_mol,
+        delta_g_per_mol: delta,
+        tolerance_g_per_mol,
+        source_file,
+        tick,
+    }
+}
+
+/// **M15D § event derivation** — extract the spec's 5 reaction event
+/// types from the per-tick [`ReactionTriggeredEvent`] stream produced
+/// by the CA kernel. Engine bridges route the derived lists into
+/// cf-replay as `reaction.autoignited`, `reaction.chain_propagated`,
+/// etc.
+///
+/// Logic:
+/// - `reaction.autoignited` fires for every triggered event whose
+///   underlying reaction is `auto_ignite: true` (the spec's "first
+///   crossing" semantics are approximated as "every autoignite-flagged
+///   firing" — the engine layer can rate-limit per-pixel if needed).
+/// - `reaction.chain_propagated` fires for every triggered event whose
+///   underlying reaction is `propagates: true`. `chain_depth` is
+///   passed as `0` because the kernel doesn't currently track per-tile
+///   propagation history; downstream consumers compute depth from
+///   spatial clustering of events.
+/// - `reaction.completed` fires for every triggered event of a
+///   single-tick reaction (rate_per_s × tick_dt ≥ 1.0 effectively
+///   instantaneous) — a heuristic that the engine layer overrides
+///   when it has multi-tick state.
+/// - `reaction.quenched` and `reaction.mass_balance_violation` are
+///   NOT derived from triggered events; their producers are the
+///   reaction quench tracker + the cf-mod / loader validator, which
+///   call the dedicated constructor functions directly.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct DerivedM15dEvents {
+    pub autoignited: Vec<ReactionAutoignitedEvent>,
+    pub chain_propagated: Vec<ReactionChainPropagatedEvent>,
+    pub completed: Vec<ReactionCompletedEvent>,
+}
+
+#[must_use]
+pub fn derive_m15d_events(
+    triggered: &[ReactionTriggeredEvent],
+    registry: &ReactionRegistry,
+) -> DerivedM15dEvents {
+    let mut out = DerivedM15dEvents::default();
+    for evt in triggered {
+        let Some(rxn) = registry.by_id(&evt.reaction_id) else {
+            continue;
+        };
+        if rxn.auto_ignite {
+            out.autoignited.push(ReactionAutoignitedEvent {
+                reaction_id: evt.reaction_id.clone(),
+                pos: evt.pos,
+                temperature_k: rxn.min_temperature_k.unwrap_or(293.15),
+                pressure_kpa: None,
+                delta_h_kj: evt.energy_release_j / 1000.0,
+                moles_reacted: 1.0,
+                tick: evt.tick,
+            });
+        }
+        if rxn.propagates {
+            out.chain_propagated.push(ReactionChainPropagatedEvent {
+                reaction_id: evt.reaction_id.clone(),
+                from_pos: evt.pos,
+                to_pos: evt.pos,
+                chain_depth: 0,
+                tick: evt.tick,
+            });
+        }
+        // Single-tick reactions land a completed event the same tick.
+        // Multi-tick state is engine-side; this derivation only covers
+        // the rate >= 1/s case.
+        if rxn.rate_per_s >= 1.0 {
+            out.completed.push(ReactionCompletedEvent {
+                reaction_id: evt.reaction_id.clone(),
+                pos: evt.pos,
+                total_moles_reacted: 1.0,
+                cumulative_delta_h_j: evt.energy_release_j,
+                duration_ticks: 1,
+                tick: evt.tick,
+            });
+        }
+    }
+    out
+}
 
 #[cfg(test)]
 mod tests {

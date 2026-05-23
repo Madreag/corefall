@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/reaction.triggered.v0.1",
+  "title": "reaction.triggered",
+  "description": "M15D § Reaction Matrix Buildout — emitted when a reaction in the 55-entry M15D registry fires for an adjacent pair (per-pixel) or sealed room (per-cell). Carries the reaction id, both inputs, the first output, optional byproduct, position, energy released, and autoignition flag. Producer: cf-material per-tick reaction evaluator (CPU + GPU). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "reaction" },
+    "event_type": { "const": "triggered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reaction_id": { "type": "string" },
+        "material_a": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 },
+        "material_b": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 },
+        "output": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 },
+        "byproduct": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 },
+        "pos": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
+        "delta_h_kj_per_mol": { "type": "number" },
+        "rate_per_s": { "type": "number" },
+        "variant": { "type": "string", "enum": ["PerPixel", "PerCell", "Both"] },
+        "auto_ignite": { "type": "boolean" }
+      },
+      "required": ["reaction_id", "delta_h_kj_per_mol", "rate_per_s", "variant", "auto_ignite"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

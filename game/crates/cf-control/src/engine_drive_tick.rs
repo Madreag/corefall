@@ -1354,6 +1354,29 @@ impl M0Engine {
                         }
                     }
                     self.recorder.record(tick, sim_time_ms, "material", "reaction_triggered", payload.clone(), None);
+                    // M15D § Also emit the unified reaction.triggered
+                    // event (new schema) so M15D consumers see one
+                    // consistent payload regardless of which category
+                    // namespace they listen on.
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "reaction",
+                        "triggered",
+                        json!({
+                            "reaction_id": ev.reaction_id,
+                            "material_a": ev.material_a,
+                            "material_b": ev.material_b,
+                            "output": ev.output,
+                            "byproduct": ev.byproduct,
+                            "pos": ev.pos,
+                            "delta_h_kj_per_mol": ev.energy_release_j / 1000.0,
+                            "rate_per_s": 0.0_f32,
+                            "variant": "PerPixel",
+                            "auto_ignite": ev.auto_ignite,
+                        }),
+                        None,
+                    );
                     if ev.violent {
                         self.recorder.record(
                             tick,
@@ -1369,6 +1392,59 @@ impl M0Engine {
                             None,
                         );
                     }
+                }
+                // M15D § Derive + emit the spec's 5 new reaction events
+                // (autoignited, chain_propagated, completed) from the
+                // per-tick triggered stream. quenched + mass_balance
+                // are producer-specific and emitted elsewhere.
+                let derived = cf_material::derive_m15d_events(&report.reactions, &state.reaction_registry);
+                for evt in &derived.autoignited {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "reaction",
+                        "autoignited",
+                        json!({
+                            "reaction_id": evt.reaction_id,
+                            "pos": evt.pos,
+                            "temperature_k": evt.temperature_k,
+                            "pressure_kpa": evt.pressure_kpa,
+                            "delta_h_kj": evt.delta_h_kj,
+                            "moles_reacted": evt.moles_reacted,
+                        }),
+                        None,
+                    );
+                }
+                for evt in &derived.chain_propagated {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "reaction",
+                        "chain_propagated",
+                        json!({
+                            "reaction_id": evt.reaction_id,
+                            "from_pos": evt.from_pos,
+                            "to_pos": evt.to_pos,
+                            "chain_depth": evt.chain_depth,
+                        }),
+                        None,
+                    );
+                }
+                for evt in &derived.completed {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "reaction",
+                        "completed",
+                        json!({
+                            "reaction_id": evt.reaction_id,
+                            "pos": evt.pos,
+                            "total_moles_reacted": evt.total_moles_reacted,
+                            "cumulative_delta_h_j": evt.cumulative_delta_h_j,
+                            "duration_ticks": evt.duration_ticks,
+                        }),
+                        None,
+                    );
                 }
                 // Route phase-transition events to the recorder.
                 for ev in &report.phase_transitions {

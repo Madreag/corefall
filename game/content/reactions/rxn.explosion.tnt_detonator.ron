@@ -1,0 +1,25 @@
+// M15D § rxn.explosion.tnt_detonator — C7H5N3O6 -> 3.5 CO + 3.5 C + 2.5 H2O + 1.5 N2
+// Shaped charge primary.
+(
+    id: "rxn.explosion.tnt_detonator",
+    display_name: "TNT Detonation",
+    inputs: [
+        (material: "tnt", moles: 1.0, molar_mass_g_per_mol: Some(227.131)),
+    ],
+    outputs: [
+        (material: "carbon_monoxide", moles: 3.5, molar_mass_g_per_mol: Some(28.010)),
+        (material: "carbon",          moles: 3.5, molar_mass_g_per_mol: Some(12.011)),
+        (material: "steam",           moles: 2.5, molar_mass_g_per_mol: Some(18.015)),
+        (material: "nitrogen",        moles: 1.5, molar_mass_g_per_mol: Some(28.014)),
+    ],
+    delta_h_kj_per_mol: -1090.0,
+    activation_energy_kj_per_mol: 8.0,
+    rate_constant_per_s: 50.0,
+    min_temperature_k: Some(510.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/reaction.autoignited.v0.1",
+  "title": "reaction.autoignited",
+  "description": "M15D § fires for an `auto_ignite: true` reaction the moment its `min_temperature_k` threshold is first crossed (or pressure threshold for PV-gated entries). Distinct from `triggered` because autoignition events are interesting for AI hazard avoidance + cinematic banner triggers + cfctl alerts. Carries the reaction id, position, ambient temperature at ignition, and the locked spec ΔH per acceptance scenario 4 ('delta_h_kj = -483.6 * moles_reacted').",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "reaction" },
+    "event_type": { "const": "autoignited" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reaction_id": { "type": "string" },
+        "pos": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
+        "temperature_k": { "type": "number" },
+        "pressure_kpa": { "type": ["number", "null"] },
+        "delta_h_kj": { "type": "number" },
+        "moles_reacted": { "type": "number" }
+      },
+      "required": ["reaction_id", "pos", "temperature_k", "delta_h_kj", "moles_reacted"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

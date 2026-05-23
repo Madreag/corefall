@@ -1,0 +1,23 @@
+// M15D § rxn.combustion.methane_o3 — CH4 + 4/3 O3 -> CO2 + 2 H2O
+(
+    id: "rxn.combustion.methane_o3",
+    display_name: "Methane + Ozone",
+    inputs: [
+        (material: "methane", moles: 1.0,       molar_mass_g_per_mol: Some(16.043)),
+        (material: "ozone",   moles: 1.3333334, molar_mass_g_per_mol: Some(47.997)),
+    ],
+    outputs: [
+        (material: "co2",   moles: 1.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "steam", moles: 2.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -1098.0,
+    activation_energy_kj_per_mol: 42.0,
+    rate_constant_per_s: 0.9,
+    min_temperature_k: Some(423.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

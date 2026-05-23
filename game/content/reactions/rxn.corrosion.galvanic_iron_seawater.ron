@@ -1,0 +1,24 @@
+// M15D § rxn.corrosion.galvanic_iron_seawater — Fe + brine + O2 -> Fe2O3
+// Spec literal lists brine as the catalyst; stoichiometry follows the
+// underlying 4 Fe + 3 O2 -> 2 Fe2O3 equation per real galvanic chemistry.
+(
+    id: "rxn.corrosion.galvanic_iron_seawater",
+    display_name: "Galvanic Iron + Seawater",
+    inputs: [
+        (material: "iron",   moles: 4.0, molar_mass_g_per_mol: Some(55.845)),
+        (material: "oxygen", moles: 3.0, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "rust", moles: 2.0, molar_mass_g_per_mol: Some(159.687)),
+    ],
+    delta_h_kj_per_mol: -800.0,
+    activation_energy_kj_per_mol: 35.0,
+    rate_constant_per_s: 0.01,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: Some("neutralized_brine"),
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

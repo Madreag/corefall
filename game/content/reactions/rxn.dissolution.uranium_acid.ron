@@ -1,0 +1,25 @@
+// M15D § rxn.dissolution.uranium_acid — U + 4 HNO3 -> UO2(NO3)2 + 2 NO + 2 H2O
+// Hazardous; NO gas surfaces in air per spec.
+(
+    id: "rxn.dissolution.uranium_acid",
+    display_name: "Uranium + Nitric Acid",
+    inputs: [
+        (material: "uranium",     moles: 1.0, molar_mass_g_per_mol: Some(238.029)),
+        (material: "nitric_acid", moles: 4.0, molar_mass_g_per_mol: Some(63.013)),
+    ],
+    outputs: [
+        (material: "uranyl_nitrate", moles: 1.0, molar_mass_g_per_mol: Some(394.039)),
+        (material: "nitric_oxide",   moles: 2.0, molar_mass_g_per_mol: Some(30.006)),
+        (material: "water",          moles: 2.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -200.0,
+    activation_energy_kj_per_mol: 35.0,
+    rate_constant_per_s: 0.05,
+    min_temperature_k: Some(333.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

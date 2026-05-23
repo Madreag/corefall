@@ -1,0 +1,23 @@
+// M15D § rxn.combustion.wood_o2 — C6H10O5 + 6 O2 -> 6 CO2 + 5 H2O
+(
+    id: "rxn.combustion.wood_o2",
+    display_name: "Cellulose Combustion",
+    inputs: [
+        (material: "wood",   moles: 1.0, molar_mass_g_per_mol: Some(162.140)),
+        (material: "oxygen", moles: 6.0, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "co2",   moles: 6.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "steam", moles: 5.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -2800.0,
+    activation_energy_kj_per_mol: 55.0,
+    rate_constant_per_s: 0.6,
+    min_temperature_k: Some(573.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

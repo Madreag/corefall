@@ -1,0 +1,22 @@
+// M15D § rxn.combustion.h2_o3 — 3 H2 + O3 -> 3 H2O (high-energy path)
+(
+    id: "rxn.combustion.h2_o3",
+    display_name: "Hydrogen + Ozone",
+    inputs: [
+        (material: "hydrogen", moles: 3.0, molar_mass_g_per_mol: Some(2.016)),
+        (material: "ozone",    moles: 1.0, molar_mass_g_per_mol: Some(47.997)),
+    ],
+    outputs: [
+        (material: "steam", moles: 3.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -870.0,
+    activation_energy_kj_per_mol: 30.0,
+    rate_constant_per_s: 1.0,
+    min_temperature_k: Some(373.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

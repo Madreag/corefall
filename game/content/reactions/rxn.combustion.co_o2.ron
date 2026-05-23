@@ -1,0 +1,22 @@
+// M15D § rxn.combustion.co_o2 — 2 CO + O2 -> 2 CO2 (incomplete-combust finisher)
+(
+    id: "rxn.combustion.co_o2",
+    display_name: "Carbon Monoxide Combustion",
+    inputs: [
+        (material: "carbon_monoxide", moles: 2.0, molar_mass_g_per_mol: Some(28.010)),
+        (material: "oxygen",          moles: 1.0, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "co2", moles: 2.0, molar_mass_g_per_mol: Some(44.009)),
+    ],
+    delta_h_kj_per_mol: -566.0,
+    activation_energy_kj_per_mol: 30.0,
+    rate_constant_per_s: 1.0,
+    min_temperature_k: Some(873.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

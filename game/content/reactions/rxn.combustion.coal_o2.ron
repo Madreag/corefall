@@ -1,0 +1,22 @@
+// M15D § rxn.combustion.coal_o2 — C + O2 -> CO2 (generator feedstock)
+(
+    id: "rxn.combustion.coal_o2",
+    display_name: "Coal Combustion",
+    inputs: [
+        (material: "coal",   moles: 1.0, molar_mass_g_per_mol: Some(12.011)),
+        (material: "oxygen", moles: 1.0, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "co2", moles: 1.0, molar_mass_g_per_mol: Some(44.009)),
+    ],
+    delta_h_kj_per_mol: -393.5,
+    activation_energy_kj_per_mol: 70.0,
+    rate_constant_per_s: 0.5,
+    min_temperature_k: Some(973.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

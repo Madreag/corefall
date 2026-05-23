@@ -1,0 +1,23 @@
+// M15D § rxn.electrolysis.water — 2 H2O + electricity -> 2 H2 + O2
+// M29 power-coupled. Rate scales linearly with available wattage.
+(
+    id: "rxn.electrolysis.water",
+    display_name: "Water Electrolysis",
+    inputs: [
+        (material: "water", moles: 2.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    outputs: [
+        (material: "hydrogen", moles: 2.0, molar_mass_g_per_mol: Some(2.016)),
+        (material: "oxygen",   moles: 1.0, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    delta_h_kj_per_mol: 572.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.1,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: Some("electricity"),
+    variant: PerCell,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

@@ -1,0 +1,23 @@
+// M15D § rxn.combustion.oil_o2 — C8H18 + 12.5 O2 -> 8 CO2 + 9 H2O
+(
+    id: "rxn.combustion.oil_o2",
+    display_name: "Octane Combustion",
+    inputs: [
+        (material: "oil",    moles: 1.0,  molar_mass_g_per_mol: Some(114.230)),
+        (material: "oxygen", moles: 12.5, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "co2",   moles: 8.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "steam", moles: 9.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -5470.0,
+    activation_energy_kj_per_mol: 80.0,
+    rate_constant_per_s: 0.8,
+    min_temperature_k: Some(633.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

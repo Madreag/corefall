@@ -1,0 +1,24 @@
+// M15D § rxn.precipitation.acid_rain — pollutant + steam + altitude -> acid_droplets
+// SO3 pollutant proxy (80.064 g/mol) + steam (18.015) -> H2SO4 (98.079).
+// Altitude is a spatial gate, not matter.
+(
+    id: "rxn.precipitation.acid_rain",
+    display_name: "Acid Rain Formation",
+    inputs: [
+        (material: "pollutant", moles: 1.0, molar_mass_g_per_mol: Some(80.064)),
+        (material: "steam",     moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    outputs: [
+        (material: "acid_droplets", moles: 1.0, molar_mass_g_per_mol: Some(98.079)),
+    ],
+    delta_h_kj_per_mol: -22.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.05,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: Some("altitude"),
+    variant: PerCell,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

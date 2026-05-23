@@ -72,6 +72,9 @@ pub mod codex_cinematics_tab;
 
 pub mod context_wheel;
 pub mod tactical_overlay;
+pub mod tile_inspect_overlay;
+
+pub use tile_inspect_overlay::{InspectReactionRow, TileInspectOverlayState};
 
 pub mod jetpack_fuel_meter;
 pub mod mass_indicator;

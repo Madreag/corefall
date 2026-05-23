@@ -268,4 +268,150 @@ pub trait EngineHandle: Send + Sync + 'static {
             "result": serde_json::Value::Null,
         })
     }
+
+    /// **M15D § Reaction Matrix Buildout** — list every reaction id in
+    /// the loaded M15D registry. Powers `cfctl query.material.reactions`.
+    /// Default impl resolves the registry through cf-material's content
+    /// directory walk; engines that ship a custom registry override
+    /// this. The response payload carries one summary row per
+    /// reaction so mod tools + UI panels build directly off this
+    /// surface without a second round-trip.
+    async fn query_material_reactions(&self) -> serde_json::Value {
+        let (count, ids, summaries) = if let Some((registry, _report)) = cf_material::load_default_dir() {
+            let ids = registry.ids();
+            let count = registry.len();
+            let summaries: Vec<serde_json::Value> = registry
+                .reactions
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "id": r.id,
+                        "display_name": r.display_name,
+                        "delta_h_kj_per_mol": r.delta_h_kj_per_mol,
+                        "activation_energy_kj_per_mol": r.activation_energy_kj_per_mol,
+                        "rate_constant_per_s": r.rate_constant_per_s,
+                        "min_temperature_k": r.min_temperature_k,
+                        "min_pressure_kpa": r.min_pressure_kpa,
+                        "variant": format!("{:?}", r.variant),
+                        "propagates": r.propagates,
+                        "auto_ignite": r.auto_ignite,
+                        "emits_event": r.emits_event,
+                    })
+                })
+                .collect();
+            (count, ids, summaries)
+        } else {
+            (0_usize, Vec::new(), Vec::new())
+        };
+        json!({
+            "schema_version": SCHEMA_VERSION,
+            "count": count,
+            "ids": ids,
+            "reactions": summaries,
+        })
+    }
+
+    /// **M15D** — return the full ReactionDef payload for a given
+    /// reaction id (inputs, outputs, ΔH, Ea, rate constant, gates).
+    /// Powers `cfctl query.material.reaction_by_id <id>`. Default impl
+    /// resolves through `cf_material::load_default_dir`.
+    async fn query_material_reaction_by_id(&self, id: &str) -> Option<serde_json::Value> {
+        let (registry, _report) = cf_material::load_default_dir()?;
+        let rxn = registry.by_id(id)?;
+        Some(serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "id": rxn.id,
+            "display_name": rxn.display_name,
+            "inputs": rxn.inputs.iter().map(|i| serde_json::json!({
+                "material": i.material,
+                "moles": i.moles,
+                "molar_mass_g_per_mol": i.molar_mass_g_per_mol,
+            })).collect::<Vec<_>>(),
+            "outputs": rxn.outputs.iter().map(|o| serde_json::json!({
+                "material": o.material,
+                "moles": o.moles,
+                "molar_mass_g_per_mol": o.molar_mass_g_per_mol,
+            })).collect::<Vec<_>>(),
+            "delta_h_kj_per_mol": rxn.delta_h_kj_per_mol,
+            "activation_energy_kj_per_mol": rxn.activation_energy_kj_per_mol,
+            "rate_constant_per_s": rxn.rate_constant_per_s,
+            "min_temperature_k": rxn.min_temperature_k,
+            "min_pressure_kpa": rxn.min_pressure_kpa,
+            "catalyst": rxn.catalyst,
+            "variant": format!("{:?}", rxn.variant),
+            "emits_event": rxn.emits_event,
+            "propagates": rxn.propagates,
+            "auto_ignite": rxn.auto_ignite,
+        }))
+    }
+
+    /// **M15D** — dev/CI tool to force a reaction to fire at the named
+    /// world-space position regardless of temperature / pressure gates.
+    /// Powers `cfctl act.dev.force_reaction <id> <x> <y>`. Returns the
+    /// queued event ack (no real-world side effects in the default
+    /// impl; the engine override hooks into the per-tick reaction
+    /// evaluator). Returns `Err` with a reason when the id isn't in
+    /// the M15D registry.
+    async fn act_dev_force_reaction(
+        &self,
+        id: &str,
+        _x: f32,
+        _y: f32,
+    ) -> Result<serde_json::Value, String> {
+        let (registry, _report) =
+            cf_material::load_default_dir().ok_or_else(|| "no_m15d_registry".to_string())?;
+        let rxn = registry.by_id(id).ok_or_else(|| "unknown_reaction_id".to_string())?;
+        Ok(serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "status": "accepted",
+            "reaction_id": rxn.id,
+            "delta_h_kj_per_mol": rxn.delta_h_kj_per_mol,
+        }))
+    }
+
+    /// **M15D § F8 tile inspect — active reactions panel.** Returns the
+    /// reactions currently active at world-space tile `(x, y)`:
+    /// reactions whose pair-match between the tile's material and an
+    /// adjacent material is satisfied + whose temperature gate is open
+    /// at the tile's current heat-field temperature. Each row carries
+    /// `reaction_id`, Arrhenius rate (per second), the ETA in ticks
+    /// until completion, and the cumulative ΔH released so far (kJ).
+    ///
+    /// Per spec § Acceptance criteria § "F8 tile inspect surfaces
+    /// active reactions":
+    /// > Given the player F8-inspects an acid+iron interface
+    /// > Then a reactions panel shows rxn.corrosion.acid_iron with
+    /// >   rate /s + ETA + cumulative delta_h_kj
+    /// > And the panel updates each tick until completion
+    ///
+    /// Default impl returns the static M15D registry view (no live
+    /// terrain state). Engines with a chunked terrain override this
+    /// to filter by actual adjacent-material pairs.
+    async fn observe_tile_reactions(&self, _x: f32, _y: f32) -> Option<serde_json::Value> {
+        let (registry, _) = cf_material::load_default_dir()?;
+        let rows: Vec<serde_json::Value> = registry
+            .reactions
+            .iter()
+            .map(|r| {
+                let rate = r.effective_rate_per_s(293.15);
+                serde_json::json!({
+                    "reaction_id": r.id,
+                    "display_name": r.display_name,
+                    "rate_per_s": rate,
+                    "eta_ticks": serde_json::Value::Null,
+                    "cumulative_delta_h_kj": 0.0,
+                    "delta_h_kj_per_mol": r.delta_h_kj_per_mol,
+                    "variant": format!("{:?}", r.variant),
+                    "auto_ignite": r.auto_ignite,
+                    "propagates": r.propagates,
+                })
+            })
+            .collect();
+        Some(serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "x": _x,
+            "y": _y,
+            "active_reactions": rows,
+        }))
+    }
 }

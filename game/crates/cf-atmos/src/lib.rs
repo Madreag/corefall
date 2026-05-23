@@ -14,10 +14,15 @@
 //! Default = 343 m/s (Earth-air STP). Vacuum = 0 → short-circuits to
 //! `gain=0` before doppler math.".
 
+pub mod combustion;
 pub mod room;
 pub mod stratification;
 pub mod tuning;
 pub mod wind;
+
+pub use combustion::{
+    autoignition_temperature_k, combustion_by_id, combustion_reactions, M15D_COMBUSTION_COUNT,
+};
 
 pub use tuning::{
     AmbientPressureTuning, AtmosTuning, AtmosTuningLoadError, IgnitionTuning, PipeTuning, RespirationTuning,
@@ -142,6 +147,14 @@ impl AtmosphereSample {
 
     /// True when the local atmosphere supports muzzle-flash ignition per
     /// Stationeers combustion table.
+    ///
+    /// **M15D § cf-atmos::combustion** — the autoignition gate now
+    /// derives from the M15D combustion table when it's loaded. The
+    /// hard-coded `VOLATILES_AUTOIGNITE_K` / `VOLATILES_AUTOIGNITE_N2O_K`
+    /// constants remain as fallbacks for tests / boot, but at runtime
+    /// the M15D's `rxn.combustion.methane_o2` (573 K) and
+    /// `rxn.combustion.methane_n2o` (323 K) entries are the source of
+    /// truth.
     pub fn supports_combustion(&self) -> bool {
         let total = self.pressure_kpa;
         if total < MIN_TOTAL_PRESSURE_FOR_IGNITION_KPA {
@@ -155,7 +168,23 @@ impl AtmosphereSample {
         if oxidizer_ratio < MIN_OXIDIZER_RATIO_FOR_IGNITION {
             return false;
         }
-        self.temp_k >= VOLATILES_AUTOIGNITE_K
+        let gate = crate::combustion::autoignition_temperature_k("rxn.combustion.methane_o2")
+            .unwrap_or(VOLATILES_AUTOIGNITE_K);
+        self.temp_k >= gate
+    }
+
+    /// **M15D § cf-atmos::combustion** — autoignition with N2O
+    /// oxidizer path. Reads from the M15D `rxn.combustion.methane_n2o`
+    /// (323 K) entry when loaded; falls back to the
+    /// `VOLATILES_AUTOIGNITE_N2O_K` constant for boot.
+    pub fn supports_combustion_n2o(&self) -> bool {
+        let total = self.pressure_kpa;
+        if total < MIN_TOTAL_PRESSURE_FOR_IGNITION_KPA {
+            return false;
+        }
+        let gate = crate::combustion::autoignition_temperature_k("rxn.combustion.methane_n2o")
+            .unwrap_or(VOLATILES_AUTOIGNITE_N2O_K);
+        self.temp_k >= gate
     }
 }
 

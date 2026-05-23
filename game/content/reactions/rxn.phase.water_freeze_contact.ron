@@ -1,0 +1,22 @@
+// M15D § rxn.phase.water_freeze_contact — H2O(l) + ice(<273K) -> ice
+// Propagating frost; ice acts as catalyst (no mass change).
+(
+    id: "rxn.phase.water_freeze_contact",
+    display_name: "Contact Freeze",
+    inputs: [
+        (material: "water", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    outputs: [
+        (material: "ice", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -6.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.3,
+    min_temperature_k: None,
+    min_pressure_kpa: None,
+    catalyst: Some("ice"),
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

@@ -1,0 +1,23 @@
+// M15D § rxn.combustion.kerosene_o2 — C12H26 + 18.5 O2 -> 12 CO2 + 13 H2O
+(
+    id: "rxn.combustion.kerosene_o2",
+    display_name: "Kerosene Combustion",
+    inputs: [
+        (material: "kerosene", moles: 1.0,  molar_mass_g_per_mol: Some(170.336)),
+        (material: "oxygen",   moles: 18.5, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "co2",   moles: 12.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "steam", moles: 13.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -7513.0,
+    activation_energy_kj_per_mol: 75.0,
+    rate_constant_per_s: 0.85,
+    min_temperature_k: Some(583.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

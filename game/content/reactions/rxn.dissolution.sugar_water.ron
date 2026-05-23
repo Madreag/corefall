@@ -1,0 +1,22 @@
+// M15D § rxn.dissolution.sugar_water — C12H22O11 + H2O -> syrup (flask cocktails)
+(
+    id: "rxn.dissolution.sugar_water",
+    display_name: "Sugar + Water",
+    inputs: [
+        (material: "sugar", moles: 1.0, molar_mass_g_per_mol: Some(342.297)),
+        (material: "water", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    outputs: [
+        (material: "syrup", moles: 1.0, molar_mass_g_per_mol: Some(360.312)),
+    ],
+    delta_h_kj_per_mol: 12.0,
+    activation_energy_kj_per_mol: 6.0,
+    rate_constant_per_s: 0.4,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

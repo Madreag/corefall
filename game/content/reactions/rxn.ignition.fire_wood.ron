@@ -1,0 +1,29 @@
+// M15D § rxn.ignition.fire_wood — fire + wood -> fire + charcoal + ash
+// Fire is catalyst (massless); wood (cellulose 162.140 g/mol) splits into
+// 1 mol carbon residue (charcoal 12.011) + 1 mol mineral ash (150.129)
+// so total output mass equals total input mass within tolerance.
+(
+    id: "rxn.ignition.fire_wood",
+    display_name: "Wood Catches Fire",
+    // CA semantics: wood is input_a so the wood pixel transforms to
+    // charcoal; fire_intense is input_b (catalyst).
+    inputs: [
+        (material: "wood",         moles: 1.0, molar_mass_g_per_mol: Some(162.140)),
+        (material: "fire_intense", moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+    ],
+    outputs: [
+        (material: "charcoal",     moles: 1.0, molar_mass_g_per_mol: Some(12.011)),
+        (material: "ash",          moles: 1.0, molar_mass_g_per_mol: Some(150.129)),
+        (material: "fire_intense", moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+    ],
+    delta_h_kj_per_mol: -180.0,
+    activation_energy_kj_per_mol: 5.0,
+    rate_constant_per_s: 0.6,
+    min_temperature_k: Some(573.0),
+    min_pressure_kpa: None,
+    catalyst: Some("fire_intense"),
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

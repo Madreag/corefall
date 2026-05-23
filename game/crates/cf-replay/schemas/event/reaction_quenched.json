@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/reaction.quenched.v0.1",
+  "title": "reaction.quenched",
+  "description": "M15D § fires when an in-flight reaction stops short of completion — e.g. fire extinguished by water before fuel is exhausted, acid neutralized mid-corrosion, gas mixture drops below the LFL during combustion. Carries the reaction id, position, the cause (`temperature_drop` / `pressure_drop` / `fuel_depleted` / `oxidizer_depleted` / `quenching_agent`), and the moles that DIDN'T react. Producer: cf-material reaction evaluator.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "reaction" },
+    "event_type": { "const": "quenched" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reaction_id": { "type": "string" },
+        "pos": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
+        "cause": {
+          "type": "string",
+          "enum": ["temperature_drop", "pressure_drop", "fuel_depleted", "oxidizer_depleted", "quenching_agent", "catalyst_removed"]
+        },
+        "moles_unreacted": { "type": "number" },
+        "temperature_k": { "type": ["number", "null"] }
+      },
+      "required": ["reaction_id", "pos", "cause", "moles_unreacted"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

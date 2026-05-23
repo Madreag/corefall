@@ -1,0 +1,25 @@
+// M15D § rxn.combustion.methane_n2o — CH4 + 4 N2O -> CO2 + 2 H2O + 4 N2
+// Oxidizer alternative path; lower autoignition vs. O2.
+(
+    id: "rxn.combustion.methane_n2o",
+    display_name: "Methane + Nitrous Oxide",
+    inputs: [
+        (material: "methane",       moles: 1.0, molar_mass_g_per_mol: Some(16.043)),
+        (material: "nitrous_oxide", moles: 4.0, molar_mass_g_per_mol: Some(44.013)),
+    ],
+    outputs: [
+        (material: "co2",      moles: 1.0, molar_mass_g_per_mol: Some(44.009)),
+        (material: "steam",    moles: 2.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "nitrogen", moles: 4.0, molar_mass_g_per_mol: Some(28.014)),
+    ],
+    delta_h_kj_per_mol: -1247.0,
+    activation_energy_kj_per_mol: 38.0,
+    rate_constant_per_s: 0.9,
+    min_temperature_k: Some(323.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

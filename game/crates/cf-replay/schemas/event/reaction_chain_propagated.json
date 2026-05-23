@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/reaction.chain_propagated.v0.1",
+  "title": "reaction.chain_propagated",
+  "description": "M15D § fires when a `propagates: true` reaction spreads from one pixel to an adjacent compatible neighbor — e.g. gunpowder + spark chain detonation, oil-fire cascade, contact freeze. Carries the reaction id, the origin pixel, the destination pixel, and the chain depth (0 for first ignition). Producer: cf-material reaction evaluator inside the propagation pass. Per acceptance scenario 5: 'reaction_chain_propagated fires for each adjacent gunpowder tile within 3 ticks'.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "reaction" },
+    "event_type": { "const": "chain_propagated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reaction_id": { "type": "string" },
+        "from_pos": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
+        "to_pos": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
+        "chain_depth": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["reaction_id", "from_pos", "to_pos", "chain_depth"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

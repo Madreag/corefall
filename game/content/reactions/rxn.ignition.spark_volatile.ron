@@ -1,0 +1,24 @@
+// M15D § rxn.ignition.spark_volatile — spark + H2 (>=4% v/v) -> fire
+// Lower-flammable-limit (LFL) check; fire carries H2 mass as it
+// is the kindling state that immediately routes into rxn.combustion.h2_o2.
+(
+    id: "rxn.ignition.spark_volatile",
+    display_name: "Spark Ignites Volatile",
+    inputs: [
+        (material: "spark",    moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+        (material: "hydrogen", moles: 1.0, molar_mass_g_per_mol: Some(2.016)),
+    ],
+    outputs: [
+        (material: "fire_intense", moles: 1.0, molar_mass_g_per_mol: Some(2.016)),
+    ],
+    delta_h_kj_per_mol: -242.0,
+    activation_energy_kj_per_mol: 1.0,
+    rate_constant_per_s: 1.0,
+    min_temperature_k: Some(773.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerCell,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)

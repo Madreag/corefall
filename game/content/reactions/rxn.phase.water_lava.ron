@@ -1,0 +1,27 @@
+// M15D § rxn.phase.water_lava — H2O(l) + magma -> H2O(g) + obsidian
+// Instant; PV spike per Acceptance criteria scenario 3.
+(
+    id: "rxn.phase.water_lava",
+    display_name: "Lava Boils Water",
+    // Spec literal "H2O(l) + magma → H2O(g) + obsidian" — magma maps to
+    // the registry's `lava` material (id 26) since the launch material
+    // table uses `lava` as the canonical melted-rock name.
+    inputs: [
+        (material: "water", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "lava",  moles: 1.0, molar_mass_g_per_mol: Some(60.084)),
+    ],
+    outputs: [
+        (material: "steam",    moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "obsidian", moles: 1.0, molar_mass_g_per_mol: Some(60.084)),
+    ],
+    delta_h_kj_per_mol: -41.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 1000000.0,
+    min_temperature_k: Some(1373.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

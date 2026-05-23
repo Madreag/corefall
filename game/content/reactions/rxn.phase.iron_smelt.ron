@@ -1,0 +1,22 @@
+// M15D § rxn.phase.iron_smelt — Fe(s) + ΔQ -> Fe(l) (M25 smelting feed)
+// Endothermic phase change; +247 kJ/mol latent heat absorbed.
+(
+    id: "rxn.phase.iron_smelt",
+    display_name: "Iron Smelt",
+    inputs: [
+        (material: "iron", moles: 1.0, molar_mass_g_per_mol: Some(55.845)),
+    ],
+    outputs: [
+        (material: "molten_iron", moles: 1.0, molar_mass_g_per_mol: Some(55.845)),
+    ],
+    delta_h_kj_per_mol: 247.0,
+    activation_energy_kj_per_mol: 100.0,
+    rate_constant_per_s: 0.2,
+    min_temperature_k: Some(1811.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerCell,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

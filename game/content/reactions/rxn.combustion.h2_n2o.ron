@@ -1,0 +1,23 @@
+// M15D § rxn.combustion.h2_n2o — H2 + N2O -> H2O + N2 (hybrid fuel path)
+(
+    id: "rxn.combustion.h2_n2o",
+    display_name: "Hydrogen + Nitrous Oxide",
+    inputs: [
+        (material: "hydrogen",      moles: 1.0, molar_mass_g_per_mol: Some(2.016)),
+        (material: "nitrous_oxide", moles: 1.0, molar_mass_g_per_mol: Some(44.013)),
+    ],
+    outputs: [
+        (material: "steam",    moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "nitrogen", moles: 1.0, molar_mass_g_per_mol: Some(28.014)),
+    ],
+    delta_h_kj_per_mol: -290.0,
+    activation_energy_kj_per_mol: 35.0,
+    rate_constant_per_s: 1.0,
+    min_temperature_k: Some(423.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

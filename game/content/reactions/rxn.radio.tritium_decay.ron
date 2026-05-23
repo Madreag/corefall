@@ -1,0 +1,23 @@
+// M15D § rxn.radio.tritium_decay — T -> He-3 + e- (watch glow)
+// 12.3-year half-life modeled as a slow per-tick rate constant.
+(
+    id: "rxn.radio.tritium_decay",
+    display_name: "Tritium Beta Decay",
+    inputs: [
+        (material: "tritium", moles: 1.0, molar_mass_g_per_mol: Some(3.016)),
+    ],
+    outputs: [
+        (material: "helium_3", moles: 1.0, molar_mass_g_per_mol: Some(3.016)),
+        (material: "electron", moles: 1.0, molar_mass_g_per_mol: Some(0.000549)),
+    ],
+    delta_h_kj_per_mol: -0.00174,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 1.78e-9,
+    min_temperature_k: None,
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerCell,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

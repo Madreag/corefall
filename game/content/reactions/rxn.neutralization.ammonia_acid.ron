@@ -1,0 +1,22 @@
+// M15D § rxn.neutralization.ammonia_acid — HCl + NH3 -> NH4Cl (solid salt cloud)
+(
+    id: "rxn.neutralization.ammonia_acid",
+    display_name: "Ammonia + Acid",
+    inputs: [
+        (material: "acid",    moles: 1.0, molar_mass_g_per_mol: Some(36.461)),
+        (material: "ammonia", moles: 1.0, molar_mass_g_per_mol: Some(17.031)),
+    ],
+    outputs: [
+        (material: "ammonium_chloride", moles: 1.0, molar_mass_g_per_mol: Some(53.492)),
+    ],
+    delta_h_kj_per_mol: -176.0,
+    activation_energy_kj_per_mol: 4.0,
+    rate_constant_per_s: 4.0,
+    min_temperature_k: Some(253.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

@@ -1,0 +1,23 @@
+// M15D § rxn.bio.vomit_decompose — vomit + air(>120s) -> polluted_water + smell
+// smell is a sensor signal, not matter (mass=0).
+(
+    id: "rxn.bio.vomit_decompose",
+    display_name: "Vomit Decomposes",
+    inputs: [
+        (material: "vomit", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    outputs: [
+        (material: "polluted_water", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "smell",          moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+    ],
+    delta_h_kj_per_mol: -8.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.01,
+    min_temperature_k: Some(293.0),
+    min_pressure_kpa: None,
+    catalyst: Some("air"),
+    variant: PerPixel,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

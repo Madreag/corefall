@@ -1,0 +1,24 @@
+// M15D § rxn.neutralization.acid_alkali — HCl + NaOH -> NaCl + H2O
+// Player counter to acid traps. No autoignition follows.
+(
+    id: "rxn.neutralization.acid_alkali",
+    display_name: "Strong Acid + Strong Base",
+    inputs: [
+        (material: "acid",   moles: 1.0, molar_mass_g_per_mol: Some(36.461)),
+        (material: "alkali", moles: 1.0, molar_mass_g_per_mol: Some(39.997)),
+    ],
+    outputs: [
+        (material: "salt",  moles: 1.0, molar_mass_g_per_mol: Some(58.443)),
+        (material: "water", moles: 1.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -57.0,
+    activation_energy_kj_per_mol: 5.0,
+    rate_constant_per_s: 5.0,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

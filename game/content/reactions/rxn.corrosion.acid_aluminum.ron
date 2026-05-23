@@ -1,0 +1,26 @@
+// M15D § rxn.corrosion.acid_aluminum — 6 HCl + 2 Al -> 2 AlCl3 + 3 H2
+(
+    id: "rxn.corrosion.acid_aluminum",
+    display_name: "Acid on Aluminum",
+    // CA semantics: aluminum is input_a so the aluminum pixel
+    // transforms to the output (the `rust` visual proxy carries
+    // AlCl3's molar mass for spec mass-balance correctness).
+    inputs: [
+        (material: "aluminum", moles: 2.0, molar_mass_g_per_mol: Some(26.982)),
+        (material: "acid",     moles: 6.0, molar_mass_g_per_mol: Some(36.461)),
+    ],
+    outputs: [
+        (material: "rust",     moles: 2.0, molar_mass_g_per_mol: Some(133.341)),
+        (material: "hydrogen", moles: 3.0, molar_mass_g_per_mol: Some(2.016)),
+    ],
+    delta_h_kj_per_mol: -1049.0,
+    activation_energy_kj_per_mol: 20.0,
+    rate_constant_per_s: 0.55,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

@@ -1,0 +1,28 @@
+// M15D § rxn.corrosion.acid_iron — 2 HCl + Fe -> FeCl2 + H2
+// Hydrogen hiss + residue per player-facing behavior. CA semantics:
+// iron is `input_a` so iron pixel transforms to output (the visual
+// `rust` proxy carries FeCl2's molar mass 126.751 for spec-correct
+// mass balance — the launch material registry does not yet ship
+// FeCl2 separately).
+(
+    id: "rxn.corrosion.acid_iron",
+    display_name: "Acid on Iron",
+    inputs: [
+        (material: "iron", moles: 1.0, molar_mass_g_per_mol: Some(55.845)),
+        (material: "acid", moles: 2.0, molar_mass_g_per_mol: Some(36.461)),
+    ],
+    outputs: [
+        (material: "rust",     moles: 1.0, molar_mass_g_per_mol: Some(126.751)),
+        (material: "hydrogen", moles: 1.0, molar_mass_g_per_mol: Some(2.016)),
+    ],
+    delta_h_kj_per_mol: -89.0,
+    activation_energy_kj_per_mol: 18.0,
+    rate_constant_per_s: 0.5,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

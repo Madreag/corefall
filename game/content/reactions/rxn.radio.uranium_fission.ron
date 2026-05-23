@@ -1,0 +1,27 @@
+// M15D § rxn.radio.uranium_fission — U-235 + n -> Ba + Kr + 3n + ΔQ
+// Reactor-only; M29 reactor is sole caller; auto_ignite stays false
+// per the spec literal "do NOT enable autoignition. M29 is sole caller".
+// Mass-balance validator skips rxn.radio.* (E=mc^2 mass defect).
+(
+    id: "rxn.radio.uranium_fission",
+    display_name: "Uranium-235 Fission",
+    inputs: [
+        (material: "uranium_235", moles: 1.0, molar_mass_g_per_mol: Some(235.044)),
+        (material: "neutron",     moles: 1.0, molar_mass_g_per_mol: Some(1.009)),
+    ],
+    outputs: [
+        (material: "barium_141",   moles: 1.0, molar_mass_g_per_mol: Some(137.327)),
+        (material: "krypton_92",   moles: 1.0, molar_mass_g_per_mol: Some(83.798)),
+        (material: "neutron",      moles: 3.0, molar_mass_g_per_mol: Some(1.009)),
+    ],
+    delta_h_kj_per_mol: -200000000.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.0,
+    min_temperature_k: None,
+    min_pressure_kpa: None,
+    catalyst: Some("reactor"),
+    variant: PerCell,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

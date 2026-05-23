@@ -12,6 +12,7 @@ pub(crate) mod m14a;
 pub(crate) mod m6_registry;
 pub(crate) mod material;
 pub(crate) mod medical;
+pub(crate) mod reaction;
 pub(crate) mod roles;
 pub(crate) mod scenario;
 pub(crate) mod trench;
@@ -304,6 +305,16 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         && path.extension().and_then(|s| s.to_str()) == Some("ron")
     {
         m14a::validate_m14a_quick_action_layout(path, report);
+        return;
+    }
+    // **M15D § cf-mod § Validate Σmass_in = Σmass_out (±0.01 g/mol).**
+    // Routes `content/reactions/*.ron` files through the mass-balance
+    // validator BEFORE the scenarios fallthrough (which would mis-route
+    // them through scenario::validate_scenario otherwise).
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("reactions")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        reaction::validate_reaction_ron(path, report);
         return;
     }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")

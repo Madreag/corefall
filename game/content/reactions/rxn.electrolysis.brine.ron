@@ -1,0 +1,26 @@
+// M15D § rxn.electrolysis.brine — 2 NaCl + 2 H2O + e- -> Cl2 + H2 + 2 NaOH
+// Chlor-alkali industrial path; consumes electricity (electron) per spec.
+(
+    id: "rxn.electrolysis.brine",
+    display_name: "Chlor-Alkali Electrolysis",
+    inputs: [
+        (material: "salt",     moles: 2.0, molar_mass_g_per_mol: Some(58.443)),
+        (material: "water",    moles: 2.0, molar_mass_g_per_mol: Some(18.015)),
+        (material: "electron", moles: 1.0, molar_mass_g_per_mol: Some(0.000549)),
+    ],
+    outputs: [
+        (material: "chlorine", moles: 1.0, molar_mass_g_per_mol: Some(70.906)),
+        (material: "hydrogen", moles: 1.0, molar_mass_g_per_mol: Some(2.016)),
+        (material: "alkali",   moles: 2.0, molar_mass_g_per_mol: Some(39.997)),
+    ],
+    delta_h_kj_per_mol: 850.0,
+    activation_energy_kj_per_mol: 0.0,
+    rate_constant_per_s: 0.08,
+    min_temperature_k: Some(273.0),
+    min_pressure_kpa: None,
+    catalyst: Some("electricity"),
+    variant: PerCell,
+    emits_event: true,
+    propagates: false,
+    auto_ignite: false,
+)

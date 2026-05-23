@@ -1,0 +1,23 @@
+// M15D § rxn.combustion.h2_o2 — 2 H2 + O2 -> 2 H2O(g)
+// Cleanest fuel; carbon-free combustion. ΔH = -483.6 kJ/mol.
+(
+    id: "rxn.combustion.h2_o2",
+    display_name: "Hydrogen + Oxygen",
+    inputs: [
+        (material: "hydrogen", moles: 2.0, molar_mass_g_per_mol: Some(2.016)),
+        (material: "oxygen",   moles: 1.0, molar_mass_g_per_mol: Some(31.998)),
+    ],
+    outputs: [
+        (material: "steam",    moles: 2.0, molar_mass_g_per_mol: Some(18.015)),
+    ],
+    delta_h_kj_per_mol: -483.6,
+    activation_energy_kj_per_mol: 50.0,
+    rate_constant_per_s: 1.0,
+    min_temperature_k: Some(700.0),
+    min_pressure_kpa: None,
+    catalyst: None,
+    variant: Both,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: false,
+)

@@ -1,0 +1,25 @@
+// M15D § rxn.ignition.fire_paper — fire + paper -> fire + ash (instant fuse)
+(
+    id: "rxn.ignition.fire_paper",
+    display_name: "Paper Catches Fire",
+    // CA semantics: paper is input_a so the paper pixel transforms to
+    // ash; fire_intense is input_b (catalyst).
+    inputs: [
+        (material: "paper",        moles: 1.0, molar_mass_g_per_mol: Some(162.140)),
+        (material: "fire_intense", moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+    ],
+    outputs: [
+        (material: "ash",          moles: 1.0, molar_mass_g_per_mol: Some(162.140)),
+        (material: "fire_intense", moles: 1.0, molar_mass_g_per_mol: Some(0.0)),
+    ],
+    delta_h_kj_per_mol: -120.0,
+    activation_energy_kj_per_mol: 2.0,
+    rate_constant_per_s: 0.95,
+    min_temperature_k: Some(506.0),
+    min_pressure_kpa: None,
+    catalyst: Some("fire_intense"),
+    variant: PerPixel,
+    emits_event: true,
+    propagates: true,
+    auto_ignite: true,
+)
