@@ -1,0 +1,11 @@
+(
+  kind: electric,
+  spread_tiles_per_s: 3.0,
+  spread_radius_tiles: 3,
+  dissipation_seconds: 5.0,
+  counter_dissipation_multiplier: 0.2,
+  on_contact_affliction: Some("electrified"),
+  contact_damage_per_tick: 0.05,
+  uses_atmos_flow: false,
+  is_static: false,
+)

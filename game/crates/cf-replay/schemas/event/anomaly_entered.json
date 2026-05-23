@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/anomaly.entered.v0.1",
+  "title": "anomaly.entered",
+  "description": "M16 § Anomaly hazards. Fires when an actor crosses into an anomaly zone's detection radius. The `kind` enum is locked to the 6 anomaly kinds spec'd at M16. Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "anomaly" },
+    "event_type": { "const": "entered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "anomaly_id": { "type": ["integer", "string"] },
+        "kind": { "type": "string", "enum": ["gravity_anomaly", "electric_anomaly", "time_anomaly", "chemical_anomaly", "bloodsucker_lair", "psy_storm"] },
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "required": ["actor_id", "anomaly_id", "kind", "position"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,11 @@
+(
+  id: "mama_bead",
+  display_name: "Mama's Beads",
+  rarity: magic,
+  bonus: (
+    radiation_resistance: 0.25,
+    toxic_resistance: 0.20,
+  ),
+  spawn_near_anomalies: ["chemical_anomaly"],
+  spawn_weight: 0.7,
+)

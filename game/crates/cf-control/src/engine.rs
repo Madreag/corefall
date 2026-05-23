@@ -732,6 +732,27 @@ pub(crate) struct EngineMutable {
     /// so observe-paths (inspect_material, observe_terrain_material_at)
     /// don't re-parse JSON on every cfctl call.
     pub(crate) material_registry_cache: Option<cf_material::MaterialRegistry>,
+    /// M16 hazard tile world + registry. Hazards spawned at scenario
+    /// load + spread/dissipate per `cf_hazard::HazardWorld::tick_grid`.
+    pub(crate) m16_hazard_world: cf_hazard::HazardWorld,
+    pub(crate) m16_hazard_registry: cf_hazard::HazardRegistry,
+    /// M16 anomaly zone world + registry. Drives entry + periodic
+    /// damage events per `cf_anomaly::AnomalyWorld::tick`.
+    pub(crate) m16_anomaly_world: cf_anomaly::AnomalyWorld,
+    pub(crate) m16_anomaly_registry: cf_anomaly::AnomalyRegistry,
+    /// M16 artifact world + registry. Spawns + pickups + carry-bonus
+    /// aggregation per `cf_artifact::ArtifactWorld`.
+    pub(crate) m16_artifact_world: cf_artifact::ArtifactWorld,
+    pub(crate) m16_artifact_registry: cf_artifact::ArtifactRegistry,
+    /// M16 per-actor swim + drowning state.
+    pub(crate) m16_swim_world: cf_swim::SwimWorld,
+    /// M16 per-actor affliction state (22 kinds, baseline + survival).
+    pub(crate) m16_affliction_by_actor: BTreeMap<ActorId, cf_affliction::ActorAfflictions>,
+    pub(crate) m16_affliction_registry: cf_affliction::AfflictionRegistry,
+    /// M16 PvE Survival mode flag. When false, survival afflictions
+    /// (hunger/thirst/sleep_dep/sanity_low) clear automatically per
+    /// spec § "Survival afflictions only active in PvE Survival mode".
+    pub(crate) m16_survival_mode_active: bool,
 }
 
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the

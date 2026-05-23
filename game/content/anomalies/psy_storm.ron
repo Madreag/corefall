@@ -1,0 +1,11 @@
+(
+  kind: psy_storm,
+  detection_radius_m: 10.0,
+  damage_per_tick: 3.0,
+  damage_period_ticks: 60,
+  on_contact_affliction: Some("sanity_low"),
+  counter: "helmet_shielding",
+  affects_movement: false,
+  movement_multiplier: 1.0,
+  detector_required: true,
+)

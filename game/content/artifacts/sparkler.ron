@@ -1,0 +1,10 @@
+(
+  id: "sparkler",
+  display_name: "Sparkler",
+  rarity: common,
+  bonus: (
+    electric_resistance: 0.30,
+  ),
+  spawn_near_anomalies: ["electric_anomaly"],
+  spawn_weight: 1.0,
+)

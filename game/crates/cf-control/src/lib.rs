@@ -93,6 +93,8 @@ mod m9b_trench_tests;
 pub mod m14h_treatment;
 pub mod m14i_long_term;
 pub mod m14j_mobility;
+pub mod m16_tick;
+pub mod engine_m16_api;
 pub mod runtime;
 pub mod scenario;
 pub mod scenario_actor;

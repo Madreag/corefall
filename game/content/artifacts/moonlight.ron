@@ -1,0 +1,10 @@
+(
+  id: "moonlight",
+  display_name: "Moonlight",
+  rarity: rare,
+  bonus: (
+    stamina_regen_multiplier: 1.30,
+  ),
+  spawn_near_anomalies: ["psy_storm"],
+  spawn_weight: 0.6,
+)

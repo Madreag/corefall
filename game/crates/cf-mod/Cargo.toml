@@ -19,6 +19,9 @@ name = "generate_m6c_manifest"
 path = "src/bin/generate_m6c_manifest.rs"
 
 [dependencies]
+cf-hazard = { path = "../cf-hazard" }
+cf-anomaly = { path = "../cf-anomaly" }
+cf-artifact = { path = "../cf-artifact" }
 anyhow = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }

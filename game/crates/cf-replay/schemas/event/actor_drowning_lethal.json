@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.drowning_lethal.v0.1",
+  "title": "actor.drowning_lethal",
+  "description": "M16 § Swimming + drowning. Fires once sustained drowning_started has run past the drowning_lethal_duration_seconds threshold; the engine then sets the actor's HP to 0 + status=Dead. Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "actor" },
+    "event_type": { "const": "drowning_lethal" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "depth_m": { "type": "number" }
+      },
+      "required": ["actor_id", "position", "depth_m"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

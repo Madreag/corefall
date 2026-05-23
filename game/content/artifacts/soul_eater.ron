@@ -1,0 +1,12 @@
+(
+  id: "soul_eater",
+  display_name: "Soul Eater",
+  rarity: unique,
+  bonus: (
+    max_hp_bonus: 50.0,
+    radiation_resistance: 0.20,
+    damage_absorption_pct: 0.10,
+  ),
+  spawn_near_anomalies: ["psy_storm"],
+  spawn_weight: 0.1,
+)

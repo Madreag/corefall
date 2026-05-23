@@ -1,0 +1,11 @@
+(
+  kind: gravity_anomaly,
+  detection_radius_m: 5.0,
+  damage_per_tick: 0.0,
+  damage_period_ticks: 60,
+  on_contact_affliction: None,
+  counter: "avoid",
+  affects_movement: true,
+  movement_multiplier: 0.6,
+  detector_required: false,
+)

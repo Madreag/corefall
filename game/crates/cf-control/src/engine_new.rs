@@ -506,6 +506,16 @@ impl M0Engine {
                             None
                         }
                     }),
+                m16_hazard_world: cf_hazard::HazardWorld::new(),
+                m16_hazard_registry: load_m16_hazard_registry(),
+                m16_anomaly_world: cf_anomaly::AnomalyWorld::new(),
+                m16_anomaly_registry: load_m16_anomaly_registry(),
+                m16_artifact_world: cf_artifact::ArtifactWorld::new(),
+                m16_artifact_registry: load_m16_artifact_registry(),
+                m16_swim_world: cf_swim::SwimWorld::new(),
+                m16_affliction_by_actor: BTreeMap::new(),
+                m16_affliction_registry: cf_affliction::AfflictionRegistry::default_registry(),
+                m16_survival_mode_active: false,
             }),
             recorder,
             current_tick,
@@ -522,5 +532,54 @@ impl M0Engine {
             engine.recorder.enable_chain_mode(engine.config.seed);
         }
         engine
+    }
+}
+
+fn locate_m16_content_dir(name: &str) -> Option<std::path::PathBuf> {
+    let candidates = [
+        std::path::PathBuf::from("content").join(name),
+        std::path::PathBuf::from("game/content").join(name),
+        std::path::PathBuf::from("../content").join(name),
+        std::path::PathBuf::from("../../content").join(name),
+    ];
+    candidates.into_iter().find(|p| p.exists())
+}
+
+fn load_m16_hazard_registry() -> cf_hazard::HazardRegistry {
+    match locate_m16_content_dir("hazards") {
+        Some(dir) => match cf_hazard::HazardRegistry::load_dir(&dir) {
+            Ok(r) => r,
+            Err(err) => {
+                tracing::warn!(target: "cf_control::engine_new", ?err, "hazard registry load failed; using defaults");
+                cf_hazard::HazardRegistry::default_registry()
+            }
+        },
+        None => cf_hazard::HazardRegistry::default_registry(),
+    }
+}
+
+fn load_m16_anomaly_registry() -> cf_anomaly::AnomalyRegistry {
+    match locate_m16_content_dir("anomalies") {
+        Some(dir) => match cf_anomaly::AnomalyRegistry::load_dir(&dir) {
+            Ok(r) => r,
+            Err(err) => {
+                tracing::warn!(target: "cf_control::engine_new", ?err, "anomaly registry load failed; using defaults");
+                cf_anomaly::AnomalyRegistry::default_registry()
+            }
+        },
+        None => cf_anomaly::AnomalyRegistry::default_registry(),
+    }
+}
+
+fn load_m16_artifact_registry() -> cf_artifact::ArtifactRegistry {
+    match locate_m16_content_dir("artifacts") {
+        Some(dir) => match cf_artifact::ArtifactRegistry::load_dir(&dir) {
+            Ok(r) => r,
+            Err(err) => {
+                tracing::warn!(target: "cf_control::engine_new", ?err, "artifact registry load failed; using defaults");
+                cf_artifact::ArtifactRegistry::default_registry()
+            }
+        },
+        None => cf_artifact::ArtifactRegistry::default_registry(),
     }
 }

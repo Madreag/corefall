@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/artifact.carried_bonus_applied.v0.1",
+  "title": "artifact.carried_bonus_applied",
+  "description": "M16 § Artifact loot. Fires when an artifact's passive bonus is applied to its carrier (on pickup, on swap, on drop). Payload carries the bonus snapshot per ArtifactBonus shape. Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "artifact" },
+    "event_type": { "const": "carried_bonus_applied" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "instance_id": { "type": "integer" },
+        "spec_id": { "type": "string" },
+        "actor_id": { "type": "integer" },
+        "bonus": {
+          "type": "object",
+          "description": "ArtifactBonus snapshot — max_hp_bonus, aim_accuracy_bonus_pct, drop_rate_bonus_pct, *_resistance, *_multiplier, reveals_anomalies, damage_absorption_pct."
+        }
+      },
+      "required": ["instance_id", "spec_id", "actor_id", "bonus"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

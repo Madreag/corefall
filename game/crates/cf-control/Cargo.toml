@@ -60,6 +60,11 @@ cf-veteran = { path = "../cf-veteran" }
 cf-storyteller = { path = "../cf-storyteller" }
 cf-ui = { path = "../cf-ui" }
 cf-environment = { path = "../cf-environment" }
+cf-hazard = { path = "../cf-hazard" }
+cf-anomaly = { path = "../cf-anomaly" }
+cf-artifact = { path = "../cf-artifact" }
+cf-swim = { path = "../cf-swim" }
+cf-affliction = { path = "../cf-affliction" }
 rand_core = { workspace = true }
 rand_xoshiro = { workspace = true }
 

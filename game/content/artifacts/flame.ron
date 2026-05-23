@@ -1,0 +1,10 @@
+(
+  id: "flame",
+  display_name: "Flame",
+  rarity: magic,
+  bonus: (
+    fire_resistance: 0.40,
+  ),
+  spawn_near_anomalies: ["electric_anomaly"],
+  spawn_weight: 0.9,
+)

@@ -1,0 +1,10 @@
+(
+  id: "atlas",
+  display_name: "Atlas",
+  rarity: rare,
+  bonus: (
+    carry_weight_multiplier: 1.50,
+  ),
+  spawn_near_anomalies: ["gravity_anomaly"],
+  spawn_weight: 0.6,
+)

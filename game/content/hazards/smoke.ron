@@ -1,0 +1,11 @@
+(
+  kind: smoke,
+  spread_tiles_per_s: 2.0,
+  spread_radius_tiles: 64,
+  dissipation_seconds: 45.0,
+  counter_dissipation_multiplier: 1.5,
+  on_contact_affliction: Some("hypoxic"),
+  contact_damage_per_tick: 0.0,
+  uses_atmos_flow: true,
+  is_static: false,
+)

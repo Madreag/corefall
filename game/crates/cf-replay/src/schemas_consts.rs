@@ -228,6 +228,16 @@ pub(crate) const SCHEMA_AFFLICTION_APPLIED: &str = include_str!("../schemas/even
 pub(crate) const SCHEMA_AFFLICTION_TICK: &str = include_str!("../schemas/event/affliction_tick.json");
 pub(crate) const SCHEMA_AFFLICTION_CLEARED: &str = include_str!("../schemas/event/affliction_cleared.json");
 pub(crate) const SCHEMA_AFFLICTION_ESCALATED: &str = include_str!("../schemas/event/affliction_escalated.json");
+pub(crate) const SCHEMA_ANOMALY_ENTERED: &str = include_str!("../schemas/event/anomaly_entered.json");
+pub(crate) const SCHEMA_ANOMALY_DAMAGE_APPLIED: &str = include_str!("../schemas/event/anomaly_damage_applied.json");
+pub(crate) const SCHEMA_ARTIFACT_SPAWNED: &str = include_str!("../schemas/event/artifact_spawned.json");
+pub(crate) const SCHEMA_ARTIFACT_PICKED_UP: &str = include_str!("../schemas/event/artifact_picked_up.json");
+pub(crate) const SCHEMA_ARTIFACT_CARRIED_BONUS_APPLIED: &str =
+    include_str!("../schemas/event/artifact_carried_bonus_applied.json");
+pub(crate) const SCHEMA_ACTOR_DROWNING_STARTED: &str = include_str!("../schemas/event/actor_drowning_started.json");
+pub(crate) const SCHEMA_ACTOR_DROWNING_LETHAL: &str = include_str!("../schemas/event/actor_drowning_lethal.json");
+pub(crate) const SCHEMA_ACTOR_SWIM_STARTED: &str = include_str!("../schemas/event/actor_swim_started.json");
+pub(crate) const SCHEMA_ACTOR_SWIM_ENDED: &str = include_str!("../schemas/event/actor_swim_ended.json");
 pub(crate) const SCHEMA_ATMOS_PRESSURE_CHANGED: &str = include_str!("../schemas/event/atmos_pressure_changed.json");
 pub(crate) const SCHEMA_ATMOS_TEMPERATURE_CHANGED: &str =
     include_str!("../schemas/event/atmos_temperature_changed.json");

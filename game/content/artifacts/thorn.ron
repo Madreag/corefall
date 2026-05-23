@@ -1,0 +1,10 @@
+(
+  id: "thorn",
+  display_name: "Thorn",
+  rarity: magic,
+  bonus: (
+    toxic_resistance: 0.35,
+  ),
+  spawn_near_anomalies: ["chemical_anomaly"],
+  spawn_weight: 0.8,
+)

@@ -1,0 +1,10 @@
+(
+  id: "shell",
+  display_name: "Shell",
+  rarity: legendary,
+  bonus: (
+    damage_absorption_pct: 0.15,
+  ),
+  spawn_near_anomalies: ["bloodsucker_lair"],
+  spawn_weight: 0.3,
+)

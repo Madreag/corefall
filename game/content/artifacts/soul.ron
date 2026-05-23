@@ -1,0 +1,10 @@
+(
+  id: "soul",
+  display_name: "Soul",
+  rarity: legendary,
+  bonus: (
+    aim_accuracy_bonus_pct: 0.10,
+  ),
+  spawn_near_anomalies: ["psy_storm"],
+  spawn_weight: 0.4,
+)

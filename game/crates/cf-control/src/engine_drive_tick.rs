@@ -2823,6 +2823,57 @@ impl M0Engine {
             self.tick_m14b(t, sim_time_ms);
         }
 
+        // M16 § hazard + anomaly + artifact + swim + affliction tick.
+        // Runs AFTER the actor sim has stepped so actor positions are
+        // stable. Drives:
+        //   - hazard.spawned / spread / actor_contact / tick / dissipated
+        //   - affliction.applied / escalated / cleared / tick
+        //   - anomaly.entered / damage_applied
+        //   - artifact.spawned / picked_up / carried_bonus_applied
+        //   - actor.swim_started / swim_ended / drowning_started / drowning_lethal
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            let tick_rate_hz = self.config.tick_rate_hz;
+            let mut state = self.state.write().expect("engine state poisoned for m16 tick");
+            if state.actor_state.is_some() {
+                let actor_state_ref = state.actor_state.as_ref().expect("checked").clone();
+                let survival_mode = state.m16_survival_mode_active;
+                let crate::engine::EngineMutable {
+                    m16_hazard_world,
+                    m16_hazard_registry,
+                    m16_anomaly_world,
+                    m16_anomaly_registry,
+                    m16_artifact_world,
+                    m16_artifact_registry,
+                    m16_swim_world,
+                    m16_affliction_by_actor,
+                    m16_affliction_registry,
+                    ..
+                } = &mut *state;
+                let _ = crate::m16_tick::run_m16_tick(
+                    crate::m16_tick::M16TickInputs {
+                        tick: t,
+                        sim_time_ms,
+                        tick_rate_hz,
+                        actor_state: &actor_state_ref,
+                        survival_mode_active: survival_mode,
+                        recorder: &self.recorder,
+                    },
+                    crate::m16_tick::M16TickStateMut {
+                        hazard_world: m16_hazard_world,
+                        hazard_registry: m16_hazard_registry,
+                        anomaly_world: m16_anomaly_world,
+                        anomaly_registry: m16_anomaly_registry,
+                        artifact_world: m16_artifact_world,
+                        artifact_registry: m16_artifact_registry,
+                        swim_world: m16_swim_world,
+                        affliction_by_actor: m16_affliction_by_actor,
+                        affliction_registry: m16_affliction_registry,
+                    },
+                );
+            }
+        }
+
         // event per advanced tick. At ticks where `tick % cadence == 0` the
         // emitter fires `snapshot.baseline_emitted` (full state); otherwise it
         // fires `snapshot.delta_emitted` (JSON-Patch diff vs the previous

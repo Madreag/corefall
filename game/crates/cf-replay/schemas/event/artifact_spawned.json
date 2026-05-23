@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/artifact.spawned.v0.1",
+  "title": "artifact.spawned",
+  "description": "M16 § Artifact loot. Fires when an anomaly proximity roll produces an artifact in the world. `spec_id` matches the artifact registry id (e.g. `stone_blood`). Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "artifact" },
+    "event_type": { "const": "spawned" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "instance_id": { "type": "integer" },
+        "spec_id": { "type": "string" },
+        "rarity": { "type": "string", "enum": ["common", "magic", "rare", "legendary", "unique"] },
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "source_anomaly_id": { "type": ["integer", "null"] }
+      },
+      "required": ["instance_id", "spec_id", "rarity", "position"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

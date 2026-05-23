@@ -1,0 +1,11 @@
+(
+  id: "ice_drop",
+  display_name: "Ice Drop",
+  rarity: rare,
+  bonus: (
+    cold_resistance: 0.55,
+    fire_resistance: -0.10,
+  ),
+  spawn_near_anomalies: ["psy_storm"],
+  spawn_weight: 0.5,
+)

@@ -1,0 +1,10 @@
+(
+  id: "bubble",
+  display_name: "Bubble",
+  rarity: magic,
+  bonus: (
+    radiation_resistance: 0.30,
+  ),
+  spawn_near_anomalies: ["chemical_anomaly"],
+  spawn_weight: 0.8,
+)

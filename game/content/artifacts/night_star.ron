@@ -1,0 +1,12 @@
+(
+  id: "night_star",
+  display_name: "Night Star",
+  rarity: legendary,
+  bonus: (
+    max_hp_bonus: 10.0,
+    aim_accuracy_bonus_pct: 0.05,
+    reveals_anomalies: true,
+  ),
+  spawn_near_anomalies: ["time_anomaly", "bloodsucker_lair"],
+  spawn_weight: 0.2,
+)

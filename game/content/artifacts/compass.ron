@@ -1,0 +1,10 @@
+(
+  id: "compass",
+  display_name: "Compass",
+  rarity: rare,
+  bonus: (
+    reveals_anomalies: true,
+  ),
+  spawn_near_anomalies: ["time_anomaly"],
+  spawn_weight: 0.6,
+)

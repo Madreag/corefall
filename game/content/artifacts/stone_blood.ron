@@ -1,0 +1,10 @@
+(
+  id: "stone_blood",
+  display_name: "Stone Blood",
+  rarity: rare,
+  bonus: (
+    max_hp_bonus: 20.0,
+  ),
+  spawn_near_anomalies: ["bloodsucker_lair"],
+  spawn_weight: 1.0,
+)

@@ -1,0 +1,11 @@
+(
+  id: "fireball",
+  display_name: "Fireball",
+  rarity: rare,
+  bonus: (
+    fire_resistance: 0.55,
+    cold_resistance: -0.10,
+  ),
+  spawn_near_anomalies: ["electric_anomaly"],
+  spawn_weight: 0.5,
+)

@@ -1,0 +1,10 @@
+(
+  id: "wrench",
+  display_name: "Wrench",
+  rarity: common,
+  bonus: (
+    tool_durability_multiplier: 1.50,
+  ),
+  spawn_near_anomalies: ["gravity_anomaly"],
+  spawn_weight: 1.2,
+)

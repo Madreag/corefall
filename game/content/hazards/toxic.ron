@@ -1,0 +1,11 @@
+(
+  kind: toxic,
+  spread_tiles_per_s: 1.5,
+  spread_radius_tiles: 32,
+  dissipation_seconds: 120.0,
+  counter_dissipation_multiplier: 1.2,
+  on_contact_affliction: Some("poisoned"),
+  contact_damage_per_tick: 0.05,
+  uses_atmos_flow: true,
+  is_static: false,
+)

@@ -1,0 +1,10 @@
+(
+  id: "snowflake",
+  display_name: "Snowflake",
+  rarity: magic,
+  bonus: (
+    cold_resistance: 0.40,
+  ),
+  spawn_near_anomalies: ["psy_storm"],
+  spawn_weight: 0.9,
+)

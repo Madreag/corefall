@@ -1,0 +1,10 @@
+(
+  id: "spring",
+  display_name: "Spring",
+  rarity: common,
+  bonus: (
+    sprint_speed_multiplier: 1.20,
+  ),
+  spawn_near_anomalies: ["gravity_anomaly"],
+  spawn_weight: 1.0,
+)

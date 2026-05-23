@@ -1,0 +1,11 @@
+(
+  kind: acid,
+  spread_tiles_per_s: 0.8,
+  spread_radius_tiles: 16,
+  dissipation_seconds: 60.0,
+  counter_dissipation_multiplier: 2.5,
+  on_contact_affliction: Some("poisoned"),
+  contact_damage_per_tick: 0.1,
+  uses_atmos_flow: false,
+  is_static: false,
+)

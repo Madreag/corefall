@@ -1518,6 +1518,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-affliction"
+version = "0.0.1"
+dependencies = [
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-aging"
 version = "0.0.1"
 dependencies = [
@@ -1541,6 +1552,17 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "cf-anomaly"
+version = "0.0.1"
+dependencies = [
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
@@ -1575,6 +1597,17 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "cf-artifact"
+version = "0.0.1"
+dependencies = [
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
@@ -1703,8 +1736,11 @@ dependencies = [
  "async-trait",
  "blake3",
  "cf-actor",
+ "cf-affliction",
  "cf-aging",
  "cf-ai",
+ "cf-anomaly",
+ "cf-artifact",
  "cf-asset-ledger",
  "cf-atmos",
  "cf-audio",
@@ -1716,6 +1752,7 @@ dependencies = [
  "cf-environment",
  "cf-equipment",
  "cf-fortification",
+ "cf-hazard",
  "cf-internal",
  "cf-killcam",
  "cf-localization",
@@ -1737,6 +1774,7 @@ dependencies = [
  "cf-squad",
  "cf-squad-ui",
  "cf-storyteller",
+ "cf-swim",
  "cf-terrain",
  "cf-tools-replay-viewer",
  "cf-treatment",
@@ -1827,6 +1865,17 @@ dependencies = [
  "cf-trench",
  "rand_core 0.10.1",
  "rand_xoshiro",
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "cf-hazard"
+version = "0.0.1"
+dependencies = [
  "ron",
  "serde",
  "serde_json",
@@ -1933,11 +1982,14 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "blake3",
+ "cf-anomaly",
+ "cf-artifact",
  "cf-asset-ledger",
  "cf-content",
  "cf-control",
  "cf-equipment",
  "cf-fortification",
+ "cf-hazard",
  "cf-material",
  "cf-prosthetic",
  "cf-replay",
@@ -2222,6 +2274,16 @@ name = "cf-storyteller"
 version = "0.0.1"
 dependencies = [
  "serde",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "cf-swim"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "tracing",
 ]

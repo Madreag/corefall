@@ -1,0 +1,11 @@
+(
+  kind: chemical_anomaly,
+  detection_radius_m: 5.0,
+  damage_per_tick: 5.0,
+  damage_period_ticks: 30,
+  on_contact_affliction: Some("poisoned"),
+  counter: "suit_mask",
+  affects_movement: false,
+  movement_multiplier: 1.0,
+  detector_required: false,
+)

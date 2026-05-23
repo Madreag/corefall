@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.drowning_started.v0.1",
+  "title": "actor.drowning_started",
+  "description": "M16 § Swimming + drowning. Fires the tick an actor's oxygen reservoir hits zero while submerged. Stacks affliction.applied { kind: hypoxic } and starts the drowning-lethal timer. Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "actor" },
+    "event_type": { "const": "drowning_started" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "required": ["actor_id", "position"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/anomaly.damage_applied.v0.1",
+  "title": "anomaly.damage_applied",
+  "description": "M16 § Anomaly hazards. Fires each time an anomaly zone applies damage to an actor (per-period cadence from the AnomalySpec). Cause-chains forward into affliction.applied / affliction.escalated when the anomaly attaches an affliction. Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "anomaly" },
+    "event_type": { "const": "damage_applied" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "anomaly_id": { "type": ["integer", "string"] },
+        "kind": { "type": "string", "enum": ["gravity_anomaly", "electric_anomaly", "time_anomaly", "chemical_anomaly", "bloodsucker_lair", "psy_storm"] },
+        "damage": { "type": "number" },
+        "applied_affliction": { "type": ["string", "null"] }
+      },
+      "required": ["actor_id", "anomaly_id", "kind", "damage"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

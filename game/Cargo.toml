@@ -61,6 +61,11 @@ members = [
   "crates/cf-veteran",
   "crates/cf-storyteller",
   "crates/cf-flask",
+  "crates/cf-hazard",
+  "crates/cf-anomaly",
+  "crates/cf-artifact",
+  "crates/cf-swim",
+  "crates/cf-affliction",
 ]
 
 [workspace.package]

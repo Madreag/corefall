@@ -9,6 +9,7 @@ pub(crate) mod inventory;
 pub(crate) mod ledger;
 pub(crate) mod loadout;
 pub(crate) mod m14a;
+pub(crate) mod m16_content;
 pub(crate) mod m6_registry;
 pub(crate) mod material;
 pub(crate) mod medical;
@@ -315,6 +316,24 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         && path.extension().and_then(|s| s.to_str()) == Some("ron")
     {
         reaction::validate_reaction_ron(path, report);
+        return;
+    }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("hazards")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        m16_content::validate_hazard_ron(path, report);
+        return;
+    }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("anomalies")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        m16_content::validate_anomaly_ron(path, report);
+        return;
+    }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("artifacts")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        m16_content::validate_artifact_ron(path, report);
         return;
     }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")

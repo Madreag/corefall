@@ -76,6 +76,18 @@ pub mod tile_inspect_overlay;
 
 pub use tile_inspect_overlay::{InspectReactionRow, TileInspectOverlayState};
 
+pub mod affliction_strip;
+pub mod anomaly_indicator;
+pub mod artifact_panel;
+pub mod oxygen_meter;
+
+pub use affliction_strip::{
+    AfflictionStripEntry, AfflictionStripState, AFFLICTION_STRIP_MAX_VISIBLE,
+};
+pub use anomaly_indicator::{AnomalyIndicatorMarker, AnomalyIndicatorState};
+pub use artifact_panel::{ArtifactPanelEntry, ArtifactPanelState};
+pub use oxygen_meter::{OxygenBand, OxygenMeterState};
+
 pub mod jetpack_fuel_meter;
 pub mod mass_indicator;
 pub mod quick_action_bar;

@@ -1,0 +1,10 @@
+(
+  id: "battery",
+  display_name: "Battery",
+  rarity: rare,
+  bonus: (
+    battery_capacity_multiplier: 1.40,
+  ),
+  spawn_near_anomalies: ["electric_anomaly"],
+  spawn_weight: 0.7,
+)

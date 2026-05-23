@@ -1,0 +1,10 @@
+(
+  id: "goldfish",
+  display_name: "Goldfish",
+  rarity: magic,
+  bonus: (
+    drop_rate_bonus_pct: 0.50,
+  ),
+  spawn_near_anomalies: ["chemical_anomaly"],
+  spawn_weight: 0.8,
+)
