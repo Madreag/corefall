@@ -200,13 +200,19 @@ pub fn base_utility(task: TaskType, ctx: &ThinkingContext<'_>) -> f32 {
             }
         }
         TaskType::TriageDownedAlly => {
-            if ctx.downed_ally_within_reach {
+            let base = if ctx.downed_ally_within_reach {
                 0.95
             } else if ctx.downed_ally_in_squad {
                 0.5
             } else {
                 0.0
-            }
+            };
+            // M16 § Auto-triage trigger contract: when an ally's affliction
+            // threshold crosses (bleeding stack ≥ 3, compound TTD < 12s,
+            // etc.) the engine pushes +0.4 onto the Medic's TriageDownedAlly
+            // utility score so the bonus combined with the role-template
+            // multiplier guarantees auto-dispatch within 1-2 ticks.
+            (base + ctx.m16_triage_bonus.max(0.0)).clamp(0.0, 1.95)
         }
         TaskType::HealSelf => {
             if ctx.self_hp_fraction < 0.4 {
@@ -340,6 +346,26 @@ mod tests {
         ctx.downed_ally_within_reach = true;
         ctx.enemy_visible = true;
         ctx.enemy_distance_normalized = 0.3;
+        let out = layer.tick_layer(&mut ctx);
+        assert_eq!(out.override_task, Some(TaskType::TriageDownedAlly));
+    }
+
+    #[test]
+    fn m16_triage_bonus_lifts_score_above_engagement() {
+        use crate::archetype::Archetype;
+        let mut layer = UtilityLayer::new(Archetype::Medic.role_template());
+        let mut ctx = ThinkingContext::stub();
+        // downed ally NOT within reach yet, but threshold crossed (e.g.
+        // bleed_stack >= 3 was just applied). Without the bonus the
+        // utility would prefer EngageVisibleEnemy.
+        ctx.downed_ally_in_squad = true;
+        ctx.enemy_visible = true;
+        ctx.enemy_distance_normalized = 0.1;
+        ctx.m16_triage_bonus = 0.0;
+        let no_bonus = base_utility(TaskType::TriageDownedAlly, &ctx);
+        ctx.m16_triage_bonus = 0.4;
+        let with_bonus = base_utility(TaskType::TriageDownedAlly, &ctx);
+        assert!(with_bonus > no_bonus + 0.35);
         let out = layer.tick_layer(&mut ctx);
         assert_eq!(out.override_task, Some(TaskType::TriageDownedAlly));
     }

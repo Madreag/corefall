@@ -1,0 +1,33 @@
+// **M16** § "Anomaly detector (item): show anomaly positions on minimap".
+// Carrying this item satisfies the Gherkin "Given anomaly detector in
+// inventory" — engine routes its presence through
+// cf_anomaly::AnomalyWorld::detector_query() so detector-required
+// anomalies (bloodsucker_lair, psy_storm) surface on the HUD minimap.
+
+(
+  id: "anomaly_detector",
+  display_name: "Anomaly Detector",
+  mass_kg: 0.8,
+  dimensions: (
+    w: 2,
+    h: 2,
+  ),
+  bulk_volume_l: 1.5,
+  stackable: false,
+  max_stack: 1,
+  category: sensor,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: Some(800),
+  repair_recipe: None,
+  material_weight_breakdown: {
+    "alloy": 0.3,
+    "polymer": 0.4,
+    "electronics": 0.1,
+  },
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)

@@ -108,6 +108,12 @@ pub struct ThinkingContext<'a> {
     pub tag_bonus_task: Option<TaskType>,
     pub tag_bonus_strength: f32,
 
+    /// M16 § "Auto-triage trigger contract". When an ally's M16 affliction
+    /// state crosses a threshold (bleed_stack >= 3, compound TTD < 12s,
+    /// etc.) the engine pushes a +0.4 additive bonus onto the Medic's
+    /// utility scorer for TriageDownedAlly. Default 0.0 = no bonus.
+    pub m16_triage_bonus: f32,
+
     /// Filled by Layer 5 (LLM prior).
     pub doctrine: String,
     /// Filled by Layer 4 (HTN).
@@ -159,6 +165,7 @@ impl<'a> ThinkingContext<'a> {
             unknown_grid_fraction: 0.0,
             tag_bonus_task: None,
             tag_bonus_strength: 0.0,
+            m16_triage_bonus: 0.0,
             doctrine: "defensive".to_string(),
             htn_goal_stack: "idle".to_string(),
             behavior_tree_trail: "idle".to_string(),

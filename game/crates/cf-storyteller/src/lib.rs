@@ -26,10 +26,17 @@
 )]
 
 pub mod retirement_event;
+pub mod m16_event;
 
 pub use retirement_event::{
     register_retirement_narrative, RetirementNarrative, RetirementNarrativeRegistry,
     NARRATIVE_EVENT_ID_VETERAN_RETIRED,
+};
+pub use m16_event::{
+    register_m16_narratives, M16NarrativeKind, M16NarrativeRegistration, M16NarrativeRegistry,
+    NARRATIVE_EVENT_ID_ACID_POOL_GROWTH, NARRATIVE_EVENT_ID_ANOMALY_ENCOUNTERED,
+    NARRATIVE_EVENT_ID_DROWNING_LETHAL, NARRATIVE_EVENT_ID_ELECTRIC_ARC_CASCADE,
+    NARRATIVE_EVENT_ID_FIRE_SPREAD, NARRATIVE_EVENT_ID_RADIATION_STORM,
 };
 
 use serde::{Deserialize, Serialize};

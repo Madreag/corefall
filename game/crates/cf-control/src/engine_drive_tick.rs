@@ -2848,8 +2848,12 @@ impl M0Engine {
                     m16_swim_world,
                     m16_affliction_by_actor,
                     m16_affliction_registry,
+                    m16_trigger_thresholds,
+                    m16_last_auto_triage_reason,
+                    chunked_terrain,
                     ..
                 } = &mut *state;
+                let terrain_ref = chunked_terrain.as_ref();
                 let _ = crate::m16_tick::run_m16_tick(
                     crate::m16_tick::M16TickInputs {
                         tick: t,
@@ -2858,6 +2862,7 @@ impl M0Engine {
                         actor_state: &actor_state_ref,
                         survival_mode_active: survival_mode,
                         recorder: &self.recorder,
+                        terrain: terrain_ref,
                     },
                     crate::m16_tick::M16TickStateMut {
                         hazard_world: m16_hazard_world,
@@ -2869,8 +2874,33 @@ impl M0Engine {
                         swim_world: m16_swim_world,
                         affliction_by_actor: m16_affliction_by_actor,
                         affliction_registry: m16_affliction_registry,
+                        trigger_thresholds: m16_trigger_thresholds,
+                        last_auto_triage_reason: m16_last_auto_triage_reason,
                     },
                 );
+
+                // M16 § "gravity_anomaly: Warps actor movement (slow + erratic)"
+                // and "time_anomaly: Slows actor (50% speed in zone)". Apply
+                // the anomaly movement multiplier to each actor's velocity
+                // for this tick. Movement-affecting anomalies only — damage
+                // anomalies (electric/chemical) leave velocity alone.
+                let crate::engine::EngineMutable {
+                    actor_state,
+                    m16_anomaly_world,
+                    m16_anomaly_registry,
+                    ..
+                } = &mut *state;
+                if let Some(sim) = actor_state.as_mut() {
+                    for actor in sim.world.actors.values_mut() {
+                        let pos = [actor.position.x, actor.position.y];
+                        let mult =
+                            m16_anomaly_world.movement_multiplier_at(m16_anomaly_registry, pos);
+                        if (mult - 1.0).abs() > 1e-3 {
+                            actor.velocity.x *= mult;
+                            actor.velocity.y *= mult;
+                        }
+                    }
+                }
             }
         }
 

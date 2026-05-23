@@ -68,6 +68,10 @@ pub enum M16AfflictionKind {
     Thirst,
     SleepDep,
     SanityLow,
+    VacuumExposure,
+    Shocked,
+    Frozen,
+    Drowning,
 }
 
 impl M16AfflictionKind {
@@ -96,6 +100,10 @@ impl M16AfflictionKind {
             M16AfflictionKind::Thirst => "thirst",
             M16AfflictionKind::SleepDep => "sleep_dep",
             M16AfflictionKind::SanityLow => "sanity_low",
+            M16AfflictionKind::VacuumExposure => "vacuum_exposure",
+            M16AfflictionKind::Shocked => "shocked",
+            M16AfflictionKind::Frozen => "frozen",
+            M16AfflictionKind::Drowning => "drowning",
         }
     }
 
@@ -124,6 +132,10 @@ impl M16AfflictionKind {
             "thirst" => M16AfflictionKind::Thirst,
             "sleep_dep" => M16AfflictionKind::SleepDep,
             "sanity_low" => M16AfflictionKind::SanityLow,
+            "vacuum_exposure" => M16AfflictionKind::VacuumExposure,
+            "shocked" => M16AfflictionKind::Shocked,
+            "frozen" => M16AfflictionKind::Frozen,
+            "drowning" => M16AfflictionKind::Drowning,
             _ => return None,
         })
     }
@@ -148,6 +160,15 @@ impl M16AfflictionKind {
             M16AfflictionKind::CoolantLeaking,
             M16AfflictionKind::OilLeaking,
             M16AfflictionKind::Overheating,
+        ]
+    }
+
+    pub fn all_threshold_set() -> &'static [M16AfflictionKind] {
+        &[
+            M16AfflictionKind::VacuumExposure,
+            M16AfflictionKind::Shocked,
+            M16AfflictionKind::Frozen,
+            M16AfflictionKind::Drowning,
         ]
     }
 
@@ -377,6 +398,38 @@ impl AfflictionSpec {
                 severity_decay_per_second: 0.0,
                 survival_mode_only: true,
             },
+            M16AfflictionKind::VacuumExposure => AfflictionSpec {
+                kind,
+                damage_per_tick_at_full: 0.067,
+                clears_with_time: false,
+                clear_duration_seconds: 0.0,
+                severity_decay_per_second: 0.0,
+                survival_mode_only: false,
+            },
+            M16AfflictionKind::Shocked => AfflictionSpec {
+                kind,
+                damage_per_tick_at_full: 0.1,
+                clears_with_time: true,
+                clear_duration_seconds: 5.0,
+                severity_decay_per_second: 0.2,
+                survival_mode_only: false,
+            },
+            M16AfflictionKind::Frozen => AfflictionSpec {
+                kind,
+                damage_per_tick_at_full: 0.025,
+                clears_with_time: true,
+                clear_duration_seconds: 40.0,
+                severity_decay_per_second: 0.025,
+                survival_mode_only: false,
+            },
+            M16AfflictionKind::Drowning => AfflictionSpec {
+                kind,
+                damage_per_tick_at_full: 0.2,
+                clears_with_time: false,
+                clear_duration_seconds: 0.0,
+                severity_decay_per_second: 0.0,
+                survival_mode_only: false,
+            },
         }
     }
 }
@@ -389,7 +442,12 @@ pub struct AfflictionRegistry {
 impl AfflictionRegistry {
     pub fn default_registry() -> Self {
         let mut specs = BTreeMap::new();
-        for k in M16AfflictionKind::all_baseline().iter().chain(M16AfflictionKind::all_survival().iter()).copied() {
+        for k in M16AfflictionKind::all_baseline()
+            .iter()
+            .chain(M16AfflictionKind::all_survival().iter())
+            .chain(M16AfflictionKind::all_threshold_set().iter())
+            .copied()
+        {
             specs.insert(k.as_str().to_string(), AfflictionSpec::default_for(k));
         }
         specs.insert(
@@ -420,6 +478,11 @@ pub struct ActiveAffliction {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ActorAfflictions {
     pub active: Vec<ActiveAffliction>,
+    /// Per-(actor, kind) flag: true on the tick severity crosses 0.8.
+    /// Engine clears once the banner has been pushed; survives ticks
+    /// where the affliction stays at high severity.
+    #[serde(default)]
+    pub critical_banner_pending: Vec<M16AfflictionKind>,
 }
 
 impl ActorAfflictions {
@@ -521,6 +584,9 @@ pub fn apply_affliction(
         if (to - from).abs() < 1e-6 {
             return (None, None);
         }
+        if from < 0.8 && to >= 0.8 && !state.critical_banner_pending.contains(&kind) {
+            state.critical_banner_pending.push(kind);
+        }
         return (
             None,
             Some(AfflictionEscalatedEvent {
@@ -543,6 +609,9 @@ pub fn apply_affliction(
         expected_clear_tick: expected_clear,
         source_event_id: Some(source_event_id.clone()),
     });
+    if severity_to_add >= 0.8 && !state.critical_banner_pending.contains(&kind) {
+        state.critical_banner_pending.push(kind);
+    }
     (
         Some(AfflictionAppliedEvent {
             actor_id,
@@ -704,20 +773,25 @@ pub fn per_instance_ttd_seconds(kind: M16AfflictionKind) -> f32 {
         M16AfflictionKind::CoolantLeaking => 90.0,
         M16AfflictionKind::OilLeaking => 90.0,
         M16AfflictionKind::Overheating => 30.0,
+        M16AfflictionKind::VacuumExposure => 15.0,
+        M16AfflictionKind::Shocked => 30.0,
+        M16AfflictionKind::Frozen => 40.0,
+        M16AfflictionKind::Drowning => 30.0,
     }
 }
 
 /// Auto-triage threshold gate. Returns the reason(s) firing for this
-/// actor, given:
-///   - their bleed wound count (M14 wound list)
-///   - any arterial wound flag (M14H severity tier)
+/// actor under `thresholds`. Inputs:
+///   - bleed wound count (M14 wound list)
+///   - arterial wound flag (M14H severity tier)
 ///   - HP percent (0..=1)
 ///   - radiation dose-rate (per-second band)
 ///   - whether the actor is in continuous shock (electric tile contact)
 ///   - whether the actor has a helmet breach + is drowning
-///   - the compound TTD from `cf_actor::ttd::TtdContract::compound_ttd_seconds`
+///   - compound TTD from `cf_actor::ttd::TtdContract::compound_ttd_seconds`
 pub fn auto_triage_reasons(
     afflictions: &ActorAfflictions,
+    thresholds: &M16TriggerThresholds,
     bleed_wound_count: u32,
     arterial_wound: bool,
     hp_percent: f32,
@@ -727,31 +801,40 @@ pub fn auto_triage_reasons(
     compound_ttd_seconds: f32,
 ) -> Vec<AutoTriageReason> {
     let mut reasons = Vec::new();
-    if bleed_wound_count >= 3 || afflictions.severity_of(M16AfflictionKind::Bleeding) >= 0.75 {
+    let bleed_min = thresholds.bleed_stack_min;
+    if bleed_wound_count >= bleed_min
+        || afflictions.severity_of(M16AfflictionKind::Bleeding) >= (bleed_min as f32 / 4.0).min(0.95)
+        || (bleed_wound_count >= 1 && hp_percent < thresholds.bleed_hp_pct_emergency)
+    {
         reasons.push(AutoTriageReason::BleedingStack3);
     }
     if arterial_wound {
         reasons.push(AutoTriageReason::SingleArterialWound);
     }
-    if afflictions.severity_of(M16AfflictionKind::Burning) > 0.0 && hp_percent < 0.40 {
+    if afflictions.severity_of(M16AfflictionKind::Burning) > 0.0 && hp_percent < thresholds.burning_hp_pct {
         reasons.push(AutoTriageReason::BurningAtLowHp);
     }
-    if afflictions.severity_of(M16AfflictionKind::Poisoned) >= 0.4 && hp_percent < 0.50 {
+    if afflictions.severity_of(M16AfflictionKind::Poisoned) >= 0.4 && hp_percent < thresholds.poison_hp_pct {
         reasons.push(AutoTriageReason::PoisonStackAtLowHp);
     }
-    if continuous_shock {
+    if continuous_shock || afflictions.severity_of(M16AfflictionKind::Shocked) >= 0.5 {
         reasons.push(AutoTriageReason::ContinuousShock);
     }
-    if afflictions.severity_of(M16AfflictionKind::Hypothermic) > 0.0 && hp_percent < 0.30 {
+    if (afflictions.severity_of(M16AfflictionKind::Hypothermic) > 0.0
+        || afflictions.severity_of(M16AfflictionKind::Frozen) > 0.0)
+        && hp_percent < thresholds.frozen_hp_pct
+    {
         reasons.push(AutoTriageReason::FrozenAtLowHp);
     }
-    if helmet_breached_drowning {
+    if helmet_breached_drowning || afflictions.severity_of(M16AfflictionKind::Drowning) > 0.0 {
         reasons.push(AutoTriageReason::DrowningWithHelmetBreach);
     }
-    if radiation_dose_rate > 0.5 {
+    if radiation_dose_rate > thresholds.radiation_dose_rate
+        || afflictions.severity_of(M16AfflictionKind::Radiation) >= 0.8
+    {
         reasons.push(AutoTriageReason::RadiationDoseHigh);
     }
-    if compound_ttd_seconds < 12.0 {
+    if compound_ttd_seconds < thresholds.compound_ttd_seconds_floor {
         reasons.push(AutoTriageReason::CompoundTtdLow);
     }
     reasons
@@ -760,6 +843,61 @@ pub fn auto_triage_reasons(
 /// Utility scorer bonus per spec § "the Medic's utility scorer adds +0.4
 /// to TriageDownedAlly(target)".
 pub const TRIAGE_UTILITY_BONUS: f32 = 0.4;
+
+/// Per-actor editable trigger thresholds per spec § "Player can edit
+/// affliction trigger thresholds per actor". Default values are the
+/// spec-locked baseline (Medic role): bleed_stack=3, hp_pct_for_low=0.4,
+/// etc. Mutated via cfctl `act.priority.set_m16_trigger_thresholds` or
+/// the Tab tactical overlay's PriorityTable editor.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct M16TriggerThresholds {
+    /// Minimum bleed wound count that triggers auto-triage. Default 3.
+    pub bleed_stack_min: u32,
+    /// HP % below which a single bleed wound also triggers. Default 0.20.
+    pub bleed_hp_pct_emergency: f32,
+    /// Burning + HP < this fraction triggers. Default 0.40.
+    pub burning_hp_pct: f32,
+    /// Poison severity + HP < this fraction triggers. Default 0.50.
+    pub poison_hp_pct: f32,
+    /// Frozen severity + HP < this fraction triggers. Default 0.30.
+    pub frozen_hp_pct: f32,
+    /// Radiation dose-rate threshold (per second) for high-dose trigger.
+    pub radiation_dose_rate: f32,
+    /// Compound TTD floor below which auto-triage fires regardless of kind.
+    pub compound_ttd_seconds_floor: f32,
+}
+
+impl Default for M16TriggerThresholds {
+    fn default() -> Self {
+        Self {
+            bleed_stack_min: 3,
+            bleed_hp_pct_emergency: 0.20,
+            burning_hp_pct: 0.40,
+            poison_hp_pct: 0.50,
+            frozen_hp_pct: 0.30,
+            radiation_dose_rate: 0.50,
+            compound_ttd_seconds_floor: 12.0,
+        }
+    }
+}
+
+impl M16TriggerThresholds {
+    /// Spec scenario 3: "the Medic only triages allies with bleed_stack ≥ 5
+    /// OR HP < 20% (the 'I will only respond to true emergencies' stance)".
+    /// Caller applies this when the player downgrades Medic priority from
+    /// 9 → 5.
+    pub fn emergency_only() -> Self {
+        Self {
+            bleed_stack_min: 5,
+            bleed_hp_pct_emergency: 0.20,
+            burning_hp_pct: 0.20,
+            poison_hp_pct: 0.20,
+            frozen_hp_pct: 0.20,
+            radiation_dose_rate: 1.0,
+            compound_ttd_seconds_floor: 8.0,
+        }
+    }
+}
 
 /// Race-aware vacuum exposure TTD per spec § "Vacuum exposure with
 /// helmet breach is race-aware".
@@ -792,10 +930,19 @@ mod tests {
         let reg = AfflictionRegistry::default_registry();
         let baseline = M16AfflictionKind::all_baseline().len();
         let survival = M16AfflictionKind::all_survival().len();
-        assert_eq!(baseline + survival + 1, 23, "18 baseline + 4 survival + blinded");
+        let threshold = M16AfflictionKind::all_threshold_set().len();
+        assert_eq!(
+            baseline + survival + threshold + 1,
+            27,
+            "18 baseline + 4 survival + 4 threshold + blinded"
+        );
         assert!(reg.specs.contains_key("blinded"));
         assert!(reg.specs.contains_key("hunger"));
         assert!(reg.specs.contains_key("sanity_low"));
+        assert!(reg.specs.contains_key("vacuum_exposure"));
+        assert!(reg.specs.contains_key("drowning"));
+        assert!(reg.specs.contains_key("shocked"));
+        assert!(reg.specs.contains_key("frozen"));
     }
 
     #[test]
@@ -893,15 +1040,59 @@ mod tests {
             expected_clear_tick: None,
             source_event_id: None,
         });
-        let reasons = auto_triage_reasons(&afflictions, 3, false, 0.9, 0.0, false, false, f32::INFINITY);
+        let thresholds = M16TriggerThresholds::default();
+        let reasons = auto_triage_reasons(&afflictions, &thresholds, 3, false, 0.9, 0.0, false, false, f32::INFINITY);
         assert!(reasons.contains(&AutoTriageReason::BleedingStack3));
     }
 
     #[test]
     fn auto_triage_fires_on_compound_ttd_low() {
         let afflictions = ActorAfflictions::default();
-        let reasons = auto_triage_reasons(&afflictions, 0, false, 0.9, 0.0, false, false, 6.0);
+        let thresholds = M16TriggerThresholds::default();
+        let reasons = auto_triage_reasons(&afflictions, &thresholds, 0, false, 0.9, 0.0, false, false, 6.0);
         assert!(reasons.contains(&AutoTriageReason::CompoundTtdLow));
+    }
+
+    #[test]
+    fn editable_thresholds_raise_bleed_trigger() {
+        let mut afflictions = ActorAfflictions::default();
+        afflictions.active.push(ActiveAffliction {
+            kind: M16AfflictionKind::Bleeding,
+            severity: 0.6,
+            applied_at_tick: 0,
+            expected_clear_tick: None,
+            source_event_id: None,
+        });
+        let emergency = M16TriggerThresholds::emergency_only();
+        let reasons = auto_triage_reasons(&afflictions, &emergency, 3, false, 0.9, 0.0, false, false, f32::INFINITY);
+        assert!(
+            !reasons.contains(&AutoTriageReason::BleedingStack3),
+            "with emergency_only thresholds (bleed_stack_min=5), 3 wounds at 90% HP must NOT trigger"
+        );
+        let reasons2 = auto_triage_reasons(&afflictions, &emergency, 5, false, 0.9, 0.0, false, false, f32::INFINITY);
+        assert!(reasons2.contains(&AutoTriageReason::BleedingStack3));
+    }
+
+    #[test]
+    fn drowning_affliction_triggers_auto_triage() {
+        let mut afflictions = ActorAfflictions::default();
+        afflictions.active.push(ActiveAffliction {
+            kind: M16AfflictionKind::Drowning,
+            severity: 0.8,
+            applied_at_tick: 0,
+            expected_clear_tick: None,
+            source_event_id: None,
+        });
+        let thresholds = M16TriggerThresholds::default();
+        let reasons = auto_triage_reasons(&afflictions, &thresholds, 0, false, 0.9, 0.0, false, false, f32::INFINITY);
+        assert!(reasons.contains(&AutoTriageReason::DrowningWithHelmetBreach));
+    }
+
+    #[test]
+    fn vacuum_exposure_kind_is_in_registry() {
+        let reg = AfflictionRegistry::default_registry();
+        let spec = reg.lookup(M16AfflictionKind::VacuumExposure);
+        assert!(spec.damage_per_tick_at_full > 0.0);
     }
 
     #[test]

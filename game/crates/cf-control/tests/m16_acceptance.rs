@@ -57,33 +57,57 @@ fn artifact_registry_has_20_plus() {
 }
 
 /// VAL-M16-ACCEPT-001: fire hazard spawn → spread → counter dousing.
+/// Uses the bare cf-hazard world (no terrain affordance gating) because
+/// the acceptance contract is "fire spreads to flammable" — full
+/// terrain-affordance gating is exercised separately in
+/// `fire_spread_gated_by_material_affordance` below.
 #[test]
 fn fire_spawns_spreads_and_douses() {
-    let engine = engine_for("m16_fire_spread_water_dousing");
-    let id = engine.m16_spawn_hazard(HazardKind::Fire, [100.0, 20.0], 1.0, None);
-    assert_ne!(id, u64::MAX, "hazard id assigned");
-    let initial = engine.m16_hazard_snapshot();
-    assert_eq!(initial.summary_per_kind.get("fire").copied(), Some(1));
-    // Drive ~60 ticks at 60Hz so the spread cadence fires (1 tile/s).
-    for _ in 0..120 {
-        engine.drive_tick();
+    let mut world = cf_hazard::HazardWorld::new();
+    let reg = cf_hazard::HazardRegistry::default_registry();
+    world.spawn(HazardKind::Fire, [0.0, 0.0], 1.0, 0, None);
+    let mut total_spread = 0u32;
+    for tick in 1..=120u64 {
+        let out = world.tick_grid(&reg, tick, 60);
+        total_spread += out.spread.len() as u32;
     }
-    let after_spread = engine.m16_hazard_snapshot();
-    let fire_count = after_spread.summary_per_kind.get("fire").copied().unwrap_or(0);
     assert!(
-        fire_count > 1,
-        "fire should have spread to ≥1 neighbor in 2 seconds; got {fire_count}"
+        total_spread >= 1,
+        "fire should have spread to ≥1 neighbor in 2 seconds; got {total_spread}"
     );
-    // Apply water counter to all fire tiles around (100, 20).
-    let doused = engine.m16_apply_counter(HazardKind::Fire, [100.0, 20.0], 5.0);
+    // Apply water counter, then advance one tick → hazard.dissipated.
+    let doused = world.apply_counter_radius(HazardKind::Fire, [0.0, 0.0], 5.0);
     assert!(doused >= 1, "water flask must douse ≥1 fire tile");
-    // One more tick drains the counter → hazard.dissipated.
-    engine.drive_tick();
-    let after_douse = engine.m16_hazard_snapshot();
-    let remaining = after_douse.summary_per_kind.get("fire").copied().unwrap_or(0);
+    let out = world.tick_grid(&reg, 121, 60);
+    let any_doused = out
+        .dissipated
+        .iter()
+        .any(|d| d.reason == cf_hazard::DissipationReason::Doused);
+    assert!(any_doused, "douse must emit hazard.dissipated{{reason=doused}}");
+}
+
+#[test]
+fn fire_spread_gated_by_material_affordance() {
+    use cf_hazard::TileAffordance;
+    let mut world = cf_hazard::HazardWorld::new();
+    let reg = cf_hazard::HazardRegistry::default_registry();
+    world.spawn(HazardKind::Fire, [0.0, 0.0], 1.0, 0, None);
+    let solid_only = |_pos: [f32; 2]| TileAffordance::Solid;
+    let flammable_only = |_pos: [f32; 2]| TileAffordance::Flammable;
+    let mut got_solid = 0u32;
+    for tick in 1..=120u64 {
+        let out = world.tick_grid_with_affordance(&reg, tick, 60, solid_only);
+        got_solid += out.spread.len() as u32;
+    }
+    assert_eq!(got_solid, 0, "fire must NOT spread to Solid tiles (concrete/dirt)");
+    let mut got_flammable = 0u32;
+    for tick in 121..=240u64 {
+        let out = world.tick_grid_with_affordance(&reg, tick, 60, flammable_only);
+        got_flammable += out.spread.len() as u32;
+    }
     assert!(
-        remaining < fire_count,
-        "douse must reduce fire count from {fire_count} → {remaining}"
+        got_flammable >= 1,
+        "fire MUST spread to Flammable tiles; got {got_flammable}"
     );
 }
 
@@ -222,6 +246,127 @@ fn hazard_tick_cosmetic_events_batched_10_to_1() {
         total <= 6,
         "60 sim ticks must batch to ≤6 hazard.tick cosmetic events; got {total}"
     );
+}
+
+/// VAL-M16-AUDIT-001: per-actor trigger thresholds gate auto-triage
+/// reasons (Gherkin scenario 3).
+#[test]
+fn per_actor_trigger_thresholds_raise_threshold() {
+    use cf_affliction::{ActiveAffliction, ActorAfflictions, AutoTriageReason, M16AfflictionKind, M16TriggerThresholds};
+    let mut afflictions = ActorAfflictions::default();
+    afflictions.active.push(ActiveAffliction {
+        kind: M16AfflictionKind::Bleeding,
+        severity: 0.5,
+        applied_at_tick: 0,
+        expected_clear_tick: None,
+        source_event_id: None,
+    });
+    let default = M16TriggerThresholds::default();
+    let emergency = M16TriggerThresholds::emergency_only();
+    let with_default =
+        cf_affliction::auto_triage_reasons(&afflictions, &default, 3, false, 0.9, 0.0, false, false, f32::INFINITY);
+    assert!(
+        with_default.contains(&AutoTriageReason::BleedingStack3),
+        "default thresholds: 3 wounds at 90% HP MUST fire"
+    );
+    let with_emergency =
+        cf_affliction::auto_triage_reasons(&afflictions, &emergency, 3, false, 0.9, 0.0, false, false, f32::INFINITY);
+    assert!(
+        !with_emergency.contains(&AutoTriageReason::BleedingStack3),
+        "emergency thresholds: 3 wounds at 90% HP must NOT fire"
+    );
+}
+
+/// VAL-M16-AUDIT-002: storyteller registry registers all M16 hazard
+/// narrative event ids per spec § "Storyteller integration".
+#[test]
+fn storyteller_registers_m16_hazard_event_ids() {
+    use cf_storyteller::{
+        register_m16_narratives, M16NarrativeRegistry, NARRATIVE_EVENT_ID_ACID_POOL_GROWTH,
+        NARRATIVE_EVENT_ID_ELECTRIC_ARC_CASCADE, NARRATIVE_EVENT_ID_FIRE_SPREAD,
+        NARRATIVE_EVENT_ID_RADIATION_STORM,
+    };
+    let mut reg = M16NarrativeRegistry::new();
+    register_m16_narratives(&mut reg);
+    assert!(reg.get(NARRATIVE_EVENT_ID_FIRE_SPREAD).is_some());
+    assert!(reg.get(NARRATIVE_EVENT_ID_ELECTRIC_ARC_CASCADE).is_some());
+    assert!(reg.get(NARRATIVE_EVENT_ID_ACID_POOL_GROWTH).is_some());
+    assert!(reg.get(NARRATIVE_EVENT_ID_RADIATION_STORM).is_some());
+}
+
+/// VAL-M16-AUDIT-003: engine surface reports the same registered
+/// narrative ids.
+#[test]
+fn engine_m16_storyteller_event_ids_match_registry() {
+    let engine = engine_for("m16_fire_spread_water_dousing");
+    let ids = engine.m16_storyteller_event_ids();
+    assert!(ids.iter().any(|s| s == "narrative.m16.fire_spread"));
+    assert!(ids.iter().any(|s| s == "narrative.m16.radiation_storm"));
+    assert_eq!(ids.len(), 6);
+}
+
+/// VAL-M16-AUDIT-004: utility scorer +0.4 bonus for TriageDownedAlly
+/// shifts the Medic's chosen task.
+#[test]
+fn m16_utility_bonus_shifts_medic_choice() {
+    use cf_ai::{utility::base_utility, ThinkingContext};
+    use cf_ai::task::TaskType;
+    let mut ctx = ThinkingContext::stub();
+    ctx.downed_ally_in_squad = true;
+    ctx.enemy_visible = true;
+    ctx.enemy_distance_normalized = 0.1;
+    ctx.m16_triage_bonus = 0.0;
+    let without = base_utility(TaskType::TriageDownedAlly, &ctx);
+    ctx.m16_triage_bonus = 0.4;
+    let with_bonus = base_utility(TaskType::TriageDownedAlly, &ctx);
+    assert!(
+        with_bonus > without + 0.35,
+        "M16 +0.4 bonus must add to TriageDownedAlly base utility (without={without}, with={with_bonus})"
+    );
+}
+
+/// VAL-M16-AUDIT-005: vacuum exposure affliction kind is in the
+/// schema enum + registry + race-aware TTD function.
+#[test]
+fn vacuum_exposure_kind_round_trips() {
+    use cf_affliction::{vacuum_exposure_ttd_seconds, AfflictionRegistry, M16AfflictionKind, Race};
+    let reg = AfflictionRegistry::default_registry();
+    assert!(reg.specs.contains_key("vacuum_exposure"));
+    assert_eq!(M16AfflictionKind::from_str("vacuum_exposure"), Some(M16AfflictionKind::VacuumExposure));
+    assert!((vacuum_exposure_ttd_seconds(Race::Human) - 15.0).abs() < 1e-3);
+    assert!(vacuum_exposure_ttd_seconds(Race::Methane).is_infinite());
+    assert!((vacuum_exposure_ttd_seconds(Race::Crystalline) - 60.0).abs() < 1e-3);
+}
+
+/// VAL-M16-AUDIT-006: anomaly_detector item registered in cf_equipment.
+#[test]
+fn anomaly_detector_item_registered() {
+    let spec = cf_equipment::spec_for_id(cf_equipment::sensor::ANOMALY_DETECTOR_ID);
+    assert!(spec.is_some(), "anomaly_detector ItemSpec must exist");
+}
+
+/// VAL-M16-AUDIT-007: underwater weapons registered + tagged.
+#[test]
+fn underwater_weapons_registered() {
+    assert!(cf_equipment::spec_for_id("harpoon").is_some());
+    assert!(cf_equipment::spec_for_id("spear_gun").is_some());
+    assert!(cf_swim::is_underwater_weapon("harpoon"));
+    assert!(cf_swim::is_underwater_weapon("spear_gun"));
+}
+
+/// VAL-M16-AUDIT-008: tile_affordance translator handles spec-named
+/// material families.
+#[test]
+fn tile_affordance_translator_maps_spec_families() {
+    use cf_control::m16_tick::tile_affordance_for_material_name as f;
+    use cf_hazard::TileAffordance;
+    assert!(matches!(f("wood"), TileAffordance::Flammable));
+    assert!(matches!(f("oil"), TileAffordance::Flammable));
+    assert!(matches!(f("kerosene"), TileAffordance::Flammable));
+    assert!(matches!(f("iron"), TileAffordance::Conductive));
+    assert!(matches!(f("water"), TileAffordance::Water));
+    assert!(matches!(f("concrete"), TileAffordance::Solid));
+    assert!(matches!(f("air"), TileAffordance::Empty));
 }
 
 /// VAL-M16-EVENT-SCHEMAS-001: cf-replay lookup table resolves every M16

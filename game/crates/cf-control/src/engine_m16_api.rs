@@ -2,7 +2,7 @@
 //! observing the M16 worlds from cfctl + acceptance tests.
 
 use cf_actor::ActorId;
-use cf_affliction::{self as affl, ClearReason, M16AfflictionKind};
+use cf_affliction::{self as affl, ClearReason, M16AfflictionKind, M16TriggerThresholds};
 use cf_anomaly::AnomalyKind;
 use cf_artifact::ArtifactInstanceId;
 use cf_hazard::{HazardId, HazardKind};
@@ -236,4 +236,72 @@ impl M0Engine {
             })
             .collect()
     }
+
+    /// Set the per-actor auto-triage trigger thresholds per spec § "Player
+    /// can edit affliction trigger thresholds per actor".
+    pub fn m16_set_trigger_thresholds(&self, actor_id: u64, thresholds: M16TriggerThresholds) {
+        let mut state = self.state.write().expect("engine state poisoned");
+        state.m16_trigger_thresholds.insert(ActorId(actor_id), thresholds);
+    }
+
+    /// Returns the active per-actor trigger thresholds (default when
+    /// unset).
+    pub fn m16_trigger_thresholds_for(&self, actor_id: u64) -> M16TriggerThresholds {
+        let state = self.state.read().expect("engine state poisoned");
+        state
+            .m16_trigger_thresholds
+            .get(&ActorId(actor_id))
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Read the M16 storyteller registry. Surfaced for cfctl / replay
+    /// debug + cf-mod validation.
+    pub fn m16_storyteller_event_ids(&self) -> Vec<String> {
+        let state = self.state.read().expect("engine state poisoned");
+        state
+            .m16_storyteller_registry
+            .by_id
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    /// True when `actor_id` is carrying the `anomaly_detector` item in
+    /// inventory. Used by the HUD minimap to gate detector-required
+    /// anomaly surfacing.
+    pub fn m16_actor_has_anomaly_detector(&self, actor_id: u64) -> bool {
+        let state = self.state.read().expect("engine state poisoned");
+        let sim = match state.actor_state.as_ref() {
+            Some(s) => s,
+            None => return false,
+        };
+        let actor = match sim.world.actors.get(&ActorId(actor_id)) {
+            Some(a) => a,
+            None => return false,
+        };
+        if let Some(grid) = &actor.inventory_grid {
+            if inventory_grid_contains_id(grid, cf_equipment::sensor::ANOMALY_DETECTOR_ID) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+fn inventory_grid_contains_id(grid: &cf_actor::inventory::InventoryGrid, id: &str) -> bool {
+    fn walk(items: &[cf_actor::inventory::PlacedItem], id: &str) -> bool {
+        for item in items {
+            if item.item_id == id {
+                return true;
+            }
+            if let Some(c) = &item.container {
+                if walk(&c.items, id) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+    walk(&grid.items, id)
 }

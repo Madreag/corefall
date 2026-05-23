@@ -753,6 +753,18 @@ pub(crate) struct EngineMutable {
     /// (hunger/thirst/sleep_dep/sanity_low) clear automatically per
     /// spec § "Survival afflictions only active in PvE Survival mode".
     pub(crate) m16_survival_mode_active: bool,
+    /// M16 § "Player can edit affliction trigger thresholds per actor".
+    /// Per-actor editable thresholds; default = Medic baseline. cfctl
+    /// `act.priority.set_m16_trigger_thresholds` mutates this.
+    pub(crate) m16_trigger_thresholds: BTreeMap<ActorId, cf_affliction::M16TriggerThresholds>,
+    /// M16 § "ai.auto_triage_initiated event fires with trigger_reason".
+    /// Per-target last fired trigger reason; engine de-dupes so the event
+    /// only fires when the dominant reason changes (not every tick).
+    pub(crate) m16_last_auto_triage_reason: BTreeMap<ActorId, cf_affliction::AutoTriageReason>,
+    /// M16 § "Storyteller integration". Registry populated at init via
+    /// `cf_storyteller::register_m16_narratives` so M25 narrative directors
+    /// see the M16 hazard event ids in their catalog.
+    pub(crate) m16_storyteller_registry: cf_storyteller::M16NarrativeRegistry,
 }
 
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the

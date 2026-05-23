@@ -16,7 +16,7 @@
   ],
   terrain: Some((width_px: 256, height_px: 128, default_material: "air", stamps: [
     (kind: "fill_aabb", min: (0.0, 0.0), max: (256.0, 16.0), material: "dirt"),
-    (kind: "fill_aabb", min: (96.0, 16.0), max: (160.0, 32.0), material: "wood"),
+    (kind: "fill_aabb", min: (96.0, 16.0), max: (160.0, 32.0), material: "oil"),
   ])),
   atmosphere_cells: [
     (id: 1, min: (0.0, 0.0), max: (256.0, 128.0), pressure_kpa: 101.325, temp_k: 293.0),

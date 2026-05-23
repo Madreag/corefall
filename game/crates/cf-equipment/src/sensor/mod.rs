@@ -11,6 +11,9 @@ pub const SOUND_DETECTOR_PASSIVE_ID: &str = "sound_detector_passive";
 pub const HEAT_CAMERA_HANDHELD_ID: &str = "heat_camera_handheld";
 pub const RADAR_COMPACT_T2_ID: &str = "radar_compact_t2";
 pub const GEOLOGICAL_SURVEYOR_M30D_ID: &str = "geological_surveyor_m30d";
+/// M16 § Anomaly detector item id. Carrying this satisfies the Gherkin
+/// "Given anomaly detector in inventory" surface contract.
+pub const ANOMALY_DETECTOR_ID: &str = "anomaly_detector";
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]

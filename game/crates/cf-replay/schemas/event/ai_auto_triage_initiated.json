@@ -2,9 +2,10 @@
   "$schema": "http://json-schema.org/draft-2020-12/schema",
   "$id": "cf-replay/event/ai_auto_triage_initiated.v1",
   "title": "ai.auto_triage_initiated",
-  "description": "Emitted when a Medic-role bot picks up an auto-triage mission for a DYING squadmate. Spec § Auto-triage Gherkin. reach_seconds=6.0; apply_seconds=8.0.",
+  "description": "Emitted when a Medic-role bot picks up an auto-triage mission for a DYING squadmate OR when an M16 affliction threshold (bleed_stack >= 3, compound TTD < 12s, etc.) crosses for an ally. Spec § Auto-triage Gherkin + M16 § Auto-triage trigger contract. reach_seconds=6.0; apply_seconds=8.0.",
   "type": "object",
   "required": ["medic_actor_id", "target_actor_id", "dying_tick"],
+  "additionalProperties": true,
   "properties": {
     "medic_actor_id": { "type": "integer", "minimum": 0 },
     "target_actor_id": { "type": "integer", "minimum": 0 },
@@ -12,6 +13,10 @@
     "reach_deadline_tick": { "type": "integer", "minimum": 0 },
     "apply_deadline_tick": { "type": "integer", "minimum": 0 },
     "reach_seconds": { "type": "number" },
-    "apply_seconds": { "type": "number" }
+    "apply_seconds": { "type": "number" },
+    "trigger_reason": {
+      "type": "string",
+      "description": "M16 § Auto-triage trigger contract. Identifies which threshold crossed (bleeding_stack_3, single_arterial_wound, burning_at_low_hp, poison_stack_at_low_hp, continuous_shock, frozen_at_low_hp, drowning_with_helmet_breach, radiation_dose_high, compound_ttd_low). Optional; legacy dispatches that fire on DYING transition leave this absent."
+    }
   }
 }

@@ -16,10 +16,12 @@
       "additionalProperties": true,
       "properties": {
         "actor_id": { "type": "integer" },
-        "kind": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "blinded", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low"] },
+        "kind": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "blinded", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low", "vacuum_exposure", "shocked", "frozen", "drowning"] },
         "source_event_id": { "type": "string" },
         "expected_duration_ticks": { "type": "integer", "minimum": 1 },
-        "severity_0_1": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+        "severity_0_1": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "per_origin_ttd_seconds": { "type": "number", "description": "M16 § race-aware TTD payload (vacuum_exposure carries race-specific TTD per spec § 'Vacuum exposure with helmet breach is race-aware')." },
+        "race": { "type": "string", "description": "M16 § origin/race label carried on race-aware afflictions (human, methane, crystalline, aqueous, robotic)." }
       },
       "required": ["actor_id", "kind", "source_event_id", "expected_duration_ticks", "severity_0_1"]
     }

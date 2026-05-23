@@ -516,6 +516,13 @@ impl M0Engine {
                 m16_affliction_by_actor: BTreeMap::new(),
                 m16_affliction_registry: cf_affliction::AfflictionRegistry::default_registry(),
                 m16_survival_mode_active: false,
+                m16_trigger_thresholds: BTreeMap::new(),
+                m16_last_auto_triage_reason: BTreeMap::new(),
+                m16_storyteller_registry: {
+                    let mut reg = cf_storyteller::M16NarrativeRegistry::new();
+                    cf_storyteller::register_m16_narratives(&mut reg);
+                    reg
+                },
             }),
             recorder,
             current_tick,

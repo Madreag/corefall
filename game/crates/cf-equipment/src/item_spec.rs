@@ -865,6 +865,8 @@ fn m6c_firearm_entries() -> Vec<ItemSpec> {
         entry("lmg_belt_fed", "Belt-fed LMG", 9.5, 3, 6, 8.5, ItemCategory::Weapon, &[("steel", 7.0), ("polymer", 2.5)], false, Some(2000)),
         entry("anti_materiel_rifle_127", "12.7mm Anti-Materiel Rifle", 14.0, 3, 7, 10.0, ItemCategory::Weapon, &[("steel", 11.0), ("polymer", 3.0)], false, Some(1800)),
         entry("squad_automatic_saw", "Squad Automatic Weapon", 7.5, 3, 6, 7.0, ItemCategory::Weapon, &[("steel", 5.5), ("polymer", 2.0)], false, Some(1800)),
+        entry("harpoon", "Harpoon", 2.4, 2, 5, 4.0, ItemCategory::Weapon, &[("steel", 1.4), ("wood", 1.0)], true, Some(900)),
+        entry("spear_gun", "Spear Gun", 1.8, 2, 4, 3.0, ItemCategory::Weapon, &[("alloy", 0.6), ("polymer", 0.5), ("steel", 0.7)], true, Some(700)),
     ]
 }
 
@@ -970,6 +972,7 @@ fn m6c_sensor_entries() -> Vec<ItemSpec> {
         entry("heat_camera_handheld", "Handheld Heat Camera", 1.0, 2, 2, 2.0, ItemCategory::Sensor, &[("polymer", 0.6), ("alloy", 0.4)], true, Some(600)),
         entry("radar_compact_t2", "Compact Radar (T2)", 6.0, 3, 5, 8.0, ItemCategory::Sensor, &[("alloy", 4.0), ("polymer", 2.0)], false, Some(800)),
         entry("geological_surveyor_m30d", "Geological Surveyor (M30D)", 3.0, 2, 4, 4.0, ItemCategory::Sensor, &[("alloy", 2.0), ("polymer", 1.0)], false, Some(700)),
+        entry("anomaly_detector", "Anomaly Detector", 0.8, 2, 2, 1.5, ItemCategory::Sensor, &[("polymer", 0.4), ("alloy", 0.3), ("electronics", 0.1)], true, Some(800)),
     ]
 }
 

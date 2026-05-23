@@ -400,12 +400,40 @@ pub struct HazardTickOutput {
 /// batched per M4 (batched 10:1 ratio for determinism)".
 pub const HAZARD_TICK_BATCH_RATIO: u64 = 10;
 
+/// Below this intensity, a hazard tile is considered "spread out" and
+/// dissipates with reason=spread_out (vs reason=time when it expired
+/// naturally). Per spec § "reasons: time/doused/spread-out".
+pub const MIN_INTENSITY_FOR_SPREAD_OUT: f32 = 0.1;
+
 /// Authoritative hazard world. Holds every live tile + a counter for next
 /// id. Spread + dissipation rules read from a `HazardRegistry`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HazardWorld {
     pub tiles: BTreeMap<HazardId, HazardTile>,
     pub next_id: HazardId,
+}
+
+/// Material affordance predicate. Engine layer passes a closure that
+/// returns one of these enums for a given tile position; cf-hazard's
+/// spread logic gates on the result to enforce spec-table rules:
+///   - fire → spreads to Flammable only
+///   - electric → arcs to Conductive (and also water — counter)
+///   - wet → pools toward Gravity-downward eligible tiles
+///   - everything else → spreads to any non-Solid tile
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TileAffordance {
+    /// Air / vacuum.
+    Empty,
+    /// Wood, oil, fabric, paper — flammable.
+    Flammable,
+    /// Metal — conductive (electric arc target).
+    Conductive,
+    /// Water — counters fire + conducts electricity per spec.
+    Water,
+    /// Concrete, dirt — solid, blocks spread.
+    Solid,
+    /// Unknown — engine falls back to spreading freely (legacy behaviour).
+    Other,
 }
 
 impl HazardWorld {
@@ -631,10 +659,13 @@ impl HazardWorld {
                     effective_rate *= spec.counter_dissipation_multiplier;
                 }
             }
+            let prev_intensity = tile.intensity;
             tile.intensity = (tile.intensity - effective_rate * dt_seconds).max(0.0);
             if tile.intensity <= 0.0 {
                 let reason = if tile.doused_this_tick {
                     DissipationReason::Doused
+                } else if prev_intensity < MIN_INTENSITY_FOR_SPREAD_OUT {
+                    DissipationReason::SpreadOut
                 } else {
                     DissipationReason::Time
                 };
@@ -661,6 +692,43 @@ impl HazardWorld {
         }
 
         out
+    }
+
+    /// Advance using a material-affordance predicate. Spec-table rules:
+    ///   - fire ONLY spreads to Flammable tiles
+    ///   - electric ONLY arcs to Conductive or Water (counter — water
+    ///     spreads electric per spec § "Insulation, water (counter —
+    ///     spreads via water!)")
+    ///   - wet pools toward gravity-down + drains away from up
+    ///   - smoke / toxic skip in this fn (M19 atm kernel owns them)
+    ///   - radiation skips (static)
+    ///   - other kinds (hot/cold/acid) spread to Empty/Flammable/Conductive/Water
+    ///
+    /// Also dilutes intensity below `MIN_INTENSITY_FOR_SPREAD_OUT` →
+    /// emits `hazard.dissipated{reason=spread_out}` per spec § "reasons:
+    /// time/doused/spread-out".
+    pub fn tick_grid_with_affordance<F>(
+        &mut self,
+        registry: &HazardRegistry,
+        tick: u64,
+        tick_rate_hz: u32,
+        material_affordance: F,
+    ) -> HazardTickOutput
+    where
+        F: Fn([f32; 2]) -> TileAffordance,
+    {
+        let predicate = |kind: HazardKind, pos: [f32; 2]| -> bool {
+            let aff = material_affordance(pos);
+            if matches!(aff, TileAffordance::Solid) {
+                return false;
+            }
+            match kind {
+                HazardKind::Fire => matches!(aff, TileAffordance::Flammable),
+                HazardKind::Electric => matches!(aff, TileAffordance::Conductive | TileAffordance::Water),
+                _ => !matches!(aff, TileAffordance::Solid),
+            }
+        };
+        self.tick_grid_with_predicate(registry, tick, tick_rate_hz, predicate)
     }
 
     /// Advance with a custom predicate that gates which tiles a hazard
@@ -760,10 +828,13 @@ impl HazardWorld {
                     effective_rate *= spec.counter_dissipation_multiplier;
                 }
             }
+            let prev_intensity = tile.intensity;
             tile.intensity = (tile.intensity - effective_rate * dt_seconds).max(0.0);
             if tile.intensity <= 0.0 {
                 let reason = if tile.doused_this_tick {
                     DissipationReason::Doused
+                } else if prev_intensity < MIN_INTENSITY_FOR_SPREAD_OUT {
+                    DissipationReason::SpreadOut
                 } else {
                     DissipationReason::Time
                 };
@@ -900,6 +971,78 @@ mod tests {
         let spec = HazardSpec::default_for(HazardKind::Electric);
         assert!(spec.counter_dissipation_multiplier < 1.0,
             "electric must be SLOWED by water (counter < 1.0) per spec 'Insulation, water (counter — spreads via water!)'");
+    }
+
+    #[test]
+    fn fire_with_affordance_predicate_only_spreads_to_flammable() {
+        let reg = HazardRegistry::default_registry();
+        let mut world = HazardWorld::new();
+        world.spawn(HazardKind::Fire, [0.0, 0.0], 1.0, 0, None);
+        let affordance = |pos: [f32; 2]| -> TileAffordance {
+            if pos[0] == 1.0 && pos[1] == 0.0 {
+                TileAffordance::Flammable
+            } else {
+                TileAffordance::Solid
+            }
+        };
+        let mut total_spread = 0u32;
+        for tick in 1..=120u64 {
+            let out = world.tick_grid_with_affordance(&reg, tick, 60, affordance);
+            total_spread += out.spread.len() as u32;
+        }
+        assert_eq!(
+            total_spread, 1,
+            "fire must spread to exactly the one flammable neighbor; got {total_spread}"
+        );
+    }
+
+    #[test]
+    fn electric_with_affordance_arcs_to_water_and_metal() {
+        let reg = HazardRegistry::default_registry();
+        let mut world = HazardWorld::new();
+        world.spawn(HazardKind::Electric, [0.0, 0.0], 1.0, 0, None);
+        let affordance = |pos: [f32; 2]| -> TileAffordance {
+            match (pos[0] as i32, pos[1] as i32) {
+                (1, 0) => TileAffordance::Water,
+                (-1, 0) => TileAffordance::Conductive,
+                (0, 1) => TileAffordance::Solid,
+                _ => TileAffordance::Other,
+            }
+        };
+        let mut spreads = Vec::new();
+        for tick in 1..=120u64 {
+            let out = world.tick_grid_with_affordance(&reg, tick, 60, affordance);
+            for s in out.spread {
+                spreads.push(s.to_pos);
+            }
+        }
+        let to_water = spreads.iter().any(|p| p[0] == 1.0 && p[1] == 0.0);
+        let to_metal = spreads.iter().any(|p| p[0] == -1.0 && p[1] == 0.0);
+        assert!(to_water, "electric must arc to water (counter — spreads via water!)");
+        assert!(to_metal, "electric must arc to conductive metal");
+    }
+
+    #[test]
+    fn diluted_hazard_dissipates_with_spread_out_reason() {
+        let reg = HazardRegistry::default_registry();
+        let mut world = HazardWorld::new();
+        let (id, _) = world.spawn(HazardKind::Acid, [0.0, 0.0], 0.05, 0, None);
+        let mut found_spread_out = false;
+        for tick in 1..=600u64 {
+            let out = world.tick_grid(&reg, tick, 60);
+            for ev in &out.dissipated {
+                if ev.hazard_id == id && ev.reason == DissipationReason::SpreadOut {
+                    found_spread_out = true;
+                }
+            }
+            if found_spread_out {
+                break;
+            }
+        }
+        assert!(
+            found_spread_out,
+            "low-intensity hazard must dissipate with reason=spread_out per spec § 'reasons: time/doused/spread-out'"
+        );
     }
 
     #[test]

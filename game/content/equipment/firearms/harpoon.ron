@@ -1,0 +1,31 @@
+// **M16** § "Underwater-specific weapons: harpoon, spear gun".
+// Routed through cf_swim::is_underwater_weapon("harpoon") so the firing
+// path applies UNDERWATER_WEAPON_RANGE_MULTIPLIER when fired while
+// swimming.
+
+(
+  id: "harpoon",
+  display_name: "Harpoon",
+  mass_kg: 2.4,
+  dimensions: (
+    w: 2,
+    h: 5,
+  ),
+  bulk_volume_l: 4.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: Some(900),
+  repair_recipe: None,
+  material_weight_breakdown: {
+    "steel": 1.4,
+    "wood": 1.0,
+  },
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)

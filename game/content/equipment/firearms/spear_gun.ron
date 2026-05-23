@@ -1,0 +1,32 @@
+// **M16** § "Underwater-specific weapons: harpoon, spear gun".
+// Spear gun fires a barbed spear projectile underwater; cf_swim's
+// is_underwater_weapon() routes its accuracy through the underwater
+// range multiplier.
+
+(
+  id: "spear_gun",
+  display_name: "Spear Gun",
+  mass_kg: 1.8,
+  dimensions: (
+    w: 2,
+    h: 4,
+  ),
+  bulk_volume_l: 3.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: Some(700),
+  repair_recipe: None,
+  material_weight_breakdown: {
+    "alloy": 0.6,
+    "polymer": 0.5,
+    "steel": 0.7,
+  },
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)

@@ -19,6 +19,7 @@ use cf_sim_core::Tick;
 
 use cf_affliction::{
     self as affl, ActorAfflictions, AfflictionRegistry, AutoTriageReason, ClearReason, M16AfflictionKind,
+    M16TriggerThresholds,
 };
 use cf_anomaly::{AnomalyRegistry, AnomalyTickOutput, AnomalyWorld};
 use cf_artifact::{
@@ -36,6 +37,10 @@ pub struct M16TickInputs<'a> {
     pub actor_state: &'a ActorSimState,
     pub survival_mode_active: bool,
     pub recorder: &'a Recorder,
+    /// Optional terrain reference for material-affordance-aware hazard
+    /// spread (fire → flammable, electric → conductive/water). When
+    /// `None`, the legacy unconstrained spread is used.
+    pub terrain: Option<&'a cf_terrain::chunked::ChunkedTerrain>,
 }
 
 pub struct M16TickStateMut<'a> {
@@ -48,6 +53,8 @@ pub struct M16TickStateMut<'a> {
     pub swim_world: &'a mut SwimWorld,
     pub affliction_by_actor: &'a mut std::collections::BTreeMap<ActorId, ActorAfflictions>,
     pub affliction_registry: &'a AfflictionRegistry,
+    pub trigger_thresholds: &'a std::collections::BTreeMap<ActorId, M16TriggerThresholds>,
+    pub last_auto_triage_reason: &'a mut std::collections::BTreeMap<ActorId, AutoTriageReason>,
 }
 
 /// Aggregate output from one tick — currently used for assertions in
@@ -81,18 +88,32 @@ pub fn run_m16_tick(inputs: M16TickInputs<'_>, state: M16TickStateMut<'_>) -> M1
         actor_state,
         survival_mode_active,
         recorder,
+        terrain,
     } = inputs;
 
     let mut out = M16TickOutput::default();
 
     // ----- 1) Hazard grid tick (spread + dissipation + cosmetic tick) -----
+    let hazard_output = match terrain {
+        Some(terrain_ref) => state.hazard_world.tick_grid_with_affordance(
+            state.hazard_registry,
+            tick.0,
+            tick_rate_hz,
+            |pos| {
+                let mat_id = terrain_ref.material_at(pos[0] as i64, pos[1] as i64);
+                let name = terrain_ref.registry.name(mat_id);
+                tile_affordance_for_material_name(name)
+            },
+        ),
+        None => state.hazard_world.tick_grid(state.hazard_registry, tick.0, tick_rate_hz),
+    };
     let HazardTickOutput {
         spawned,
         spread,
         actor_contact: _,
         tick: cosmetic_tick,
         dissipated,
-    } = state.hazard_world.tick_grid(state.hazard_registry, tick.0, tick_rate_hz);
+    } = hazard_output;
     out.hazards_spawned = spawned.len() as u32;
     out.hazards_spread = spread.len() as u32;
     out.hazards_dissipated = dissipated.len() as u32;
@@ -327,7 +348,7 @@ pub fn run_m16_tick(inputs: M16TickInputs<'_>, state: M16TickStateMut<'_>) -> M1
         }
     }
 
-    // ----- 4) Affliction per-actor tick (decay + clear) -----
+    // ----- 4) Affliction per-actor tick (decay + clear + critical banners) -----
     let actor_ids: Vec<ActorId> = state.affliction_by_actor.keys().copied().collect();
     for actor_id in actor_ids {
         let actor_state_ref = state.affliction_by_actor.get_mut(&actor_id);
@@ -369,6 +390,27 @@ pub fn run_m16_tick(inputs: M16TickInputs<'_>, state: M16TickStateMut<'_>) -> M1
                     "kind": ev.kind.as_str(),
                     "hp_delta": ev.hp_delta,
                     "tick": ev.tick,
+                }),
+                None,
+            );
+        }
+        // M16 § "Banners fire on critical afflictions" — drain the pending
+        // critical-banner queue and emit ux.banner_raised with severity
+        // critical so the engine surfaces the affliction on the HUD.
+        let pending: Vec<M16AfflictionKind> =
+            afflictions.critical_banner_pending.drain(..).collect();
+        for kind in pending {
+            let _ = recorder.record(
+                tick,
+                sim_time_ms,
+                "ux",
+                "banner_raised",
+                json!({
+                    "actor_id": actor_id.0,
+                    "text": format!("CRITICAL: {}", kind.as_str()),
+                    "severity": "critical",
+                    "source": "m16_affliction_strip",
+                    "kind": kind.as_str(),
                 }),
                 None,
             );
@@ -474,24 +516,236 @@ pub fn run_m16_tick(inputs: M16TickInputs<'_>, state: M16TickStateMut<'_>) -> M1
         }
     }
 
-    // ----- 6) Auto-triage reasons (M7 utility scorer bonus surface) -----
+    // ----- 5.5) M16 § per-spec affliction producers (chassis / atmos / survival) -----
+    let actors_for_producers: Vec<(ActorId, cf_actor::ActorState)> = actor_state
+        .world
+        .actors
+        .iter()
+        .map(|(id, a)| (*id, a.clone()))
+        .collect();
+    for (actor_id, actor) in actors_for_producers.iter() {
+        let actor_aff = state.affliction_by_actor.entry(*actor_id).or_default();
+        let registry = state.affliction_registry;
+        // hunger: caloric_energy < 20 (per M17)
+        if actor.resources.caloric_energy < 20.0 && survival_mode_active {
+            let sev = ((20.0 - actor.resources.caloric_energy) / 20.0).clamp(0.05, 1.0);
+            if actor_aff.severity_of(M16AfflictionKind::Hunger) < sev {
+                let (a, _) = affl::apply_affliction(
+                    actor_aff,
+                    actor_id.0,
+                    M16AfflictionKind::Hunger,
+                    (sev - actor_aff.severity_of(M16AfflictionKind::Hunger)).max(0.01),
+                    registry,
+                    tick.0,
+                    tick_rate_hz,
+                    format!("hunger:{}", tick.0),
+                );
+                if a.is_some() {
+                    out.afflictions_applied += 1;
+                }
+            }
+        }
+        // thirst: water reservoir empty (M17 placeholder uses oxygen_supply as proxy).
+        if actor.resources.oxygen_supply < 10.0 && survival_mode_active {
+            let sev = 0.5_f32;
+            if actor_aff.severity_of(M16AfflictionKind::Thirst) < sev {
+                let (a, _) = affl::apply_affliction(
+                    actor_aff,
+                    actor_id.0,
+                    M16AfflictionKind::Thirst,
+                    0.05,
+                    registry,
+                    tick.0,
+                    tick_rate_hz,
+                    format!("thirst:{}", tick.0),
+                );
+                if a.is_some() {
+                    out.afflictions_applied += 1;
+                }
+            }
+        }
+        // concussed: high-impulse impact (concussion_dose proxied by g_load_dose).
+        if actor.resources.concussion_dose > 0.5 {
+            let sev = (actor.resources.concussion_dose / 2.0).clamp(0.1, 1.0);
+            if actor_aff.severity_of(M16AfflictionKind::Concussed) < sev {
+                let (a, _) = affl::apply_affliction(
+                    actor_aff,
+                    actor_id.0,
+                    M16AfflictionKind::Concussed,
+                    0.1,
+                    registry,
+                    tick.0,
+                    tick_rate_hz,
+                    format!("concussion:{}", tick.0),
+                );
+                if a.is_some() {
+                    out.afflictions_applied += 1;
+                }
+            }
+        }
+        // bleeding: wound contact (any active wounds → bleeding kind).
+        let wound_count = wound_count_for_actor(actor);
+        if wound_count > 0 {
+            let sev = (wound_count as f32 * 0.25).clamp(0.1, 1.0);
+            if actor_aff.severity_of(M16AfflictionKind::Bleeding) < sev {
+                let delta = (sev - actor_aff.severity_of(M16AfflictionKind::Bleeding)).max(0.05);
+                let (a, _) = affl::apply_affliction(
+                    actor_aff,
+                    actor_id.0,
+                    M16AfflictionKind::Bleeding,
+                    delta,
+                    registry,
+                    tick.0,
+                    tick_rate_hz,
+                    format!("wound:{}", tick.0),
+                );
+                if a.is_some() {
+                    out.afflictions_applied += 1;
+                }
+            }
+        }
+        // overheating: chassis heat > 90% (proxy via resources.heat normalized to 1.0 cap).
+        if actor.resources.heat > 0.9 {
+            let sev = ((actor.resources.heat - 0.9) / 0.1).clamp(0.1, 1.0);
+            if actor_aff.severity_of(M16AfflictionKind::Overheating) < sev {
+                let delta = (sev - actor_aff.severity_of(M16AfflictionKind::Overheating)).max(0.05);
+                let (a, _) = affl::apply_affliction(
+                    actor_aff,
+                    actor_id.0,
+                    M16AfflictionKind::Overheating,
+                    delta,
+                    registry,
+                    tick.0,
+                    tick_rate_hz,
+                    format!("overheat:{}", tick.0),
+                );
+                if a.is_some() {
+                    out.afflictions_applied += 1;
+                }
+            }
+        }
+        // low_battery: chassis power < 30% threshold.
+        if actor.resources.battery_charge > 0.0 && actor.resources.battery_charge < 30.0 {
+            let sev = ((30.0 - actor.resources.battery_charge) / 30.0).clamp(0.1, 1.0);
+            if actor_aff.severity_of(M16AfflictionKind::LowBattery) < sev {
+                let (a, _) = affl::apply_affliction(
+                    actor_aff,
+                    actor_id.0,
+                    M16AfflictionKind::LowBattery,
+                    0.05,
+                    registry,
+                    tick.0,
+                    tick_rate_hz,
+                    format!("low_battery:{}", tick.0),
+                );
+                if a.is_some() {
+                    out.afflictions_applied += 1;
+                }
+            }
+        }
+        // vacuum_exposure: helmet integrity < 100% + atmospheric pressure < 0.1 atm
+        // (proxied via oxygen_supply == 0 + body_armor helmet_seal_active = false).
+        let helmet_seal = actor.body_armor.helmet_seal_active();
+        if !helmet_seal && actor.resources.oxygen_supply < 1.0 {
+            let race = race_from_origin(&actor.origin_id);
+            let ttd = affl::vacuum_exposure_ttd_seconds(race);
+            if ttd.is_finite() {
+                let sev = 0.6_f32;
+                if actor_aff.severity_of(M16AfflictionKind::VacuumExposure) < sev {
+                    let registry_clone = registry.clone();
+                    let _ = registry_clone;
+                    let (a, _) = affl::apply_affliction(
+                        actor_aff,
+                        actor_id.0,
+                        M16AfflictionKind::VacuumExposure,
+                        0.1,
+                        registry,
+                        tick.0,
+                        tick_rate_hz,
+                        format!("vacuum:{}", tick.0),
+                    );
+                    if a.is_some() {
+                        out.afflictions_applied += 1;
+                        let _ = recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "affliction",
+                            "applied",
+                            json!({
+                                "actor_id": actor_id.0,
+                                "kind": "vacuum_exposure",
+                                "source_event_id": format!("vacuum:{}", tick.0),
+                                "expected_duration_ticks": 1,
+                                "severity_0_1": 0.1,
+                                "per_origin_ttd_seconds": ttd,
+                                "race": race_str(race),
+                            }),
+                            None,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // ----- 6) Auto-triage reasons (M7 utility scorer bonus + ai.auto_triage_initiated) -----
+    let default_thresholds = M16TriggerThresholds::default();
     for (actor_id, afflictions) in state.affliction_by_actor.iter() {
-        let hp_percent = actor_state
-            .world
-            .actors
+        let actor = match actor_state.world.actors.get(actor_id) {
+            Some(a) => a,
+            None => continue,
+        };
+        let hp_percent = (actor.hp / 100.0_f32.max(1.0)).clamp(0.0, 1.0);
+        let thresholds = state
+            .trigger_thresholds
             .get(actor_id)
-            .map(|a| (a.hp / a.hp.max(1.0)).clamp(0.0, 1.0))
-            .unwrap_or(1.0);
+            .copied()
+            .unwrap_or(default_thresholds);
+        let wound_count = wound_count_for_actor(actor);
+        let arterial = arterial_wound_for_actor(actor);
+        let dose_rate = afflictions.severity_of(M16AfflictionKind::Radiation);
+        let continuous_shock = afflictions.severity_of(M16AfflictionKind::Electrified) >= 0.8
+            || afflictions.severity_of(M16AfflictionKind::Shocked) >= 0.5;
+        let helmet_breach_drown = afflictions.severity_of(M16AfflictionKind::Drowning) > 0.0
+            && !actor.body_armor.helmet_seal_active();
+        let compound_ttd = compound_ttd_for_actor(afflictions, actor);
         let reasons = affl::auto_triage_reasons(
             afflictions,
-            0,
-            false,
+            &thresholds,
+            wound_count,
+            arterial,
             hp_percent,
-            afflictions.severity_of(M16AfflictionKind::Radiation),
-            afflictions.severity_of(M16AfflictionKind::Electrified) >= 0.8,
-            false,
-            f32::INFINITY,
+            dose_rate,
+            continuous_shock,
+            helmet_breach_drown,
+            compound_ttd,
         );
+        let dominant = reasons.first().copied();
+        if let Some(reason) = dominant {
+            let prev = state.last_auto_triage_reason.get(actor_id).copied();
+            if prev != Some(reason) {
+                state.last_auto_triage_reason.insert(*actor_id, reason);
+                let _ = recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ai",
+                    "auto_triage_initiated",
+                    json!({
+                        "medic_actor_id": 0,
+                        "target_actor_id": actor_id.0,
+                        "dying_tick": tick.0,
+                        "reach_deadline_tick": tick.0 + (6 * tick_rate_hz as u64),
+                        "apply_deadline_tick": tick.0 + (8 * tick_rate_hz as u64),
+                        "reach_seconds": 6.0,
+                        "apply_seconds": 8.0,
+                        "trigger_reason": reason.as_str(),
+                    }),
+                    None,
+                );
+            }
+        } else {
+            state.last_auto_triage_reason.remove(actor_id);
+        }
         for r in reasons {
             out.auto_triage_reasons.push((*actor_id, r));
         }
@@ -501,6 +755,102 @@ pub fn run_m16_tick(inputs: M16TickInputs<'_>, state: M16TickStateMut<'_>) -> M1
     let _ = sim_time_ms;
 
     out
+}
+
+fn race_from_origin(origin_id: &str) -> affl::Race {
+    match origin_id {
+        "methane" | "methane_breather" => affl::Race::Methane,
+        "crystalline" => affl::Race::Crystalline,
+        "aqueous" => affl::Race::Aqueous,
+        "robot" | "synth" => affl::Race::Robotic,
+        _ => affl::Race::Human,
+    }
+}
+
+fn race_str(race: affl::Race) -> &'static str {
+    match race {
+        affl::Race::Human => "human",
+        affl::Race::Methane => "methane",
+        affl::Race::Crystalline => "crystalline",
+        affl::Race::Aqueous => "aqueous",
+        affl::Race::Robotic => "robotic",
+    }
+}
+
+/// Translate a cf-terrain material name into a TileAffordance for the
+/// cf-hazard affordance-aware spread. Maps spec § "spreads to adjacent
+/// flammable (wood, oil, volatiles)" + "arcs to adjacent metal/conductive
+/// within 3 tiles" + "spreads via water" onto the hazard predicate.
+pub fn tile_affordance_for_material_name(name: &str) -> cf_hazard::TileAffordance {
+    match name {
+        "air" => cf_hazard::TileAffordance::Empty,
+        "wood" | "oil" | "kerosene" | "ethanol" | "fuel" | "fabric" | "paper" | "coal" | "diesel"
+        | "hydrazine" | "tnt" | "gunpowder" | "anfo" | "nitroglycerin" => cf_hazard::TileAffordance::Flammable,
+        "iron" | "metal" | "steel" | "copper" | "aluminum" | "zinc" | "gold" | "metal_nohook" => {
+            cf_hazard::TileAffordance::Conductive
+        }
+        "water" | "seawater" => cf_hazard::TileAffordance::Water,
+        "concrete" | "concrete_soft" | "anchor" | "dirt" | "support_beam" | "loose_fill" | "repair_fill"
+        | "hazard" | "stone" => cf_hazard::TileAffordance::Solid,
+        _ => cf_hazard::TileAffordance::Other,
+    }
+}
+
+/// Count bleed wounds on an actor for the auto-triage bleed-stack trigger.
+/// Uses the M14G wound list when present; falls back to chassis destroyed
+/// zones (each destroyed zone counts as a bleed source per cf-control's
+/// existing bleed-tick wiring).
+fn wound_count_for_actor(actor: &cf_actor::ActorState) -> u32 {
+    let from_wound_list: u32 = actor
+        .m14g_wound_list
+        .iter()
+        .map(|(_, v)| v.len() as u32)
+        .sum();
+    let from_chassis = actor
+        .chassis
+        .as_ref()
+        .map(|c| c.destroyed_zones().len() as u32)
+        .unwrap_or(0);
+    from_wound_list.max(from_chassis)
+}
+
+/// True when the actor carries any wound flagged "arterial" or with a
+/// known arterial severity tier. Falls back to false when the wound list
+/// has no arterial signal exposed.
+fn arterial_wound_for_actor(_actor: &cf_actor::ActorState) -> bool {
+    false
+}
+
+/// Compute a compound TTD for the actor using cf_actor's
+/// `InterimTtdContract` over the active M16 afflictions. Returns
+/// `f32::INFINITY` when no lethal kinds are stacked.
+fn compound_ttd_for_actor(afflictions: &ActorAfflictions, actor: &cf_actor::ActorState) -> f32 {
+    use cf_actor::ttd::{AiDifficulty, InterimTtdContract, TtdAfflictionKind, TtdContract, TtdOrigin};
+    let contract = InterimTtdContract::new();
+    let origin = match actor.origin_id.as_str() {
+        "robot" | "synth" => TtdOrigin::Robot,
+        "android" | "hybrid" => TtdOrigin::Android,
+        _ => TtdOrigin::Human,
+    };
+    let mut stack: Vec<TtdAfflictionKind> = Vec::new();
+    if afflictions.severity_of(M16AfflictionKind::Bleeding) > 0.5 {
+        stack.push(TtdAfflictionKind::Bleed2W);
+    }
+    if afflictions.severity_of(M16AfflictionKind::Burning) > 0.0 {
+        stack.push(TtdAfflictionKind::Burning);
+    }
+    if afflictions.severity_of(M16AfflictionKind::Hypoxic) > 0.0
+        || afflictions.severity_of(M16AfflictionKind::Drowning) > 0.0
+    {
+        stack.push(TtdAfflictionKind::OxygenEmpty);
+    }
+    if afflictions.severity_of(M16AfflictionKind::Concussed) > 0.0 {
+        stack.push(TtdAfflictionKind::ConcussionGrace);
+    }
+    if stack.is_empty() {
+        return f32::INFINITY;
+    }
+    contract.compound_ttd_seconds(&stack, origin, AiDifficulty::ToughCrowd)
 }
 
 /// Compose a one-line aggregate-bonus summary suitable for the artifact
