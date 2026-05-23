@@ -30,14 +30,31 @@
     clippy::cast_sign_loss,
     clippy::cast_lossless,
     clippy::struct_field_names,
+    clippy::struct_excessive_bools,
     clippy::match_same_arms,
     clippy::unused_self,
-    clippy::similar_names
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::needless_pass_by_value,
+    clippy::should_implement_trait,
+    clippy::map_unwrap_or,
+    clippy::explicit_iter_loop,
+    clippy::manual_is_multiple_of
 )]
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+
+pub mod env;
+
+pub use env::{
+    tick_all as env_tick_all, AtmosphericSusceptibility, EnvAccumulator, EnvAfflictionKind,
+    EnvAfflictionRegistry, EnvAfflictionSpec, EnvAfflictionState, EnvClearReason, EnvClearedEvent,
+    EnvOriginImmuneEvent, EnvSeverity, EnvSeverityChangedEvent, EnvSignal, EnvThresholdCrossedEvent,
+    EnvTickOutput, OriginId,
+};
 
 /// 23 affliction kinds locked in
 /// `cf-replay/schemas/event/affliction_applied.json` enum: 18 baseline +

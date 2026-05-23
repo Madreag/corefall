@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/affliction.env_origin_immune.v0.1",
+  "title": "affliction.env_origin_immune",
+  "description": "M16A § Per-origin immunity short-circuit. Fires once when an M16A env affliction kernel would normally accumulate for `actor_id` but the actor's origin (M17 race) is immune to that kind (multiplier == 0). Examples: robot vs stuffiness, methane_breather vs asphyxiation in O2 atmosphere (where the alt kind fires instead), aqueous vs trench_foot. The `reason` carries the M17 row identifier for the immunity rule.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "affliction" },
+    "event_type": { "const": "env_origin_immune" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "kind": { "type": "string", "enum": ["stuffiness", "heatstroke", "hypothermia", "asphyxiation", "refrigerant_inhalation", "electrocution", "illuminated", "laceration", "trench_foot", "stamina_movement_cost", "panic_freeze_env"] },
+        "origin_id": { "type": "string" },
+        "reason": { "type": "string" },
+        "alt_kind": { "type": ["string", "null"], "description": "Alternate affliction kind that fires in lieu of the immune kind (e.g. methane_breather sees oxygen toxicity via refrigerant_inhalation kernel)." }
+      },
+      "required": ["actor_id", "kind", "origin_id", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

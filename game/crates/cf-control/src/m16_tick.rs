@@ -18,8 +18,9 @@ use cf_replay::Recorder;
 use cf_sim_core::Tick;
 
 use cf_affliction::{
-    self as affl, ActorAfflictions, AfflictionRegistry, AutoTriageReason, ClearReason, M16AfflictionKind,
-    M16TriggerThresholds,
+    self as affl, ActorAfflictions, AfflictionRegistry, AtmosphericSusceptibility, AutoTriageReason,
+    ClearReason, EnvAfflictionKind, EnvAfflictionRegistry, EnvAfflictionState, EnvClearReason,
+    EnvSeverity, EnvSignal, M16AfflictionKind, M16TriggerThresholds, OriginId,
 };
 use cf_anomaly::{AnomalyRegistry, AnomalyTickOutput, AnomalyWorld};
 use cf_artifact::{
@@ -55,6 +56,8 @@ pub struct M16TickStateMut<'a> {
     pub affliction_registry: &'a AfflictionRegistry,
     pub trigger_thresholds: &'a std::collections::BTreeMap<ActorId, M16TriggerThresholds>,
     pub last_auto_triage_reason: &'a mut std::collections::BTreeMap<ActorId, AutoTriageReason>,
+    pub env_state_by_actor: &'a mut std::collections::BTreeMap<ActorId, EnvAfflictionState>,
+    pub env_registry: &'a EnvAfflictionRegistry,
 }
 
 /// Aggregate output from one tick — currently used for assertions in
@@ -77,6 +80,10 @@ pub struct M16TickOutput {
     pub drowning_started: u32,
     pub drowning_lethal: u32,
     pub auto_triage_reasons: Vec<(ActorId, AutoTriageReason)>,
+    pub env_threshold_crossings: u32,
+    pub env_severity_changes: u32,
+    pub env_cleared: u32,
+    pub env_origin_immune: u32,
 }
 
 /// Run one sim tick. Pure with respect to time — RNG-free.
@@ -751,10 +758,159 @@ pub fn run_m16_tick(inputs: M16TickInputs<'_>, state: M16TickStateMut<'_>) -> M1
         }
     }
 
+    // ----- 7) M16A § Env affliction kernel (11 env-driven kinds) -----
+    let env_actors: Vec<(ActorId, cf_actor::ActorState)> = actor_state
+        .world
+        .actors
+        .iter()
+        .map(|(id, a)| (*id, a.clone()))
+        .collect();
+    let dt_seconds = 1.0_f32 / (tick_rate_hz.max(1) as f32);
+    for (actor_id, actor) in env_actors.iter() {
+        let env_state = state.env_state_by_actor.entry(*actor_id).or_default();
+        let origin = OriginId::from_str(&actor.origin_id);
+        let susceptibility = AtmosphericSusceptibility::for_origin(origin);
+        let signal = build_env_signal_for_actor(actor, state.affliction_by_actor.get(actor_id));
+        let source_id = format!("m16a_env:{}", tick.0);
+        let env_out = cf_affliction::env_tick_all(
+            env_state,
+            actor_id.0,
+            susceptibility,
+            &signal,
+            state.env_registry,
+            dt_seconds,
+            Some(source_id),
+        );
+        for ev in env_out.threshold_crossed {
+            let _ = recorder.record(
+                tick,
+                sim_time_ms,
+                "affliction",
+                "env_threshold_crossed",
+                json!({
+                    "actor_id": ev.actor_id,
+                    "kind": ev.kind.as_str(),
+                    "severity": ev.severity.as_str(),
+                    "severity_0_1": ev.severity_0_1,
+                    "accumulator_value": ev.accumulator_value,
+                    "source_event_id": ev.source_event_id.clone().unwrap_or_default(),
+                    "origin_id": ev.origin_id.as_str(),
+                }),
+                ev.source_event_id,
+            );
+            out.env_threshold_crossings += 1;
+        }
+        for ev in env_out.severity_changed {
+            let _ = recorder.record(
+                tick,
+                sim_time_ms,
+                "affliction",
+                "env_severity_changed",
+                json!({
+                    "actor_id": ev.actor_id,
+                    "kind": ev.kind.as_str(),
+                    "from_severity": ev.from_severity,
+                    "to_severity": ev.to_severity,
+                    "accumulator_value": ev.accumulator_value,
+                }),
+                None,
+            );
+            out.env_severity_changes += 1;
+        }
+        for ev in env_out.cleared {
+            let _ = recorder.record(
+                tick,
+                sim_time_ms,
+                "affliction",
+                "env_cleared",
+                json!({
+                    "actor_id": ev.actor_id,
+                    "kind": ev.kind.as_str(),
+                    "reason": ev.reason.as_str(),
+                }),
+                None,
+            );
+            out.env_cleared += 1;
+        }
+        for ev in env_out.origin_immune {
+            let _ = recorder.record(
+                tick,
+                sim_time_ms,
+                "affliction",
+                "env_origin_immune",
+                json!({
+                    "actor_id": ev.actor_id,
+                    "kind": ev.kind.as_str(),
+                    "origin_id": ev.origin_id.as_str(),
+                    "reason": ev.reason,
+                    "alt_kind": ev.alt_kind.map(|k| k.as_str()),
+                }),
+                None,
+            );
+            out.env_origin_immune += 1;
+        }
+        if env_out.m16b_sepsis_feed {
+            env_state.m16b_sepsis_feed = true;
+        }
+    }
+
     // Suppress unused-warning for `recorder` when no actors are present.
     let _ = sim_time_ms;
 
     out
+}
+
+/// Build the M16A env signal slice for `actor` from current sim state +
+/// parent affliction signals. The actual M19/M28/M9 producers will fill
+/// in atmospheric / thermal / electric values as those crates ship live
+/// state to the engine; this helper is the consumer-side aggregator.
+fn build_env_signal_for_actor(
+    actor: &cf_actor::ActorState,
+    parent: Option<&cf_affliction::ActorAfflictions>,
+) -> EnvSignal {
+    let body_weight_kg = 70.0_f32;
+    let extra_weight = (actor.mass_kg - body_weight_kg).max(0.0);
+    let mut signal = EnvSignal {
+        humidity_pct: 50.0,
+        co2_partial_kpa: 0.04,
+        o2_partial_kpa: 21.0,
+        occupant_count: 1,
+        room_temp_k: 293.15,
+        refrigerant_partial_kpa: 0.0,
+        electric_shock_event_j: 0.0,
+        spotlight_lit: false,
+        razor_wire_contact: false,
+        bladed_hit_severity: 0.0,
+        wet_duckboard_contact: false,
+        feet_dry_and_warm: true,
+        heavy_weapon_kg: extra_weight,
+        baseline_carry_kg: 20.0,
+        analyzer_alarm_unaddressed: false,
+        extreme_breach_event: false,
+        stabilize_assist: false,
+    };
+    if let Some(parent_state) = parent {
+        if parent_state.severity_of(M16AfflictionKind::Hypoxic) > 0.5 {
+            signal.o2_partial_kpa = 10.0;
+        }
+        if parent_state.severity_of(M16AfflictionKind::Hyperthermic) > 0.0 {
+            signal.room_temp_k = 330.0;
+        }
+        if parent_state.severity_of(M16AfflictionKind::Hypothermic) > 0.0 {
+            signal.room_temp_k = 260.0;
+        }
+        if parent_state.severity_of(M16AfflictionKind::Electrified) > 0.0 {
+            signal.electric_shock_event_j = 80.0
+                * parent_state.severity_of(M16AfflictionKind::Electrified);
+        }
+        if parent_state.severity_of(M16AfflictionKind::Wet) > 0.5
+            && signal.room_temp_k < 285.0
+        {
+            signal.wet_duckboard_contact = true;
+            signal.feet_dry_and_warm = false;
+        }
+    }
+    signal
 }
 
 fn race_from_origin(origin_id: &str) -> affl::Race {

@@ -228,6 +228,14 @@ pub(crate) const SCHEMA_AFFLICTION_APPLIED: &str = include_str!("../schemas/even
 pub(crate) const SCHEMA_AFFLICTION_TICK: &str = include_str!("../schemas/event/affliction_tick.json");
 pub(crate) const SCHEMA_AFFLICTION_CLEARED: &str = include_str!("../schemas/event/affliction_cleared.json");
 pub(crate) const SCHEMA_AFFLICTION_ESCALATED: &str = include_str!("../schemas/event/affliction_escalated.json");
+pub(crate) const SCHEMA_AFFLICTION_ENV_THRESHOLD_CROSSED: &str =
+    include_str!("../schemas/event/affliction_env_threshold_crossed.json");
+pub(crate) const SCHEMA_AFFLICTION_ENV_CLEARED: &str =
+    include_str!("../schemas/event/affliction_env_cleared.json");
+pub(crate) const SCHEMA_AFFLICTION_ENV_SEVERITY_CHANGED: &str =
+    include_str!("../schemas/event/affliction_env_severity_changed.json");
+pub(crate) const SCHEMA_AFFLICTION_ENV_ORIGIN_IMMUNE: &str =
+    include_str!("../schemas/event/affliction_env_origin_immune.json");
 pub(crate) const SCHEMA_ANOMALY_ENTERED: &str = include_str!("../schemas/event/anomaly_entered.json");
 pub(crate) const SCHEMA_ANOMALY_DAMAGE_APPLIED: &str = include_str!("../schemas/event/anomaly_damage_applied.json");
 pub(crate) const SCHEMA_ARTIFACT_SPAWNED: &str = include_str!("../schemas/event/artifact_spawned.json");

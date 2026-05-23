@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/affliction.env_threshold_crossed.v0.1",
+  "title": "affliction.env_threshold_crossed",
+  "description": "M16A § Environmental affliction depth layer — fires when an accumulator-driven environmental affliction crosses a threshold band (mild / moderate / severe / lethal). The `kind` enum lists the 11 launch env-driven afflictions per M16A spec § '11 launch environment-driven afflictions': stuffiness, heatstroke, hypothermia, asphyxiation, refrigerant_inhalation, electrocution, illuminated, laceration, trench_foot, stamina_movement_cost, panic_freeze_env. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "affliction" },
+    "event_type": { "const": "env_threshold_crossed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "kind": { "type": "string", "enum": ["stuffiness", "heatstroke", "hypothermia", "asphyxiation", "refrigerant_inhalation", "electrocution", "illuminated", "laceration", "trench_foot", "stamina_movement_cost", "panic_freeze_env"] },
+        "severity": { "type": "string", "enum": ["mild", "moderate", "severe", "lethal"] },
+        "severity_0_1": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "accumulator_value": { "type": "number" },
+        "source_event_id": { "type": "string" },
+        "origin_id": { "type": "string" }
+      },
+      "required": ["actor_id", "kind", "severity", "severity_0_1", "accumulator_value"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

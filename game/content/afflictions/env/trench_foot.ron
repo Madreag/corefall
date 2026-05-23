@@ -1,0 +1,16 @@
+(
+  schema_version: 1,
+  kind: trench_foot,
+  mild_threshold: 7200.0,
+  moderate_threshold: 14400.0,
+  severe_threshold: 21600.0,
+  lethal_threshold: 100000000.0,
+  accumulator_rate_per_s: 1.0,
+  decay_per_s: 1.0,
+  hp_per_second_at_threshold: 0.0,
+  speed_multiplier: 0.9,
+  aim_wobble_multiplier: 1.0,
+  stamina_drain_multiplier: 1.0,
+  clear_cooldown_s: 86400.0,
+  feeds_m16b_sepsis: true,
+)

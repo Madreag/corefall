@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/affliction.env_severity_changed.v0.1",
+  "title": "affliction.env_severity_changed",
+  "description": "M16A § Environmental affliction severity change. Fires when the per-tick env affliction kernel rolls a kind's severity band up or down (without crossing the mild→moderate→severe→lethal threshold lines). Used for HUD severity-bar updates without spamming threshold-cross events. The `kind` enum mirrors affliction.env_threshold_crossed.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "affliction" },
+    "event_type": { "const": "env_severity_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "kind": { "type": "string", "enum": ["stuffiness", "heatstroke", "hypothermia", "asphyxiation", "refrigerant_inhalation", "electrocution", "illuminated", "laceration", "trench_foot", "stamina_movement_cost", "panic_freeze_env"] },
+        "from_severity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "to_severity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "accumulator_value": { "type": "number" }
+      },
+      "required": ["actor_id", "kind", "from_severity", "to_severity"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

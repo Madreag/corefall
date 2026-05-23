@@ -1,0 +1,16 @@
+(
+  schema_version: 1,
+  kind: laceration,
+  mild_threshold: 1.0,
+  moderate_threshold: 3.0,
+  severe_threshold: 5.0,
+  lethal_threshold: 8.0,
+  accumulator_rate_per_s: 0.0,
+  decay_per_s: 0.0,
+  hp_per_second_at_threshold: 0.0167,
+  speed_multiplier: 1.0,
+  aim_wobble_multiplier: 1.0,
+  stamina_drain_multiplier: 1.0,
+  clear_cooldown_s: 30.0,
+  feeds_m16b_sepsis: true,
+)

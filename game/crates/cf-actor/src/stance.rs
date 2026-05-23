@@ -40,6 +40,7 @@ pub struct StanceInputs {
     pub knife_throw_active: bool,
     pub knockdown_ticks_remaining: u32,
     pub dying_ticks_remaining: u32,
+    pub panic_freeze_ticks_remaining: u32,
 }
 
 impl Default for StanceInputs {
@@ -62,6 +63,7 @@ impl Default for StanceInputs {
             knife_throw_active: false,
             knockdown_ticks_remaining: 0,
             dying_ticks_remaining: 0,
+            panic_freeze_ticks_remaining: 0,
         }
     }
 }
@@ -74,6 +76,9 @@ impl Default for StanceInputs {
 pub fn derive_stance(inputs: StanceInputs) -> Stance {
     if inputs.knockdown_ticks_remaining > 0 {
         return Stance::KnockedDown;
+    }
+    if inputs.panic_freeze_ticks_remaining > 0 {
+        return Stance::PanickedFreeze;
     }
     if inputs.dying_ticks_remaining > 0 {
         return Stance::Dying;
@@ -265,6 +270,15 @@ mod tests {
         i.knockdown_ticks_remaining = 5;
         i.dying_ticks_remaining = 10;
         assert_eq!(derive_stance(i), Stance::KnockedDown);
+    }
+
+    #[test]
+    fn panic_freeze_locks_movement_above_dying() {
+        let mut i = base_inputs();
+        i.panic_freeze_ticks_remaining = 90;
+        i.dying_ticks_remaining = 10;
+        assert_eq!(derive_stance(i), Stance::PanickedFreeze);
+        assert!(Stance::PanickedFreeze.locks_fire());
     }
 
     #[test]

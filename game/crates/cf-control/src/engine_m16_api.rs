@@ -150,6 +150,32 @@ impl M0Engine {
             .unwrap_or_default()
     }
 
+    /// M16A § Return the per-actor env affliction snapshot — kind +
+    /// severity_0_1 + accumulator_value + severity_band for all 11 env
+    /// kinds whose state is active. Powers `cfctl
+    /// query.actor.affliction_state`.
+    pub fn m16a_actor_env_state(
+        &self,
+        actor_id: u64,
+    ) -> Vec<(String, f32, f32, &'static str)> {
+        let state = self.state.read().expect("engine state poisoned");
+        let entry = state.m16a_env_state_by_actor.get(&ActorId(actor_id));
+        let mut out: Vec<(String, f32, f32, &'static str)> = Vec::new();
+        let entry = match entry {
+            Some(e) => e,
+            None => return out,
+        };
+        for k in cf_affliction::EnvAfflictionKind::all() {
+            let sev = entry.severity(*k);
+            let acc = entry.accumulator(*k).kind_value;
+            if sev > 0.0 || acc > 0.0 {
+                let band = cf_affliction::EnvSeverity::from_severity_0_1(sev);
+                out.push((k.as_str().to_string(), sev, acc, band.as_str()));
+            }
+        }
+        out
+    }
+
     /// Apply a hazard contact directly (used by acceptance tests + cfctl).
     pub fn m16_apply_affliction(
         &self,

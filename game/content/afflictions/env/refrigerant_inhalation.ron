@@ -1,0 +1,16 @@
+(
+  schema_version: 1,
+  kind: refrigerant_inhalation,
+  mild_threshold: 50.0,
+  moderate_threshold: 120.0,
+  severe_threshold: 200.0,
+  lethal_threshold: 400.0,
+  accumulator_rate_per_s: 1.0,
+  decay_per_s: 0.5,
+  hp_per_second_at_threshold: 0.1,
+  speed_multiplier: 0.9,
+  aim_wobble_multiplier: 1.6,
+  stamina_drain_multiplier: 1.2,
+  clear_cooldown_s: 600.0,
+  feeds_m16b_sepsis: true,
+)

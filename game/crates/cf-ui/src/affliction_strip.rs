@@ -133,6 +133,18 @@ fn icon_for(kind: &str) -> String {
         "thirst" => "THRST".to_string(),
         "sleep_dep" => "SLP".to_string(),
         "sanity_low" => "SAN".to_string(),
+        // M16A § Environmental afflictions (11 kinds).
+        "stuffiness" => "STFY".to_string(),
+        "heatstroke" => "HSTK".to_string(),
+        "hypothermia" => "HYPO".to_string(),
+        "asphyxiation" => "ASFX".to_string(),
+        "refrigerant_inhalation" => "RFRG".to_string(),
+        "electrocution" => "ECTN".to_string(),
+        "illuminated" => "LIT".to_string(),
+        "laceration" => "LACR".to_string(),
+        "trench_foot" => "TRFT".to_string(),
+        "stamina_movement_cost" => "LOAD".to_string(),
+        "panic_freeze_env" => "PANC".to_string(),
         _ => "?".to_string(),
     }
 }
@@ -163,6 +175,17 @@ fn tooltip_for(kind: &str, severity: f32) -> String {
         "thirst" => "Thirst. Aim wobble. Drink water.",
         "sleep_dep" => "Sleep deprived. Reaction time +50%. Sleep.",
         "sanity_low" => "Sanity low. AI decisions impaired. Therapy + recreation.",
+        "stuffiness" => "Stuffy room (humidity + CO2 + crowding). Ventilate.",
+        "heatstroke" => "Heatstroke. Speed + aim degraded. Cool down.",
+        "hypothermia" => "Hypothermia. Speed + aim degraded. Warm enclosure.",
+        "asphyxiation" => "Asphyxiation. Low O2 ambient. Return to breathable atmosphere.",
+        "refrigerant_inhalation" => "Refrigerant inhalation. Lung damage. Decontaminate suit.",
+        "electrocution" => "Electrocution. KO grace + shock damage. Wait or insulate.",
+        "illuminated" => "Illuminated by spotlight. Concealment lost. Leave cone.",
+        "laceration" => "Laceration. Bleed stack. Bandage + tend per wound.",
+        "trench_foot" => "Trench foot. Speed loss + infection risk. Dry boots + warm.",
+        "stamina_movement_cost" => "Heavy load. Stamina drain + speed loss. Drop weapon or resupply.",
+        "panic_freeze_env" => "Panic freeze. Cannot act. Wait or squadmate stabilize.",
         _ => "Unknown affliction.",
     };
     format!("{}\nSeverity: {pct}%\n{}", kind, body)
@@ -261,5 +284,29 @@ mod tests {
             icons.insert(icon);
         }
         assert_eq!(icons.len(), kinds.len(), "icons must be unique across kinds");
+    }
+
+    #[test]
+    fn icon_for_every_m16a_env_kind_returns_unique_label() {
+        let env_kinds = [
+            "stuffiness",
+            "heatstroke",
+            "hypothermia",
+            "asphyxiation",
+            "refrigerant_inhalation",
+            "electrocution",
+            "illuminated",
+            "laceration",
+            "trench_foot",
+            "stamina_movement_cost",
+            "panic_freeze_env",
+        ];
+        let mut icons: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for k in env_kinds {
+            let icon = icon_for(k);
+            assert_ne!(icon, "?", "icon_for({k}) returned default '?'");
+            icons.insert(icon);
+        }
+        assert_eq!(icons.len(), env_kinds.len(), "m16a env icons must be unique");
     }
 }

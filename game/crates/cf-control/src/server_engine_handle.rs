@@ -269,6 +269,18 @@ pub trait EngineHandle: Send + Sync + 'static {
         })
     }
 
+    /// **M16A § Per-actor env affliction state**. Returns the active 11
+    /// env-driven affliction kinds with severity_0_1 + accumulator + band.
+    /// Default returns an empty list; engine override reads
+    /// `m16a_env_state_by_actor`.
+    async fn query_actor_affliction_state(&self, actor_id: u64) -> serde_json::Value {
+        json!({
+            "schema_version": SCHEMA_VERSION,
+            "actor_id": actor_id,
+            "env_afflictions": serde_json::Value::Array(Vec::new()),
+        })
+    }
+
     /// **M15D § Reaction Matrix Buildout** — list every reaction id in
     /// the loaded M15D registry. Powers `cfctl query.material.reactions`.
     /// Default impl resolves the registry through cf-material's content

@@ -87,6 +87,7 @@ pub enum Stance {
     Mounted = 32,
     SwimSurface = 33,
     SwimSubmerged = 34,
+    PanickedFreeze = 35,
 }
 
 impl Stance {
@@ -130,6 +131,7 @@ impl Stance {
             Stance::Mounted => "mounted",
             Stance::SwimSurface => "swim_surface",
             Stance::SwimSubmerged => "swim_submerged",
+            Stance::PanickedFreeze => "panicked_freeze",
         }
     }
 
@@ -146,6 +148,7 @@ impl Stance {
                 | Stance::Dying
                 | Stance::KnockedDown
                 | Stance::Ejecting
+                | Stance::PanickedFreeze
         )
     }
 

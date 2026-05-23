@@ -324,6 +324,18 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         m16_content::validate_hazard_ron(path, report);
         return;
     }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("env")
+        && path
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+            == Some("afflictions")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        m16_content::validate_env_affliction_ron(path, report);
+        return;
+    }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("anomalies")
         && path.extension().and_then(|s| s.to_str()) == Some("ron")
     {

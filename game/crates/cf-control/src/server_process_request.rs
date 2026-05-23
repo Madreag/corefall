@@ -1830,6 +1830,23 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "unknown_reaction_id")),
             }
         }
+        "query.actor.affliction_state" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default)]
+                actor_id: Option<u64>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let actor_id = p.actor_id.unwrap_or(0);
+            let value = engine.query_actor_affliction_state(actor_id).await;
+            Some(success_response(request.id, value))
+        }
         "observe.tile.reactions" => {
             #[derive(Deserialize)]
             #[serde(deny_unknown_fields)]

@@ -799,6 +799,33 @@ impl EngineHandle for M0Engine {
         self.compute_trench_segment_at_pos(x, y)
     }
 
+    async fn query_actor_affliction_state(&self, actor_id: u64) -> serde_json::Value {
+        let env = self.m16a_actor_env_state(actor_id);
+        let parent: Vec<serde_json::Value> = self
+            .m16_actor_afflictions(actor_id)
+            .into_iter()
+            .map(|(kind, severity)| serde_json::json!({
+                "kind": kind,
+                "severity_0_1": severity,
+            }))
+            .collect();
+        let env_payload: Vec<serde_json::Value> = env
+            .into_iter()
+            .map(|(kind, sev, acc, band)| serde_json::json!({
+                "kind": kind,
+                "severity_0_1": sev,
+                "accumulator_value": acc,
+                "severity_band": band,
+            }))
+            .collect();
+        serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "actor_id": actor_id,
+            "afflictions": parent,
+            "env_afflictions": env_payload,
+        })
+    }
+
     /// 30 mission-category events.
     async fn inspect_mission(&self) -> Option<serde_json::Value> {
         let mission = self.observe_mission().await?;

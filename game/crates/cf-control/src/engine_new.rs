@@ -523,6 +523,8 @@ impl M0Engine {
                     cf_storyteller::register_m16_narratives(&mut reg);
                     reg
                 },
+                m16a_env_state_by_actor: BTreeMap::new(),
+                m16a_env_registry: cf_affliction::EnvAfflictionRegistry::default_registry(),
             }),
             recorder,
             current_tick,

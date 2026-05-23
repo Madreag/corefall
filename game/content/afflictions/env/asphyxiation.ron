@@ -1,0 +1,16 @@
+(
+  schema_version: 1,
+  kind: asphyxiation,
+  mild_threshold: 30.0,
+  moderate_threshold: 60.0,
+  severe_threshold: 80.0,
+  lethal_threshold: 90.0,
+  accumulator_rate_per_s: 1.0,
+  decay_per_s: 2.0,
+  hp_per_second_at_threshold: 2.0,
+  speed_multiplier: 0.7,
+  aim_wobble_multiplier: 1.6,
+  stamina_drain_multiplier: 1.5,
+  clear_cooldown_s: 0.0,
+  feeds_m16b_sepsis: false,
+)

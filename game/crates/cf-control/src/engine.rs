@@ -765,6 +765,15 @@ pub(crate) struct EngineMutable {
     /// `cf_storyteller::register_m16_narratives` so M25 narrative directors
     /// see the M16 hazard event ids in their catalog.
     pub(crate) m16_storyteller_registry: cf_storyteller::M16NarrativeRegistry,
+    /// M16A § Per-actor env affliction state (accumulators + severities
+    /// for the 11 environment-driven kinds: stuffiness, heatstroke,
+    /// hypothermia, asphyxiation, refrigerant_inhalation, electrocution,
+    /// illuminated, laceration, trench_foot, stamina_movement_cost,
+    /// panic_freeze_env).
+    pub(crate) m16a_env_state_by_actor: BTreeMap<ActorId, cf_affliction::EnvAfflictionState>,
+    /// M16A § Env affliction registry loaded from
+    /// `content/afflictions/env/*.ron`.
+    pub(crate) m16a_env_registry: cf_affliction::EnvAfflictionRegistry,
 }
 
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the

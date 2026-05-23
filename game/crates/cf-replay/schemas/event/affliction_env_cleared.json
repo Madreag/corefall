@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/affliction.env_cleared.v0.1",
+  "title": "affliction.env_cleared",
+  "description": "M16A § Environmental affliction cleared. Fires when an M16A env-driven affliction is removed (clear condition met: ventilation, leave room, dry feet + warmth, drop weapon, leave cone, etc.). reason enum: condition_cleared (env signal lapsed), cooldown_elapsed (timer-based clear), squadmate_stabilized (panic_freeze_env), death (cascade clear on actor death). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "affliction" },
+    "event_type": { "const": "env_cleared" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "kind": { "type": "string", "enum": ["stuffiness", "heatstroke", "hypothermia", "asphyxiation", "refrigerant_inhalation", "electrocution", "illuminated", "laceration", "trench_foot", "stamina_movement_cost", "panic_freeze_env"] },
+        "reason": { "type": "string", "enum": ["condition_cleared", "cooldown_elapsed", "squadmate_stabilized", "death"] }
+      },
+      "required": ["actor_id", "kind", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -2850,6 +2850,8 @@ impl M0Engine {
                     m16_affliction_registry,
                     m16_trigger_thresholds,
                     m16_last_auto_triage_reason,
+                    m16a_env_state_by_actor,
+                    m16a_env_registry,
                     chunked_terrain,
                     ..
                 } = &mut *state;
@@ -2876,6 +2878,8 @@ impl M0Engine {
                         affliction_registry: m16_affliction_registry,
                         trigger_thresholds: m16_trigger_thresholds,
                         last_auto_triage_reason: m16_last_auto_triage_reason,
+                        env_state_by_actor: m16a_env_state_by_actor,
+                        env_registry: m16a_env_registry,
                     },
                 );
 
