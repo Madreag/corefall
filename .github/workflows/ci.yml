@@ -15,7 +15,7 @@ jobs:
       run:
         working-directory: game
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - name: Install Linux deps
         if: runner.os == 'Linux'
         run: |
