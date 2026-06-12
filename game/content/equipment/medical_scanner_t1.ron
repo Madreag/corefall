@@ -1,0 +1,9 @@
+(
+  item_id: "medical_scanner_t1",
+  display_name: "Medical Scanner T1",
+  scan_duration_seconds: 30.0,
+  diagnosis_confidence: 0.95,
+  reads_dose: true,
+  reads_age: true,
+  tier: 1,
+)

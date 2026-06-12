@@ -1,0 +1,43 @@
+(
+  kind: anthrax,
+  pathogen_class: bacterial,
+  primary_vector: spore_exposure,
+  transmission_vector_table: [
+    (
+      vector: spore_exposure,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 86400.0,
+  prodromal_seconds: 21600.0,
+  manifest_seconds: 345600.0,
+  lethality_untreated: 0.8,
+  lethality_scales_with_dose: false,
+  becomes_chronic: false,
+  can_become_carrier: false,
+  human_to_human: false,
+  isolation_class: class_a,
+  r0_per_exposure_event: 0.5,
+  cure: (
+    treatment_kind: antitoxin,
+    item_required: Some("antitoxin_anthrax"),
+    dose_count: 7,
+    dose_interval_hours: 12.0,
+    success_chance: 0.7,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.25,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: Some((
+    vaccine_id: "anthrax_vaccine",
+    display_name: "Anthrax Vaccine",
+    immunity_duration_seconds: 157680000.0,
+    side_effect_chance: 0.05,
+    doses_required: 1,
+    procurement: standard,
+    manufacture_lead_seconds: 0.0,
+  )),
+  cure_only_pre_manifest: false,
+)

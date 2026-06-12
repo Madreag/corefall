@@ -1,0 +1,11 @@
+(
+  item_id: "chemotherapy_kit",
+  display_name: "Chemotherapy Kit",
+  treatment_kind: chemotherapy,
+  treats: [
+    cancer,
+  ],
+  dose_count: 6,
+  dose_interval_hours: 720.0,
+  tier: 3,
+)

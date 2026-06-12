@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/pandemic.declared.v0.1",
+  "title": "pandemic.declared",
+  "description": "M16B § Pandemic declaration. Fires once when the infected/total ratio holds above the epidemic threshold (default 10%) for the contiguous 24h window. Deterministic via tick-counter, never wall-clock. `base_lockdown` true triggers M19E auto-quarantine across all rooms + M28D airlock dampers + the M11 'PANDEMIC: locking down quarters' chatter line.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "pandemic" },
+    "event_type": { "const": "declared" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "tick": { "type": "integer", "minimum": 0 },
+        "strain": { "type": "string", "enum": ["slimelung", "food_poisoning", "radiation_sickness", "common_cold", "flu", "pneumonia", "tuberculosis", "cholera", "typhoid", "rabies", "tetanus", "bubonic_plague", "anthrax", "cancer", "mental_illness", "sepsis", "influenza_pandemic"] },
+        "infected_count": { "type": "integer", "minimum": 0 },
+        "total_count": { "type": "integer", "minimum": 0 },
+        "infected_fraction": { "type": "number", "minimum": 0 },
+        "base_lockdown": { "type": "boolean" }
+      },
+      "required": ["tick", "strain", "infected_count", "total_count", "infected_fraction"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

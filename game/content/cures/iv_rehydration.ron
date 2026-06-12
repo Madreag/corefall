@@ -1,0 +1,12 @@
+(
+  item_id: "iv_rehydration",
+  display_name: "IV Rehydration",
+  treatment_kind: rehydration,
+  treats: [
+    cholera,
+    food_poisoning,
+  ],
+  dose_count: 6,
+  dose_interval_hours: 8.0,
+  tier: 1,
+)

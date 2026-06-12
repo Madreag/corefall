@@ -1,0 +1,35 @@
+(
+  kind: mental_illness,
+  pathogen_class: psychological,
+  primary_vector: stress_accumulator,
+  transmission_vector_table: [
+    (
+      vector: stress_accumulator,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 1209600.0,
+  prodromal_seconds: 604800.0,
+  manifest_seconds: 2592000.0,
+  lethality_untreated: 0.0,
+  lethality_scales_with_dose: false,
+  becomes_chronic: true,
+  can_become_carrier: false,
+  human_to_human: false,
+  isolation_class: not_applicable,
+  r0_per_exposure_event: 0.0,
+  cure: (
+    treatment_kind: therapy,
+    item_required: None,
+    dose_count: 0,
+    dose_interval_hours: 0.0,
+    success_chance: 0.0,
+    partial_course_consequence: (
+      relapses: false,
+      drives_resistance_chance: 0.0,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: None,
+  cure_only_pre_manifest: false,
+)

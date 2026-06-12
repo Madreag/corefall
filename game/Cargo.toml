@@ -66,6 +66,7 @@ members = [
   "crates/cf-artifact",
   "crates/cf-swim",
   "crates/cf-affliction",
+  "crates/cf-disease",
 ]
 
 [workspace.package]

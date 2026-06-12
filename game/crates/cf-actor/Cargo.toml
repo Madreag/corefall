@@ -23,6 +23,7 @@ cf-treatment = { path = "../cf-treatment" }
 cf-scar = { path = "../cf-scar" }
 cf-aging = { path = "../cf-aging" }
 cf-prosthetic = { path = "../cf-prosthetic" }
+cf-disease = { path = "../cf-disease" }
 
 [dev-dependencies]
 serde_json = { workspace = true }

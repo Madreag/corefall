@@ -1,0 +1,43 @@
+(
+  kind: tetanus,
+  pathogen_class: bacterial,
+  primary_vector: wound_contact,
+  transmission_vector_table: [
+    (
+      vector: wound_contact,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 604800.0,
+  prodromal_seconds: 86400.0,
+  manifest_seconds: 864000.0,
+  lethality_untreated: 0.5,
+  lethality_scales_with_dose: false,
+  becomes_chronic: false,
+  can_become_carrier: false,
+  human_to_human: false,
+  isolation_class: class_c,
+  r0_per_exposure_event: 0.0,
+  cure: (
+    treatment_kind: immunoglobulin,
+    item_required: Some("immunoglobulin_tetanus"),
+    dose_count: 1,
+    dose_interval_hours: 0.0,
+    success_chance: 0.8,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.0,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: Some((
+    vaccine_id: "tetanus_toxoid",
+    display_name: "Tetanus Toxoid",
+    immunity_duration_seconds: 157680000.0,
+    side_effect_chance: 0.05,
+    doses_required: 1,
+    procurement: standard,
+    manufacture_lead_seconds: 0.0,
+  )),
+  cure_only_pre_manifest: false,
+)

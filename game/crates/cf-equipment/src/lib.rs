@@ -32,7 +32,8 @@
     clippy::cast_possible_wrap,
     clippy::float_cmp,
     clippy::manual_is_multiple_of,
-    clippy::similar_names
+    clippy::similar_names,
+    clippy::too_many_lines
 )]
 
 // M1 / M2 / M3 spec "## Files" wiring: the helpers live in dedicated
@@ -59,9 +60,12 @@ pub mod item_spec;
 pub mod jetpack;
 pub mod jetpack_atmos;
 pub mod knife_throw;
+pub mod cures;
 pub mod magazine;
 pub mod medical;
+pub mod medical_scanner;
 pub mod melee;
+pub mod vaccines;
 pub mod ppe;
 pub mod sensor;
 pub mod shell;
@@ -148,6 +152,16 @@ pub use medical::{
         DEFIB_REVIVE_WINDOW_SECONDS,
     },
     m6c_medical_presets, MedicalEffectKind, MedicalPreset,
+};
+pub use medical_scanner::{
+    load_scanner_dir, load_scanner_spec, MedicalScannerSpec, ScanInProgress, ScannerLoadError,
+    SCAN_CONFIDENCE_DEFAULT, SCAN_DURATION_SECONDS_DEFAULT,
+};
+pub use cures::{
+    cure_item_for, default_cure_catalog, load_cure_dir, CureItemSpec, CureLoadError,
+};
+pub use vaccines::{
+    default_vaccine_catalog, load_vaccine_dir, vaccine_catalog, VaccineItemSpec, VaccineLoadError,
 };
 pub use melee::{
     m6_melee_presets, m6c_melee_presets, MeleeKind, MeleePreset, BATON_M6_DEFAULT_ID, HATCHET_M6_DEFAULT_ID,

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://corefall/event/disease.exposed.v0.1",
   "title": "disease.exposed",
-  "description": "M14I § Long-term radiation → cancer hand-off — fires once when cumulative_dose crosses the cancer threshold. M16B consumer drives the cancer.lifecycle FSM from this event.",
+  "description": "M14I § Long-term radiation → cancer hand-off (cumulative_dose/threshold) + M16B § canonical disease exposure. Fires when an actor is exposed to a pathogen via a transmission vector. `pathogen` is one of the 17 canonical diseases; `vector` is the transmission path; `source_item_id` is the originating item (e.g. a contaminated dish) when foodborne. The M14I cancer hand-off keeps cumulative_dose/threshold; both shapes validate (additive, optional fields).",
   "type": "object",
   "additionalProperties": true,
   "properties": {
@@ -17,7 +17,10 @@
       "properties": {
         "actor_id": { "type": "integer" },
         "tick": { "type": "integer", "minimum": 0 },
-        "vector": { "type": "string" },
+        "vector": { "type": "string", "enum": ["airborne", "foodborne", "waterborne", "close_contact", "vector_borne", "wound_contact", "wound_infection", "spore_exposure", "radiation_dose", "toxin_accumulation", "stress_accumulator", "long_term_radiation"] },
+        "pathogen": { "type": "string", "enum": ["slimelung", "food_poisoning", "radiation_sickness", "common_cold", "flu", "pneumonia", "tuberculosis", "cholera", "typhoid", "rabies", "tetanus", "bubonic_plague", "anthrax", "cancer", "mental_illness", "sepsis", "influenza_pandemic"] },
+        "source_item_id": { "type": ["string", "null"] },
+        "resistant_strain": { "type": "boolean" },
         "cumulative_dose": { "type": "number", "minimum": 0 },
         "threshold": { "type": "number", "minimum": 0 }
       },

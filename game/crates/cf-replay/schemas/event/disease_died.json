@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/disease.died.v0.1",
+  "title": "disease.died",
+  "description": "M16B § Death from a disease. Fires when an infection completes the Dying stage and reaches Dead (the lethality roll passed and the disease was not cured in time).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "disease" },
+    "event_type": { "const": "died" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "pathogen": { "type": "string", "enum": ["slimelung", "food_poisoning", "radiation_sickness", "common_cold", "flu", "pneumonia", "tuberculosis", "cholera", "typhoid", "rabies", "tetanus", "bubonic_plague", "anthrax", "cancer", "mental_illness", "sepsis", "influenza_pandemic"] }
+      },
+      "required": ["actor_id", "tick", "pathogen"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,39 @@
+(
+  kind: pneumonia,
+  pathogen_class: bacterial,
+  primary_vector: airborne,
+  transmission_vector_table: [
+    (
+      vector: airborne,
+      relative_r0: 1.0,
+    ),
+    (
+      vector: wound_contact,
+      relative_r0: 0.4,
+    ),
+  ],
+  incubation_seconds: 86400.0,
+  prodromal_seconds: 43200.0,
+  manifest_seconds: 864000.0,
+  lethality_untreated: 0.3,
+  lethality_scales_with_dose: false,
+  becomes_chronic: false,
+  can_become_carrier: false,
+  human_to_human: true,
+  isolation_class: class_b,
+  r0_per_exposure_event: 1.6,
+  cure: (
+    treatment_kind: antibiotic,
+    item_required: Some("antibiotic_course_t1"),
+    dose_count: 14,
+    dose_interval_hours: 12.0,
+    success_chance: 0.95,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.25,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: None,
+  cure_only_pre_manifest: false,
+)

@@ -1,0 +1,43 @@
+(
+  kind: influenza_pandemic,
+  pathogen_class: viral,
+  primary_vector: airborne,
+  transmission_vector_table: [
+    (
+      vector: airborne,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 64800.0,
+  prodromal_seconds: 28800.0,
+  manifest_seconds: 691200.0,
+  lethality_untreated: 0.3,
+  lethality_scales_with_dose: false,
+  becomes_chronic: false,
+  can_become_carrier: false,
+  human_to_human: true,
+  isolation_class: class_a,
+  r0_per_exposure_event: 4.0,
+  cure: (
+    treatment_kind: antiviral,
+    item_required: Some("antiviral_t1"),
+    dose_count: 5,
+    dose_interval_hours: 12.0,
+    success_chance: 0.7,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.25,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: Some((
+    vaccine_id: "pandemic_vaccine",
+    display_name: "Pandemic Vaccine",
+    immunity_duration_seconds: 157680000.0,
+    side_effect_chance: 0.08,
+    doses_required: 2,
+    procurement: delayed_manufacture,
+    manufacture_lead_seconds: 1209600.0,
+  )),
+  cure_only_pre_manifest: false,
+)

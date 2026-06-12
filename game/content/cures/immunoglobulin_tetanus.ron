@@ -1,0 +1,11 @@
+(
+  item_id: "immunoglobulin_tetanus",
+  display_name: "Tetanus Immunoglobulin",
+  treatment_kind: immunoglobulin,
+  treats: [
+    tetanus,
+  ],
+  dose_count: 1,
+  dose_interval_hours: 0.0,
+  tier: 2,
+)

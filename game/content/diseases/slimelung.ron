@@ -1,0 +1,43 @@
+(
+  kind: slimelung,
+  pathogen_class: fungal,
+  primary_vector: airborne,
+  transmission_vector_table: [
+    (
+      vector: airborne,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 21600.0,
+  prodromal_seconds: 3600.0,
+  manifest_seconds: 86400.0,
+  lethality_untreated: 0.1,
+  lethality_scales_with_dose: false,
+  becomes_chronic: false,
+  can_become_carrier: false,
+  human_to_human: true,
+  isolation_class: class_a,
+  r0_per_exposure_event: 2.5,
+  cure: (
+    treatment_kind: inhaler,
+    item_required: Some("bronchial_inhaler"),
+    dose_count: 3,
+    dose_interval_hours: 8.0,
+    success_chance: 0.9,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.0,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: Some((
+    vaccine_id: "cold_slim_vaccine",
+    display_name: "Cold-Slim Vaccine",
+    immunity_duration_seconds: 157680000.0,
+    side_effect_chance: 0.05,
+    doses_required: 1,
+    procurement: standard,
+    manufacture_lead_seconds: 0.0,
+  )),
+  cure_only_pre_manifest: false,
+)

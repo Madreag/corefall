@@ -1,0 +1,43 @@
+(
+  kind: tuberculosis,
+  pathogen_class: bacterial,
+  primary_vector: airborne,
+  transmission_vector_table: [
+    (
+      vector: airborne,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 2419200.0,
+  prodromal_seconds: 604800.0,
+  manifest_seconds: 5184000.0,
+  lethality_untreated: 0.5,
+  lethality_scales_with_dose: false,
+  becomes_chronic: true,
+  can_become_carrier: true,
+  human_to_human: true,
+  isolation_class: class_a,
+  r0_per_exposure_event: 3.0,
+  cure: (
+    treatment_kind: antibiotic,
+    item_required: Some("antibiotic_course_t2"),
+    dose_count: 180,
+    dose_interval_hours: 24.0,
+    success_chance: 0.85,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.25,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: Some((
+    vaccine_id: "bcg_vaccine",
+    display_name: "BCG Vaccine",
+    immunity_duration_seconds: 157680000.0,
+    side_effect_chance: 0.05,
+    doses_required: 1,
+    procurement: standard,
+    manufacture_lead_seconds: 0.0,
+  )),
+  cure_only_pre_manifest: false,
+)

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/disease.diagnosed.v0.1",
+  "title": "disease.diagnosed",
+  "description": "M16B § Medical Scanner diagnosis (M14H consumer). Fires when a Medical Scanner completes a scan of an infected actor, reading the lifecycle stage, cumulative dose (radiation/toxin), and actor age. `confidence` is the scanner-tier diagnostic confidence (0.95 for T1).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "disease" },
+    "event_type": { "const": "diagnosed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "pathogen": { "type": "string", "enum": ["slimelung", "food_poisoning", "radiation_sickness", "common_cold", "flu", "pneumonia", "tuberculosis", "cholera", "typhoid", "rabies", "tetanus", "bubonic_plague", "anthrax", "cancer", "mental_illness", "sepsis", "influenza_pandemic"] },
+        "stage": { "type": "string", "enum": ["exposed", "incubating", "prodromal", "manifest", "recovering", "chronic", "dying", "carrier", "recovered", "dead"] },
+        "confidence": { "type": "number", "minimum": 0 },
+        "dose": { "type": "number", "minimum": 0 },
+        "age_seconds": { "type": "number", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick", "pathogen", "stage", "confidence"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

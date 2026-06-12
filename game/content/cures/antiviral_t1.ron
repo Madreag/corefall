@@ -1,0 +1,12 @@
+(
+  item_id: "antiviral_t1",
+  display_name: "Antiviral Course T1",
+  treatment_kind: antiviral,
+  treats: [
+    flu,
+    influenza_pandemic,
+  ],
+  dose_count: 5,
+  dose_interval_hours: 12.0,
+  tier: 1,
+)

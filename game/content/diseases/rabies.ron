@@ -1,0 +1,43 @@
+(
+  kind: rabies,
+  pathogen_class: viral,
+  primary_vector: vector_borne,
+  transmission_vector_table: [
+    (
+      vector: vector_borne,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 5184000.0,
+  prodromal_seconds: 172800.0,
+  manifest_seconds: 604800.0,
+  lethality_untreated: 1.0,
+  lethality_scales_with_dose: false,
+  becomes_chronic: false,
+  can_become_carrier: false,
+  human_to_human: false,
+  isolation_class: not_applicable,
+  r0_per_exposure_event: 0.0,
+  cure: (
+    treatment_kind: post_exposure_vaccine,
+    item_required: Some("rabies_vaccine"),
+    dose_count: 4,
+    dose_interval_hours: 72.0,
+    success_chance: 1.0,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.0,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: Some((
+    vaccine_id: "rabies_vaccine",
+    display_name: "Rabies Vaccine",
+    immunity_duration_seconds: 157680000.0,
+    side_effect_chance: 0.05,
+    doses_required: 1,
+    procurement: standard,
+    manufacture_lead_seconds: 0.0,
+  )),
+  cure_only_pre_manifest: true,
+)

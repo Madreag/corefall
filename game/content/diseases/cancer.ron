@@ -1,0 +1,39 @@
+(
+  kind: cancer,
+  pathogen_class: neoplastic,
+  primary_vector: toxin_accumulation,
+  transmission_vector_table: [
+    (
+      vector: toxin_accumulation,
+      relative_r0: 1.0,
+    ),
+    (
+      vector: radiation_dose,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 15552000.0,
+  prodromal_seconds: 2592000.0,
+  manifest_seconds: 15552000.0,
+  lethality_untreated: 0.7,
+  lethality_scales_with_dose: false,
+  becomes_chronic: true,
+  can_become_carrier: false,
+  human_to_human: false,
+  isolation_class: not_applicable,
+  r0_per_exposure_event: 0.0,
+  cure: (
+    treatment_kind: chemotherapy,
+    item_required: Some("chemotherapy_kit"),
+    dose_count: 6,
+    dose_interval_hours: 720.0,
+    success_chance: 0.5,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.0,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: None,
+  cure_only_pre_manifest: false,
+)

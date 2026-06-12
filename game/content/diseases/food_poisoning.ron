@@ -1,0 +1,35 @@
+(
+  kind: food_poisoning,
+  pathogen_class: bacterial,
+  primary_vector: foodborne,
+  transmission_vector_table: [
+    (
+      vector: foodborne,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 3600.0,
+  prodromal_seconds: 0.0,
+  manifest_seconds: 43200.0,
+  lethality_untreated: 0.05,
+  lethality_scales_with_dose: false,
+  becomes_chronic: false,
+  can_become_carrier: false,
+  human_to_human: false,
+  isolation_class: class_c,
+  r0_per_exposure_event: 0.0,
+  cure: (
+    treatment_kind: rehydration,
+    item_required: Some("iv_rehydration"),
+    dose_count: 2,
+    dose_interval_hours: 6.0,
+    success_chance: 0.95,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.0,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: None,
+  cure_only_pre_manifest: false,
+)

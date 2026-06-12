@@ -22,11 +22,15 @@
     clippy::must_use_candidate,
     clippy::doc_markdown,
     clippy::missing_const_for_fn,
-    clippy::unused_self
+    clippy::unused_self,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
 )]
 
 pub mod retirement_event;
 pub mod m16_event;
+pub mod pandemic;
 
 pub use retirement_event::{
     register_retirement_narrative, RetirementNarrative, RetirementNarrativeRegistry,
@@ -37,6 +41,11 @@ pub use m16_event::{
     NARRATIVE_EVENT_ID_ACID_POOL_GROWTH, NARRATIVE_EVENT_ID_ANOMALY_ENCOUNTERED,
     NARRATIVE_EVENT_ID_DROWNING_LETHAL, NARRATIVE_EVENT_ID_ELECTRIC_ARC_CASCADE,
     NARRATIVE_EVENT_ID_FIRE_SPREAD, NARRATIVE_EVENT_ID_RADIATION_STORM,
+};
+pub use pandemic::{
+    declare_base_lockdown, register_pandemic_narratives, BaseLockdown, PandemicDeclaredEvent,
+    PandemicNarrativeRegistration, PandemicNarrativeRegistry, PandemicTracker,
+    NARRATIVE_EVENT_ID_PANDEMIC_DECLARED, PANDEMIC_LOCKDOWN_CHATTER,
 };
 
 use serde::{Deserialize, Serialize};

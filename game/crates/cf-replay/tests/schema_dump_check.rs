@@ -529,3 +529,60 @@ fn schema_dump_check_sandbag_eroded_from_to_enum() {
         }
     }
 }
+
+/// M16B § 8 new disease/pandemic event schemas: file + (category,event_type)
+/// pairs that the recorder lookup must resolve.
+const M16B_EVENT_SCHEMAS: &[(&str, &str, &str)] = &[
+    ("disease_stage_changed.json", "disease", "stage_changed"),
+    ("disease_relapsed.json", "disease", "relapsed"),
+    ("disease_diagnosed.json", "disease", "diagnosed"),
+    ("disease_quarantine_entered.json", "disease", "quarantine_entered"),
+    ("disease_recovered.json", "disease", "recovered"),
+    ("disease_died.json", "disease", "died"),
+    ("disease_vaccinated.json", "disease", "vaccinated"),
+    ("pandemic_declared.json", "pandemic", "declared"),
+];
+
+/// M16B: all 8 new schemas exist on disk + parse + declare the required
+/// JSON-Schema keys.
+#[test]
+fn schema_dump_check_m16b_event_schemas_present() {
+    for (name, _, _) in M16B_EVENT_SCHEMAS {
+        let path = schemas_dir().join(name);
+        assert!(path.exists(), "M16B schema {name} missing at {}", path.display());
+        let v = parse_schema(name);
+        assert_required_keys(&v, name);
+    }
+    assert_eq!(M16B_EVENT_SCHEMAS.len(), 8, "expected 8 M16B event schemas");
+}
+
+/// M16B: every new schema is wired into the recorder's `event_schema_for`
+/// lookup so payload validation actually runs in run-bundle evidence.
+#[test]
+fn schema_dump_check_m16b_event_schemas_registered() {
+    for (name, category, event_type) in M16B_EVENT_SCHEMAS {
+        assert!(
+            cf_replay::schemas::event_schema_for(category, event_type).is_some(),
+            "M16B schema {name} not registered for ({category}, {event_type})"
+        );
+    }
+    // disease.exposed extended (M14I + M16B) must still resolve.
+    assert!(cf_replay::schemas::event_schema_for("disease", "exposed").is_some());
+}
+
+/// M16B: the canonical disease enum on `disease.stage_changed` carries all
+/// 17 launch diseases; `pandemic.declared` carries the strain enum.
+#[test]
+fn schema_dump_check_m16b_disease_enums_complete() {
+    let v = parse_schema("disease_stage_changed.json");
+    let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
+    let payload = props.get("payload").and_then(|p| p.as_object()).unwrap();
+    let payload_props = payload.get("properties").and_then(|p| p.as_object()).unwrap();
+    let pathogen = payload_props.get("pathogen").and_then(|p| p.as_object()).unwrap();
+    let enum_vals = pathogen.get("enum").and_then(|e| e.as_array()).unwrap();
+    assert_eq!(enum_vals.len(), 17, "disease.stage_changed pathogen enum must list all 17 diseases");
+    let strings: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
+    for required in ["slimelung", "pneumonia", "tuberculosis", "influenza_pandemic", "sepsis"] {
+        assert!(strings.contains(&required), "pathogen enum missing `{required}`");
+    }
+}

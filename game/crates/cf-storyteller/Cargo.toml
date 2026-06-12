@@ -10,5 +10,6 @@ publish.workspace = true
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+cf-disease = { path = "../cf-disease" }
 
 [dev-dependencies]

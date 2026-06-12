@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/disease.relapsed.v0.1",
+  "title": "disease.relapsed",
+  "description": "M16B § Treatment relapse. Fires when a treatment course is abandoned below the completion threshold (reason=partial_course) or fails its success roll (reason=treatment_failed). `drove_resistance` is true when a partial antibiotic course's resistance roll passed, flagging the next infection of this pathogen as a resistant strain (forward-compat at M16B).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "disease" },
+    "event_type": { "const": "relapsed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "pathogen": { "type": "string", "enum": ["slimelung", "food_poisoning", "radiation_sickness", "common_cold", "flu", "pneumonia", "tuberculosis", "cholera", "typhoid", "rabies", "tetanus", "bubonic_plague", "anthrax", "cancer", "mental_illness", "sepsis", "influenza_pandemic"] },
+        "reason": { "type": "string", "enum": ["partial_course", "treatment_failed"] },
+        "drove_resistance": { "type": "boolean" }
+      },
+      "required": ["actor_id", "tick", "pathogen", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

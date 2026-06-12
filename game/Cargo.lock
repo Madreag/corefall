@@ -1501,6 +1501,7 @@ dependencies = [
  "cf-aging",
  "cf-atmos",
  "cf-chassis",
+ "cf-disease",
  "cf-equipment",
  "cf-fortification",
  "cf-physics",
@@ -1808,6 +1809,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-disease"
+version = "0.0.1"
+dependencies = [
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-e2e"
 version = "0.0.1"
 dependencies = [
@@ -1828,6 +1840,7 @@ dependencies = [
 name = "cf-environment"
 version = "0.0.1"
 dependencies = [
+ "cf-disease",
  "cf-wound",
  "serde",
  "serde_json",
@@ -1840,9 +1853,11 @@ name = "cf-equipment"
 version = "0.0.1"
 dependencies = [
  "cf-atmos",
+ "cf-disease",
  "ron",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
@@ -1988,6 +2003,7 @@ dependencies = [
  "cf-asset-ledger",
  "cf-content",
  "cf-control",
+ "cf-disease",
  "cf-equipment",
  "cf-fortification",
  "cf-hazard",
@@ -2274,6 +2290,7 @@ dependencies = [
 name = "cf-storyteller"
 version = "0.0.1"
 dependencies = [
+ "cf-disease",
  "serde",
  "thiserror 2.0.18",
  "tracing",
@@ -2362,6 +2379,7 @@ dependencies = [
  "cf-actor",
  "cf-aging",
  "cf-ai",
+ "cf-disease",
  "cf-equipment",
  "cf-fortification",
  "cf-material",

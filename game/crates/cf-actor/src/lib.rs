@@ -75,6 +75,7 @@ pub mod attitude;
 pub mod body_armor_slot;
 pub mod cardiac;
 pub mod components;
+pub mod diseases;
 pub mod m14h_state;
 pub mod constants;
 pub mod cover;

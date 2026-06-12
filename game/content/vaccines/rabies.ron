@@ -1,0 +1,10 @@
+(
+  item_id: "rabies_vaccine",
+  display_name: "Rabies Vaccine",
+  prevents: rabies,
+  immunity_duration_seconds: 157680000.0,
+  side_effect_chance: 0.05,
+  doses_required: 1,
+  procurement: standard,
+  manufacture_lead_seconds: 0.0,
+)

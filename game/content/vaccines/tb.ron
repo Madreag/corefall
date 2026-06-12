@@ -1,0 +1,10 @@
+(
+  item_id: "bcg_vaccine",
+  display_name: "BCG Vaccine",
+  prevents: tuberculosis,
+  immunity_duration_seconds: 157680000.0,
+  side_effect_chance: 0.05,
+  doses_required: 1,
+  procurement: standard,
+  manufacture_lead_seconds: 0.0,
+)

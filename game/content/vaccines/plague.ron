@@ -1,0 +1,10 @@
+(
+  item_id: "plague_vaccine",
+  display_name: "Plague Vaccine",
+  prevents: bubonic_plague,
+  immunity_duration_seconds: 157680000.0,
+  side_effect_chance: 0.05,
+  doses_required: 1,
+  procurement: standard,
+  manufacture_lead_seconds: 0.0,
+)

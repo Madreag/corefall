@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/disease.quarantine_entered.v0.1",
+  "title": "disease.quarantine_entered",
+  "description": "M16B § Quarantine entry. Fires when an actor is moved into an isolation room whose grade satisfies the disease's isolation requirement. `room_class` is the grade of the room the actor entered (A airborne / B bodily-fluid / C contact). Class A entries seal the airlock via the M28D damper.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "disease" },
+    "event_type": { "const": "quarantine_entered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "pathogen": { "type": "string", "enum": ["slimelung", "food_poisoning", "radiation_sickness", "common_cold", "flu", "pneumonia", "tuberculosis", "cholera", "typhoid", "rabies", "tetanus", "bubonic_plague", "anthrax", "cancer", "mental_illness", "sepsis", "influenza_pandemic"] },
+        "room_class": { "type": "string", "enum": ["A", "B", "C", "n/a"] }
+      },
+      "required": ["actor_id", "tick", "pathogen", "room_class"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

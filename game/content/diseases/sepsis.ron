@@ -1,0 +1,35 @@
+(
+  kind: sepsis,
+  pathogen_class: wound_infection,
+  primary_vector: wound_infection,
+  transmission_vector_table: [
+    (
+      vector: wound_infection,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 0.0,
+  prodromal_seconds: 0.0,
+  manifest_seconds: 18000.0,
+  lethality_untreated: 0.8,
+  lethality_scales_with_dose: false,
+  becomes_chronic: false,
+  can_become_carrier: false,
+  human_to_human: false,
+  isolation_class: not_applicable,
+  r0_per_exposure_event: 0.0,
+  cure: (
+    treatment_kind: antibiotic,
+    item_required: Some("antibiotic_course_t2"),
+    dose_count: 5,
+    dose_interval_hours: 6.0,
+    success_chance: 0.6,
+    partial_course_consequence: (
+      relapses: true,
+      drives_resistance_chance: 0.25,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: None,
+  cure_only_pre_manifest: false,
+)

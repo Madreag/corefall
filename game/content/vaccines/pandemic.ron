@@ -1,0 +1,10 @@
+(
+  item_id: "pandemic_vaccine",
+  display_name: "Pandemic Vaccine",
+  prevents: influenza_pandemic,
+  immunity_duration_seconds: 157680000.0,
+  side_effect_chance: 0.08,
+  doses_required: 2,
+  procurement: delayed_manufacture,
+  manufacture_lead_seconds: 1209600.0,
+)

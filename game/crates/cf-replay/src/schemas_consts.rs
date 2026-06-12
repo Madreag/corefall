@@ -166,6 +166,16 @@ pub(crate) const SCHEMA_PROSTHETIC_INSTALLED: &str = include_str!("../schemas/ev
 pub(crate) const SCHEMA_PROSTHETIC_MALFUNCTIONED: &str = include_str!("../schemas/event/prosthetic_malfunctioned.json");
 pub(crate) const SCHEMA_PROSTHETIC_MAINTAINED: &str = include_str!("../schemas/event/prosthetic_maintained.json");
 pub(crate) const SCHEMA_DISEASE_EXPOSED: &str = include_str!("../schemas/event/disease_exposed.json");
+pub(crate) const SCHEMA_DISEASE_STAGE_CHANGED: &str =
+    include_str!("../schemas/event/disease_stage_changed.json");
+pub(crate) const SCHEMA_DISEASE_RELAPSED: &str = include_str!("../schemas/event/disease_relapsed.json");
+pub(crate) const SCHEMA_DISEASE_DIAGNOSED: &str = include_str!("../schemas/event/disease_diagnosed.json");
+pub(crate) const SCHEMA_DISEASE_QUARANTINE_ENTERED: &str =
+    include_str!("../schemas/event/disease_quarantine_entered.json");
+pub(crate) const SCHEMA_DISEASE_RECOVERED: &str = include_str!("../schemas/event/disease_recovered.json");
+pub(crate) const SCHEMA_DISEASE_DIED: &str = include_str!("../schemas/event/disease_died.json");
+pub(crate) const SCHEMA_DISEASE_VACCINATED: &str = include_str!("../schemas/event/disease_vaccinated.json");
+pub(crate) const SCHEMA_PANDEMIC_DECLARED: &str = include_str!("../schemas/event/pandemic_declared.json");
 pub(crate) const SCHEMA_VETERAN_RETIRED: &str = include_str!("../schemas/event/veteran_retired.json");
 pub(crate) const SCHEMA_M14J_ACTOR_VAULTED: &str = include_str!("../schemas/event/actor_vaulted.json");
 pub(crate) const SCHEMA_M14J_ACTOR_WALL_JUMPED: &str = include_str!("../schemas/event/actor_wall_jumped.json");

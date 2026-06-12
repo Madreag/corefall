@@ -1,0 +1,13 @@
+(
+  item_id: "antibiotic_course_t2",
+  display_name: "Antibiotic Course T2",
+  treatment_kind: antibiotic,
+  treats: [
+    tuberculosis,
+    bubonic_plague,
+    sepsis,
+  ],
+  dose_count: 180,
+  dose_interval_hours: 24.0,
+  tier: 2,
+)

@@ -5,10 +5,40 @@
 //! cf-ai can `use cf_environment::{EnvironmentSignal, HazardClass}` without
 //! waiting on the full kernel.
 
+#![deny(unsafe_code)]
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate,
+    clippy::doc_markdown,
+    clippy::missing_const_for_fn,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::struct_field_names,
+    clippy::struct_excessive_bools,
+    clippy::match_same_arms,
+    clippy::similar_names,
+    clippy::too_many_arguments,
+    clippy::too_many_lines
+)]
+
 use serde::{Deserialize, Serialize};
 
+pub mod germ_spread;
+pub mod room_grading;
 pub mod tile_thermal;
 
+pub use germ_spread::{
+    contact_exposure_probability, population_infected_ratio, tick_room_contact_spread, ActorEpi,
+    ExposureRequest, CONTACT_TRANSMISSION_COEFF, WOUND_RUST_DIRT_INCREASE,
+};
+pub use room_grading::{
+    classify_room, enter_quarantine, QuarantineOutcome, RoomFeatures, CLASS_A_FILTER_THROUGHPUT,
+};
 pub use tile_thermal::{
     classify_tile_thermal, ThermalWoundEmit, BURN_FIRST_DEGREE_TICKS, BURN_SECOND_DEGREE_TICKS,
     BURN_THIRD_DEGREE_TICKS, COLD_TILE_THRESHOLD_K, FROSTBITE_FIRST_DEGREE_TICKS,

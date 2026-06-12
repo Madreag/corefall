@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/disease.stage_changed.v0.1",
+  "title": "disease.stage_changed",
+  "description": "M16B § Per-disease lifecycle FSM transition. Fires on every stage change: Exposed → Incubating → Prodromal → Manifest → (Recovering | Chronic | Dying | Carrier) → (Recovered | Dead). The `pathogen` is one of the 17 canonical diseases; `from`/`to` are lifecycle stages.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "disease" },
+    "event_type": { "const": "stage_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "pathogen": { "type": "string", "enum": ["slimelung", "food_poisoning", "radiation_sickness", "common_cold", "flu", "pneumonia", "tuberculosis", "cholera", "typhoid", "rabies", "tetanus", "bubonic_plague", "anthrax", "cancer", "mental_illness", "sepsis", "influenza_pandemic"] },
+        "from": { "type": "string", "enum": ["exposed", "incubating", "prodromal", "manifest", "recovering", "chronic", "dying", "carrier", "recovered", "dead"] },
+        "to": { "type": "string", "enum": ["exposed", "incubating", "prodromal", "manifest", "recovering", "chronic", "dying", "carrier", "recovered", "dead"] }
+      },
+      "required": ["actor_id", "tick", "pathogen", "from", "to"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

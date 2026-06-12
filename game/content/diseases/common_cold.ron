@@ -1,0 +1,35 @@
+(
+  kind: common_cold,
+  pathogen_class: viral,
+  primary_vector: close_contact,
+  transmission_vector_table: [
+    (
+      vector: close_contact,
+      relative_r0: 1.0,
+    ),
+  ],
+  incubation_seconds: 43200.0,
+  prodromal_seconds: 21600.0,
+  manifest_seconds: 432000.0,
+  lethality_untreated: 0.0,
+  lethality_scales_with_dose: false,
+  becomes_chronic: false,
+  can_become_carrier: false,
+  human_to_human: true,
+  isolation_class: class_c,
+  r0_per_exposure_event: 1.5,
+  cure: (
+    treatment_kind: bed_rest,
+    item_required: None,
+    dose_count: 0,
+    dose_interval_hours: 0.0,
+    success_chance: 1.0,
+    partial_course_consequence: (
+      relapses: false,
+      drives_resistance_chance: 0.0,
+    ),
+    origin_compatibility: [],
+  ),
+  vaccine: None,
+  cure_only_pre_manifest: false,
+)

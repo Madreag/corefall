@@ -348,6 +348,33 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         m16_content::validate_artifact_ron(path, report);
         return;
     }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("diseases")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        if path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|n| n.starts_with('_'))
+            .unwrap_or(false)
+        {
+            m16_content::validate_susceptibility_matrix_ron(path, report);
+        } else {
+            m16_content::validate_disease_ron(path, report);
+        }
+        return;
+    }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("cures")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        m16_content::validate_cure_ron(path, report);
+        return;
+    }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("vaccines")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        m16_content::validate_vaccine_ron(path, report);
+        return;
+    }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")
         || path
             .components()
