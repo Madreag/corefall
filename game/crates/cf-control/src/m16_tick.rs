@@ -75,6 +75,8 @@ pub struct M16TickOutput {
     pub afflictions_applied: u32,
     pub afflictions_escalated: u32,
     pub afflictions_cleared: u32,
+    /// M16C — Pain stack recomputes that changed (emitted pain.stack_changed).
+    pub pain_recomputed: u32,
     pub swim_started: u32,
     pub swim_ended: u32,
     pub drowning_started: u32,
@@ -533,6 +535,32 @@ pub fn run_m16_tick(inputs: M16TickInputs<'_>, state: M16TickStateMut<'_>) -> M1
     for (actor_id, actor) in actors_for_producers.iter() {
         let actor_aff = state.affliction_by_actor.entry(*actor_id).or_default();
         let registry = state.affliction_registry;
+        // M16C § Pain affliction — recomputed from the M14G wound list every
+        // PAIN_RECOMPUTE_INTERVAL_TICKS ticks (perf-bound). Pain stacks per
+        // active wound × severity × 12; the stack drives aim wobble, move
+        // speed, morale drain, and the auto-triage trigger.
+        if cf_affliction::pain_recompute_due(tick.0) {
+            if let Some(pain_ev) =
+                cf_affliction::recompute_pain(actor_aff, actor_id.0, &actor.m14g_wound_list, tick.0)
+            {
+                out.pain_recomputed += 1;
+                let _ = recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "pain",
+                    "stack_changed",
+                    json!({
+                        "actor_id": pain_ev.actor_id,
+                        "tick": pain_ev.tick,
+                        "old_stack": pain_ev.old_stack,
+                        "new_stack": pain_ev.new_stack,
+                        "severity": pain_ev.severity,
+                        "aim_wobble_multiplier": pain_ev.aim_wobble_multiplier,
+                    }),
+                    None,
+                );
+            }
+        }
         // hunger: caloric_energy < 20 (per M17)
         if actor.resources.caloric_energy < 20.0 && survival_mode_active {
             let sev = ((20.0 - actor.resources.caloric_energy) / 20.0).clamp(0.05, 1.0);

@@ -76,6 +76,38 @@ fn move_intent_advances_position() {
 }
 
 #[test]
+fn affliction_speed_multiplier_slows_movement() {
+    // M5/M16 — the affliction-derived walk-speed multiplier is consumed by
+    // `effective_max_speed`. A 0.5× actor travels markedly less than baseline.
+    let run = |mult: f32| {
+        let (mut state, mut intents) = setup();
+        let start = state.world.actors.get(&ActorId(1)).unwrap().position.x;
+        state.world.actors.get_mut(&ActorId(1)).unwrap().affliction_speed_multiplier = mult;
+        for _ in 0..40 {
+            // Re-assert intent each tick (the step drains the intent map) and
+            // re-assert the multiplier (a real engine sets it per tick).
+            intents.insert(
+                ActorId(1),
+                ControlIntent {
+                    actor: ActorId(1),
+                    move_x: 1.0,
+                    ..ControlIntent::new(ActorId(1), IntentSource::Human)
+                },
+            );
+            state.world.actors.get_mut(&ActorId(1)).unwrap().affliction_speed_multiplier = mult;
+            let _ = step_no_rng(&mut state, &mut intents, deps());
+        }
+        state.world.actors.get(&ActorId(1)).unwrap().position.x - start
+    };
+    let baseline = run(1.0);
+    let afflicted = run(0.5);
+    assert!(baseline > 0.0, "baseline actor moved");
+    assert!(afflicted < baseline, "afflicted travels less ({afflicted} < {baseline})");
+    // Steady-state max speed halved → roughly half the distance.
+    assert!(afflicted < baseline * 0.7, "0.5x speed ≈ ≤0.7 distance ({afflicted} vs {baseline})");
+}
+
+#[test]
 fn jump_only_works_on_ground() {
     let (mut state, mut intents) = setup();
     intents.insert(

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/psych.condition_triggered.v0.1",
+  "title": "psych.condition_triggered",
+  "description": "M16C § A mental-health condition triggered for an actor (combat trauma, witness-death, sustained stress, drug use, comorbidity). The `condition` is one of the 8 launch conditions; `reason` is the trigger; `stage` is the lifecycle stage right after triggering (acute). Synthetic origins (robots/drones) never trigger.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "psych" },
+    "event_type": { "const": "condition_triggered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "condition": { "type": "string", "enum": ["ptsd", "anxiety_disorder", "depression", "addiction", "withdrawal", "insomnia", "panic_disorder", "acute_stress_reaction"] },
+        "reason": { "type": "string", "enum": ["witness_deaths", "survive_critical_wound", "concussion_at_ko", "sustained_stress", "loss_of_squadmate", "drug_doses", "drug_absence", "panic_threshold", "anxiety_chronic", "imminent_trauma", "sleep_deprivation", "comorbidity"] },
+        "stage": { "type": "string", "enum": ["triggered", "acute", "subacute", "chronic", "remission", "refractory"] }
+      },
+      "required": ["actor_id", "tick", "condition", "reason", "stage"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

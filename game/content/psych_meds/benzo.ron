@@ -1,0 +1,15 @@
+(
+  item_id: "benzo_diazepam",
+  display_name: "Benzodiazepine (Diazepam-class)",
+  class: benzo,
+  treats: [
+    anxiety_disorder,
+    panic_disorder,
+    insomnia,
+  ],
+  onset_seconds: 604800.0,
+  dose_count: 14,
+  dose_interval_hours: 12.0,
+  addiction_risk_per_dose: 0.04,
+  tier: 1,
+)

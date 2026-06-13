@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/psych.panic_attack.v0.1",
+  "title": "psych.panic_attack",
+  "description": "M16C § A panic attack fires for an actor with Panic Disorder / PTSD / Acute Stress Reaction. Freezes the actor (Stance::PanickedFreeze) for `freeze_seconds` ∈ [3, 8] until `freeze_until_tick`. Per-tick roll is seeded so identical seeds reproduce panic-attack timing.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "psych" },
+    "event_type": { "const": "panic_attack" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "condition": { "type": "string", "enum": ["ptsd", "anxiety_disorder", "depression", "addiction", "withdrawal", "insomnia", "panic_disorder", "acute_stress_reaction"] },
+        "freeze_seconds": { "type": "number", "minimum": 3.0, "maximum": 8.0 },
+        "freeze_until_tick": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["actor_id", "tick", "condition", "freeze_seconds", "freeze_until_tick"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

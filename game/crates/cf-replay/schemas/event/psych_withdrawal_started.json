@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/psych.withdrawal_started.v0.1",
+  "title": "psych.withdrawal_started",
+  "description": "M16C § An addicted actor enters Withdrawal after the stim is absent for more than 12h. Aim wobble doubles (`aim_wobble_multiplier` = 2.0); withdrawal resolves naturally over 2 in-game weeks.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "psych" },
+    "event_type": { "const": "withdrawal_started" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "hours_since_dose": { "type": "number", "minimum": 12.0 },
+        "aim_wobble_multiplier": { "type": "number", "minimum": 1.0 }
+      },
+      "required": ["actor_id", "tick", "hours_since_dose", "aim_wobble_multiplier"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

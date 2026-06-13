@@ -375,6 +375,34 @@ pub(crate) fn validate_one(path: &Path, report: &mut ValidationReport) {
         m16_content::validate_vaccine_ron(path, report);
         return;
     }
+    // M16C — mental-health content.
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("psych_conditions")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        if path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|n| n.starts_with('_'))
+            .unwrap_or(false)
+        {
+            m16_content::validate_psych_comorbidity_ron(path, report);
+        } else {
+            m16_content::validate_psych_condition_ron(path, report);
+        }
+        return;
+    }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("psych_meds")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        m16_content::validate_psych_med_ron(path, report);
+        return;
+    }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("stims")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        m16_content::validate_stim_ron(path, report);
+        return;
+    }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")
         || path
             .components()

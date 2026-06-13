@@ -774,6 +774,18 @@ pub(crate) struct EngineMutable {
     /// M16A § Env affliction registry loaded from
     /// `content/afflictions/env/*.ron`.
     pub(crate) m16a_env_registry: cf_affliction::EnvAfflictionRegistry,
+    /// M16C § Per-actor mental-health state (8-condition lifecycle FSM +
+    /// witness-death + stim-dose trigger windows).
+    pub(crate) m16c_mental_health_by_actor: BTreeMap<ActorId, cf_mental_health::ActorMentalHealth>,
+    /// M16C § Condition registry (boot defaults; overlaid from
+    /// `content/psych_conditions/*.ron`).
+    pub(crate) m16c_condition_registry: cf_mental_health::ConditionRegistry,
+    /// M16C § Comorbidity matrix (boot defaults; overlaid from
+    /// `content/psych_conditions/_comorbidity.ron`).
+    pub(crate) m16c_comorbidity_matrix: cf_mental_health::ComorbidityMatrix,
+    /// M16C § Actors whose death has already been counted toward witnesses'
+    /// witness-death windows (edge-detect so each death counts exactly once).
+    pub(crate) m16c_processed_deaths: std::collections::BTreeSet<ActorId>,
 }
 
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the

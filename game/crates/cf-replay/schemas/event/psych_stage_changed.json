@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/psych.stage_changed.v0.1",
+  "title": "psych.stage_changed",
+  "description": "M16C § Per-condition lifecycle FSM transition: Triggered → Acute → (Subacute | Chronic) → (Remission | Refractory). `trait_granted` carries the chronic_*/refractory_* trait id when entering a persistent stage (null/absent otherwise).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "psych" },
+    "event_type": { "const": "stage_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "condition": { "type": "string", "enum": ["ptsd", "anxiety_disorder", "depression", "addiction", "withdrawal", "insomnia", "panic_disorder", "acute_stress_reaction"] },
+        "from": { "type": "string", "enum": ["triggered", "acute", "subacute", "chronic", "remission", "refractory"] },
+        "to": { "type": "string", "enum": ["triggered", "acute", "subacute", "chronic", "remission", "refractory"] },
+        "trait_granted": { "type": ["string", "null"], "description": "chronic_<condition> / refractory_<condition> trait id granted by entering `to`, if any." }
+      },
+      "required": ["actor_id", "tick", "condition", "from", "to"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

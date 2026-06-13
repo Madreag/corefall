@@ -1,0 +1,11 @@
+(
+  item_id: "combat_stim_t2",
+  display_name: "Combat Stim T2",
+  kind: combat_stim,
+  addiction_risk_per_dose: 0.07,
+  duration_seconds: 90.0,
+  accuracy_bonus: 0.15,
+  move_speed_bonus: 0.15,
+  fear_resist_bonus: 0.3,
+  tier: 2,
+)

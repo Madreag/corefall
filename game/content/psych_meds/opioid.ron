@@ -1,0 +1,11 @@
+(
+  item_id: "opioid_morphine",
+  display_name: "Opioid Analgesic (Morphine-class)",
+  class: opioid,
+  treats: [],
+  onset_seconds: 3600.0,
+  dose_count: 6,
+  dose_interval_hours: 6.0,
+  addiction_risk_per_dose: 0.06,
+  tier: 2,
+)

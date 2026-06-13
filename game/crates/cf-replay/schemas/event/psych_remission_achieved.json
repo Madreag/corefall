@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/psych.remission_achieved.v0.1",
+  "title": "psych.remission_achieved",
+  "description": "M16C § A condition reaches Remission. `treated` distinguishes a treatment-driven remission (therapy + medication course) from a natural resolution. `trait_granted` is the recovered_from_<condition> persistence trait.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "psych" },
+    "event_type": { "const": "remission_achieved" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "condition": { "type": "string", "enum": ["ptsd", "anxiety_disorder", "depression", "addiction", "withdrawal", "insomnia", "panic_disorder", "acute_stress_reaction"] },
+        "treated": { "type": "boolean" },
+        "trait_granted": { "type": "string", "description": "recovered_from_<condition> persistence trait id." }
+      },
+      "required": ["actor_id", "tick", "condition", "treated", "trait_granted"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

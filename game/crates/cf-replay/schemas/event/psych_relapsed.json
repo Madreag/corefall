@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/psych.relapsed.v0.1",
+  "title": "psych.relapsed",
+  "description": "M16C § A condition in Remission relapses back to Acute (per-tick relapse roll, e.g. PTSD post-cure relapse risk). Resets the treatment course.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "psych" },
+    "event_type": { "const": "relapsed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "condition": { "type": "string", "enum": ["ptsd", "anxiety_disorder", "depression", "addiction", "withdrawal", "insomnia", "panic_disorder", "acute_stress_reaction"] }
+      },
+      "required": ["actor_id", "tick", "condition"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

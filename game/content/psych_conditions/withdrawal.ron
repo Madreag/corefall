@@ -1,0 +1,13 @@
+(
+  kind: withdrawal,
+  acute_window_seconds: 259200.0,
+  subacute_window_seconds: 0.0,
+  chronic_chance: 0.0,
+  therapy_sessions_required: 2,
+  medication: Some(withdrawal_assist),
+  medication_onset_seconds: 259200.0,
+  panic_chance_per_tick: 0.0,
+  relapse_chance_per_tick: 0.0,
+  resolves_naturally: true,
+  natural_resolve_seconds: 1209600.0,
+)

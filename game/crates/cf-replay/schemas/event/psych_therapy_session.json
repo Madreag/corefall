@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/psych.therapy_session.v0.1",
+  "title": "psych.therapy_session",
+  "description": "M16C § One completed therapy NPC session (30 in-game minutes). `session_index` is the 1-based count toward `sessions_required`; `efficacy` is the seeded per-session efficacy roll [0,1).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "psych" },
+    "event_type": { "const": "therapy_session" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "condition": { "type": "string", "enum": ["ptsd", "anxiety_disorder", "depression", "addiction", "withdrawal", "insomnia", "panic_disorder", "acute_stress_reaction"] },
+        "session_index": { "type": "integer", "minimum": 1 },
+        "sessions_required": { "type": "integer", "minimum": 0 },
+        "efficacy": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      },
+      "required": ["actor_id", "tick", "condition", "session_index", "sessions_required", "efficacy"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,13 @@
+(
+  kind: ptsd,
+  acute_window_seconds: 604800.0,
+  subacute_window_seconds: 2592000.0,
+  chronic_chance: 0.3,
+  therapy_sessions_required: 10,
+  medication: Some(ssri),
+  medication_onset_seconds: 1209600.0,
+  panic_chance_per_tick: 0.00005,
+  relapse_chance_per_tick: 0.000001,
+  resolves_naturally: false,
+  natural_resolve_seconds: 0.0,
+)

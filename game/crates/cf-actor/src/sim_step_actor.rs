@@ -157,10 +157,14 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
             // stack deterministically. Falls back to 1.0 when no
             // encumbrance envelope is attached (pre-M6B actors).
             let encumbrance_factor = actor.encumbrance_walk_speed_multiplier();
+            // M5/M16 — affliction-derived walk-speed multiplier (Pain, thirst,
+            // frozen, …). Identity 1.0 for an unafflicted actor, so behaviour
+            // is byte-for-byte unchanged when no affliction is present.
+            let affliction_speed = actor.affliction_speed_multiplier;
             let effective_max_speed = if force_crawl {
-                tuning.max_speed * 0.25 * encumbrance_factor
+                tuning.max_speed * 0.25 * encumbrance_factor * affliction_speed
             } else {
-                tuning.max_speed * move_factor * encumbrance_factor
+                tuning.max_speed * move_factor * encumbrance_factor * affliction_speed
             };
             if accepted_input && intent.jump {
                 let (new_vy, accepted) = apply_jump(JumpInputs {
@@ -464,26 +468,28 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
         // per-shot, not per-particle).
         let particle_count = spec.particle_count.max(1);
         // adds 0.1 rad mount_motion penalty when riding a moving critter.
-        let mount_spread_bonus = {
-            let actor_for_mount = state.world.actors.get(&actor_id);
-            match actor_for_mount.and_then(|a| a.mount) {
-                Some(m) => {
-                    let critter_speed = state
-                        .world
-                        .actors
-                        .get(&m.critter_id)
-                        .map(|c| (c.velocity.x.powi(2) + c.velocity.y.powi(2)).sqrt())
-                        .unwrap_or(0.0);
-                    if critter_speed > crate::mount::DISMOUNT_STATIONARY_SPEED_THRESHOLD {
-                        crate::mount::MOUNT_MOTION_AIM_SPREAD_RAD
-                    } else {
-                        0.0
-                    }
+        let actor_for_mount = state.world.actors.get(&actor_id);
+        // M5/M16 — additive aim-spread bonus from the firer's afflictions (Pain,
+        // concussed, blinded, …). Identity 0.0 for an unafflicted actor, added
+        // to the cone exactly like the mount-motion bonus below.
+        let affliction_aim_spread = actor_for_mount.map_or(0.0, |a| a.affliction_aim_spread_bonus_rad);
+        let mount_spread_bonus = match actor_for_mount.and_then(|a| a.mount) {
+            Some(m) => {
+                let critter_speed = state
+                    .world
+                    .actors
+                    .get(&m.critter_id)
+                    .map(|c| (c.velocity.x.powi(2) + c.velocity.y.powi(2)).sqrt())
+                    .unwrap_or(0.0);
+                if critter_speed > crate::mount::DISMOUNT_STATIONARY_SPEED_THRESHOLD {
+                    crate::mount::MOUNT_MOTION_AIM_SPREAD_RAD
+                } else {
+                    0.0
                 }
-                None => 0.0,
             }
+            None => 0.0,
         };
-        let half_spread = (spec.spread_radians + mount_spread_bonus) * 0.5;
+        let half_spread = (spec.spread_radians + mount_spread_bonus + affliction_aim_spread) * 0.5;
         // Angle of the base aim (radians).
         let base_angle = aim.y.atan2(aim.x);
         let base_speed = (base_velocity.x * base_velocity.x + base_velocity.y * base_velocity.y).sqrt();
@@ -494,10 +500,23 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
         // Reborrow actor.velocity for inheritance addition per particle.
         let actor_velocity = state.world.actors.get(&actor_id).map_or(Vec2::ZERO, |a| a.velocity);
         for particle_idx in 0..particle_count {
-            // Deterministic in-cone offset for particles 2..N. The first
-            // particle always flies on the base aim line so single-particle
-            // weapons match historical behaviour byte-for-byte.
-            let angle = if particle_count == 1 || half_spread <= 0.0 {
+            // Deterministic in-cone offset. An UNAFFLICTED single-particle
+            // weapon flies on the base aim line (no RNG draw) so historical
+            // behaviour stays byte-for-byte. M5/M16: an *afflicted* single
+            // shot wobbles within its affliction cone only (Pain / concussed /
+            // blinded …); the RNG draw happens only for afflicted shooters, so
+            // unafflicted determinism is untouched. Multi-particle weapons keep
+            // their existing per-pellet cone (now also widened by afflictions
+            // via `half_spread`).
+            let angle = if particle_count == 1 {
+                if affliction_aim_spread > 0.0 {
+                    let raw = (rng() as f64) / (u64::MAX as f64); // [0, 1]
+                    let unit = (raw as f32) * 2.0 - 1.0; // [-1, +1]
+                    base_angle + unit * (affliction_aim_spread * 0.5)
+                } else {
+                    base_angle
+                }
+            } else if half_spread <= 0.0 {
                 base_angle
             } else {
                 // Sample a uniform[-1, 1] from the engine's seeded RNG.

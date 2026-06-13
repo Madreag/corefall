@@ -15,6 +15,7 @@ cf-sim-core = { path = "../cf-sim-core" }
 cf-trench = { path = "../cf-trench" }
 cf-fortification = { path = "../cf-fortification" }
 cf-treatment = { path = "../cf-treatment" }
+cf-mental-health = { path = "../cf-mental-health" }
 
 [dev-dependencies]
 serde_json = { workspace = true }

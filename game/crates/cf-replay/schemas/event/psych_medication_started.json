@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/psych.medication_started.v0.1",
+  "title": "psych.medication_started",
+  "description": "M16C § A medication course begins for a condition. `medication` is one of the 8 psych-medication classes; the course counts toward remission once it has run for the class onset time (e.g. SSRI 14 in-game days).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "psych" },
+    "event_type": { "const": "medication_started" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "condition": { "type": "string", "enum": ["ptsd", "anxiety_disorder", "depression", "addiction", "withdrawal", "insomnia", "panic_disorder", "acute_stress_reaction"] },
+        "medication": { "type": "string", "enum": ["ssri", "benzo", "snri", "opioid", "stimulant", "antipsychotic", "sleep_aid", "withdrawal_assist"] }
+      },
+      "required": ["actor_id", "tick", "condition", "medication"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

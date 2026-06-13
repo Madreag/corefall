@@ -1,0 +1,13 @@
+(
+  item_id: "antipsychotic_quetiapine",
+  display_name: "Anti-psychotic (Quetiapine-class)",
+  class: antipsychotic,
+  treats: [
+    ptsd,
+  ],
+  onset_seconds: 604800.0,
+  dose_count: 30,
+  dose_interval_hours: 24.0,
+  addiction_risk_per_dose: 0.0,
+  tier: 3,
+)

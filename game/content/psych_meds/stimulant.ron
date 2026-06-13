@@ -1,0 +1,11 @@
+(
+  item_id: "stimulant_modafinil",
+  display_name: "Stimulant (Modafinil-class)",
+  class: stimulant,
+  treats: [],
+  onset_seconds: 43200.0,
+  dose_count: 10,
+  dose_interval_hours: 24.0,
+  addiction_risk_per_dose: 0.07,
+  tier: 2,
+)

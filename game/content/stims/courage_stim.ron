@@ -1,0 +1,11 @@
+(
+  item_id: "courage_stim",
+  display_name: "Courage Stim",
+  kind: courage_stim,
+  addiction_risk_per_dose: 0.04,
+  duration_seconds: 120.0,
+  accuracy_bonus: 0.0,
+  move_speed_bonus: 0.0,
+  fear_resist_bonus: 0.5,
+  tier: 1,
+)

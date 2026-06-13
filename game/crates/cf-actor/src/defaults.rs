@@ -61,3 +61,9 @@ pub(crate) fn default_walk_threshold() -> f32 {
 pub(crate) fn default_bloom_factor() -> f32 {
     1.0
 }
+
+/// Identity default for the transient affliction-derived walk-speed multiplier
+/// (no slow). See `ActorState::affliction_speed_multiplier`.
+pub(crate) fn default_affliction_speed_multiplier() -> f32 {
+    1.0
+}

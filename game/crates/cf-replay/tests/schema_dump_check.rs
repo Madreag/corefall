@@ -586,3 +586,74 @@ fn schema_dump_check_m16b_disease_enums_complete() {
         assert!(strings.contains(&required), "pathogen enum missing `{required}`");
     }
 }
+
+/// M16C § 11 new mental-health (psych.*) + Pain (pain.*) event schemas: file +
+/// (category, event_type) pairs the recorder lookup must resolve.
+const M16C_EVENT_SCHEMAS: &[(&str, &str, &str)] = &[
+    ("psych_condition_triggered.json", "psych", "condition_triggered"),
+    ("psych_stage_changed.json", "psych", "stage_changed"),
+    ("psych_panic_attack.json", "psych", "panic_attack"),
+    ("psych_remission_achieved.json", "psych", "remission_achieved"),
+    ("psych_relapsed.json", "psych", "relapsed"),
+    ("psych_addiction_developed.json", "psych", "addiction_developed"),
+    ("psych_withdrawal_started.json", "psych", "withdrawal_started"),
+    ("psych_therapy_session.json", "psych", "therapy_session"),
+    ("psych_medication_started.json", "psych", "medication_started"),
+    ("psych_comorbidity_detected.json", "psych", "comorbidity_detected"),
+    ("pain_stack_changed.json", "pain", "stack_changed"),
+];
+
+/// M16C: all 11 new schemas exist on disk + parse + declare the required keys.
+#[test]
+fn schema_dump_check_m16c_event_schemas_present() {
+    for (name, _, _) in M16C_EVENT_SCHEMAS {
+        let path = schemas_dir().join(name);
+        assert!(path.exists(), "M16C schema {name} missing at {}", path.display());
+        let v = parse_schema(name);
+        assert_required_keys(&v, name);
+    }
+    assert_eq!(M16C_EVENT_SCHEMAS.len(), 11, "expected 11 M16C event schemas");
+}
+
+/// M16C: every new schema is wired into the recorder's `event_schema_for`
+/// lookup so payload validation runs in run-bundle evidence.
+#[test]
+fn schema_dump_check_m16c_event_schemas_registered() {
+    for (name, category, event_type) in M16C_EVENT_SCHEMAS {
+        assert!(
+            cf_replay::schemas::event_schema_for(category, event_type).is_some(),
+            "M16C schema {name} not registered for ({category}, {event_type})"
+        );
+    }
+}
+
+/// M16C: psych.condition_triggered carries all 8 conditions, and the affliction
+/// kind enum now includes `pain` (the M16C Pain affliction).
+#[test]
+fn schema_dump_check_m16c_enums_complete() {
+    let v = parse_schema("psych_condition_triggered.json");
+    let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
+    let payload = props.get("payload").and_then(|p| p.as_object()).unwrap();
+    let payload_props = payload.get("properties").and_then(|p| p.as_object()).unwrap();
+    let condition = payload_props.get("condition").and_then(|p| p.as_object()).unwrap();
+    let enum_vals = condition.get("enum").and_then(|e| e.as_array()).unwrap();
+    assert_eq!(enum_vals.len(), 8, "psych condition enum must list all 8 conditions");
+    let strings: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
+    for required in ["ptsd", "addiction", "withdrawal", "panic_disorder", "acute_stress_reaction"] {
+        assert!(strings.contains(&required), "condition enum missing `{required}`");
+    }
+    // `pain` is now in the affliction kind enum.
+    let av = parse_schema("affliction_applied.json");
+    let ap = av.get("properties").and_then(|p| p.as_object()).unwrap();
+    let apl = ap.get("payload").and_then(|p| p.as_object()).unwrap();
+    let appp = apl.get("properties").and_then(|p| p.as_object()).unwrap();
+    let kind = appp.get("kind").and_then(|p| p.as_object()).unwrap();
+    let kinds: Vec<&str> = kind
+        .get("enum")
+        .and_then(|e| e.as_array())
+        .unwrap()
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+    assert!(kinds.contains(&"pain"), "affliction kind enum must include `pain`");
+}

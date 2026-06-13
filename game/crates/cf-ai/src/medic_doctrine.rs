@@ -124,6 +124,153 @@ pub struct MedicAssessment {
     pub highest_priority_treatment: Option<TreatmentKind>,
 }
 
+// ===========================================================================
+// M16C — Medic `TreatPsych` priority + psych-emergency triage.
+//
+// The Medic role gains a parallel psych-triage pass: given an ally's
+// `cf_mental_health::ActorMentalHealth` state it picks the highest-priority
+// psychological intervention (calm a panicking actor, administer the indicated
+// medication, escort to a therapy NPC, or monitor an in-progress course). The
+// M22 utility scorer weights the `TreatPsych` task by [`psych_emergency_level`]
+// and adds [`TREAT_PSYCH_UTILITY_BONUS`] when an emergency is active.
+// ===========================================================================
+
+use cf_mental_health::{ActorMentalHealth, ConditionKind, ConditionRegistry, PsychMedClass};
+
+/// Utility scorer bonus the Medic adds to `TreatPsych(target)` when the target
+/// is in an active psych emergency (mirrors [`super::auto_triage`]'s triage
+/// bonus shape).
+pub const TREAT_PSYCH_UTILITY_BONUS: f32 = 0.4;
+
+/// How urgent an ally's psych state is for the Medic's `TreatPsych` priority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsychEmergencyLevel {
+    /// No symptomatic condition — nothing to treat.
+    None,
+    /// Symptomatic but treatment is underway / non-critical.
+    Routine,
+    /// Untreated high-risk condition (withdrawal HP-drain, depression suicide
+    /// risk) — treat soon.
+    Urgent,
+    /// Actor is incapacitated by an active panic-attack freeze — treat now.
+    Critical,
+}
+
+/// The psych intervention the Medic should take for one ally.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsychTreatAction {
+    /// Nothing to do.
+    None,
+    /// Treatment is underway (med active + therapy in progress) — keep watch.
+    Monitor { target: u64, condition: ConditionKind },
+    /// Stay with and calm an actor frozen by a panic attack.
+    Calm { target: u64, condition: ConditionKind },
+    /// Administer the indicated medication (not yet started).
+    AdministerMedication {
+        target: u64,
+        condition: ConditionKind,
+        medication: PsychMedClass,
+    },
+    /// Escort the actor to a therapy NPC (medication done / not required, but
+    /// therapy sessions remain).
+    EscortToTherapy { target: u64, condition: ConditionKind },
+}
+
+/// Triage rank for a symptomatic condition (higher = more urgent). Drives both
+/// the emergency level and which condition the Medic addresses first.
+fn psych_triage_rank(kind: ConditionKind) -> u8 {
+    match kind {
+        // HP-draining / life-risk conditions first.
+        ConditionKind::Withdrawal => 9,
+        ConditionKind::Depression => 8,
+        ConditionKind::PanicDisorder => 7,
+        ConditionKind::Ptsd => 6,
+        ConditionKind::AnxietyDisorder => 5,
+        ConditionKind::Addiction => 4,
+        ConditionKind::AcuteStressReaction => 3,
+        ConditionKind::Insomnia => 2,
+    }
+}
+
+/// Conditions whose untreated symptomatic presence is an *urgent* (vs routine)
+/// psych emergency.
+fn is_high_risk(kind: ConditionKind) -> bool {
+    matches!(kind, ConditionKind::Withdrawal | ConditionKind::Depression)
+}
+
+/// The most urgent symptomatic condition on `mh`, if any.
+fn top_symptomatic(mh: &ActorMentalHealth) -> Option<ConditionKind> {
+    mh.active
+        .iter()
+        .filter(|c| c.stage.is_symptomatic())
+        .map(|c| c.kind)
+        .max_by_key(|&k| psych_triage_rank(k))
+}
+
+/// Classify an ally's psych emergency for the Medic's `TreatPsych` weighting.
+pub fn psych_emergency_level(mh: &ActorMentalHealth, tick: u64) -> PsychEmergencyLevel {
+    if mh.is_panic_frozen(tick) {
+        return PsychEmergencyLevel::Critical;
+    }
+    match top_symptomatic(mh) {
+        None => PsychEmergencyLevel::None,
+        Some(kind) if is_high_risk(kind) => PsychEmergencyLevel::Urgent,
+        Some(_) => PsychEmergencyLevel::Routine,
+    }
+}
+
+/// Resolve the Medic's `TreatPsych` action for one ally. Deterministic and
+/// side-effect free — the engine dispatches the returned action.
+pub fn psych_triage(
+    mh: &ActorMentalHealth,
+    target: u64,
+    tick: u64,
+    tick_rate_hz: u32,
+    registry: &ConditionRegistry,
+) -> PsychTreatAction {
+    // 1. A frozen actor is incapacitated — calm them first.
+    if let Some(frozen) = mh.active.iter().find(|c| c.is_panic_frozen(tick)) {
+        return PsychTreatAction::Calm {
+            target,
+            condition: frozen.kind,
+        };
+    }
+    // 2. Otherwise address the most urgent symptomatic condition.
+    let Some(kind) = top_symptomatic(mh) else {
+        return PsychTreatAction::None;
+    };
+    let Some(condition) = mh.find(kind) else {
+        return PsychTreatAction::None;
+    };
+    let Some(spec) = registry.get(kind) else {
+        return PsychTreatAction::None;
+    };
+    // Medication indicated but not yet started → administer it.
+    if let Some(med) = spec.medication {
+        if !condition.treatment.medication_started() {
+            return PsychTreatAction::AdministerMedication {
+                target,
+                condition: kind,
+                medication: med,
+            };
+        }
+        // Med running but not yet at onset, and therapy still pending →
+        // monitor; therapy complete + med active → monitor (awaiting onset).
+        if condition.treatment.therapy_sessions_completed < spec.therapy_sessions_required {
+            return PsychTreatAction::EscortToTherapy { target, condition: kind };
+        }
+        let _ = tick_rate_hz;
+        return PsychTreatAction::Monitor { target, condition: kind };
+    }
+    // No medication indicated (rest/therapy only).
+    if condition.treatment.therapy_sessions_completed < spec.therapy_sessions_required {
+        return PsychTreatAction::EscortToTherapy { target, condition: kind };
+    }
+    PsychTreatAction::Monitor { target, condition: kind }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,5 +343,75 @@ mod tests {
         let mut s = MedicDoctrineState::new(1);
         let (action, _) = s.resolve_next_action(0, &[], |_| false, |_| 100);
         assert_eq!(action, MedicAction::Idle);
+    }
+
+    // ---- M16C psych-triage ----
+    use cf_mental_health::{OriginId, TriggerReason};
+
+    #[test]
+    fn psych_triage_calms_a_panic_frozen_actor() {
+        let reg = ConditionRegistry::default_registry();
+        let mut mh = ActorMentalHealth::with_origin(OriginId::Human);
+        mh.trigger(42, ConditionKind::PanicDisorder, TriggerReason::PanicThreshold, 0);
+        // Freeze the actor until tick 300.
+        mh.find_mut(ConditionKind::PanicDisorder).unwrap().panic_frozen_until_tick = 300;
+        assert_eq!(psych_emergency_level(&mh, 100), PsychEmergencyLevel::Critical);
+        assert_eq!(
+            psych_triage(&mh, 42, 100, 60, &reg),
+            PsychTreatAction::Calm { target: 42, condition: ConditionKind::PanicDisorder }
+        );
+    }
+
+    #[test]
+    fn psych_triage_administers_medication_for_untreated_ptsd() {
+        let reg = ConditionRegistry::default_registry();
+        let mut mh = ActorMentalHealth::with_origin(OriginId::Human);
+        mh.trigger(42, ConditionKind::Ptsd, TriggerReason::WitnessDeaths, 0);
+        assert_eq!(psych_emergency_level(&mh, 10), PsychEmergencyLevel::Routine);
+        assert_eq!(
+            psych_triage(&mh, 42, 10, 60, &reg),
+            PsychTreatAction::AdministerMedication {
+                target: 42,
+                condition: ConditionKind::Ptsd,
+                medication: PsychMedClass::Ssri,
+            }
+        );
+    }
+
+    #[test]
+    fn psych_triage_escorts_to_therapy_once_medication_started() {
+        let reg = ConditionRegistry::default_registry();
+        let mut mh = ActorMentalHealth::with_origin(OriginId::Human);
+        mh.trigger(42, ConditionKind::Ptsd, TriggerReason::WitnessDeaths, 0);
+        mh.start_medication(42, ConditionKind::Ptsd, PsychMedClass::Ssri, 0);
+        assert_eq!(
+            psych_triage(&mh, 42, 10, 60, &reg),
+            PsychTreatAction::EscortToTherapy { target: 42, condition: ConditionKind::Ptsd }
+        );
+    }
+
+    #[test]
+    fn psych_triage_prioritizes_withdrawal_as_urgent() {
+        let reg = ConditionRegistry::default_registry();
+        let mut mh = ActorMentalHealth::with_origin(OriginId::Human);
+        // Insomnia (low rank) + Withdrawal (top rank) both symptomatic.
+        mh.trigger(42, ConditionKind::Insomnia, TriggerReason::SleepDeprivation, 0);
+        mh.trigger(42, ConditionKind::Withdrawal, TriggerReason::DrugAbsence, 0);
+        assert_eq!(psych_emergency_level(&mh, 10), PsychEmergencyLevel::Urgent);
+        match psych_triage(&mh, 42, 10, 60, &reg) {
+            PsychTreatAction::AdministerMedication { condition, medication, .. } => {
+                assert_eq!(condition, ConditionKind::Withdrawal);
+                assert_eq!(medication, PsychMedClass::WithdrawalAssist);
+            }
+            other => panic!("expected withdrawal medication, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn psych_triage_none_when_healthy() {
+        let reg = ConditionRegistry::default_registry();
+        let mh = ActorMentalHealth::with_origin(OriginId::Human);
+        assert_eq!(psych_emergency_level(&mh, 0), PsychEmergencyLevel::None);
+        assert_eq!(psych_triage(&mh, 42, 0, 60, &reg), PsychTreatAction::None);
     }
 }

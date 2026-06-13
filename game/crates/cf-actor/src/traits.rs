@@ -22,12 +22,51 @@ pub mod ids {
     pub const PHANTOM_LIMB: &str = "phantom_limb";
     pub const MEMORY_LOSS_MINOR: &str = "memory_loss_minor";
     pub const MEMORY_LOSS_MAJOR: &str = "memory_loss_major";
-    pub const CHRONIC_PREFIX: &str = "chronic_";
-    pub const CHRONIC_DEPRESSION: &str = "chronic_depression";
-    pub const CHRONIC_PAIN: &str = "chronic_pain";
-    pub const CHRONIC_INSOMNIA: &str = "chronic_insomnia";
-    pub const CHRONIC_ANXIETY: &str = "chronic_anxiety";
     pub const RETIRED_VETERAN: &str = "retired_veteran";
+
+    // ---- M16C psych-condition trait prefixes ----
+    // These mirror `cf_mental_health::ConditionKind::{recovered,chronic,
+    // refractory}_trait()` exactly: the lifecycle grants `recovered_from_*` on
+    // remission, `chronic_*` on chronic entry, `refractory_*` on refractory
+    // entry. M14I scar-record + M41 veteran dossier gate on the prefixes.
+    pub const RECOVERED_FROM_PREFIX: &str = "recovered_from_";
+    pub const CHRONIC_PREFIX: &str = "chronic_";
+    pub const REFRACTORY_PREFIX: &str = "refractory_";
+
+    // Chronic (one per condition). `chronic_pain` is the M16C Pain affliction
+    // analogue carried as a long-term trait.
+    pub const CHRONIC_PAIN: &str = "chronic_pain";
+    pub const CHRONIC_PTSD: &str = "chronic_ptsd";
+    pub const CHRONIC_ANXIETY_DISORDER: &str = "chronic_anxiety_disorder";
+    pub const CHRONIC_DEPRESSION: &str = "chronic_depression";
+    pub const CHRONIC_ADDICTION: &str = "chronic_addiction";
+    pub const CHRONIC_WITHDRAWAL: &str = "chronic_withdrawal";
+    pub const CHRONIC_INSOMNIA: &str = "chronic_insomnia";
+    pub const CHRONIC_PANIC_DISORDER: &str = "chronic_panic_disorder";
+    pub const CHRONIC_ACUTE_STRESS_REACTION: &str = "chronic_acute_stress_reaction";
+
+    // Recovered (one per condition).
+    pub const RECOVERED_FROM_PTSD: &str = "recovered_from_ptsd";
+    pub const RECOVERED_FROM_ANXIETY_DISORDER: &str = "recovered_from_anxiety_disorder";
+    pub const RECOVERED_FROM_DEPRESSION: &str = "recovered_from_depression";
+    pub const RECOVERED_FROM_ADDICTION: &str = "recovered_from_addiction";
+    pub const RECOVERED_FROM_WITHDRAWAL: &str = "recovered_from_withdrawal";
+    pub const RECOVERED_FROM_INSOMNIA: &str = "recovered_from_insomnia";
+    pub const RECOVERED_FROM_PANIC_DISORDER: &str = "recovered_from_panic_disorder";
+    pub const RECOVERED_FROM_ACUTE_STRESS_REACTION: &str = "recovered_from_acute_stress_reaction";
+
+    // Refractory (one per condition).
+    pub const REFRACTORY_PTSD: &str = "refractory_ptsd";
+    pub const REFRACTORY_ANXIETY_DISORDER: &str = "refractory_anxiety_disorder";
+    pub const REFRACTORY_DEPRESSION: &str = "refractory_depression";
+    pub const REFRACTORY_ADDICTION: &str = "refractory_addiction";
+    pub const REFRACTORY_WITHDRAWAL: &str = "refractory_withdrawal";
+    pub const REFRACTORY_INSOMNIA: &str = "refractory_insomnia";
+    pub const REFRACTORY_PANIC_DISORDER: &str = "refractory_panic_disorder";
+    pub const REFRACTORY_ACUTE_STRESS_REACTION: &str = "refractory_acute_stress_reaction";
+
+    /// Legacy alias for [`CHRONIC_ANXIETY_DISORDER`] (pre-M16C short form).
+    pub const CHRONIC_ANXIETY: &str = "chronic_anxiety";
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -72,6 +111,16 @@ impl TraitSet {
         self.traits.iter().any(|t| t.starts_with(ids::CHRONIC_PREFIX))
     }
 
+    /// Any trait whose id starts with `"recovered_from_"` (M16C remission).
+    pub fn has_recovered(&self) -> bool {
+        self.traits.iter().any(|t| t.starts_with(ids::RECOVERED_FROM_PREFIX))
+    }
+
+    /// Any trait whose id starts with `"refractory_"` (M16C treatment-resistant).
+    pub fn has_refractory(&self) -> bool {
+        self.traits.iter().any(|t| t.starts_with(ids::REFRACTORY_PREFIX))
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &String> {
         self.traits.iter()
     }
@@ -113,6 +162,36 @@ mod tests {
         let mut t = TraitSet::new();
         t.insert(ids::CHRONIC_DEPRESSION);
         assert!(t.has_chronic());
+    }
+
+    #[test]
+    fn m16c_psych_trait_ids_follow_prefix_convention() {
+        // Each per-condition id must equal prefix + condition (so they match
+        // `cf_mental_health::ConditionKind::{recovered,chronic,refractory}_trait`).
+        assert_eq!(ids::CHRONIC_PTSD, format!("{}ptsd", ids::CHRONIC_PREFIX));
+        assert_eq!(ids::CHRONIC_ADDICTION, format!("{}addiction", ids::CHRONIC_PREFIX));
+        assert_eq!(
+            ids::RECOVERED_FROM_PTSD,
+            format!("{}ptsd", ids::RECOVERED_FROM_PREFIX)
+        );
+        assert_eq!(
+            ids::REFRACTORY_PANIC_DISORDER,
+            format!("{}panic_disorder", ids::REFRACTORY_PREFIX)
+        );
+        assert_eq!(
+            ids::RECOVERED_FROM_ACUTE_STRESS_REACTION,
+            format!("{}acute_stress_reaction", ids::RECOVERED_FROM_PREFIX)
+        );
+    }
+
+    #[test]
+    fn recovered_and_refractory_prefix_helpers() {
+        let mut t = TraitSet::new();
+        t.insert(ids::RECOVERED_FROM_PTSD);
+        assert!(t.has_recovered());
+        assert!(!t.has_refractory());
+        t.insert(ids::REFRACTORY_DEPRESSION);
+        assert!(t.has_refractory());
     }
 
     #[test]

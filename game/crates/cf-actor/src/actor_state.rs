@@ -191,6 +191,18 @@ pub struct ActorState {
     /// `checksum_bytes` (VAL-CROSS-029).
     #[serde(default)]
     pub m14g_wound_list: cf_wound::ActorWoundList,
+    /// M5/M16 — transient per-tick affliction-derived combat/movement modifiers
+    /// (the M16 affliction → aim/move-speed consumer). The engine recomputes
+    /// these every tick from the M16 affliction state; the actor sim consumes
+    /// them in `effective_max_speed` (walk-speed × multiplier) and the
+    /// weapon-fire spread cone (+ aim-spread bonus radians). Identity defaults
+    /// (1.0 / 0.0) keep an unafflicted actor byte-for-byte unchanged. Not
+    /// serialized and not part of `checksum_bytes` — they are derived, not
+    /// authoritative state.
+    #[serde(skip, default = "crate::defaults::default_affliction_speed_multiplier")]
+    pub affliction_speed_multiplier: f32,
+    #[serde(skip)]
+    pub affliction_aim_spread_bonus_rad: f32,
     #[serde(default)]
     pub m14h_cardiac: cardiac::ActorCardiacComponent,
     /// trigger (spec § "Necrosis if not removed").
@@ -474,6 +486,8 @@ impl ActorState {
             resources: ResourceAccumulators::default(),
             afflictions: Vec::new(),
             m14g_wound_list: cf_wound::ActorWoundList::new(),
+            affliction_speed_multiplier: 1.0,
+            affliction_aim_spread_bonus_rad: 0.0,
             m14h_cardiac: cardiac::ActorCardiacComponent::new(),
             m14h_tourniquets: std::collections::BTreeMap::new(),
             m14h_buffs: Vec::new(),

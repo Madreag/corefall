@@ -1,0 +1,52 @@
+(
+  pairs: [
+    (
+      primary: ptsd,
+      comorbid: depression,
+      chance: 0.3,
+      mandatory: false,
+    ),
+    (
+      primary: ptsd,
+      comorbid: insomnia,
+      chance: 0.4,
+      mandatory: false,
+    ),
+    (
+      primary: depression,
+      comorbid: insomnia,
+      chance: 0.35,
+      mandatory: false,
+    ),
+    (
+      primary: anxiety_disorder,
+      comorbid: insomnia,
+      chance: 0.3,
+      mandatory: false,
+    ),
+    (
+      primary: panic_disorder,
+      comorbid: insomnia,
+      chance: 0.25,
+      mandatory: false,
+    ),
+    (
+      primary: addiction,
+      comorbid: insomnia,
+      chance: 0.2,
+      mandatory: false,
+    ),
+    (
+      primary: anxiety_disorder,
+      comorbid: panic_disorder,
+      chance: 0.2,
+      mandatory: false,
+    ),
+    (
+      primary: addiction,
+      comorbid: withdrawal,
+      chance: 0.0,
+      mandatory: true,
+    ),
+  ],
+)

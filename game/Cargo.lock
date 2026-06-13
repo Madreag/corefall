@@ -1522,6 +1522,7 @@ dependencies = [
 name = "cf-affliction"
 version = "0.0.1"
 dependencies = [
+ "cf-wound",
  "ron",
  "serde",
  "serde_json",
@@ -1547,6 +1548,7 @@ version = "0.0.1"
 dependencies = [
  "cf-actor",
  "cf-fortification",
+ "cf-mental-health",
  "cf-sim-core",
  "cf-treatment",
  "cf-trench",
@@ -1758,6 +1760,7 @@ dependencies = [
  "cf-killcam",
  "cf-localization",
  "cf-material",
+ "cf-mental-health",
  "cf-mission",
  "cf-net",
  "cf-perception",
@@ -1854,6 +1857,7 @@ version = "0.0.1"
 dependencies = [
  "cf-atmos",
  "cf-disease",
+ "cf-mental-health",
  "ron",
  "serde",
  "serde_json",
@@ -1982,6 +1986,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-mental-health"
+version = "0.0.1"
+dependencies = [
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-mission"
 version = "0.0.1"
 dependencies = [
@@ -2008,6 +2023,7 @@ dependencies = [
  "cf-fortification",
  "cf-hazard",
  "cf-material",
+ "cf-mental-health",
  "cf-prosthetic",
  "cf-replay",
  "cf-save",
@@ -2291,6 +2307,7 @@ name = "cf-storyteller"
 version = "0.0.1"
 dependencies = [
  "cf-disease",
+ "cf-mental-health",
  "serde",
  "thiserror 2.0.18",
  "tracing",
@@ -2383,6 +2400,7 @@ dependencies = [
  "cf-equipment",
  "cf-fortification",
  "cf-material",
+ "cf-mental-health",
  "cf-prosthetic",
  "cf-scar",
  "cf-terrain",

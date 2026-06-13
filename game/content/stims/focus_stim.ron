@@ -1,0 +1,11 @@
+(
+  item_id: "focus_stim",
+  display_name: "Focus Stim",
+  kind: focus_stim,
+  addiction_risk_per_dose: 0.05,
+  duration_seconds: 120.0,
+  accuracy_bonus: 0.2,
+  move_speed_bonus: 0.0,
+  fear_resist_bonus: 0.0,
+  tier: 1,
+)

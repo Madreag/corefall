@@ -1,0 +1,13 @@
+(
+  item_id: "sleep_aid_zolpidem",
+  display_name: "Sleep Aid (Zolpidem-class)",
+  class: sleep_aid,
+  treats: [
+    insomnia,
+  ],
+  onset_seconds: 259200.0,
+  dose_count: 14,
+  dose_interval_hours: 24.0,
+  addiction_risk_per_dose: 0.0,
+  tier: 1,
+)

@@ -65,6 +65,8 @@ pub mod magazine;
 pub mod medical;
 pub mod medical_scanner;
 pub mod melee;
+pub mod psych_meds;
+pub mod stims;
 pub mod vaccines;
 pub mod ppe;
 pub mod sensor;

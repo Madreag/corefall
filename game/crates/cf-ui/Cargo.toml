@@ -14,6 +14,7 @@ bevy = { workspace = true }
 cf-actor = { path = "../cf-actor" }
 cf-ai = { path = "../cf-ai" }
 cf-disease = { path = "../cf-disease" }
+cf-mental-health = { path = "../cf-mental-health" }
 cf-equipment = { path = "../cf-equipment" }
 cf-fortification = { path = "../cf-fortification" }
 cf-material = { path = "../cf-material" }

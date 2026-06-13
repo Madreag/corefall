@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/pain.stack_changed.v0.1",
+  "title": "pain.stack_changed",
+  "description": "M16C § The Pain affliction stack was recomputed from the M14G wound list (Σ severity × 12). `severity` is stack / 30 clamped to [0,1]; `aim_wobble_multiplier` = 1 + severity ∈ [1,2]. Recomputed every 5 ticks. Pain also drives move speed ×(1 − severity×0.3), morale −1/tick when severe, and auto-triage above 80%.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "pain" },
+    "event_type": { "const": "stack_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "old_stack": { "type": "number", "minimum": 0.0 },
+        "new_stack": { "type": "number", "minimum": 0.0 },
+        "severity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "aim_wobble_multiplier": { "type": "number", "minimum": 1.0, "maximum": 2.0 }
+      },
+      "required": ["actor_id", "tick", "old_stack", "new_stack", "severity", "aim_wobble_multiplier"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

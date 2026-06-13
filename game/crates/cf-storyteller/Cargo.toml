@@ -11,5 +11,6 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 cf-disease = { path = "../cf-disease" }
+cf-mental-health = { path = "../cf-mental-health" }
 
 [dev-dependencies]

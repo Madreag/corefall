@@ -24,6 +24,7 @@ cf-anomaly = { path = "../cf-anomaly" }
 cf-artifact = { path = "../cf-artifact" }
 cf-affliction = { path = "../cf-affliction" }
 cf-disease = { path = "../cf-disease" }
+cf-mental-health = { path = "../cf-mental-health" }
 anyhow = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }

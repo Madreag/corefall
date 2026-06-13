@@ -390,6 +390,159 @@ pub(crate) fn validate_vaccine_ron(path: &Path, report: &mut ValidationReport) {
     report.add_pass(path.to_path_buf(), format!("vaccine {}", spec.item_id));
 }
 
+// ===========================================================================
+// M16C — mental-health content validators.
+// ===========================================================================
+
+/// Validate one `content/psych_conditions/<condition>.ron` against the
+/// `cf_mental_health::ConditionSpec` schema + value ranges.
+pub(crate) fn validate_psych_condition_ron(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let spec: cf_mental_health::ConditionSpec = match ron::from_str(&raw) {
+        Ok(s) => s,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ron parse failed: {err}"));
+            return;
+        }
+    };
+    let pct = |v: f32| (0.0..=1.0).contains(&v);
+    if spec.acute_window_seconds < 0.0 {
+        report.add_error(path.to_path_buf(), "acute_window_seconds must be >= 0".to_string());
+    }
+    if spec.subacute_window_seconds < 0.0 {
+        report.add_error(path.to_path_buf(), "subacute_window_seconds must be >= 0".to_string());
+    }
+    if spec.medication_onset_seconds < 0.0 {
+        report.add_error(path.to_path_buf(), "medication_onset_seconds must be >= 0".to_string());
+    }
+    if spec.natural_resolve_seconds < 0.0 {
+        report.add_error(path.to_path_buf(), "natural_resolve_seconds must be >= 0".to_string());
+    }
+    if !pct(spec.chronic_chance) {
+        report.add_error(
+            path.to_path_buf(),
+            format!("chronic_chance must be in [0,1]; got {}", spec.chronic_chance),
+        );
+    }
+    if !pct(spec.panic_chance_per_tick) {
+        report.add_error(path.to_path_buf(), "panic_chance_per_tick must be in [0,1]".to_string());
+    }
+    if !pct(spec.relapse_chance_per_tick) {
+        report.add_error(path.to_path_buf(), "relapse_chance_per_tick must be in [0,1]".to_string());
+    }
+    report.add_pass(path.to_path_buf(), format!("psych condition {}", spec.kind.as_str()));
+}
+
+/// Validate `content/psych_conditions/_comorbidity.ron` against the
+/// `cf_mental_health::ComorbidityMatrix` schema.
+pub(crate) fn validate_psych_comorbidity_ron(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let matrix: cf_mental_health::ComorbidityMatrix = match ron::from_str(&raw) {
+        Ok(m) => m,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ron parse failed: {err}"));
+            return;
+        }
+    };
+    if matrix.pairs.is_empty() {
+        report.add_error(path.to_path_buf(), "comorbidity matrix must declare at least one pair".to_string());
+    }
+    for pair in &matrix.pairs {
+        if pair.primary == pair.comorbid {
+            report.add_error(
+                path.to_path_buf(),
+                format!("comorbid pair must link two distinct conditions; got {} twice", pair.primary.as_str()),
+            );
+        }
+        if !(0.0..=1.0).contains(&pair.chance) {
+            report.add_error(
+                path.to_path_buf(),
+                format!("comorbid chance must be in [0,1]; got {}", pair.chance),
+            );
+        }
+    }
+    report.add_pass(path.to_path_buf(), format!("comorbidity matrix ({} pairs)", matrix.pairs.len()));
+}
+
+/// Validate one `content/psych_meds/<class>.ron` against the
+/// `cf_mental_health::PsychMedItemSpec` schema + value ranges.
+pub(crate) fn validate_psych_med_ron(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let spec: cf_mental_health::PsychMedItemSpec = match ron::from_str(&raw) {
+        Ok(s) => s,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ron parse failed: {err}"));
+            return;
+        }
+    };
+    if spec.item_id.is_empty() {
+        report.add_error(path.to_path_buf(), "item_id must be non-empty".to_string());
+    }
+    if spec.onset_seconds < 0.0 {
+        report.add_error(path.to_path_buf(), "onset_seconds must be >= 0".to_string());
+    }
+    if spec.dose_interval_hours < 0.0 {
+        report.add_error(path.to_path_buf(), "dose_interval_hours must be >= 0".to_string());
+    }
+    if !(0.0..=1.0).contains(&spec.addiction_risk_per_dose) {
+        report.add_error(
+            path.to_path_buf(),
+            format!("addiction_risk_per_dose must be in [0,1]; got {}", spec.addiction_risk_per_dose),
+        );
+    }
+    report.add_pass(path.to_path_buf(), format!("psych med {}", spec.item_id));
+}
+
+/// Validate one `content/stims/<stim>.ron` against the
+/// `cf_equipment::stims::StimItemSpec` schema + value ranges.
+pub(crate) fn validate_stim_ron(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let spec: cf_equipment::stims::StimItemSpec = match ron::from_str(&raw) {
+        Ok(s) => s,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ron parse failed: {err}"));
+            return;
+        }
+    };
+    if spec.item_id.is_empty() {
+        report.add_error(path.to_path_buf(), "item_id must be non-empty".to_string());
+    }
+    if spec.duration_seconds < 0.0 {
+        report.add_error(path.to_path_buf(), "duration_seconds must be >= 0".to_string());
+    }
+    if !(0.0..=1.0).contains(&spec.addiction_risk_per_dose) {
+        report.add_error(
+            path.to_path_buf(),
+            format!("addiction_risk_per_dose must be in [0,1]; got {}", spec.addiction_risk_per_dose),
+        );
+    }
+    report.add_pass(path.to_path_buf(), format!("stim {}", spec.item_id));
+}
+
 #[cfg(test)]
 mod m16b_tests {
     use super::*;
@@ -443,6 +596,68 @@ mod m16b_tests {
             assert_eq!(report.fail(), 0, "{sub} content must validate cleanly");
             assert!(report.pass() >= 9, "{sub} must have >= 9 passing files");
         }
+    }
+
+    #[test]
+    fn all_psych_content_passes() {
+        // psych_conditions (+ _comorbidity).
+        let cond = content("psych_conditions");
+        let mut report = ValidationReport::default();
+        for entry in fs::read_dir(&cond).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("ron") {
+                continue;
+            }
+            if path.file_name().and_then(|s| s.to_str()).map(|n| n.starts_with('_')) == Some(true) {
+                validate_psych_comorbidity_ron(&path, &mut report);
+            } else {
+                validate_psych_condition_ron(&path, &mut report);
+            }
+        }
+        assert_eq!(report.fail(), 0, "psych_conditions must validate cleanly");
+        assert!(report.pass() >= 9, "8 conditions + comorbidity matrix must pass");
+
+        // psych_meds.
+        let meds = content("psych_meds");
+        let mut mreport = ValidationReport::default();
+        for entry in fs::read_dir(&meds).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("ron") {
+                continue;
+            }
+            validate_psych_med_ron(&path, &mut mreport);
+        }
+        assert_eq!(mreport.fail(), 0, "psych_meds must validate cleanly");
+        assert!(mreport.pass() >= 8, "8 psych meds must pass");
+
+        // stims.
+        let stims = content("stims");
+        let mut sreport = ValidationReport::default();
+        for entry in fs::read_dir(&stims).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("ron") {
+                continue;
+            }
+            validate_stim_ron(&path, &mut sreport);
+        }
+        assert_eq!(sreport.fail(), 0, "stims must validate cleanly");
+        assert!(sreport.pass() >= 4, "4 stims must pass");
+    }
+
+    #[test]
+    fn malformed_psych_condition_fails() {
+        let mut path = std::env::temp_dir();
+        path.push(format!("cf_m16c_bad_condition_{}.ron", std::process::id()));
+        // chronic_chance 2.0 is out of [0,1].
+        fs::write(
+            &path,
+            "(kind: ptsd, acute_window_seconds: 1.0, subacute_window_seconds: 1.0, chronic_chance: 2.0, therapy_sessions_required: 1, medication: None, medication_onset_seconds: 0.0, panic_chance_per_tick: 0.0, relapse_chance_per_tick: 0.0, resolves_naturally: false, natural_resolve_seconds: 0.0)",
+        )
+        .unwrap();
+        let mut report = ValidationReport::default();
+        validate_psych_condition_ron(&path, &mut report);
+        assert!(report.fail() >= 1, "out-of-range chronic_chance must FAIL");
+        let _ = fs::remove_file(&path);
     }
 
     #[test]

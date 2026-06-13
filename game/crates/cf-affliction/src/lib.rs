@@ -47,13 +47,27 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+pub mod effects;
 pub mod env;
+pub mod pain;
 
 pub use env::{
     tick_all as env_tick_all, AtmosphericSusceptibility, EnvAccumulator, EnvAfflictionKind,
     EnvAfflictionRegistry, EnvAfflictionSpec, EnvAfflictionState, EnvClearReason, EnvClearedEvent,
     EnvOriginImmuneEvent, EnvSeverity, EnvSeverityChangedEvent, EnvSignal, EnvThresholdCrossedEvent,
     EnvTickOutput, OriginId,
+};
+pub use effects::{
+    affliction_aim_spread_bonus_radians, affliction_move_speed_multiplier,
+    aim_spread_bonus_radians_for, move_speed_multiplier_for, MAX_AIM_SPREAD_BONUS_RAD,
+    MIN_MOVE_SPEED_MULTIPLIER,
+};
+pub use pain::{
+    pain_aim_wobble_multiplier, pain_morale_drain_per_tick, pain_move_speed_factor,
+    pain_recompute_due, pain_severity_pct, pain_stack_from_wounds, pain_triggers_autotriage,
+    recompute_pain, PainStackChangedEvent, PAIN_AUTOTRIAGE_PCT, PAIN_FULL_STACK,
+    PAIN_MORALE_DRAIN_PER_TICK, PAIN_MORALE_SEVERE_PCT, PAIN_MOVE_SPEED_COEFF, PAIN_PER_SEVERITY,
+    PAIN_RECOMPUTE_INTERVAL_TICKS,
 };
 
 /// 23 affliction kinds locked in
@@ -89,6 +103,10 @@ pub enum M16AfflictionKind {
     Shocked,
     Frozen,
     Drowning,
+    /// M16C — chronic Pain affliction recomputed from the M14G wound list
+    /// (`pain.rs`). Standalone (not in the baseline / survival / threshold
+    /// sets); drives aim wobble, move speed, morale drain, and auto-triage.
+    Pain,
 }
 
 impl M16AfflictionKind {
@@ -121,6 +139,7 @@ impl M16AfflictionKind {
             M16AfflictionKind::Shocked => "shocked",
             M16AfflictionKind::Frozen => "frozen",
             M16AfflictionKind::Drowning => "drowning",
+            M16AfflictionKind::Pain => "pain",
         }
     }
 
@@ -153,6 +172,7 @@ impl M16AfflictionKind {
             "shocked" => M16AfflictionKind::Shocked,
             "frozen" => M16AfflictionKind::Frozen,
             "drowning" => M16AfflictionKind::Drowning,
+            "pain" => M16AfflictionKind::Pain,
             _ => return None,
         })
     }
@@ -447,6 +467,17 @@ impl AfflictionSpec {
                 severity_decay_per_second: 0.0,
                 survival_mode_only: false,
             },
+            // Pain deals no direct HP damage and never decays / time-clears on
+            // its own — its severity is SET each pass by `pain::recompute_pain`
+            // from the wound list, and it clears when the wounds resolve.
+            M16AfflictionKind::Pain => AfflictionSpec {
+                kind,
+                damage_per_tick_at_full: 0.0,
+                clears_with_time: false,
+                clear_duration_seconds: 0.0,
+                severity_decay_per_second: 0.0,
+                survival_mode_only: false,
+            },
         }
     }
 }
@@ -470,6 +501,12 @@ impl AfflictionRegistry {
         specs.insert(
             M16AfflictionKind::Blinded.as_str().to_string(),
             AfflictionSpec::default_for(M16AfflictionKind::Blinded),
+        );
+        // M16C — Pain is standalone (recomputed from the wound list), like
+        // Blinded it lives outside the baseline / survival / threshold sets.
+        specs.insert(
+            M16AfflictionKind::Pain.as_str().to_string(),
+            AfflictionSpec::default_for(M16AfflictionKind::Pain),
         );
         Self { specs }
     }
@@ -745,6 +782,8 @@ pub enum AutoTriageReason {
     DrowningWithHelmetBreach,
     RadiationDoseHigh,
     CompoundTtdLow,
+    /// M16C — Pain affliction above 80% severity.
+    PainAbove80,
 }
 
 impl AutoTriageReason {
@@ -759,6 +798,7 @@ impl AutoTriageReason {
             AutoTriageReason::DrowningWithHelmetBreach => "drowning_with_helmet_breach",
             AutoTriageReason::RadiationDoseHigh => "radiation_dose_high",
             AutoTriageReason::CompoundTtdLow => "compound_ttd_low",
+            AutoTriageReason::PainAbove80 => "pain_above_80",
         }
     }
 }
@@ -794,6 +834,9 @@ pub fn per_instance_ttd_seconds(kind: M16AfflictionKind) -> f32 {
         M16AfflictionKind::Shocked => 30.0,
         M16AfflictionKind::Frozen => 40.0,
         M16AfflictionKind::Drowning => 30.0,
+        // Pain itself deals no HP damage — no independent time-to-death; the
+        // underlying wounds carry the lethality.
+        M16AfflictionKind::Pain => f32::INFINITY,
     }
 }
 
@@ -853,6 +896,10 @@ pub fn auto_triage_reasons(
     }
     if compound_ttd_seconds < thresholds.compound_ttd_seconds_floor {
         reasons.push(AutoTriageReason::CompoundTtdLow);
+    }
+    // M16C — Pain above 80% severity warrants a triage bonus (spec § Pain).
+    if afflictions.severity_of(M16AfflictionKind::Pain) > crate::pain::PAIN_AUTOTRIAGE_PCT {
+        reasons.push(AutoTriageReason::PainAbove80);
     }
     reasons
 }
@@ -943,17 +990,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registry_has_all_22_kinds_plus_blinded() {
+    fn registry_has_all_22_kinds_plus_blinded_and_pain() {
         let reg = AfflictionRegistry::default_registry();
         let baseline = M16AfflictionKind::all_baseline().len();
         let survival = M16AfflictionKind::all_survival().len();
         let threshold = M16AfflictionKind::all_threshold_set().len();
-        assert_eq!(
-            baseline + survival + threshold + 1,
-            27,
-            "18 baseline + 4 survival + 4 threshold + blinded"
-        );
+        // 18 baseline + 4 survival + 4 threshold + blinded + pain (M16C).
+        assert_eq!(baseline + survival + threshold + 2, 28);
+        assert_eq!(reg.specs.len(), 28);
         assert!(reg.specs.contains_key("blinded"));
+        assert!(reg.specs.contains_key("pain"));
         assert!(reg.specs.contains_key("hunger"));
         assert!(reg.specs.contains_key("sanity_low"));
         assert!(reg.specs.contains_key("vacuum_exposure"));
@@ -1103,6 +1149,35 @@ mod tests {
         let thresholds = M16TriggerThresholds::default();
         let reasons = auto_triage_reasons(&afflictions, &thresholds, 0, false, 0.9, 0.0, false, false, f32::INFINITY);
         assert!(reasons.contains(&AutoTriageReason::DrowningWithHelmetBreach));
+    }
+
+    #[test]
+    fn pain_above_80_triggers_auto_triage() {
+        // M16C § "Auto-triage trigger when Pain > 80%".
+        let mut afflictions = ActorAfflictions::default();
+        afflictions.active.push(ActiveAffliction {
+            kind: M16AfflictionKind::Pain,
+            severity: 0.85,
+            applied_at_tick: 0,
+            expected_clear_tick: None,
+            source_event_id: None,
+        });
+        let thresholds = M16TriggerThresholds::default();
+        let reasons =
+            auto_triage_reasons(&afflictions, &thresholds, 0, false, 0.9, 0.0, false, false, f32::INFINITY);
+        assert!(reasons.contains(&AutoTriageReason::PainAbove80), "pain 0.85 must trigger auto-triage");
+        // Below 80% does not.
+        let mut low = ActorAfflictions::default();
+        low.active.push(ActiveAffliction {
+            kind: M16AfflictionKind::Pain,
+            severity: 0.75,
+            applied_at_tick: 0,
+            expected_clear_tick: None,
+            source_event_id: None,
+        });
+        let reasons2 =
+            auto_triage_reasons(&low, &thresholds, 0, false, 0.9, 0.0, false, false, f32::INFINITY);
+        assert!(!reasons2.contains(&AutoTriageReason::PainAbove80), "pain 0.75 must NOT trigger");
     }
 
     #[test]

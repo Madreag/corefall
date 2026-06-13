@@ -45,6 +45,7 @@ pub mod stamina_bar;
 pub mod stealth_meter;
 pub mod weapon_swap_overlay;
 
+pub mod psych_dashboard;
 pub mod reactor_hp_bar;
 pub mod reactor_pressure_line;
 pub mod timer_warnings;

@@ -1,0 +1,13 @@
+(
+  item_id: "snri_venlafaxine",
+  display_name: "SNRI (Venlafaxine-class)",
+  class: snri,
+  treats: [
+    depression,
+  ],
+  onset_seconds: 1209600.0,
+  dose_count: 30,
+  dose_interval_hours: 24.0,
+  addiction_risk_per_dose: 0.0,
+  tier: 2,
+)

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/psych.addiction_developed.v0.1",
+  "title": "psych.addiction_developed",
+  "description": "M16C § An actor develops an Addiction after 7+ combat-stim doses within 30 days. `dose_count` is the count inside the window on the firing dose; `trait_granted` is the permanent chronic_addiction vulnerability trait.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "psych" },
+    "event_type": { "const": "addiction_developed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "dose_count": { "type": "integer", "minimum": 7 },
+        "trait_granted": { "type": "string", "description": "chronic_addiction permanent vulnerability trait id." }
+      },
+      "required": ["actor_id", "tick", "dose_count", "trait_granted"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

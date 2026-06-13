@@ -176,6 +176,24 @@ pub(crate) const SCHEMA_DISEASE_RECOVERED: &str = include_str!("../schemas/event
 pub(crate) const SCHEMA_DISEASE_DIED: &str = include_str!("../schemas/event/disease_died.json");
 pub(crate) const SCHEMA_DISEASE_VACCINATED: &str = include_str!("../schemas/event/disease_vaccinated.json");
 pub(crate) const SCHEMA_PANDEMIC_DECLARED: &str = include_str!("../schemas/event/pandemic_declared.json");
+// M16C — mental-health (psych.*) + Pain (pain.*) event schemas.
+pub(crate) const SCHEMA_PSYCH_CONDITION_TRIGGERED: &str =
+    include_str!("../schemas/event/psych_condition_triggered.json");
+pub(crate) const SCHEMA_PSYCH_STAGE_CHANGED: &str = include_str!("../schemas/event/psych_stage_changed.json");
+pub(crate) const SCHEMA_PSYCH_PANIC_ATTACK: &str = include_str!("../schemas/event/psych_panic_attack.json");
+pub(crate) const SCHEMA_PSYCH_REMISSION_ACHIEVED: &str =
+    include_str!("../schemas/event/psych_remission_achieved.json");
+pub(crate) const SCHEMA_PSYCH_RELAPSED: &str = include_str!("../schemas/event/psych_relapsed.json");
+pub(crate) const SCHEMA_PSYCH_ADDICTION_DEVELOPED: &str =
+    include_str!("../schemas/event/psych_addiction_developed.json");
+pub(crate) const SCHEMA_PSYCH_WITHDRAWAL_STARTED: &str =
+    include_str!("../schemas/event/psych_withdrawal_started.json");
+pub(crate) const SCHEMA_PSYCH_THERAPY_SESSION: &str = include_str!("../schemas/event/psych_therapy_session.json");
+pub(crate) const SCHEMA_PSYCH_MEDICATION_STARTED: &str =
+    include_str!("../schemas/event/psych_medication_started.json");
+pub(crate) const SCHEMA_PSYCH_COMORBIDITY_DETECTED: &str =
+    include_str!("../schemas/event/psych_comorbidity_detected.json");
+pub(crate) const SCHEMA_PAIN_STACK_CHANGED: &str = include_str!("../schemas/event/pain_stack_changed.json");
 pub(crate) const SCHEMA_VETERAN_RETIRED: &str = include_str!("../schemas/event/veteran_retired.json");
 pub(crate) const SCHEMA_M14J_ACTOR_VAULTED: &str = include_str!("../schemas/event/actor_vaulted.json");
 pub(crate) const SCHEMA_M14J_ACTOR_WALL_JUMPED: &str = include_str!("../schemas/event/actor_wall_jumped.json");

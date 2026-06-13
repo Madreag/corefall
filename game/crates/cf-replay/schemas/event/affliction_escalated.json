@@ -16,7 +16,7 @@
       "additionalProperties": true,
       "properties": {
         "actor_id": { "type": "integer" },
-        "kind": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "blinded", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low", "vacuum_exposure", "shocked", "frozen", "drowning"] },
+        "kind": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "blinded", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low", "vacuum_exposure", "shocked", "frozen", "drowning", "pain"] },
         "from_severity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
         "to_severity": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
       },

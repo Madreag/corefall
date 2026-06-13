@@ -2908,6 +2908,16 @@ impl M0Engine {
             }
         }
 
+        // M16C § mental-health per-tick pass. Runs after the M16 affliction
+        // tick so Pain severity is settled. Drives the witness-death PTSD
+        // trigger, the per-condition lifecycle advance (panic attacks / stage
+        // transitions / remission / relapse), the withdrawal onset check, and
+        // trait persistence (chronic_* / recovered_from_* → actor TraitSet).
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.tick_m16c_psych(t, sim_time_ms);
+        }
+
         // event per advanced tick. At ticks where `tick % cadence == 0` the
         // emitter fires `snapshot.baseline_emitted` (full state); otherwise it
         // fires `snapshot.delta_emitted` (JSON-Patch diff vs the previous

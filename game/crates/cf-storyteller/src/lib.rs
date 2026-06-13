@@ -31,6 +31,7 @@
 pub mod retirement_event;
 pub mod m16_event;
 pub mod pandemic;
+pub mod trauma_event;
 
 pub use retirement_event::{
     register_retirement_narrative, RetirementNarrative, RetirementNarrativeRegistry,
@@ -46,6 +47,11 @@ pub use pandemic::{
     declare_base_lockdown, register_pandemic_narratives, BaseLockdown, PandemicDeclaredEvent,
     PandemicNarrativeRegistration, PandemicNarrativeRegistry, PandemicTracker,
     NARRATIVE_EVENT_ID_PANDEMIC_DECLARED, PANDEMIC_LOCKDOWN_CHATTER,
+};
+pub use trauma_event::{
+    register_trauma_narratives, TraumaKind, TraumaNarrativeRegistration, TraumaNarrativeRegistry,
+    TraumaTracker, TraumaWitnessedEvent, NARRATIVE_EVENT_ID_TRAUMA_WITNESSED,
+    TRAUMA_WITNESSED_CHATTER,
 };
 
 use serde::{Deserialize, Serialize};
