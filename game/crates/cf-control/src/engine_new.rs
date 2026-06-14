@@ -529,6 +529,16 @@ impl M0Engine {
                 m16c_condition_registry: cf_mental_health::ConditionRegistry::default_registry(),
                 m16c_comorbidity_matrix: cf_mental_health::ComorbidityMatrix::default_matrix(),
                 m16c_processed_deaths: std::collections::BTreeSet::new(),
+                m17_origin_registry: load_m17_origin_registry(),
+                m17_seeded_actors: std::collections::BTreeSet::new(),
+                m17_internal_shock_dose: BTreeMap::new(),
+                m17_internal_shock_band: BTreeMap::new(),
+                m17_helmet_breached: std::collections::BTreeSet::new(),
+                m17_resource_critical_band: BTreeMap::new(),
+                m17_power_by_actor: BTreeMap::new(),
+                m17_oxygen_tank_by_actor: BTreeMap::new(),
+                m17_thermal_band: BTreeMap::new(),
+                m17_death_cause: BTreeMap::new(),
             }),
             recorder,
             current_tick,
@@ -556,6 +566,13 @@ fn locate_m16_content_dir(name: &str) -> Option<std::path::PathBuf> {
         std::path::PathBuf::from("../../content").join(name),
     ];
     candidates.into_iter().find(|p| p.exists())
+}
+
+fn load_m17_origin_registry() -> cf_actor::origin::OriginRegistry {
+    match locate_m16_content_dir("origins") {
+        Some(dir) => cf_actor::origin::OriginRegistry::load_dir(&dir),
+        None => cf_actor::origin::OriginRegistry::canonical(),
+    }
 }
 
 fn load_m16_hazard_registry() -> cf_hazard::HazardRegistry {

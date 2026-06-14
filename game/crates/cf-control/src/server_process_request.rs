@@ -385,6 +385,19 @@ pub(crate) async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
+        "act.player.overclock" => {
+            let p: ActPlayerOverclockParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerOverclock {
+                    tier: p.tier,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
         "act.player.quick_action_slot" => {
             let p: ActPlayerQuickActionSlotParams = match serde_json::from_value(params) {
                 Ok(v) => v,

@@ -638,15 +638,6 @@ impl ActorMentalHealth {
         }
     }
 
-    /// Aim-wobble multiplier from an active Withdrawal (2.0×), else 1.0×.
-    pub fn withdrawal_aim_wobble(&self) -> f32 {
-        if self.is_symptomatic(ConditionKind::Withdrawal) {
-            crate::WITHDRAWAL_AIM_WOBBLE_MULTIPLIER
-        } else {
-            1.0
-        }
-    }
-
     /// True when any active condition currently freezes the actor (panic).
     pub fn is_panic_frozen(&self, tick: u64) -> bool {
         self.active.iter().any(|c| c.is_panic_frozen(tick))
@@ -1141,7 +1132,9 @@ mod tests {
         let ev = s.check_withdrawal(7, t, 60).expect("withdrawal after 12h absence");
         assert!((ev.aim_wobble_multiplier - 2.0).abs() < 1e-6);
         assert!(ev.hours_since_dose >= 12.0);
-        assert!((s.withdrawal_aim_wobble() - 2.0).abs() < 1e-6);
+        // The withdrawal now degrades the actor's aim through the effects
+        // consumer (the 2× wobble → additive aim spread the sim applies).
+        assert!(crate::effects::condition_aim_spread_bonus_radians(&s) > 0.0);
     }
 
     #[test]

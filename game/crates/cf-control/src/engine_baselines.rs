@@ -67,6 +67,11 @@ impl M0Engine {
             ("concussion", "concussion.dose_changed"),
             ("armor", "armor.layer_hp_changed"),
             ("thermal", "thermal.signature_changed"),
+            // M17 § origin reaction + per-origin resource model — producers
+            // ladder up from `registered` to `active`.
+            ("origin", "origin.shot_force_feedback"),
+            ("resource", "resource.changed"),
+            ("internal_shock", "internal_shock.dose_changed"),
             // ladder up from `registered` to `active`.
             ("attachable", "attachable.detached"),
             // `affliction` were `registered` but engine.rs emits
@@ -91,10 +96,8 @@ impl M0Engine {
             ("atmospherics", "M19"),
             ("environment", "M20"),
             ("fluid", "M9"),
-            ("origin", "M9"),
             ("shield", "M13+"),
             ("module", "M13+"),
-            ("resource", "M17"),
             ("logistics", "M25"),
             ("chassis", "M13"),
             ("ability", "M13+"),

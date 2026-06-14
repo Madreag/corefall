@@ -271,7 +271,8 @@ impl M0Engine {
                     if Some(*id) == sim.world.player {
                         match cur {
                             cf_actor::Status::Dead | cf_actor::Status::Dying => player_dead = true,
-                            cf_actor::Status::Downed => player_downed = true,
+                            // INERT robot: offline + slumped, surfaced like a downed actor.
+                            cf_actor::Status::Downed | cf_actor::Status::Inert => player_downed = true,
                             cf_actor::Status::Unstable => player_unstable = true,
                             cf_actor::Status::Stable | cf_actor::Status::Inactive => {}
                         }

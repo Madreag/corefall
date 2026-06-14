@@ -725,6 +725,9 @@ pub(crate) async fn cmd_act(
                 .await?
         }
         ActAction::PlayerEject => session.send_request("act.player.eject", json!({})).await?,
+        ActAction::PlayerOverclock { tier } => {
+            session.send_request("act.player.overclock", json!({ "tier": tier })).await?
+        }
         ActAction::ChassisRepair {
             zone,
             module_id,

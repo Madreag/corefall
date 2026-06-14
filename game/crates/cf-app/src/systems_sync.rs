@@ -448,6 +448,7 @@ pub(crate) fn sync_actor_state_to_render(
         reduced_motion: live_settings.reduced_motion,
         reduced_shake: live_settings.reduced_shake,
         reduced_flash: live_settings.reduced_flash,
+        reduced_g_force_blackout: live_settings.reduced_g_force_blackout,
         hold_to_confirm: live_settings.hold_to_confirm,
         hold_threshold_ms: live_settings.hold_threshold_ms,
         key_remap_enabled: live_settings.key_remap_enabled,
@@ -504,6 +505,38 @@ pub(crate) fn sync_actor_state_to_render(
     hud_state.stance = stance;
     hud_state.body_silhouette = silhouette;
     hud_state.stability = hud_state.player.as_ref().map(|p| p.stability).unwrap_or(1.0);
+    // M17 — per-origin resource bars + concussion vignette.
+    hud_state.resources = match hud_state.player.as_ref() {
+        Some(p) => cf_ui::HudResources {
+            origin: p.m17.origin.clone(),
+            blood: p.m17.blood,
+            blood_max: p.m17.blood_max,
+            oil: p.m17.oil,
+            oil_max: p.m17.oil_max,
+            power: p.m17.power,
+            power_max: p.m17.power_max,
+            caloric: p.m17.caloric,
+            oxygen_seconds: p.m17.oxygen_seconds,
+            heat: p.m17.heat,
+            internal_shock_dose: p.m17.internal_shock_dose,
+            power_fire_locked: p.m17.power_fire_locked,
+            overclock_tier: p.m17.overclock_tier,
+            throttled: p.m17.throttled,
+        },
+        None => cf_ui::HudResources::default(),
+    };
+    hud_state.concussion = match hud_state.player.as_ref() {
+        Some(p) => {
+            let band = cf_actor::concussion::ConcussionBand::from_dose(p.m17.concussion_dose);
+            cf_ui::HudConcussion {
+                dose: p.m17.concussion_dose,
+                band: band.as_str().to_string(),
+                vignette_fraction: band.vignette_fraction(),
+                ducks_ambient: band.ducks_ambient(),
+            }
+        }
+        None => cf_ui::HudConcussion::default(),
+    };
     hud_state.modules = match hud_state.player.as_ref().and_then(|p| p.chassis.as_ref()) {
         Some(chassis) => HudModuleStrip {
             modules: chassis

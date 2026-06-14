@@ -304,6 +304,11 @@ pub enum ActAction {
         active: bool,
     },
     PlayerEject,
+    /// M17 — request a robot overclock tier (0-3; 0 cancels the boost).
+    PlayerOverclock {
+        #[arg(long)]
+        tier: u8,
+    },
     ChassisRepair {
         /// Body zone to repair (e.g. `torso`, `arm_right`, `hand_left`).
         #[arg(long)]

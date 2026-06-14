@@ -61,6 +61,7 @@ impl M0Engine {
                 ControlCommand::ActPlayerClimb { .. } => Some("act.player.climb"),
                 ControlCommand::ActPlayerJet { .. } => Some("act.player.jet"),
                 ControlCommand::ActPlayerEject { .. } => Some("act.player.eject"),
+                ControlCommand::ActPlayerOverclock { .. } => Some("act.player.overclock"),
                 ControlCommand::ActPlayerQuickActionSlot { .. } => Some("act.player.quick_action_slot"),
                 ControlCommand::ActPlayerQuickActionToggle { .. } => Some("act.player.quick_action_toggle"),
                 ControlCommand::ActPlayerQuickActionRadial { .. } => Some("act.player.quick_action_radial"),
@@ -117,6 +118,7 @@ impl M0Engine {
                 ControlCommand::ActPlayerClimb { .. } => Some("act.player.climb"),
                 ControlCommand::ActPlayerJet { .. } => Some("act.player.jet"),
                 ControlCommand::ActPlayerEject { .. } => Some("act.player.eject"),
+                ControlCommand::ActPlayerOverclock { .. } => Some("act.player.overclock"),
                 ControlCommand::ActPlayerQuickActionSlot { .. } => Some("act.player.quick_action_slot"),
                 ControlCommand::ActPlayerQuickActionToggle { .. } => Some("act.player.quick_action_toggle"),
                 ControlCommand::ActPlayerQuickActionRadial { .. } => Some("act.player.quick_action_radial"),
@@ -1554,6 +1556,54 @@ impl M0Engine {
                         "actor": player_id.0,
                         "kind": if active { "jet_thrust_started" } else { "jet_thrust_ended" },
                     }),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerOverclock { tier, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.overclock");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let _ = source;
+                let tier = tier.min(3);
+                let mut is_power_origin = false;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if actor.origin().uses_internal_shock() {
+                            is_power_origin = true;
+                            actor.overclock.tier = tier;
+                            actor.overclock.sustained_ticks = 0;
+                        }
+                    }
+                }
+                drop(state);
+                if !is_power_origin {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.overclock", "reason": "origin_not_power_survival", "actor": player_id.0}),
+                        None,
+                    );
+                    return CommandResult::rejected("origin_not_power_survival".to_string(), tick.0);
+                }
+                let speed = cf_actor::overclock::overclock_action_speed(tier);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.player.overclock", "actor": player_id.0, "tier": tier}),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "chassis",
+                    "overclock_started",
+                    json!({"actor_id": player_id.0, "tier": tier, "action_speed_factor": speed}),
                     None,
                 );
                 CommandResult::accepted(tick.0)

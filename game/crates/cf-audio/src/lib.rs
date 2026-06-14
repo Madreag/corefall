@@ -40,6 +40,7 @@ pub mod deterministic_replay;
 pub mod doppler;
 pub mod echo;
 pub mod footstep_lookup;
+pub mod heart_rate;
 pub mod loader;
 pub mod medium;
 pub mod mix;
@@ -68,6 +69,10 @@ pub use deterministic_replay::{
 };
 pub use doppler::{clamp_factor, resolve_doppler, DopplerShift, DOPPLER_FACTOR_MAX, DOPPLER_FACTOR_MIN};
 pub use echo::{dominant_band, echo_response_for, weighted_mean_coefficient, DecayBand, EchoResponse};
+pub use heart_rate::{
+    ambient_duck_factor, heart_rate_bpm, heart_rate_caption, heart_rate_gain, HeartRateBand, HeartRateMix,
+    AMBIENT_DUCK_FACTOR, HEART_RATE_BPM_CLEAR, HEART_RATE_BPM_KO,
+};
 pub use loader::{relative_to_repo_root, SfxEntry, SfxPool, MEMORY_BUDGET_BYTES};
 pub use medium::{
     medium_at_midpoint, Medium, MediumFilter, SPEED_OF_SOUND_AIR_M_PER_S, SPEED_OF_SOUND_AMMONIA_M_PER_S,

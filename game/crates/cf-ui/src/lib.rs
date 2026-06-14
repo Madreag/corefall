@@ -80,7 +80,9 @@ pub use tile_inspect_overlay::{InspectReactionRow, TileInspectOverlayState};
 pub mod affliction_strip;
 pub mod anomaly_indicator;
 pub mod artifact_panel;
+pub mod concussion_vignette;
 pub mod disease_dashboard;
+pub mod origin_hud;
 pub mod oxygen_meter;
 
 pub use affliction_strip::{
@@ -88,7 +90,9 @@ pub use affliction_strip::{
 };
 pub use anomaly_indicator::{AnomalyIndicatorMarker, AnomalyIndicatorState};
 pub use artifact_panel::{ArtifactPanelEntry, ArtifactPanelState};
+pub use concussion_vignette::{tunneling_active, vignette_alpha};
 pub use disease_dashboard::{DiseaseDashboardEntry, DiseaseDashboardState};
+pub use origin_hud::{origin_hud_lines, OriginHudBar};
 pub use oxygen_meter::{OxygenBand, OxygenMeterState};
 
 pub mod jetpack_fuel_meter;
@@ -112,8 +116,8 @@ pub use hud_lines::{
     stability_line_with_knockdown, stance_line, tool_line,
 };
 pub use hud_model::{
-    HudBanner, HudBodySilhouette, HudBreach, HudCaption, HudEnemy, HudMission, HudModule, HudModuleStrip, HudRifle,
-    HudSettings, HudState, HudToolValidity,
+    HudBanner, HudBodySilhouette, HudBreach, HudCaption, HudConcussion, HudEnemy, HudMission, HudModule,
+    HudModuleStrip, HudResources, HudRifle, HudSettings, HudState, HudToolValidity,
 };
 pub use status_strip::{
     AmmoStripText, BannerFocusWrapper, BannerStripRoot, BannerStripText, BreachStripText, CapturedStripText,

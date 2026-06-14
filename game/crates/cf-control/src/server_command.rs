@@ -141,6 +141,12 @@ pub enum ControlCommand {
     ActPlayerEject {
         source: IntentSource,
     },
+    /// M17 — request an overclock tier (0-3) for a power-survival origin
+    /// (robot/drone). Tier 0 cancels the boost. Rejected for organics.
+    ActPlayerOverclock {
+        tier: u8,
+        source: IntentSource,
+    },
     ActPlayerQuickActionSlot {
         slot: u8,
         source: IntentSource,

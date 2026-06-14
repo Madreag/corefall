@@ -78,6 +78,7 @@ cf-audio = { path = "../cf-audio" }
 cf-asset-ledger = { path = "../cf-asset-ledger" }
 cf-ai = { path = "../cf-ai" }
 cf-actor = { path = "../cf-actor" }
+cf-affliction = { path = "../cf-affliction" }
 cf-equipment = { path = "../cf-equipment" }
 cf-physics = { path = "../cf-physics" }
 blake3 = { workspace = true }

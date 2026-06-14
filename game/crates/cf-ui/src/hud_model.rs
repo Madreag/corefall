@@ -22,6 +22,36 @@ pub struct HudState {
     pub tool_validity: Option<HudToolValidity>,
     pub stability: f32,
     pub controls_captured_by: Option<String>,
+    pub resources: HudResources,
+    pub concussion: HudConcussion,
+}
+
+/// M17 per-origin survival resources mirrored from the engine's origin tick.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct HudResources {
+    pub origin: String,
+    pub blood: f32,
+    pub blood_max: f32,
+    pub oil: f32,
+    pub oil_max: f32,
+    pub power: f32,
+    pub power_max: f32,
+    pub caloric: f32,
+    pub oxygen_seconds: f32,
+    pub heat: f32,
+    pub internal_shock_dose: f32,
+    pub power_fire_locked: bool,
+    pub overclock_tier: u8,
+    pub throttled: bool,
+}
+
+/// M17 G-force / concussion HUD projection (drives the blackout vignette).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct HudConcussion {
+    pub dose: f32,
+    pub band: String,
+    pub vignette_fraction: f32,
+    pub ducks_ambient: bool,
 }
 
 /// HUD accessibility/settings mirror. cf-app bridge writes this from
@@ -41,6 +71,7 @@ pub struct HudSettings {
     pub ai_debug: bool,
     pub comic_style_overlay: String,
     pub comic_death_recap: bool,
+    pub reduced_g_force_blackout: bool,
 }
 
 impl Default for HudSettings {
@@ -59,6 +90,7 @@ impl Default for HudSettings {
             ai_debug: false,
             comic_style_overlay: "subtle".to_string(),
             comic_death_recap: false,
+            reduced_g_force_blackout: false,
         }
     }
 }

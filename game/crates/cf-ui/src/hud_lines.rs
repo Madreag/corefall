@@ -430,6 +430,7 @@ mod tests {
             body_silhouette: cf_actor::BodySilhouette::default(),
             chassis: None,
             origin_id: "human".into(),
+            m17: cf_actor::M17ResourceView::default(),
             stability: 1.0,
             stability_recovery_rate: 0.02,
             mass_kg: 80.0,

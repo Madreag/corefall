@@ -98,6 +98,7 @@ pub mod friendly_fire;
 pub mod high_ground;
 pub mod htn;
 pub mod llm_prior;
+pub mod m17_doctrine;
 pub mod patrol;
 pub mod personality;
 pub mod priority;
@@ -171,6 +172,11 @@ pub use friendly_fire::{FriendlyFireAvoidanceEvent, FriendlyFireKind};
 pub use high_ground::HighGroundEvent;
 pub use htn::{HtnGoal, HtnLayer, HtnRootGoal};
 pub use llm_prior::{DoctrinePrior, LlmPriorLayer};
+pub use m17_doctrine::{
+    battery_retreat, evaluate_m17_doctrine, refuses_vacuum, shed_utility_equipment, thermal_retreat,
+    M17DoctrineInputs, M17DoctrineReason, BATTERY_RETREAT_FRACTION, POWER_SHED_FRACTION,
+    THERMAL_RETREAT_FRACTION, VACUUM_MIN_OXYGEN_SECONDS,
+};
 pub use patrol::{PatrolRoute, PatrolWaypointReachedEvent};
 pub use personality::{MoodChangedEvent, PersonalityProfile, PersonalityTrait};
 pub use priority::{PriorityTable, QuickPreset};

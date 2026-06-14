@@ -569,6 +569,67 @@ pub const SUPPORTED_KEY_CODE_NAMES: &[&str] = &[
     "F12",
 ];
 
+/// M17 § "Settings + configuration surface" — per-origin personal-power +
+/// oxygen + robot-thermal toggles. PvE survival enables these; some PvP modes
+/// disable them.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(default)]
+pub struct PersonalPowerConfig {
+    pub enable_battery_management: bool,
+    pub enable_oxygen_simulation: bool,
+    pub enable_robot_thermal: bool,
+    pub battery_drain_multiplier: f32,
+    pub oxygen_consumption_multiplier: f32,
+    pub auto_shed_threshold_pct: u32,
+    pub hot_swap_speed_multiplier: f32,
+    pub enable_player_powered_armor: bool,
+    pub enable_robot_inert_recovery: bool,
+}
+
+impl Default for PersonalPowerConfig {
+    fn default() -> Self {
+        Self {
+            enable_battery_management: true,
+            enable_oxygen_simulation: true,
+            enable_robot_thermal: true,
+            battery_drain_multiplier: 1.0,
+            oxygen_consumption_multiplier: 1.0,
+            auto_shed_threshold_pct: 30,
+            hot_swap_speed_multiplier: 1.0,
+            enable_player_powered_armor: true,
+            enable_robot_inert_recovery: true,
+        }
+    }
+}
+
+/// M17 § "Configuration surface (per M38)" — 10-race origin toggles.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(default)]
+pub struct RaceConfig {
+    pub enable_all_10_races: bool,
+    pub race_specific_recipe_unlocks: bool,
+    pub race_specific_ai_doctrine: bool,
+    pub enable_oxygen_poisoning: bool,
+    pub enable_dehydration: bool,
+    pub enable_dormancy: bool,
+    /// Per-world starter-race recommendations (world id → origin id).
+    pub starter_race_recommendations_per_world: std::collections::BTreeMap<String, String>,
+}
+
+impl Default for RaceConfig {
+    fn default() -> Self {
+        Self {
+            enable_all_10_races: true,
+            race_specific_recipe_unlocks: true,
+            race_specific_ai_doctrine: true,
+            enable_oxygen_poisoning: true,
+            enable_dehydration: true,
+            enable_dormancy: true,
+            starter_race_recommendations_per_world: std::collections::BTreeMap::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct Settings {
     pub ui_scale: f32,
@@ -577,6 +638,11 @@ pub struct Settings {
     pub reduced_motion: bool,
     pub reduced_shake: bool,
     pub reduced_flash: bool,
+    /// M17 § "G-Force HUD blackout" accessibility — caps the concussion
+    /// vignette/blackout at the Moderate band (no Severe tunneling / KO
+    /// blackout) for photosensitive / motion-sensitive players. Default off.
+    #[serde(default)]
+    pub reduced_g_force_blackout: bool,
     /// M4A: hold-to-press alternative for tap-to-press actions (ACC-A-05).
     /// When `true`, edge-triggered actions (jump / fire / reload / dig /
     /// reset / select_slot_*) require holding the key/button for
@@ -645,6 +711,13 @@ pub struct Settings {
     /// { ai_debug: true }` through cfctl.
     #[serde(default)]
     pub ai_debug: bool,
+
+    /// M17 § per-origin personal-power + oxygen + robot-thermal config.
+    #[serde(default)]
+    pub personal_power: PersonalPowerConfig,
+    /// M17 § 10-race origin toggles.
+    #[serde(default)]
+    pub race: RaceConfig,
 
     // === M8 accessibility / camera / debug / locale extensions ===
     /// FullPause). Cosmetic per M4; replay-deterministic.
@@ -960,6 +1033,7 @@ impl Default for Settings {
             reduced_motion: false,
             reduced_shake: false,
             reduced_flash: false,
+            reduced_g_force_blackout: false,
             hold_to_confirm: false,
             hold_threshold_ms: default_hold_threshold_ms(),
             key_remap_enabled: false,
@@ -975,6 +1049,8 @@ impl Default for Settings {
             walk_threshold: default_walk_threshold(),
             ai_difficulty: default_ai_difficulty(),
             ai_debug: false,
+            personal_power: PersonalPowerConfig::default(),
+            race: RaceConfig::default(),
             game_speed_assist: GameSpeedAssist::Off,
             color_cue_mode: ColorCueMode::Default,
             aim_assist: AimAssist::Off,

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/resource.cascade_offline.v0.1",
+  "title": "resource.cascade_offline",
+  "description": "M17 § resource.* family — an actor resource went offline because its producing organ or circuit was destroyed. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "resource" },
+    "event_type": { "const": "cascade_offline" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "kind": { "type": "string", "enum": ["blood", "oil", "power", "caloric", "bio_fluid", "oxygen_supply", "battery_charge", "internal_shock", "stamina"] },
+        "organ_id": { "type": ["string", "null"] },
+        "reason": { "type": "string", "enum": ["organ_destroyed", "circuit_destroyed"] }
+      },
+      "required": ["actor_id", "kind", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

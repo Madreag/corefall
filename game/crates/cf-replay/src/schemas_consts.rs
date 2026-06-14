@@ -561,3 +561,12 @@ pub(crate) const SCHEMA_MATERIAL_VIOLENT_BURST: &str = include_str!("../schemas/
 pub(crate) const SCHEMA_MATERIAL_REGISTERED: &str = include_str!("../schemas/event/material_registered.json");
 pub(crate) const SCHEMA_MATERIAL_REGISTRY_VALIDATION_FAILED: &str =
     include_str!("../schemas/event/material_registry_validation_failed.json");
+// M17 — resource.* event schemas.
+pub(crate) const SCHEMA_RESOURCE_CHANGED: &str = include_str!("../schemas/event/resource_changed.json");
+pub(crate) const SCHEMA_RESOURCE_CRITICAL: &str = include_str!("../schemas/event/resource_critical.json");
+pub(crate) const SCHEMA_RESOURCE_DEPLETED: &str = include_str!("../schemas/event/resource_depleted.json");
+pub(crate) const SCHEMA_RESOURCE_RESTORED: &str = include_str!("../schemas/event/resource_restored.json");
+pub(crate) const SCHEMA_RESOURCE_DRAIN_RATE_CHANGED: &str =
+    include_str!("../schemas/event/resource_drain_rate_changed.json");
+pub(crate) const SCHEMA_RESOURCE_CASCADE_OFFLINE: &str =
+    include_str!("../schemas/event/resource_cascade_offline.json");

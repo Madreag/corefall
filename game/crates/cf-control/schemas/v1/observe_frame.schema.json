@@ -1589,6 +1589,91 @@
         "settings"
       ]
     },
+    "PersonalPowerConfig": {
+      "description": "M17 § \"Settings + configuration surface\" — per-origin personal-power +\noxygen + robot-thermal toggles. PvE survival enables these; some PvP modes\ndisable them.",
+      "type": "object",
+      "properties": {
+        "auto_shed_threshold_pct": {
+          "type": "integer",
+          "format": "uint32",
+          "default": 30,
+          "minimum": 0
+        },
+        "battery_drain_multiplier": {
+          "type": "number",
+          "format": "float",
+          "default": 1.0
+        },
+        "enable_battery_management": {
+          "type": "boolean",
+          "default": true
+        },
+        "enable_oxygen_simulation": {
+          "type": "boolean",
+          "default": true
+        },
+        "enable_player_powered_armor": {
+          "type": "boolean",
+          "default": true
+        },
+        "enable_robot_inert_recovery": {
+          "type": "boolean",
+          "default": true
+        },
+        "enable_robot_thermal": {
+          "type": "boolean",
+          "default": true
+        },
+        "hot_swap_speed_multiplier": {
+          "type": "number",
+          "format": "float",
+          "default": 1.0
+        },
+        "oxygen_consumption_multiplier": {
+          "type": "number",
+          "format": "float",
+          "default": 1.0
+        }
+      }
+    },
+    "RaceConfig": {
+      "description": "M17 § \"Configuration surface (per M38)\" — 10-race origin toggles.",
+      "type": "object",
+      "properties": {
+        "enable_all_10_races": {
+          "type": "boolean",
+          "default": true
+        },
+        "enable_dehydration": {
+          "type": "boolean",
+          "default": true
+        },
+        "enable_dormancy": {
+          "type": "boolean",
+          "default": true
+        },
+        "enable_oxygen_poisoning": {
+          "type": "boolean",
+          "default": true
+        },
+        "race_specific_ai_doctrine": {
+          "type": "boolean",
+          "default": true
+        },
+        "race_specific_recipe_unlocks": {
+          "type": "boolean",
+          "default": true
+        },
+        "starter_race_recommendations_per_world": {
+          "description": "Per-world starter-race recommendations (world id → origin id).",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      }
+    },
     "ReactorView": {
       "description": "M2.5 reactor projection. Drives the HUD reactor-hp bar + the cfctl\n`inspect reactor <id>` lookup.",
       "type": "object",
@@ -1932,6 +2017,34 @@
           "type": "boolean",
           "default": false
         },
+        "personal_power": {
+          "description": "M17 § per-origin personal-power + oxygen + robot-thermal config.",
+          "$ref": "#/$defs/PersonalPowerConfig",
+          "default": {
+            "auto_shed_threshold_pct": 30,
+            "battery_drain_multiplier": 1.0,
+            "enable_battery_management": true,
+            "enable_oxygen_simulation": true,
+            "enable_player_powered_armor": true,
+            "enable_robot_inert_recovery": true,
+            "enable_robot_thermal": true,
+            "hot_swap_speed_multiplier": 1.0,
+            "oxygen_consumption_multiplier": 1.0
+          }
+        },
+        "race": {
+          "description": "M17 § 10-race origin toggles.",
+          "$ref": "#/$defs/RaceConfig",
+          "default": {
+            "enable_all_10_races": true,
+            "enable_dehydration": true,
+            "enable_dormancy": true,
+            "enable_oxygen_poisoning": true,
+            "race_specific_ai_doctrine": true,
+            "race_specific_recipe_unlocks": true,
+            "starter_race_recommendations_per_world": {}
+          }
+        },
         "recoil_decay_per_tick": {
           "description": "(CCCP `HDFirearm.cpp:891`). Default `0.05`.",
           "type": "number",
@@ -1946,6 +2059,11 @@
         },
         "reduced_flash": {
           "type": "boolean"
+        },
+        "reduced_g_force_blackout": {
+          "description": "M17 § \"G-Force HUD blackout\" accessibility — caps the concussion\nvignette/blackout at the Moderate band (no Severe tunneling / KO\nblackout) for photosensitive / motion-sensitive players. Default off.",
+          "type": "boolean",
+          "default": false
         },
         "reduced_motion": {
           "type": "boolean"

@@ -786,6 +786,32 @@ pub(crate) struct EngineMutable {
     /// M16C § Actors whose death has already been counted toward witnesses'
     /// witness-death windows (edge-detect so each death counts exactly once).
     pub(crate) m16c_processed_deaths: std::collections::BTreeSet<ActorId>,
+    /// M17 § Per-origin reaction + resource profile registry (the 11-row
+    /// origin matrix; overlaid from `content/origins/*.json`).
+    pub(crate) m17_origin_registry: cf_actor::origin::OriginRegistry,
+    /// M17 § Actors whose survival resources have been seeded from their
+    /// origin profile (lazy, once, on first sight while alive).
+    pub(crate) m17_seeded_actors: std::collections::BTreeSet<ActorId>,
+    /// M17 § Per-actor robot internal-shock dose (0-100; the synthetic
+    /// concussion analogue — decays 2/s).
+    pub(crate) m17_internal_shock_dose: BTreeMap<ActorId, f32>,
+    /// M17 § Last internal-shock band per actor (for band-change dedupe).
+    pub(crate) m17_internal_shock_band: BTreeMap<ActorId, &'static str>,
+    /// M17 § Actors whose sealed helmet is currently breached (oxygen drains
+    /// at 3× until resealed / refilled).
+    pub(crate) m17_helmet_breached: std::collections::BTreeSet<ActorId>,
+    /// M17 § Last critical-threshold band fired per (actor, resource-kind) so
+    /// `resource.critical` only fires on a band crossing (30% / 10% / 0%).
+    pub(crate) m17_resource_critical_band: BTreeMap<(ActorId, u8), u8>,
+    /// M17 § Per-actor personal-power network (battery + draw + shedding).
+    pub(crate) m17_power_by_actor: BTreeMap<ActorId, cf_actor::power::ActorPower>,
+    /// M17 § Per-actor worn oxygen tank (refills oxygen_supply; robots none).
+    pub(crate) m17_oxygen_tank_by_actor: BTreeMap<ActorId, cf_actor::oxygen::OxygenTank>,
+    /// M17 § Per-actor thermal band last emitted (throttle-event dedupe).
+    pub(crate) m17_thermal_band: BTreeMap<ActorId, cf_actor::overclock::ThermalBand>,
+    /// M17 § Per-origin death-recap cause string (the dominant lethal cause,
+    /// origin-aware, surfaced by the M10 debrief).
+    pub(crate) m17_death_cause: BTreeMap<ActorId, String>,
 }
 
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the

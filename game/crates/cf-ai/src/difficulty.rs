@@ -84,6 +84,21 @@ impl DifficultyPreset {
                 reload_ms: 1200,
                 retreat_hp_pct: 0.2,
             },
+            // M17 — Hardcore: real-physics TTD (no compound floor) + permadeath.
+            // The player had better know what they're doing.
+            "hardcore" => DifficultyPreset {
+                id: "hardcore".into(),
+                display_name: "Hardcore".into(),
+                hp: 150.0,
+                aim_settle_ticks: 4,
+                miss_chance: 0.02,
+                sight_range: 560.0,
+                sight_fov_degrees: 160.0,
+                hearing_radius: 720.0,
+                memory_decay_ticks: 900,
+                reload_ms: 1000,
+                retreat_hp_pct: 0.15,
+            },
             _ => return None,
         })
     }

@@ -657,3 +657,59 @@ fn schema_dump_check_m16c_enums_complete() {
         .collect();
     assert!(kinds.contains(&"pain"), "affliction kind enum must include `pain`");
 }
+
+/// M17 § 6 new resource.* event schemas: file + (category, event_type) pairs
+/// the recorder lookup must resolve.
+const M17_RESOURCE_EVENT_SCHEMAS: &[(&str, &str, &str)] = &[
+    ("resource_changed.json", "resource", "changed"),
+    ("resource_critical.json", "resource", "critical"),
+    ("resource_depleted.json", "resource", "depleted"),
+    ("resource_restored.json", "resource", "restored"),
+    ("resource_drain_rate_changed.json", "resource", "drain_rate_changed"),
+    ("resource_cascade_offline.json", "resource", "cascade_offline"),
+];
+
+/// M17: all 6 new schemas exist on disk + parse + declare the required keys.
+#[test]
+fn schema_dump_check_m17_resource_event_schemas_present() {
+    for (name, _, _) in M17_RESOURCE_EVENT_SCHEMAS {
+        let path = schemas_dir().join(name);
+        assert!(path.exists(), "M17 schema {name} missing at {}", path.display());
+        let v = parse_schema(name);
+        assert_required_keys(&v, name);
+    }
+    assert_eq!(M17_RESOURCE_EVENT_SCHEMAS.len(), 6, "expected 6 M17 resource event schemas");
+}
+
+/// M17: every new schema is wired into the recorder's `event_schema_for`
+/// lookup so payload validation runs in run-bundle evidence.
+#[test]
+fn schema_dump_check_m17_resource_event_schemas_registered() {
+    for (name, category, event_type) in M17_RESOURCE_EVENT_SCHEMAS {
+        assert!(
+            cf_replay::schemas::event_schema_for(category, event_type).is_some(),
+            "M17 schema {name} not registered for ({category}, {event_type})"
+        );
+    }
+}
+
+/// M17: every resource.* schema carries the canonical 9-value kind enum.
+#[test]
+fn schema_dump_check_m17_resource_kind_enum_complete() {
+    for (name, _, _) in M17_RESOURCE_EVENT_SCHEMAS {
+        let v = parse_schema(name);
+        let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
+        let payload = props.get("payload").and_then(|p| p.as_object()).unwrap();
+        let payload_props = payload.get("properties").and_then(|p| p.as_object()).unwrap();
+        let kind = payload_props.get("kind").and_then(|p| p.as_object()).unwrap();
+        let enum_vals = kind.get("enum").and_then(|e| e.as_array()).unwrap();
+        let strings: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
+        for required in [
+            "blood", "oil", "power", "caloric", "bio_fluid", "oxygen_supply", "battery_charge",
+            "internal_shock", "stamina",
+        ] {
+            assert!(strings.contains(&required), "{name} kind enum missing `{required}`");
+        }
+        assert_eq!(enum_vals.len(), 9, "{name} kind enum must list all 9 resource kinds");
+    }
+}

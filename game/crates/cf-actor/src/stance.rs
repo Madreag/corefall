@@ -85,7 +85,7 @@ pub fn derive_stance(inputs: StanceInputs) -> Stance {
     }
     match inputs.status {
         Status::Dead => return Stance::Dead,
-        Status::Downed => return Stance::Downed,
+        Status::Downed | Status::Inert => return Stance::Downed,
         Status::Inactive => return Stance::Idle,
         Status::Dying => return Stance::Dying,
         _ => {}

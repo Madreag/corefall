@@ -275,6 +275,14 @@ pub struct ActPlayerEjectParams {
     pub schema_version: u32,
 }
 
+/// M17 — `act.player.overclock` params. `tier` 0-3 (0 cancels the boost).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerOverclockParams {
+    pub schema_version: u32,
+    pub tier: u8,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerQuickActionSlotParams {

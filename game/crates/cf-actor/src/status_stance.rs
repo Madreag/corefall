@@ -24,11 +24,21 @@ pub enum Status {
     Dead = 3,
     Inactive = 4,
     Dying = 5,
+    /// M17 — power-survival origins (robots/drones) at 0 power: cannot move or
+    /// fire, NOT dead. Recoverable via repair tool + fresh battery. Appended
+    /// after `Dying=5` to preserve `checksum_bytes` byte layout.
+    Inert = 6,
 }
 
 impl Status {
     pub fn is_dead(self) -> bool {
         matches!(self, Status::Dead)
+    }
+
+    /// True for terminal-or-offline states that pause the actor (dead, dying,
+    /// inactive, or inert). Inert is recoverable; the others are not.
+    pub fn is_offline(self) -> bool {
+        matches!(self, Status::Dead | Status::Dying | Status::Inactive | Status::Inert)
     }
 
     pub fn accepts_input(self) -> bool {
@@ -43,6 +53,7 @@ impl Status {
             Status::Dying => "dying",
             Status::Dead => "dead",
             Status::Inactive => "inactive",
+            Status::Inert => "inert",
         }
     }
 }
@@ -155,7 +166,7 @@ impl Stance {
     pub fn from_state(velocity: Vec2, on_ground: bool, status: Status) -> Stance {
         match status {
             Status::Dead => Stance::Dead,
-            Status::Dying | Status::Downed => Stance::Downed,
+            Status::Dying | Status::Downed | Status::Inert => Stance::Downed,
             Status::Inactive => Stance::Idle,
             Status::Stable | Status::Unstable => {
                 if !on_ground {
@@ -189,7 +200,7 @@ impl Stance {
         }
         match status {
             Status::Dead => Stance::Dead,
-            Status::Dying | Status::Downed => Stance::Downed,
+            Status::Dying | Status::Downed | Status::Inert => Stance::Downed,
             Status::Inactive => Stance::Idle,
             Status::Stable | Status::Unstable => {
                 if jet_active {

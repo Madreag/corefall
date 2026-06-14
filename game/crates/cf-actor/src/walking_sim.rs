@@ -117,6 +117,8 @@ pub fn walk_sim_tick(actor: &mut ActorState, ctx: WalkSimContext) -> WalkSimEven
         Status::Downed | Status::Dying => AttitudeStatus::Dying,
         Status::Dead => AttitudeStatus::Dead,
         Status::Inactive => AttitudeStatus::Stable,
+        // INERT robot slumps like a downed actor (limp, non-responsive).
+        Status::Inert => AttitudeStatus::Dying,
     };
 
     let spring_ctx = SpringContext {

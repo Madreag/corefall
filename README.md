@@ -18,9 +18,9 @@
 [![Windows](https://img.shields.io/badge/Windows-supported-0078D6?style=flat-square&logo=windows&logoColor=white)](#)
 
 [![Status](https://img.shields.io/badge/status-prealpha-orange?style=flat-square)](#project-status)
-[![Milestones](https://img.shields.io/badge/milestones-20%20done%20%2F%20154%20active-2EA043?style=flat-square)](#roadmap)
-[![Crates](https://img.shields.io/badge/crates-48-blueviolet?style=flat-square)](#workspace)
-[![Lib tests](https://img.shields.io/badge/lib%20tests-2886%20passing-2EA043?style=flat-square)](#ci)
+[![Milestones](https://img.shields.io/badge/milestones-48%20done%20%2F%20126%20active-2EA043?style=flat-square)](#roadmap)
+[![Crates](https://img.shields.io/badge/crates-67-blueviolet?style=flat-square)](#workspace)
+[![Lib tests](https://img.shields.io/badge/lib%20tests-3593%20passing-2EA043?style=flat-square)](#ci)
 [![Ledger](https://img.shields.io/badge/ledger-7710%20fresh-2EA043?style=flat-square)](#asset-ledger)
 
 **[Pillars](#headline-systems) · [Roadmap](#roadmap) · [Workspace](#workspace) · [Performance](#performance--determinism-contract) · [Getting started](#getting-started) · [CLI](#cli-reference)**
@@ -36,7 +36,7 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 It's a **best-of-genre synthesis** that takes Cortex Command's command-core / dropship / chassis / digging fantasy and sets it on top of Stationeers-grade-or-better atmospherics, ONI-grade closed-loop life support, Noita-grade systemic materials, full collision physics, universal gravity, ACRE2-tier voice + radio simulation, and War Thunder-grade armor + spalling. AI bots are first-class teammates and rivals. Replay is deterministic. Modding is data-first. Accessibility is a floor, not an afterthought.
 
 > [!important]
-> **Where we are (2026-05-17).** 20 milestones closed: `M1`-`M11A` train + `M3A`/`M4A`/`M8A`/`M9A` + `M12` + `M12A` + **new today: `M9B` (Trench Networks) + `M9C` (Static Fortifications) + `M10B` (Replay-as-MP4 Export)**. **M9B closure**: new `cf-trench` crate with 6 cross-section variants + per-stance cover state (Exposed/Partial/Full) + zigzag procgen (anti-enfilade ±45° kinks) + 4 trench templates + 8 launch scenarios + 6 embedded modules (duckboard/fire_step/breastwork/drainage_sump/revetment/corner_traverse) + AI-TRENCH-A-01 doctrine + entrenching_tool + cover-indicator HUD + 8 replay event schemas. **M9C closure**: new `cf-fortification` crate with 7 sub-modules (mg_nest/watchtower/minefield/wire/anti_tank/camo/sandbag) + 23 fortification RON + 4 minefield templates + 10 launch scenarios + Crewing stance + bomb_disposal_robot + 4 AI doctrines (AI-MG-A-02/OBS-A-01/ENG-A-03/AT-A-04) + 16 replay event schemas + cross-area integration with M9B trench templates. **M10B closure**: new `cf-replay-export` crate with ffmpeg-next 8.1.0 bridge + 5 codec presets (twitch_1080p60/youtube_4k60/discord_720p30/clip_compact/archival_lossless) + chapter markers (M4+M9B+M9C event taxonomies) + camera director with Catmull-Rom interpolation + 5 overlays (HUD/kill_feed/cause_chain/chapter_timeline/watermark) + commentary mixer + tiny-skia software rasterizer + cf-app Export Last Replay CTA + cfctl replay shims + 2 CI scripts. Total of 188 validation-contract assertions passed across the three milestones; 2,886 workspace tests pass. Next up: `M13` (Equipment + Chassis + Damage Grammar).
+> **Where we are (2026-06-13).** 48 milestones closed (`M1`–`M16C`). The full **physics + damage train** is in (`M13` equipment/chassis/damage grammar → `M14` collision + impulse routing → `M14A`–`M14J`: limb-driven walking, gravity/wind producers, HEAT/APFSDS rounds, projectile-projectile CCD, per-pixel + lateral structural collapse, per-wound granularity, field-medic surgery, long-term scars/aging/veterans, advanced mobility). The **materials kernel** is in (`M15` Noita-grade per-pixel CA → `M15B` GPU kernel + precipitation, `M15C` 50+ material registry, `M15D` 55+ reaction matrix). The **hazard + affliction + biology layer** is in (`M16` hazards + 22 afflictions + anomalies + artifacts + swimming → `M16A` 11 environment-driven afflictions, `M16B` disease registry + lifecycle FSM + cure/vaccine/quarantine, **newest: `M16C` mental-health system** — Pain affliction + 8 conditions + PTSD + addiction + trauma + therapy, with the affliction→aim/move-speed combat consumer that closes the long-standing M5/M16 gap). 3,593 workspace lib tests pass; cross-OS determinism gate green. Next up: `M17` (Origin Reaction + Resource Model — the canonical no-HP-bar blood/oil/power/caloric/bio-fluid layer).
 
 ---
 
@@ -46,10 +46,10 @@ It's a **best-of-genre synthesis** that takes Cortex Command's command-core / dr
 |---|---|
 | **Engine** | Bevy 0.18.1 + wgpu + custom sim core, Tokio for the JSON-RPC control plane |
 | **Language** | Rust 1.95.0 (pinned via `game/rust-toolchain.toml`) |
-| **Workspace** | 44 crates (33 real + 11 stubs) · **1,248 lib tests passing** |
+| **Workspace** | 67 crates · **3,593 lib tests passing** |
 | **Determinism** | Same seed + same inputs → byte-identical event stream on Linux + macOS + Windows |
 | **Networking** | QUIC via `quinn`; LAN lockstep + internet rollback; semantic terrain events |
-| **Asset ledger** | **6,718 fresh entries** — every shipped asset is regenerable from prompt + seed |
+| **Asset ledger** | **7,710 fresh entries** — every shipped asset is regenerable from prompt + seed |
 | **Reference platform** | AMD Ryzen 9 9950X3D + RTX 5090 + 48 GB DDR5 — 200 actors + 500 projectiles + 1000 hazard pixels at sustained 60 Hz |
 | **Server tiers** | Workstation x86_64 · Apple Silicon (Mac mini M4 Pro+) · Linux VPS · Apple Mini Lab cluster |
 | **License** | Apache-2.0 OR MIT (your choice) |
@@ -89,17 +89,16 @@ The pillars that make Corefall its own genre, not a clone of any of its inspirat
 
 ### What's shipped
 
-- **15 milestones closed** (`specs/done/`): M1 / M2 / M3 / M3A / M4 / M4A / M5 / M6 / M7 / M8 / M8A / M9 / M9A / M10 / M11 / M11A.
-- **6,718 ledger entries** across all asset categories — every shipped asset is regenerable from prompt + seed via `cf-mod ledger regenerate <id>`.
-- **523 Tier 2 audio assets baked tonight** (`M12A` + `M37A`): 242 voice lines via ElevenLabs `eleven_v3` + `eleven_flash_v2_5`, 242 SFX via `eleven_text_to_sound_v2`, 39 music loops via `music_v1`. The remaining 81 music tracks have handoff docs ready for either RTX 5090 local (ACE-Step v1.5, Apache 2.0) or AIVA Pro Playwright generation.
-- **1,248 / 1,253 lib tests passing.** 5 pre-existing failures isolated to `cf-ai` (1), `cf-perception` (1), `cf-render-2d` (1), `cf-server` (2). Tonight's work didn't introduce any new failures.
-- **CI gates clean:** `cf-mod ledger verify --strict` reports `total=6718 fresh=6718 stale=0 drifted=0 missing=0 failed=0`; `cf-mod validate content/` reports `pass=1 warn=84 fail=0`.
+- **48 milestones closed** (`specs/done/`): the M1–M11A foundation + the M12/M12A–C aesthetic + audio + cinematic train + the full **M13–M14J physics / damage / wound / medic / long-term / mobility** train + the **M15–M15D materials kernel** (per-pixel CA + GPU + 50+ materials + 55+ reactions) + the **M16–M16C hazard / affliction / disease / mental-health layer**.
+- **7,710 ledger entries** across all asset categories — every shipped asset is regenerable from prompt + seed via `cf-mod ledger regenerate <id>`.
+- **3,593 workspace lib tests passing.** Cross-OS determinism gate (Linux + macOS + Windows, 60/120 Hz) green; sim crates remain `f64`-free, `thread_rng`-free, and default-hash-free per the 7 determinism hard rules.
+- **CI gates:** `cf-mod ledger verify --strict` reports `total=7710 fresh=7710`; `cf-mod validate content/` passes; schema-drift + run-bundle validators clean.
 
 ### Up next
 
-**`M12` — Vivid color-rich illustrated aesthetic + juice.** Hand-drawn ink-accent UI, 12 mission comic panels, death-recap-as-graphic-novel, juice rules per DR-055. Tier 1 visual placeholder backbone (6,066 entries) already covers every M12 surface; the runtime juice rules + animation system + comic-panel transitions remain.
+**`M17` — Origin Reaction + Resource Model.** The canonical no-HP-bar layer: blood / oil / power / caloric / bio-fluid per origin, damage routed to specific resources via specific organs/circuits, G-Force vision blackout scaling per origin. M16C's mental-health + affliction systems feed it (Pain morale-drain lands in M19H's accumulator; the affliction→aim/move-speed consumer is live).
 
-In parallel: **`M12A`** finishing the SFX coverage gap, **`M37A`** baking the remaining 81 music tracks, **`M24A` / `M25A` / `M32A` / `M33A`** Tier 2 visual / narrative / portrait / tutorial production.
+In parallel: the production-tier tracks remain in flight — **`M24A`** VFX, **`M25A`** narrative/codex, **`M32A`** ComfyUI portraits, **`M33A`** tutorial labs, **`M37A`** the remaining 81 music tracks, **`M48A`/`M48B`** Tier 3 polish + Steam store.
 
 ---
 
@@ -110,22 +109,23 @@ Every shipped asset is logged in `content/asset_ledger/ledger.jsonl` with prompt
 | Category | Count | Tier |
 |---|---:|---|
 | ActorSprite (per-faction × per-actor SVG poses) | 3,080 | Tier 1 SVG |
-| UiIcon (HUD widgets, shell UI, faction emblems) | 1,701 | Tier 1 SVG |
+| UiIcon (HUD widgets, shell UI, faction emblems) | 1,709 | Tier 1 SVG |
+| **Audio_SFX** (weapon / movement / impact / ambient / UI) | **1,222** | **Tier 2 ElevenLabs `eleven_text_to_sound_v2`** |
 | Particle (VFX particle textures) | 284 | Tier 1 SVG |
-| **Audio_Voice** (NPC + storyteller + boss + mission + tutorial + chatter) | 242 | **Tier 2 ElevenLabs `eleven_v3` / `eleven_flash_v2_5`** |
-| **Audio_SFX** (weapon / movement / impact / ambient / UI) | 242 | **Tier 2 ElevenLabs `eleven_text_to_sound_v2`** |
+| **Audio_Voice** (NPC + storyteller + boss + mission + tutorial + chatter) | 243 | **Tier 2 ElevenLabs `eleven_v3` / `eleven_flash_v2_5`** |
 | BaseModuleSprite (workbenches, vents, generators) | 240 | Tier 1 SVG |
 | WeaponSprite (per-class fire / dry / reload) | 210 | Tier 1 SVG |
 | MaterialSwatch (per-material × per-state textures) | 170 | Tier 1 SVG |
 | Animation (per-actor walk / hit / death frame strips) | 144 | Tier 1 SVG |
-| **Audio_Music** (12 worlds + 8 factions + 5 storytellers + 5 bosses × 4 variants) | **120** | **39 Tier 2 ElevenLabs `music_v1` + 81 Tier 1 procedural — handoffs pending** |
+| **Audio_Music** (12 worlds + 8 factions + 5 storytellers + 5 bosses × 4 variants) | **121** | **Tier 2 ElevenLabs `music_v1` + Tier 1 procedural** |
 | Cosmetic (helmets, paint kits, decals) | 106 | Tier 1 SVG |
 | TerrainTile (per-world × per-biome tiles) | 85 | Tier 1 SVG |
 | VehicleSprite (dropships, mechs, rockets) | 54 | Tier 1 SVG |
 | ChassisSprite (3 archetypes × layered armor) | 40 | Tier 1 SVG |
-| **Total** | **6,718** | clean |
+| Mod_Custom (modder-authored ledger entries) | 2 | mod |
+| **Total** | **7,710** | clean |
 
-The 81 unfinished music tracks are documented per-file at `game/content/audio/music/MUSIC_LEDGER.md` with full prompts and 4 generation paths (top-up ElevenLabs / local 5090 / AIVA / delete-for-silence).
+Remaining unfinished music tracks are documented per-file at `game/content/audio/music/MUSIC_LEDGER.md` with full prompts and generation paths (top-up ElevenLabs / local 5090 / AIVA).
 
 ---
 
@@ -144,17 +144,17 @@ The 81 unfinished music tracks are documented per-file at `game/content/audio/mu
 | M3B | ⏳ | ONI-Grade Per-Tile Element Model + Heat Transfer | Per-tile `element_id + mass_kg + temp_K` substrate; ONI heat-transfer math with caps + thermal conductivity scaling; mass-based pressure damage; vacuum-as-perfect-insulator; one-element-per-cell rule |
 | M3A | ✅ | Cross-OS Determinism | Linux x86_64 + Windows x86_64 + macOS aarch64 byte-identical event streams |
 | M4 | ✅ | Event Recorder Core | 38 event categories, replay verifier, per-tick blake3 `sim_checksum`, cosmetic-flag backpressure |
-| M4B | ⏳ | Save Format Versioning + Schema Migration + Delta-Encoded Snapshots + Run-Bundle Ledger Deep | `SaveSchemaVersion` semver + forward-only migration chain + delta-encoded snapshots ≥4× compression + per-event BLAKE3 chain-of-custody for tamper-evident tournament bundles |
+| M4B | ✅ | Save Format Versioning + Schema Migration + Delta-Encoded Snapshots + Run-Bundle Ledger Deep | `SaveSchemaVersion` semver + forward-only migration chain + delta-encoded snapshots ≥4× compression + per-event BLAKE3 chain-of-custody for tamper-evident tournament bundles |
 | M4A | ✅ | Asset Ledger Infrastructure | JSONL append-only ledger, 17 asset categories, 6 production tiers, regen + verify CLI, supersede chain |
 | M5 | ✅ | Deep Damage Event Surface Lock | 74 deep-damage event schemas across 13 families (armor / internal / concussion / fluid / origin / hazard / atmos / shield / environment / thermal) |
 | M6 | ✅ | Actor Depth + Equipment + Squad | 36 actions, 6 weapons, 4 grenades, 8-slot inventory, side-view facing, 1 friendly bot + 4 squad commands |
-| M6B | ⏳ | Item Schema Canonicalization + Per-Item Weight + Grid Dimensions + Inventory Encumbrance | Canonical ItemSpec schema (mass + grid + bulk + slot + container) + per-actor max_carry_kg + encumbrance compute + backpack tiers + container nesting |
-| M6C | ⏳ | Equipment Catalog Buildout (68 Launch SKUs) | 12 firearms + 8 melee + 10 throwables + 8 heavy weapons + 12 medical + 8 survival + 5 sensors + 15 PPE = 78 new SKUs at no-compromise depth |
+| M6B | ✅ | Item Schema Canonicalization + Per-Item Weight + Grid Dimensions + Inventory Encumbrance | Canonical ItemSpec schema (mass + grid + bulk + slot + container) + per-actor max_carry_kg + encumbrance compute + backpack tiers + container nesting |
+| M6C | ✅ | Equipment Catalog Buildout (68 Launch SKUs) | 12 firearms + 8 melee + 10 throwables + 8 heavy weapons + 12 medical + 8 survival + 5 sensors + 15 PPE = 78 new SKUs at no-compromise depth |
 | M7 | ✅ | AI Archetypes + Mission Director | 6 archetypes, 5-layer thinking stack, per-actor 22-task Priority Table, chatter scaffold, 20+ traits, 3 doctrines |
-| M7B | ⏳ | Deep Squad Command Grammar + Formation Orders + Combat Doctrine | 50+ squad commands (Advance/Suppress/Stack/Wedge/Echelon/Bound/Overwatch/Frag-Out/Smoke/Reinforce/Medic-Up/Fall-Back/etc) + 9 formation kinds with per-actor slot solver + 6× archetype behavior tree files (30+ nodes each) + Cortex-Command-style brain-hop preserving squad-state |
+| M7B | ✅ | Deep Squad Command Grammar + Formation Orders + Combat Doctrine | 50+ squad commands (Advance/Suppress/Stack/Wedge/Echelon/Bound/Overwatch/Frag-Out/Smoke/Reinforce/Medic-Up/Fall-Back/etc) + 9 formation kinds with per-actor slot solver + 6× archetype behavior tree files (30+ nodes each) + Cortex-Command-style brain-hop preserving squad-state |
 | M8 | ✅ | UX + Camera + Debug + L10n + Squad Control | Tab tactical overlay, Q-hold context wheel, "Why?" key, 10+ HUD widgets, 7 debug overlays, photo mode, replay scrubber |
 | M8A | ✅ | Parallel Determinism + GPU Offload + Server | Bevy ECS scheduler, snapshot-read / compute-parallel / commit-serial, `cf-net` (QUIC + LAN lockstep + internet rollback), GPU cosmetic offload, semantic terrain events |
-| M8B | ⏳ | QUIC Wire Protocol + Rollback Prediction + NAT Punch-Through Deep | Locked QUIC frame format + semver negotiation + 6-frame rollback prediction + redundant-input + Reed-Solomon FEC + ICE-lite/STUN/TURN NAT punch + transport-select (server-auth vs P2P lockstep) |
+| M8B | ✅ | QUIC Wire Protocol + Rollback Prediction + NAT Punch-Through Deep | Locked QUIC frame format + semver negotiation + 6-frame rollback prediction + redundant-input + Reed-Solomon FEC + ICE-lite/STUN/TURN NAT punch + transport-select (server-auth vs P2P lockstep) |
 | M9 | ✅ | Micro Reactor Defense Fun Slice | 60-90 s defend scenario, 5-tier terrain HP, 3-layer reactor armor, trench gameplay, parallel-foundation stress test |
 | M9B | ✅ | Trench Networks + Defensive Position Authored Content | 6 trench cross-section variants (shallow_scrape / standard / deep / communication / fire_step / parapet_raised) + zigzag procgen + per-segment cover state + 6 embedded modules + 4 trench templates + 8 launch scenarios + AI-TRENCH-A-01 burst-and-duck doctrine + 8 replay event schemas |
 | M9C | ✅ | Static Fortifications + Defensive Structures (MG Nests / Watchtowers / Mines / Wire) | MG nest + ammo box + spotter scope + 3-tier sandbag wall + 3-tier watchtower + spotlight + 4 mine kinds + minesweeper + bomb disposal robot + barbed/razor/electrified/concertina wire + anti-tank ditch + dragon's teeth + tank trap + camo netting + 4 AI doctrines (AI-MG-A-02/OBS-A-01/ENG-A-03/AT-A-04) + 10 launch scenarios + 16 replay event schemas |
@@ -163,30 +163,30 @@ The 81 unfinished music tracks are documented per-file at `game/content/audio/mu
 | M10B | ✅ | Replay-as-MP4 Export + Replay Editor + Overlay Composition + Chapter Markers + Per-Scene Camera Control | `cf-replay-export` ffmpeg-next 8.1.0 pipeline + 5 codec presets (twitch_1080p60/youtube_4k60/discord_720p30/clip_compact/archival_lossless FFV1) + auto-derived chapter markers (M4+M9B+M9C taxonomies) + camera director with Catmull-Rom interpolation + 5 overlays (HUD/kill_feed/cause_chain/chapter_timeline/watermark) + commentary mixer at 48kHz stereo + tiny-skia software rasterizer + cf-app Export Last Replay CTA |
 | M11 | ✅ | Readability + ACC-A Floor | 12 HUD nodes / 7 zones, 200% scale, high contrast, War Thunder angle widget, 25-scenario PASS verdict table |
 | M11A | ✅ | Shell UI Foundation | `cf-shell` crate (12 modules, 56 tests), splash + title + main menu + pause + save/load + settings tree + credits + loading screen + FRE wizard + 48 shell-widget SVGs |
-| M12 | 🔄 | Vivid Color-Rich Illustrated Aesthetic + Juice | Hand-drawn ink-accent UI, 12 mission comic panels, death-recap-as-graphic-novel, juice rules per DR-055 |
-| M12A | 🔄 | Tier 1 Audio Pipeline | 1200+ SFX target via Stable Audio Open / AudioCraft + caption metadata · **Tier 2 ElevenLabs SFX shipped (242 / 242)** |
-| M12B | ⏳ | HRTF Spatial Audio + Per-Room Reverb + Per-Material Echo + Per-Source Occlusion | HRTF 3D positioning (MIT KEMAR) + per-room reverb derived from M19 volume + wall-material mix + per-material echo/decay/transmission-loss/low-pass for 14 materials + wall occlusion + Doppler + per-medium filtering (water/smoke/vacuum/ammonia) |
-| M12C | ⏳ | In-Engine Cinematic Cutscenes + Mission-Opening + Between-Mission + Ending Cinematics + Camera Cinematography | In-engine cinematic playback distinct from comic panels + per-mission opening 30-60s + between-mission 15-30s + ending 2-5min + per-storyteller bias profiles + 5 camera primitives (pan/dolly/zoom/orbit/shake) + ElevenLabs narration sync + chapter markers |
-| M13 | ⏳ | Equipment + Chassis + Damage Grammar | 3 chassis archetypes, 15-zone body graph, layered armor, module state machine, pilot eject, brain-hop API |
-| M14 | ⏳ | Full Collision + Impulse Routing | Universal gravity field, projectile-projectile CCD, War Thunder penetration ray, HE / HEAT / APFSDS, spalling |
-| M14A | ⏳ | Limb-Driven Walking + CC Feel + Sim Overlay + Mass + Jetpack + Heavy Armor + Quick Action | 123 PARITY gates: walking sim + per-pixel material overlay + Stationeers atm overlay + per-origin resource overlay |
-| M14B | ⏳ | Gravity Field + Wind Force Producers | Per-cell + per-region gravity overrides (wells / low-g labs / magnetic boots) + cf-atmos wind-from-ΔP producer + gas stratification |
-| M14C | ⏳ | Tank-Grade Rounds (HEAT + APFSDS Producers + Content) | Promote M14 forward-compat to producers + 1 HEAT launcher + 1 APFSDS chassis weapon + ERA module + kill-cam variants |
-| M14D | ⏳ | Projectile-Projectile CCD | Selective broadphase + narrowphase pair-collision; kinetic deflect / fuze-trigger / APS intercept; C-RAM base defense |
-| M14E | ⏳ | Per-Pixel Structural Integrity + Tunnel Collapse | Per-chunk integrity field + vibration accumulator + cave-in roll + falling-debris damage + cascade-to-neighbor-chunks |
-| M14F | ⏳ | Lateral Wall Collapse + Sidewall Structural Integrity | 90° rotation of M14E engine: vertical mineshafts + retaining walls + dam ruptures + bunker perimeter walls under siege |
-| M14G | ⏳ | Per-Wound-Type Granularity + Severity Bands + Visual Decals | 28 WoundKind variants + 6-band severity ladder + per-wound bleed/pain/infection/heal metadata + wound decal lifecycle |
-| M14H | ⏳ | Field Medic Workflow + Surgery + Defibrillator + Triage + Treatment Producer Catalog | 22 treatment producers + field-medic decision tree + 5-phase surgery minigame + cardiac arrest CPR/defib loop + patient queue UX |
-| M14I | ⏳ | Long-Term Consequences + Scars + Phantom Limbs + Aging + Veteran Persistence Functional Layer | Per-veteran scar timeline with functional debuff + biological aging clock + prosthetic loop + chronic conditions + retirement |
-| M14J | ⏳ | Actor Advanced Mobility (Climbing + Parkour + Grappling + Rope + Mounted Riding) | Auto-vault + wall-jump (3-chain cap) + grappling hook + verlet rope swing + ladder/cable/vine climb + zip line + mounted riding with rider+critter mass aggregation + refined swim integrating M16 water |
-| M15 | ⏳ | Active Material Kernel | Noita-grade per-pixel CA, 50+ materials, 30+ reactions, alchemy, flasks, GPU compute |
-| M15B | ⏳ | GPU Material Kernel + Precipitation Cycle | wgpu compute pipeline + CPU determinism fallback + steam → cloud → rain + acid rain on Vulcan |
-| M15C | ⏳ | Full Material Registry Buildout (50+ Materials with Complete Schemas) | Full ONI + Stationeers + Noita schemas: id/hardness/density/specific_heat/thermal_conductivity/melt/boil/molar_mass/9 affordance flags/toxicity/corrosiveness/radioactivity/electrical_conductivity per material |
-| M15D | ⏳ | Reaction Matrix Buildout (55+ Locked Reactions with Stoichiometry) | acid+iron→rust, water+lava→obsidian, H2+O2+fire→steam, oil+fire→smoke, gunpowder+spark→explosion, etc — full stoichiometry / ΔH / Ea / rate / autoignition per reaction |
-| M16 | ⏳ | Hazard Package + Afflictions | 18 afflictions, 6 STALKER anomalies, 20+ artifacts, swimming + underwater combat |
-| M16A | ⏳ | Atmospheric + Environmental Affliction Depth Layer | Per-condition consumer kernel between M16 roster + M19/M28/M9 environment events; 11 environment-driven afflictions (stuffiness / heatstroke / hypothermia / asphyxiation / refrigerant_inhalation / electrocution / illuminated / laceration / trench_foot / stamina_movement_cost / panic_freeze_env); accumulators + threshold transitions + race-aware TTD curves + per-affliction clear conditions |
-| M16B | ⏳ | Disease Registry + Per-Disease Lifecycle + Cure Recipe + Vaccine + Quarantine | 17 launch diseases + per-disease cure recipe + vaccine + isolation class + R0 spread + per-origin susceptibility matrix |
-| M16C | ⏳ | Mental Health Conditions + PTSD + Addiction + Trauma + Therapy + Pain Affliction | 8 mental-health conditions + Pain affliction + therapy NPC + 8 psych medications + comorbidity matrix |
+| M12 | ✅ | Vivid Color-Rich Illustrated Aesthetic + Juice | Hand-drawn ink-accent UI, 12 mission comic panels, death-recap-as-graphic-novel, juice rules per DR-055 |
+| M12A | ✅ | Tier 1 Audio Pipeline | 1200+ SFX target via Stable Audio Open / AudioCraft + caption metadata · **Tier 2 ElevenLabs SFX shipped (242 / 242)** |
+| M12B | ✅ | HRTF Spatial Audio + Per-Room Reverb + Per-Material Echo + Per-Source Occlusion | HRTF 3D positioning (MIT KEMAR) + per-room reverb derived from M19 volume + wall-material mix + per-material echo/decay/transmission-loss/low-pass for 14 materials + wall occlusion + Doppler + per-medium filtering (water/smoke/vacuum/ammonia) |
+| M12C | ✅ | In-Engine Cinematic Cutscenes + Mission-Opening + Between-Mission + Ending Cinematics + Camera Cinematography | In-engine cinematic playback distinct from comic panels + per-mission opening 30-60s + between-mission 15-30s + ending 2-5min + per-storyteller bias profiles + 5 camera primitives (pan/dolly/zoom/orbit/shake) + ElevenLabs narration sync + chapter markers |
+| M13 | ✅ | Equipment + Chassis + Damage Grammar | 3 chassis archetypes, 15-zone body graph, layered armor, module state machine, pilot eject, brain-hop API |
+| M14 | ✅ | Full Collision + Impulse Routing | Universal gravity field, projectile-projectile CCD, War Thunder penetration ray, HE / HEAT / APFSDS, spalling |
+| M14A | ✅ | Limb-Driven Walking + CC Feel + Sim Overlay + Mass + Jetpack + Heavy Armor + Quick Action | 123 PARITY gates: walking sim + per-pixel material overlay + Stationeers atm overlay + per-origin resource overlay |
+| M14B | ✅ | Gravity Field + Wind Force Producers | Per-cell + per-region gravity overrides (wells / low-g labs / magnetic boots) + cf-atmos wind-from-ΔP producer + gas stratification |
+| M14C | ✅ | Tank-Grade Rounds (HEAT + APFSDS Producers + Content) | Promote M14 forward-compat to producers + 1 HEAT launcher + 1 APFSDS chassis weapon + ERA module + kill-cam variants |
+| M14D | ✅ | Projectile-Projectile CCD | Selective broadphase + narrowphase pair-collision; kinetic deflect / fuze-trigger / APS intercept; C-RAM base defense |
+| M14E | ✅ | Per-Pixel Structural Integrity + Tunnel Collapse | Per-chunk integrity field + vibration accumulator + cave-in roll + falling-debris damage + cascade-to-neighbor-chunks |
+| M14F | ✅ | Lateral Wall Collapse + Sidewall Structural Integrity | 90° rotation of M14E engine: vertical mineshafts + retaining walls + dam ruptures + bunker perimeter walls under siege |
+| M14G | ✅ | Per-Wound-Type Granularity + Severity Bands + Visual Decals | 28 WoundKind variants + 6-band severity ladder + per-wound bleed/pain/infection/heal metadata + wound decal lifecycle |
+| M14H | ✅ | Field Medic Workflow + Surgery + Defibrillator + Triage + Treatment Producer Catalog | 22 treatment producers + field-medic decision tree + 5-phase surgery minigame + cardiac arrest CPR/defib loop + patient queue UX |
+| M14I | ✅ | Long-Term Consequences + Scars + Phantom Limbs + Aging + Veteran Persistence Functional Layer | Per-veteran scar timeline with functional debuff + biological aging clock + prosthetic loop + chronic conditions + retirement |
+| M14J | ✅ | Actor Advanced Mobility (Climbing + Parkour + Grappling + Rope + Mounted Riding) | Auto-vault + wall-jump (3-chain cap) + grappling hook + verlet rope swing + ladder/cable/vine climb + zip line + mounted riding with rider+critter mass aggregation + refined swim integrating M16 water |
+| M15 | ✅ | Active Material Kernel | Noita-grade per-pixel CA, 50+ materials, 30+ reactions, alchemy, flasks, GPU compute |
+| M15B | ✅ | GPU Material Kernel + Precipitation Cycle | wgpu compute pipeline + CPU determinism fallback + steam → cloud → rain + acid rain on Vulcan |
+| M15C | ✅ | Full Material Registry Buildout (50+ Materials with Complete Schemas) | Full ONI + Stationeers + Noita schemas: id/hardness/density/specific_heat/thermal_conductivity/melt/boil/molar_mass/9 affordance flags/toxicity/corrosiveness/radioactivity/electrical_conductivity per material |
+| M15D | ✅ | Reaction Matrix Buildout (55+ Locked Reactions with Stoichiometry) | acid+iron→rust, water+lava→obsidian, H2+O2+fire→steam, oil+fire→smoke, gunpowder+spark→explosion, etc — full stoichiometry / ΔH / Ea / rate / autoignition per reaction |
+| M16 | ✅ | Hazard Package + Afflictions | 18 afflictions, 6 STALKER anomalies, 20+ artifacts, swimming + underwater combat |
+| M16A | ✅ | Atmospheric + Environmental Affliction Depth Layer | Per-condition consumer kernel between M16 roster + M19/M28/M9 environment events; 11 environment-driven afflictions (stuffiness / heatstroke / hypothermia / asphyxiation / refrigerant_inhalation / electrocution / illuminated / laceration / trench_foot / stamina_movement_cost / panic_freeze_env); accumulators + threshold transitions + race-aware TTD curves + per-affliction clear conditions |
+| M16B | ✅ | Disease Registry + Per-Disease Lifecycle + Cure Recipe + Vaccine + Quarantine | 17 launch diseases + per-disease cure recipe + vaccine + isolation class + R0 spread + per-origin susceptibility matrix |
+| M16C | ✅ | Mental Health Conditions + PTSD + Addiction + Trauma + Therapy + Pain Affliction | 8 mental-health conditions + Pain affliction + therapy NPC + 8 psych medications + comorbidity matrix |
 | M17 | ⏳ | Origin Reaction + Resource Model | No-HP-bar canonical, blood / oil / power / caloric / bio-fluid per origin, G-Force vision blackout |
 | M18 | ⏳ | Micro Sabotage Fun Slice | 60-90 s sabotage integrating collision + materials + hazards + origin |
 | M18A | ⏳ | Animation Production Tier 1 | 1100+ frame strips (walk / hit reactions / death) via AnimateDiff |
@@ -321,8 +321,9 @@ The lettered-suffix companions (`MnA` / `MnB` / `MnC` / `MnD` / `MnE`) sit **nex
 
 The current depth-extension waves:
 
-- **Physics depth** — M14 (collision) → M14A (limb walking + sim overlay) + M14B (gravity overrides + wind producer) + M14C (HEAT + APFSDS tank rounds) + M14D (projectile-projectile CCD) + M14E (per-pixel structural integrity + tunnel collapse).
-- **Materials depth** — M15 (active material kernel) → M15B (GPU material kernel + precipitation cycle).
+- **Physics depth** — M14 (collision) → M14A (limb walking + sim overlay) + M14B (gravity overrides + wind producer) + M14C (HEAT + APFSDS tank rounds) + M14D (projectile-projectile CCD) + M14E (per-pixel structural integrity + tunnel collapse) + M14F (lateral wall collapse + sidewall integrity) + M14G (per-wound-type granularity + severity bands + decals) + M14H (field-medic surgery + defibrillator + triage + treatment catalog) + M14I (long-term scars + phantom limbs + aging + veteran persistence) + M14J (actor advanced mobility).
+- **Materials depth** — M15 (active material kernel) → M15B (GPU material kernel + precipitation cycle) + M15C (50+ material registry buildout with complete schemas) + M15D (50+ locked reaction matrix — Noita alchemy + Stationeers stoichiometry).
+- **Affliction / biology depth** — M16 (hazard package + 22 afflictions + anomalies + artifacts + swimming) → M16A (11 atmospheric + environmental afflictions) + M16B (disease registry + per-disease lifecycle FSM + cure recipe + vaccine + quarantine + per-origin susceptibility) + M16C (mental-health: 8 conditions + PTSD + addiction + trauma + therapy + Pain affliction + the affliction→aim/move-speed combat consumer).
 - **Atmospherics depth** — M19 (PV=nRT kernel) → M19B (fuel production + refining chain) + M19C (suit life-support deep).
 - **Narrative depth** — M25 (campaign spine) → M25A (Tier 1 bible) → M25B (Tier 2 LLM expansion to 600 codex / 24 NPCs / 30 mission briefings / 100+ chatter / 5 storyteller scripts / 60+ loading tips).
 - **Building depth** — M28 (base atmospherics) → M28A (build mode UX) + M28B (thermal engineering + breach response) + M28C (vehicle bay + loading dock).
@@ -389,23 +390,26 @@ The combination is what allows a 9950X3D Windows client, an M4 Pro macOS server,
 
 ## Workspace
 
-**44 crates** under [`game/crates/`](game/crates/). Each crate has its own `AGENTS.md` boundary contract.
+**67 crates** under [`game/crates/`](game/crates/). Each crate has its own `AGENTS.md` boundary contract.
 
 ```text
-sim core              cf-sim-core · cf-actor · cf-physics · cf-terrain · cf-material · cf-chassis · cf-equipment
-                      cf-mission · cf-perception · cf-squad · cf-ai · cf-environment · cf-atmos · cf-priority
-control + replay      cf-control · cfctl · cf-replay · cf-replay-scrub · cf-headless · cf-mod · cf-asset-ledger
-                      cf-save · cf-e2e · cf-bench
+sim core              cf-sim-core · cf-actor · cf-physics · cf-terrain · cf-material · cf-material-gpu · cf-chassis
+                      cf-equipment · cf-internal · cf-mission · cf-perception · cf-squad · cf-ai · cf-environment
+                      cf-atmos · cf-priority
+damage + biology      cf-wound · cf-treatment · cf-scar · cf-aging · cf-prosthetic · cf-veteran · cf-affliction
+                      cf-disease · cf-mental-health
+world systems         cf-hazard · cf-anomaly · cf-artifact · cf-swim · cf-flask · cf-storyteller · cf-trench
+                      cf-fortification · cf-procgen · cf-content
+control + replay      cf-control · cfctl · cf-replay · cf-replay-scrub · cf-replay-export · cf-headless · cf-mod
+                      cf-asset-ledger · cf-save · cf-e2e · cf-bench
 runtime + presentation cf-app · cf-render-2d · cf-camera · cf-capture · cf-ui · cf-shell · cf-debug · cf-audio
-                      cf-photo · cf-killcam · cf-localization · cf-squad-ui
+                      cf-photo · cf-killcam · cf-cinematic · cf-localization · cf-squad-ui
 networking + server   cf-net · cf-server · cf-server-ops · cf-server-persistence · cf-server-anti-cheat
                       cf-server-admin
 tooling               cf-tools-editor · cf-tools-replay-viewer
 ```
 
-Notable additions tonight:
-- **`cf-shell`** — 12-module shell UI crate (splash / title / attract_mode / main_menu / pause_menu / save_load / save_slot_preview / settings_tree / credits / loading_screen / fre_wizard / shell_api / state). 56 lib tests. `ShellPlugin` wired into `cf-app`.
-- **`cf-audio::registry::AudioRegistry`** — pure-data ledger hydration indexed by canonical_name × {voice / sfx / music}. `music_variant_for(track_id, intensity)` adaptive-music selector per the `[0.0,0.3)→calm / [0.3,0.6)→buildup / [0.6,1.0]→climax` schedule. 18 / 18 cf-audio tests pass.
+The **damage + biology** and **world systems** families are the M13–M16C buildout: typed wounds + field surgery + scars/aging/prosthetics/veterans (`cf-wound`/`cf-treatment`/`cf-scar`/`cf-aging`/`cf-prosthetic`/`cf-veteran`), the 28-affliction roster + Pain consumer (`cf-affliction`), the 17-disease lifecycle (`cf-disease`), the 8-condition mental-health FSM (`cf-mental-health`), plus hazards/anomalies/artifacts/swim/flasks and the trench + fortification authored-content engines.
 
 ---
 
@@ -471,9 +475,9 @@ python3 tools/prototype_run_check.py ../prototype_runs/native/m1_*
 
 ```bash
 cd game
-cargo run -p cf-mod -- ledger verify --strict       # expects: total=6718 fresh=6718 stale=0 ...
-cargo run -p cf-mod -- validate ../content/         # expects: pass=1 warn=84 fail=0
-cargo test -p cf-audio -p cf-control -p cf-shell --lib   # 18 + 165 + 56 = 239 / 239 pass
+cargo run -p cf-mod -- ledger verify --strict       # expects: total=7710 fresh=7710 stale=0 ...
+cargo run -p cf-mod -- validate ../content/         # expects: pass>0 fail=0
+cargo test --workspace --lib --no-fail-fast         # 3,593 lib tests
 ```
 
 ---

@@ -41,7 +41,11 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
             .expect("actor id exists by construction");
 
         let previous_status = actor.status;
-        let accepted_input = actor.status.accepts_input() && actor.knockdown_ticks_remaining == 0;
+        // M16C — a panic-attack freeze incapacitates the actor exactly like a
+        // knockdown: no movement, aim, jump, or fire for the freeze duration.
+        let accepted_input = actor.status.accepts_input()
+            && actor.knockdown_ticks_remaining == 0
+            && actor.panic_freeze_ticks_remaining == 0;
         let mut outcome = ActorTickOutcome {
             actor: actor_id,
             source: intent.source,
@@ -304,7 +308,12 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
     let (rifle_selected, rifle_disabled_by_limb_loss, weapon_jammed, swap_in_progress) = {
         let actor = state.world.actors.get(&actor_id);
         let selected = actor.is_some_and(|a| a.inventory.selected_item().is_rifle());
-        let swap = actor.is_some_and(|a| a.weapon_swap_in_progress);
+        // M17 — a power-survival origin in reserve mode (or INERT) cannot fire.
+        let swap = actor.is_some_and(|a| {
+            a.weapon_swap_in_progress
+                || a.power_fire_locked
+                || matches!(a.status, crate::Status::Inert)
+        });
         let (rifle_off, jammed) = actor.and_then(|a| a.chassis.as_ref()).map_or((false, false), |c| {
             let (_, _, disable_rifle, _, _, _) = c.body_graph.movement_factor(&c.destroyed_zones());
             (disable_rifle, c.weapon_jammed)

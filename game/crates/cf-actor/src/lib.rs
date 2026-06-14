@@ -65,7 +65,9 @@
     clippy::large_enum_variant,
     clippy::default_trait_access,
     clippy::implicit_hasher,
-    clippy::uninlined_format_args
+    clippy::uninlined_format_args,
+    clippy::should_implement_trait,
+    clippy::trivially_copy_pass_by_ref
 )]
 
 pub mod arm_sway;
@@ -75,7 +77,13 @@ pub mod attitude;
 pub mod body_armor_slot;
 pub mod cardiac;
 pub mod components;
+pub mod concussion;
 pub mod diseases;
+pub mod internal_shock;
+pub mod origin;
+pub mod overclock;
+pub mod oxygen;
+pub mod power;
 pub mod m14h_state;
 pub mod constants;
 pub mod cover;
@@ -193,7 +201,21 @@ pub use gib::{default_cascade_chain, spread_angle, GibOriginKind, GibSpawn, Spre
 pub use lean::{LeanDirection, LeanState, LEAN_MAX_DEGREES};
 pub use stamina::{Stamina, SPRINT_STAMINA_DRAIN_PER_S, SPRINT_STAMINA_RECOVERY_PER_S};
 pub use stance::{derive_stance, fire_allowed_in_stance, is_cinematic, stance_bloom_factor, StanceInputs};
-pub use ttd::{AiDifficulty, InterimTtdContract, TtdAfflictionKind, TtdContract, TtdOrigin};
+pub use ttd::{
+    compound_ttd_floored, damage_type_ttd, damage_type_ttd_base, stack_penalty, AiDifficulty,
+    DamageType, InterimTtdContract, TtdAfflictionKind, TtdContract, TtdOrigin,
+};
+pub use concussion::{band_cap, effective_band, ko_duration_seconds, ConcussionBand};
+pub use origin::{
+    BodyPowerNeed, BreathGas, EnvResistance, FeedbackKind, Origin, OriginProfile, OriginRegistry,
+};
+pub use overclock::{
+    effective_action_speed, heat_dissipation_per_s, overclock_action_speed, overclock_heat_per_s,
+    overclock_power_drain_per_s, OverclockState, ThermalBand,
+};
+pub use oxygen::{tick_oxygen, OxygenTank, OxygenTankTier, OxygenTickInput, OxygenTickResult};
+pub use power::{ActorPower, BatteryPack, BatteryTier, PowerPriority};
+pub use internal_shock::{accrue_dose, decay_dose, impulse_arms_internal_shock};
 
 pub use actor_state::ActorState;
 pub use actor_world::ActorWorld;
@@ -203,8 +225,8 @@ pub use intent::{ControlIntent, IntentSource};
 pub use inventory_top::{Inventory, InventoryItem, ItemSlot};
 pub use observation::{
     ActorObservation, ChassisModuleView, ChassisView, ChassisZoneView,
-    ExtendedInventorySlotView, InventoryGridPlacementView, InventoryGridView, ReloadState,
-    WeaponStateView,
+    ExtendedInventorySlotView, InventoryGridPlacementView, InventoryGridView, M17ResourceView,
+    ReloadState, WeaponStateView,
 };
 pub use silhouette::{BodySilhouette, ModuleState, ModuleStrip};
 pub use status_stance::{Stance, Status};

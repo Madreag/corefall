@@ -11,7 +11,7 @@
 //! - Checksum status (`final_sim_checksum` + cadence + checksum_event_count
 //!   + first/last tick).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
 use crate::bundle::Bundle;
@@ -25,6 +25,7 @@ pub struct Debrief<'a> {
     pub terrain: TerrainRecap,
     pub key_events: KeyEvents,
     pub checksum: ChecksumStatus,
+    pub m17: M17Recap,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -112,6 +113,125 @@ pub struct ChecksumStatus {
     pub last_tick: Option<u64>,
 }
 
+/// Reaction class of an origin. Drives which vocabulary the death recap uses
+/// so a synthetic chassis is never described as "bleeding out" and an organic
+/// body is never described as "going offline".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OriginClass {
+    Organic,
+    Synthetic,
+}
+
+impl OriginClass {
+    fn label(self) -> &'static str {
+        match self {
+            OriginClass::Organic => "organic",
+            OriginClass::Synthetic => "synthetic",
+        }
+    }
+}
+
+/// Map a replay `origin_id` (PascalCase, locked at v0.1) to its reaction class.
+/// Robot is the only fully-synthetic launch origin; the rest route through the
+/// organic flesh/blood/concussion model.
+fn origin_class_of(origin_id: &str) -> Option<OriginClass> {
+    match origin_id {
+        "Human" | "Android" | "PoweredOrganic" | "HeavyBiomech" => Some(OriginClass::Organic),
+        "Robot" => Some(OriginClass::Synthetic),
+        _ => None,
+    }
+}
+
+/// Per-kind tally over the `resource.*` event stream.
+#[derive(Debug, Clone, Default)]
+pub struct ResourceKindStat {
+    pub changed: u64,
+    pub critical: u64,
+    pub depleted: u64,
+}
+
+/// `origin.shot_force_feedback` + `origin.helmet_breach` aggregate.
+#[derive(Debug, Clone, Default)]
+pub struct ForceFeedbackSummary {
+    pub total: u64,
+    /// pain_jolt / servo_jolt / frame_ring counts.
+    pub by_feedback_kind: BTreeMap<String, u64>,
+    pub helmet_breaches: u64,
+    pub helmet_breach_actors: BTreeSet<u64>,
+    pub g_load_total: f64,
+    pub g_load_by_actor: BTreeMap<u64, f64>,
+}
+
+/// `internal.*` organ-vs-circuit destroyed/damaged tallies.
+#[derive(Debug, Clone, Default)]
+pub struct InternalDamageBreakdown {
+    pub organs_damaged: u64,
+    pub organs_destroyed: u64,
+    pub circuits_damaged: u64,
+    pub circuits_destroyed: u64,
+}
+
+/// One dead (or offlined) actor's origin-appropriate cause chain. Organic
+/// fields stay empty for a synthetic chassis and vice-versa.
+#[derive(Debug, Clone)]
+pub struct OriginDeath {
+    pub actor_id: u64,
+    pub origin_id: Option<String>,
+    pub class: Option<OriginClass>,
+    pub died_at_tick: Option<u64>,
+    // organic cause channels
+    pub organs_destroyed: Vec<String>,
+    pub organ_failures: Vec<String>,
+    pub concussion_band: Option<String>,
+    pub concussion_ko: bool,
+    pub bled_out: bool,
+    pub bleeding: bool,
+    // synthetic cause channels
+    pub circuits_destroyed: Vec<String>,
+    pub circuit_failures: Vec<String>,
+    pub internal_shock_hits: u64,
+    pub modules_damaged: Vec<String>,
+    pub power_depleted: bool,
+    pub went_offline: bool,
+    pub offline_reason: Option<String>,
+    pub thermal_cascade: bool,
+}
+
+impl OriginDeath {
+    fn new(actor_id: u64) -> Self {
+        OriginDeath {
+            actor_id,
+            origin_id: None,
+            class: None,
+            died_at_tick: None,
+            organs_destroyed: Vec::new(),
+            organ_failures: Vec::new(),
+            concussion_band: None,
+            concussion_ko: false,
+            bled_out: false,
+            bleeding: false,
+            circuits_destroyed: Vec::new(),
+            circuit_failures: Vec::new(),
+            internal_shock_hits: 0,
+            modules_damaged: Vec::new(),
+            power_depleted: false,
+            went_offline: false,
+            offline_reason: None,
+            thermal_cascade: false,
+        }
+    }
+}
+
+/// M17 per-origin death recap + resource / force-feedback / internal-damage
+/// rollups, all derived from the recorded event stream (offline; no engine).
+#[derive(Debug, Clone, Default)]
+pub struct M17Recap {
+    pub deaths: Vec<OriginDeath>,
+    pub resource_timeline: BTreeMap<String, ResourceKindStat>,
+    pub force_feedback: ForceFeedbackSummary,
+    pub internal_damage: InternalDamageBreakdown,
+}
+
 /// Compose a debrief from the bundle.
 pub fn compose<'a>(bundle: &'a Bundle) -> Debrief<'a> {
     let outcome = compose_outcome(bundle);
@@ -120,6 +240,7 @@ pub fn compose<'a>(bundle: &'a Bundle) -> Debrief<'a> {
     let terrain = compose_terrain(bundle);
     let key_events = compose_key_events(bundle);
     let checksum = compose_checksum(bundle);
+    let m17 = compose_m17(bundle);
     Debrief {
         bundle,
         outcome,
@@ -128,6 +249,7 @@ pub fn compose<'a>(bundle: &'a Bundle) -> Debrief<'a> {
         terrain,
         key_events,
         checksum,
+        m17,
     }
 }
 
@@ -327,6 +449,406 @@ fn compose_checksum(bundle: &Bundle) -> ChecksumStatus {
         checksum_event_count: bundle.summary.checksum_event_count,
         first_tick: bundle.summary.first_tick,
         last_tick: bundle.summary.last_tick,
+    }
+}
+
+/// Single pass over the event stream that builds the M17 origin recap:
+/// actor→origin map, dead-actor cause chains, resource tallies, force-feedback
+/// rollup, and internal-damage breakdown. Everything is derived from recorded
+/// events — the debrief never touches the engine.
+fn compose_m17(bundle: &Bundle) -> M17Recap {
+    let mut origin_id_by_actor: BTreeMap<u64, String> = BTreeMap::new();
+    let mut causes: BTreeMap<u64, OriginDeath> = BTreeMap::new();
+    let mut dead: BTreeMap<u64, Option<u64>> = BTreeMap::new();
+    let mut force_feedback = ForceFeedbackSummary::default();
+    let mut resource_timeline: BTreeMap<String, ResourceKindStat> = BTreeMap::new();
+    let mut internal_damage = InternalDamageBreakdown::default();
+
+    for event in bundle.events.iter() {
+        let cat = event.category.as_str();
+        let ety = event.event_type.as_str();
+        let p = &event.payload;
+        let aid = event_actor_id(event);
+
+        // actor → origin (last-seen wins) from the events that carry origin_id.
+        if let Some(id) = aid {
+            if (cat == "origin" && ety == "shot_force_feedback") || (cat == "concussion" && ety == "dose_changed") {
+                if let Some(origin) = p.get("origin_id").and_then(|v| v.as_str()) {
+                    origin_id_by_actor.insert(id, origin.to_string());
+                }
+            }
+        }
+
+        // Death / incapacitation detection (mirrors DamageRecap's actor_died
+        // plus an `actor_status_changed → dead/dying/inert` fallback).
+        let status_is_terminal = ety == "actor_status_changed"
+            && p.get("new_status")
+                .and_then(|v| v.as_str())
+                .map(|s| {
+                    matches!(
+                        s.to_ascii_lowercase().as_str(),
+                        "dead" | "dying" | "inert" | "incapacitated" | "destroyed"
+                    )
+                })
+                .unwrap_or(false);
+        if ety == "actor_died" || status_is_terminal {
+            if let Some(id) = aid {
+                dead.entry(id).or_insert(Some(event.tick));
+            }
+        }
+
+        match (cat, ety) {
+            ("internal", "organ_damaged") => internal_damage.organs_damaged += 1,
+            ("internal", "organ_destroyed") => {
+                internal_damage.organs_destroyed += 1;
+                if let Some(id) = aid {
+                    causes
+                        .entry(id)
+                        .or_insert_with(|| OriginDeath::new(id))
+                        .organs_destroyed
+                        .push(organ_or_circuit_label(p, "organ_kind", "organ_id", "organ"));
+                }
+            }
+            ("internal", "organ_failure_cascade") => {
+                if let Some(id) = aid {
+                    causes
+                        .entry(id)
+                        .or_insert_with(|| OriginDeath::new(id))
+                        .organ_failures
+                        .push(organ_or_circuit_label(p, "organ_kind", "organ_id", "organ"));
+                }
+            }
+            ("internal", "circuit_damaged") => internal_damage.circuits_damaged += 1,
+            ("internal", "circuit_destroyed") => {
+                internal_damage.circuits_destroyed += 1;
+                if let Some(id) = aid {
+                    causes
+                        .entry(id)
+                        .or_insert_with(|| OriginDeath::new(id))
+                        .circuits_destroyed
+                        .push(organ_or_circuit_label(p, "circuit_kind", "circuit_id", "circuit"));
+                }
+            }
+            ("internal", "circuit_failure_cascade") => {
+                if let Some(id) = aid {
+                    causes
+                        .entry(id)
+                        .or_insert_with(|| OriginDeath::new(id))
+                        .circuit_failures
+                        .push(organ_or_circuit_label(p, "circuit_kind", "circuit_id", "circuit"));
+                }
+            }
+            ("concussion", "band_changed") => {
+                if let Some(id) = aid {
+                    if let Some(band) = p.get("to_band").and_then(|v| v.as_str()) {
+                        causes.entry(id).or_insert_with(|| OriginDeath::new(id)).concussion_band = Some(band.to_string());
+                    }
+                }
+            }
+            ("concussion", "ko_threshold_crossed") => {
+                if let Some(id) = aid {
+                    causes.entry(id).or_insert_with(|| OriginDeath::new(id)).concussion_ko = true;
+                }
+            }
+            ("internal_shock", "dose_changed") => {
+                if let Some(id) = aid {
+                    causes.entry(id).or_insert_with(|| OriginDeath::new(id)).internal_shock_hits += 1;
+                }
+            }
+            ("internal_shock", "module_damaged") => {
+                if let Some(id) = aid {
+                    let module = p.get("module_id").and_then(|v| v.as_str()).unwrap_or("module").to_string();
+                    causes
+                        .entry(id)
+                        .or_insert_with(|| OriginDeath::new(id))
+                        .modules_damaged
+                        .push(module);
+                }
+            }
+            ("chassis", "thermal_throttle_started") => {
+                if let Some(id) = aid {
+                    causes.entry(id).or_insert_with(|| OriginDeath::new(id)).thermal_cascade = true;
+                }
+            }
+            ("affliction", "applied") => {
+                if let Some(id) = aid {
+                    if p.get("kind").and_then(|v| v.as_str()) == Some("bleeding") {
+                        causes.entry(id).or_insert_with(|| OriginDeath::new(id)).bleeding = true;
+                    }
+                }
+            }
+            ("resource", "changed") => {
+                if let Some(kind) = p.get("kind").and_then(|v| v.as_str()) {
+                    resource_timeline.entry(kind.to_string()).or_default().changed += 1;
+                }
+            }
+            ("resource", "critical") => {
+                if let Some(kind) = p.get("kind").and_then(|v| v.as_str()) {
+                    resource_timeline.entry(kind.to_string()).or_default().critical += 1;
+                }
+            }
+            ("resource", "depleted") => {
+                if let Some(kind) = p.get("kind").and_then(|v| v.as_str()) {
+                    resource_timeline.entry(kind.to_string()).or_default().depleted += 1;
+                    if let Some(id) = aid {
+                        let c = causes.entry(id).or_insert_with(|| OriginDeath::new(id));
+                        match kind {
+                            "blood" | "bio_fluid" => c.bled_out = true,
+                            "power" | "oil" => c.power_depleted = true,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            ("resource", "cascade_offline") => {
+                if let Some(id) = aid {
+                    let reason = p.get("reason").and_then(|v| v.as_str()).map(str::to_string);
+                    let c = causes.entry(id).or_insert_with(|| OriginDeath::new(id));
+                    c.went_offline = true;
+                    c.power_depleted = true;
+                    if c.offline_reason.is_none() {
+                        c.offline_reason = reason;
+                    }
+                    dead.entry(id).or_insert(Some(event.tick));
+                }
+            }
+            ("origin", "shot_force_feedback") => {
+                force_feedback.total += 1;
+                if let Some(fk) = p.get("feedback_kind").and_then(|v| v.as_str()) {
+                    *force_feedback.by_feedback_kind.entry(fk.to_string()).or_insert(0) += 1;
+                }
+                if let Some(g) = p.get("g_load_delta").and_then(|v| v.as_f64()) {
+                    if g.is_finite() && g != 0.0 {
+                        force_feedback.g_load_total += g;
+                        if let Some(id) = aid {
+                            *force_feedback.g_load_by_actor.entry(id).or_insert(0.0) += g;
+                        }
+                    }
+                }
+            }
+            ("origin", "helmet_breach") => {
+                force_feedback.helmet_breaches += 1;
+                if let Some(id) = aid {
+                    force_feedback.helmet_breach_actors.insert(id);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut deaths: Vec<OriginDeath> = Vec::new();
+    for (aid, tick) in dead.into_iter() {
+        let mut d = causes.remove(&aid).unwrap_or_else(|| OriginDeath::new(aid));
+        d.died_at_tick = tick;
+        d.origin_id = origin_id_by_actor.get(&aid).cloned();
+        d.class = d
+            .origin_id
+            .as_deref()
+            .and_then(origin_class_of)
+            .or_else(|| infer_class_from_causes(&d));
+        deaths.push(d);
+    }
+
+    M17Recap {
+        deaths,
+        resource_timeline,
+        force_feedback,
+        internal_damage,
+    }
+}
+
+/// Best-effort reaction class when no `origin_id` telemetry is attached to the
+/// dead actor: organic if it shows flesh/blood/concussion damage, synthetic if
+/// it shows circuit/shock/power/heat damage.
+fn infer_class_from_causes(d: &OriginDeath) -> Option<OriginClass> {
+    let organic = !d.organs_destroyed.is_empty()
+        || !d.organ_failures.is_empty()
+        || d.concussion_band.is_some()
+        || d.concussion_ko
+        || d.bled_out
+        || d.bleeding;
+    let synthetic = !d.circuits_destroyed.is_empty()
+        || !d.circuit_failures.is_empty()
+        || d.internal_shock_hits > 0
+        || !d.modules_damaged.is_empty()
+        || d.went_offline
+        || d.thermal_cascade;
+    match (organic, synthetic) {
+        (true, false) => Some(OriginClass::Organic),
+        (false, true) => Some(OriginClass::Synthetic),
+        _ => None,
+    }
+}
+
+fn organ_or_circuit_label(p: &serde_json::Value, kind_key: &str, id_key: &str, fallback: &str) -> String {
+    p.get(kind_key)
+        .and_then(|v| v.as_str())
+        .or_else(|| p.get(id_key).and_then(|v| v.as_str()))
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+/// Order-preserving de-duplicating join (so `heart, heart, liver` → `heart, liver`).
+fn join_unique(items: &[String]) -> String {
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
+    let mut out: Vec<&str> = Vec::new();
+    for item in items {
+        if seen.insert(item.as_str()) {
+            out.push(item.as_str());
+        }
+    }
+    out.join(", ")
+}
+
+/// True when a verbatim payload string is safe to print on a synthetic line
+/// (carries no organic vocabulary that would read as wrong-origin language).
+fn synthetic_safe(s: &str) -> bool {
+    let s = s.to_ascii_lowercase();
+    !["organ", "blood", "bled", "concuss", "flesh"].iter().any(|w| s.contains(w))
+}
+
+fn render_death_recap(out: &mut String, deaths: &[OriginDeath]) {
+    if deaths.is_empty() {
+        let _ = writeln!(out, "_no actor deaths recorded_");
+        return;
+    }
+    for d in deaths.iter() {
+        let at = d
+            .died_at_tick
+            .map(|t| format!(" (tick {t})"))
+            .unwrap_or_default();
+        let origin = d.origin_id.as_deref();
+        match d.class {
+            Some(OriginClass::Organic) => {
+                let mut parts: Vec<String> = Vec::new();
+                if !d.organs_destroyed.is_empty() {
+                    parts.push(format!("organ destroyed: {}", join_unique(&d.organs_destroyed)));
+                }
+                if !d.organ_failures.is_empty() {
+                    parts.push(format!("organ failure: {}", join_unique(&d.organ_failures)));
+                }
+                if let Some(band) = &d.concussion_band {
+                    parts.push(format!("concussion band: {band}"));
+                }
+                if d.concussion_ko {
+                    parts.push("concussion KO".to_string());
+                }
+                if d.bled_out {
+                    parts.push("bled out".to_string());
+                } else if d.bleeding {
+                    parts.push("bleeding".to_string());
+                }
+                if parts.is_empty() {
+                    parts.push("cause undetermined".to_string());
+                }
+                let _ = writeln!(
+                    out,
+                    "- actor #{} ({}, organic){}: {}",
+                    d.actor_id,
+                    origin.unwrap_or("organic"),
+                    at,
+                    parts.join("; ")
+                );
+            }
+            Some(OriginClass::Synthetic) => {
+                let mut parts: Vec<String> = Vec::new();
+                if !d.circuits_destroyed.is_empty() {
+                    parts.push(format!("circuit destroyed: {}", join_unique(&d.circuits_destroyed)));
+                }
+                if !d.circuit_failures.is_empty() {
+                    parts.push(format!("circuit failure: {}", join_unique(&d.circuit_failures)));
+                }
+                if d.internal_shock_hits > 0 {
+                    parts.push(format!("internal shock ×{}", d.internal_shock_hits));
+                }
+                if !d.modules_damaged.is_empty() {
+                    parts.push(format!("module damage: {}", join_unique(&d.modules_damaged)));
+                }
+                if d.went_offline {
+                    match d.offline_reason.as_deref() {
+                        Some(r) if synthetic_safe(r) => parts.push(format!("went offline ({r})")),
+                        _ => parts.push("went offline".to_string()),
+                    }
+                } else if d.power_depleted {
+                    parts.push("power depleted".to_string());
+                }
+                if d.thermal_cascade {
+                    parts.push("thermal cascade".to_string());
+                }
+                if parts.is_empty() {
+                    parts.push("cause undetermined".to_string());
+                }
+                let _ = writeln!(
+                    out,
+                    "- actor #{} ({}, synthetic){}: {}",
+                    d.actor_id,
+                    origin.unwrap_or("synthetic"),
+                    at,
+                    parts.join("; ")
+                );
+            }
+            None => {
+                let _ = writeln!(
+                    out,
+                    "- actor #{}{}: cause undetermined (no origin telemetry)",
+                    d.actor_id, at
+                );
+            }
+        }
+    }
+}
+
+fn render_resource_timeline(out: &mut String, m17: &M17Recap) {
+    if m17.resource_timeline.is_empty() {
+        let _ = writeln!(out, "_no `resource.*` events recorded_");
+        return;
+    }
+    let _ = writeln!(out, "| kind | changed | critical | depleted |");
+    let _ = writeln!(out, "|------|---------|----------|----------|");
+    for (kind, stat) in m17.resource_timeline.iter() {
+        let _ = writeln!(
+            out,
+            "| `{kind}` | {} | {} | {} |",
+            stat.changed, stat.critical, stat.depleted
+        );
+    }
+}
+
+fn render_internal_damage(out: &mut String, m17: &M17Recap) {
+    let i = &m17.internal_damage;
+    let _ = writeln!(
+        out,
+        "- Organs — damaged: {} · destroyed: {}",
+        i.organs_damaged, i.organs_destroyed
+    );
+    let _ = writeln!(
+        out,
+        "- Circuits — damaged: {} · destroyed: {}",
+        i.circuits_damaged, i.circuits_destroyed
+    );
+}
+
+fn render_force_feedback(out: &mut String, m17: &M17Recap) {
+    let ff = &m17.force_feedback;
+    let _ = writeln!(out, "- Total `origin.shot_force_feedback` events: {}", ff.total);
+    if !ff.by_feedback_kind.is_empty() {
+        let _ = writeln!(out, "- By feedback kind:");
+        for (kind, count) in ff.by_feedback_kind.iter() {
+            let _ = writeln!(out, "  - `{kind}`: {count}");
+        }
+    }
+    let _ = writeln!(
+        out,
+        "- Helmet breaches: {} (actors affected: {})",
+        ff.helmet_breaches,
+        ff.helmet_breach_actors.len()
+    );
+    let _ = writeln!(out, "- Cumulative g-load dose: {:.1}", ff.g_load_total);
+    if !ff.g_load_by_actor.is_empty() {
+        let _ = writeln!(out, "- G-load by actor:");
+        for (actor, dose) in ff.g_load_by_actor.iter() {
+            let _ = writeln!(out, "  - actor #{actor}: {dose:.1}");
+        }
     }
 }
 
@@ -585,13 +1107,18 @@ pub fn render_markdown(debrief: &Debrief<'_>) -> String {
     }
     let _ = writeln!(out);
 
-    // markdown lists 18 mandated `##` sections. Sections 9-17 are stubs
-    // that ladder up when M9 producer events fire (most are placeholder
-    // headers today; once armor/internal/concussion/fluid/origin/hazard/
-    // affliction/atmos producers populate events from M13+/M14/M16/M17/M19
-    // milestones, these stubs fill in with real per-actor breakdowns).
-    // Stub headers MUST appear so AI Self-Test grading + spec literal
-    // assertions find them in any bundle.
+    // ---- Per-origin death recap — M17 origin reaction model ----
+    let _ = writeln!(out, "## Per-Origin Death Recap");
+    let _ = writeln!(out);
+    render_death_recap(&mut out, &debrief.m17.deaths);
+    let _ = writeln!(out);
+
+    // markdown lists 18 mandated `##` sections. The M17 producers now fill
+    // Resource Timeline / Internal Damage Breakdown / Origin Force Feedback
+    // Summary with real rollups; the remaining headers ladder up at their own
+    // milestones (armor M13, fluid/concussion M14, hazard/affliction M16,
+    // atmos M19) and stay as stubs until then. Headers MUST appear so AI
+    // Self-Test grading + spec literal assertions find them in any bundle.
     for section_stub in [
         ("Mission State", "_synthesizes objective progression + reactor state at run end_"),
         ("Resource Timeline", "_M17 resource cost trend (ladder up at M17)_"),
@@ -605,7 +1132,14 @@ pub fn render_markdown(debrief: &Debrief<'_>) -> String {
         ("Atmospheric Events", "_M19 atmos pressure / temperature / phase transitions_"),
     ] {
         let _ = writeln!(out, "## {}", section_stub.0);
-        let _ = writeln!(out, "{}", section_stub.1);
+        match section_stub.0 {
+            "Resource Timeline" => render_resource_timeline(&mut out, &debrief.m17),
+            "Internal Damage Breakdown" => render_internal_damage(&mut out, &debrief.m17),
+            "Origin Force Feedback Summary" => render_force_feedback(&mut out, &debrief.m17),
+            _ => {
+                let _ = writeln!(out, "{}", section_stub.1);
+            }
+        }
         let _ = writeln!(out);
     }
 
@@ -755,6 +1289,51 @@ pub fn render_json(debrief: &Debrief<'_>) -> serde_json::Value {
             "checksum_event_count": debrief.checksum.checksum_event_count,
             "first_tick": debrief.checksum.first_tick,
             "last_tick": debrief.checksum.last_tick,
+        },
+        "m17": {
+            "deaths": debrief.m17.deaths.iter().map(|d| {
+                serde_json::json!({
+                    "actor_id": d.actor_id,
+                    "origin_id": d.origin_id,
+                    "class": d.class.map(|c| c.label()),
+                    "died_at_tick": d.died_at_tick,
+                    "organs_destroyed": d.organs_destroyed,
+                    "organ_failures": d.organ_failures,
+                    "concussion_band": d.concussion_band,
+                    "concussion_ko": d.concussion_ko,
+                    "bled_out": d.bled_out,
+                    "bleeding": d.bleeding,
+                    "circuits_destroyed": d.circuits_destroyed,
+                    "circuit_failures": d.circuit_failures,
+                    "internal_shock_hits": d.internal_shock_hits,
+                    "modules_damaged": d.modules_damaged,
+                    "power_depleted": d.power_depleted,
+                    "went_offline": d.went_offline,
+                    "offline_reason": d.offline_reason,
+                    "thermal_cascade": d.thermal_cascade,
+                })
+            }).collect::<Vec<_>>(),
+            "resource_timeline": debrief.m17.resource_timeline.iter().map(|(kind, stat)| {
+                (kind.clone(), serde_json::json!({
+                    "changed": stat.changed,
+                    "critical": stat.critical,
+                    "depleted": stat.depleted,
+                }))
+            }).collect::<serde_json::Map<String, serde_json::Value>>(),
+            "force_feedback": {
+                "total": debrief.m17.force_feedback.total,
+                "by_feedback_kind": debrief.m17.force_feedback.by_feedback_kind,
+                "helmet_breaches": debrief.m17.force_feedback.helmet_breaches,
+                "helmet_breach_actors": debrief.m17.force_feedback.helmet_breach_actors.iter().copied().collect::<Vec<u64>>(),
+                "g_load_total": debrief.m17.force_feedback.g_load_total,
+                "g_load_by_actor": debrief.m17.force_feedback.g_load_by_actor.iter().map(|(k, v)| (k.to_string(), serde_json::json!(*v))).collect::<serde_json::Map<String, serde_json::Value>>(),
+            },
+            "internal_damage": {
+                "organs_damaged": debrief.m17.internal_damage.organs_damaged,
+                "organs_destroyed": debrief.m17.internal_damage.organs_destroyed,
+                "circuits_damaged": debrief.m17.internal_damage.circuits_damaged,
+                "circuits_destroyed": debrief.m17.internal_damage.circuits_destroyed,
+            }
         }
     })
 }
@@ -977,8 +1556,144 @@ mod tests {
             "terrain",
             "key_events",
             "checksum",
+            "m17",
         ] {
             assert!(json.get(k).is_some(), "json missing key {k}");
         }
+    }
+
+    fn ev(run_id: &str, tick: u64, seq: u64, category: &str, event_type: &str, payload: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({
+            "schema_version": "prototype-recorder-event.v0.1",
+            "run_id": run_id,
+            "tick": tick,
+            "sim_time_ms": tick as f64 * 16.0,
+            "event_id": format!("{run_id}:{tick}:{seq}"),
+            "category": category,
+            "event_type": event_type,
+            "payload": payload,
+        })
+    }
+
+    fn death_recap_line(md: &str, actor_id: u64) -> String {
+        let needle = format!("- actor #{actor_id} (");
+        md.lines()
+            .find(|l| l.starts_with(&needle))
+            .unwrap_or_else(|| panic!("death recap line for actor {actor_id} missing in:\n{md}"))
+            .to_string()
+    }
+
+    #[test]
+    fn debrief_m17_human_death_uses_organic_vocab() {
+        let run_id = "debrief_m17_human";
+        let events = vec![
+            ev(run_id, 0, 0, "system", "run_started", serde_json::json!({})),
+            ev(run_id, 5, 1, "origin", "shot_force_feedback", serde_json::json!({"actor_id": 1, "origin_id": "Human", "feedback_kind": "pain_jolt", "frame_ring": false, "g_load_delta": 4.0})),
+            ev(run_id, 6, 2, "concussion", "dose_changed", serde_json::json!({"actor_id": 1, "from_dose": 0.0, "to_dose": 40.0, "origin_id": "Human"})),
+            ev(run_id, 7, 3, "concussion", "band_changed", serde_json::json!({"actor_id": 1, "from_band": "Clear", "to_band": "Severe", "dose": 40.0})),
+            ev(run_id, 8, 4, "concussion", "ko_threshold_crossed", serde_json::json!({"actor_id": 1})),
+            ev(run_id, 9, 5, "internal", "organ_damaged", serde_json::json!({"actor_id": 1, "organ_id": "heart", "organ_kind": "heart", "from_hp": 100.0, "to_hp": 0.0})),
+            ev(run_id, 10, 6, "internal", "organ_destroyed", serde_json::json!({"actor_id": 1, "organ_id": "heart", "organ_kind": "heart"})),
+            ev(run_id, 11, 7, "internal", "organ_failure_cascade", serde_json::json!({"actor_id": 1, "organ_id": "heart", "organ_kind": "heart", "affliction_kind": "cardiac_arrest", "severity": 1.0})),
+            ev(run_id, 12, 8, "affliction", "applied", serde_json::json!({"actor_id": 1, "kind": "bleeding", "severity_0_1": 0.7})),
+            ev(run_id, 13, 9, "resource", "changed", serde_json::json!({"actor_id": 1, "kind": "blood", "from": 5000.0, "to": 1000.0})),
+            ev(run_id, 14, 10, "resource", "critical", serde_json::json!({"actor_id": 1, "kind": "blood", "threshold_pct": 10.0, "current": 500.0})),
+            ev(run_id, 15, 11, "resource", "depleted", serde_json::json!({"actor_id": 1, "kind": "blood"})),
+            ev(run_id, 16, 12, "actor", "actor_died", serde_json::json!({"actor": 1, "cause": "bled_out"})),
+        ];
+        let bundle = build_bundle(run_id, &events, serde_json::json!({}));
+        let d = compose(&bundle);
+
+        assert_eq!(d.m17.deaths.len(), 1);
+        let death = &d.m17.deaths[0];
+        assert_eq!(death.actor_id, 1);
+        assert_eq!(death.class, Some(OriginClass::Organic));
+        assert_eq!(death.origin_id.as_deref(), Some("Human"));
+        assert!(death.bled_out);
+        assert!(death.concussion_ko);
+        assert_eq!(d.m17.internal_damage.organs_destroyed, 1);
+        assert_eq!(d.m17.resource_timeline.get("blood").map(|s| s.depleted), Some(1));
+        assert_eq!(d.m17.force_feedback.by_feedback_kind.get("pain_jolt"), Some(&1));
+
+        let md = render_markdown(&d);
+        assert!(md.contains("## Per-Origin Death Recap"));
+        let line = death_recap_line(&md, 1);
+        for present in ["organic", "organ", "concussion", "bled out"] {
+            assert!(line.contains(present), "organic line missing `{present}`: {line}");
+        }
+        for forbidden in ["circuit", "offline", "thermal", "servo"] {
+            assert!(!line.contains(forbidden), "organic line leaked synthetic word `{forbidden}`: {line}");
+        }
+    }
+
+    #[test]
+    fn debrief_m17_robot_death_uses_synthetic_vocab() {
+        let run_id = "debrief_m17_robot";
+        let events = vec![
+            ev(run_id, 0, 0, "system", "run_started", serde_json::json!({})),
+            ev(run_id, 5, 1, "origin", "shot_force_feedback", serde_json::json!({"actor_id": 2, "origin_id": "Robot", "feedback_kind": "servo_jolt", "frame_ring": true, "g_load_delta": 0.0, "internal_shock_module_id": "power_core"})),
+            ev(run_id, 6, 2, "internal_shock", "dose_changed", serde_json::json!({"actor_id": 2, "from_dose": 0.0, "to_dose": 30.0})),
+            ev(run_id, 7, 3, "internal", "circuit_damaged", serde_json::json!({"actor_id": 2, "circuit_id": "power_core", "circuit_kind": "power", "from_hp": 100.0, "to_hp": 0.0})),
+            ev(run_id, 8, 4, "internal", "circuit_destroyed", serde_json::json!({"actor_id": 2, "circuit_id": "power_core", "circuit_kind": "power"})),
+            ev(run_id, 9, 5, "internal", "circuit_failure_cascade", serde_json::json!({"actor_id": 2, "circuit_id": "power_core", "circuit_kind": "power", "affliction_kind": "power_failure", "severity": 1.0})),
+            ev(run_id, 10, 6, "chassis", "thermal_throttle_started", serde_json::json!({"actor_id": 2, "heat": 0.9, "action_speed_factor": 0.6})),
+            ev(run_id, 11, 7, "resource", "changed", serde_json::json!({"actor_id": 2, "kind": "power", "from": 100.0, "to": 10.0})),
+            ev(run_id, 12, 8, "resource", "depleted", serde_json::json!({"actor_id": 2, "kind": "power"})),
+            ev(run_id, 13, 9, "resource", "cascade_offline", serde_json::json!({"actor_id": 2, "kind": "power", "organ_id": "power_core", "reason": "circuit_destroyed"})),
+        ];
+        let bundle = build_bundle(run_id, &events, serde_json::json!({}));
+        let d = compose(&bundle);
+
+        assert_eq!(d.m17.deaths.len(), 1);
+        let death = &d.m17.deaths[0];
+        assert_eq!(death.actor_id, 2);
+        assert_eq!(death.class, Some(OriginClass::Synthetic));
+        assert_eq!(death.origin_id.as_deref(), Some("Robot"));
+        assert!(death.went_offline);
+        assert!(death.thermal_cascade);
+        assert_eq!(death.internal_shock_hits, 1);
+        assert_eq!(d.m17.internal_damage.circuits_destroyed, 1);
+        assert_eq!(d.m17.resource_timeline.get("power").map(|s| s.depleted), Some(1));
+        assert_eq!(d.m17.force_feedback.by_feedback_kind.get("servo_jolt"), Some(&1));
+
+        let md = render_markdown(&d);
+        let line = death_recap_line(&md, 2);
+        for present in ["synthetic", "circuit", "went offline", "thermal cascade"] {
+            assert!(line.contains(present), "synthetic line missing `{present}`: {line}");
+        }
+        for forbidden in ["bled", "organ", "concussion", "blood"] {
+            assert!(!line.contains(forbidden), "synthetic line leaked organic word `{forbidden}`: {line}");
+        }
+    }
+
+    #[test]
+    fn debrief_m17_force_feedback_and_resource_rollups() {
+        let run_id = "debrief_m17_rollup";
+        let events = vec![
+            ev(run_id, 0, 0, "system", "run_started", serde_json::json!({})),
+            ev(run_id, 1, 1, "origin", "shot_force_feedback", serde_json::json!({"actor_id": 1, "origin_id": "Human", "feedback_kind": "pain_jolt", "g_load_delta": 2.5})),
+            ev(run_id, 2, 2, "origin", "shot_force_feedback", serde_json::json!({"actor_id": 1, "origin_id": "Human", "feedback_kind": "pain_jolt", "g_load_delta": 1.5})),
+            ev(run_id, 3, 3, "origin", "helmet_breach", serde_json::json!({"actor_id": 1, "helmet_item_id": 0, "breach_pos": [0.0, 0.0], "oxygen_loss_rate": 3.0})),
+            ev(run_id, 4, 4, "resource", "changed", serde_json::json!({"actor_id": 1, "kind": "oil", "from": 100.0, "to": 50.0})),
+            ev(run_id, 5, 5, "resource", "critical", serde_json::json!({"actor_id": 1, "kind": "oil", "threshold_pct": 10.0, "current": 5.0})),
+        ];
+        let bundle = build_bundle(run_id, &events, serde_json::json!({}));
+        let d = compose(&bundle);
+
+        assert_eq!(d.m17.force_feedback.total, 2);
+        assert_eq!(d.m17.force_feedback.by_feedback_kind.get("pain_jolt"), Some(&2));
+        assert_eq!(d.m17.force_feedback.helmet_breaches, 1);
+        assert_eq!(d.m17.force_feedback.helmet_breach_actors.len(), 1);
+        assert!((d.m17.force_feedback.g_load_total - 4.0).abs() < 1e-6);
+        let oil = d.m17.resource_timeline.get("oil").expect("oil tally");
+        assert_eq!(oil.changed, 1);
+        assert_eq!(oil.critical, 1);
+        assert!(d.m17.deaths.is_empty());
+
+        let md = render_markdown(&d);
+        assert!(md.contains("## Per-Origin Death Recap"));
+        assert!(md.contains("_no actor deaths recorded_"));
+        assert!(md.contains("Cumulative g-load dose: 4.0"));
+        assert!(md.contains("Helmet breaches: 1"));
     }
 }

@@ -171,6 +171,11 @@ fn addiction_and_withdrawal_from_stim_use() {
         engine.m16c_mental_health_summary(1).iter().any(|(c, _)| c == "withdrawal"),
         "withdrawal condition present"
     );
+    // The 2× wobble must reach the ACTOR's aim, not just the event payload: the
+    // §4 projection folds the withdrawal aim-shake into the actor's aim-spread
+    // bonus the weapon-fire cone consumes.
+    let (_speed, spread) = engine.m16c_actor_combat_modifiers(1);
+    assert!(spread > 0.1, "withdrawal degrades the actor's aim spread (got {spread})");
 }
 
 // ===========================================================================
@@ -224,6 +229,15 @@ fn panic_attack_fires_for_panic_disorder() {
     let ev = first_event(&engine, "psych", "panic_attack").expect("psych.panic_attack fired");
     let freeze = ev.payload.get("freeze_seconds").and_then(|v| v.as_f64()).unwrap();
     assert!((3.0..=8.0).contains(&freeze), "freeze {freeze} in [3,8]s");
+    // Spec scenario 5: "actor.stance = Stance::PanickedFreeze for duration ∈
+    // [3s, 8s]". The freeze must actually incapacitate the actor (stance +
+    // input/fire lock), not merely emit an event.
+    assert!(engine.m16c_actor_panic_freeze_ticks(1) > 0, "actor is panic-frozen");
+    assert_eq!(
+        engine.m16c_actor_stance(1).as_deref(),
+        Some("panicked_freeze"),
+        "actor stance is PanickedFreeze during the panic attack"
+    );
 }
 
 fn first_panic_tick(seed: u64, actor: u64) -> u64 {
@@ -270,4 +284,41 @@ fn determinism_same_seed_reproduces_panic_timing() {
     let b = run();
     assert!(a.is_some(), "panic fired");
     assert_eq!(a, b, "identical seed reproduces the panic freeze-until tick");
+}
+
+// ===========================================================================
+// Symptom consumers — per-condition combat/movement effects reach the actor
+// (the spec § condition table promised these; they were previously unwired).
+// ===========================================================================
+#[test]
+fn depression_slows_actor_move_speed() {
+    let engine = engine_for("m16c_addiction_loop");
+    engine.drive_tick();
+    let (speed0, _) = engine.m16c_actor_combat_modifiers(1);
+    assert!((speed0 - 1.0).abs() < 1e-6, "baseline identity move speed");
+    assert!(engine.m16c_trigger_condition(1, "depression", "sustained_stress"));
+    // Project the symptom onto the actor — well within Depression's 30-day
+    // acute window, so it stays symptomatic.
+    engine.m16c_drive_psych_tick(120);
+    let (speed, _) = engine.m16c_actor_combat_modifiers(1);
+    assert!((speed - 0.85).abs() < 0.02, "depression move speed ×0.85 (got {speed})");
+}
+
+#[test]
+fn withdrawal_drains_actor_hp_but_never_lethally() {
+    let engine = engine_for("m16c_addiction_loop");
+    engine.drive_tick();
+    for _ in 0..7 {
+        engine.m16c_use_combat_stim(1);
+    }
+    // Onset withdrawal, then run a span of psych passes to accumulate the drain.
+    let base = twelve_hours_ticks();
+    engine.m16c_drive_psych_tick(base);
+    let hp0 = engine.m16c_actor_hp(1);
+    for k in 1..=100u64 {
+        engine.m16c_drive_psych_tick(base + k);
+    }
+    let hp1 = engine.m16c_actor_hp(1);
+    assert!(hp1 < hp0, "withdrawal drains HP over time ({hp1} < {hp0})");
+    assert!(hp1 > 0.0, "withdrawal is debilitating but never directly lethal ({hp1})");
 }

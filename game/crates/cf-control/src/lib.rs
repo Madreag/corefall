@@ -96,6 +96,7 @@ pub mod m14j_mobility;
 pub mod m16_tick;
 pub mod engine_m16_api;
 pub mod m16c_psych;
+pub mod m17_origin;
 pub mod runtime;
 pub mod scenario;
 pub mod scenario_actor;

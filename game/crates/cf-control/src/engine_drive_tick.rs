@@ -2918,6 +2918,16 @@ impl M0Engine {
             self.tick_m16c_psych(t, sim_time_ms);
         }
 
+        // M17 § origin reaction + per-origin resource pass. Runs after the
+        // M16/M16C passes so afflictions (bleeding/leaks/concussion) are
+        // settled. Drives resource drain + depletion events, oxygen/vacuum,
+        // concussion decay + recovery, overclock/downclock + thermal throttle,
+        // and the per-origin death triggers (robot INERT / organic bleed-out).
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.tick_m17_origin(t, sim_time_ms);
+        }
+
         // event per advanced tick. At ticks where `tick % cadence == 0` the
         // emitter fires `snapshot.baseline_emitted` (full state); otherwise it
         // fires `snapshot.delta_emitted` (JSON-Patch diff vs the previous

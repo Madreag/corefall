@@ -37,6 +37,12 @@ use crate::engine::{EngineMutable, M0Engine};
 /// clustered squad (the squad-wipe scenario) is well inside this.
 pub const WITNESS_RADIUS: f32 = 384.0;
 
+/// Floor for the combined (affliction × mental-health) move-speed multiplier —
+/// even a fully debuffed actor keeps 15% of base walk speed.
+pub const COMBINED_MOVE_SPEED_FLOOR: f32 = 0.15;
+/// Cap (radians ≈ 40°) for the combined affliction + condition aim-spread bonus.
+pub const COMBINED_AIM_SPREAD_CAP: f32 = 0.70;
+
 fn within_witness_radius(a: [f32; 2], b: [f32; 2]) -> bool {
     let dx = a[0] - b[0];
     let dy = a[1] - b[1];
@@ -347,23 +353,47 @@ impl M0Engine {
             }
         }
 
-        // ----- 4) Affliction → combat/movement modifiers (M5/M16 consumer) -----
-        // Push each actor's aggregate affliction aim-spread + move-speed onto
-        // the actor so the next sim step consumes them (Pain wobble + slow,
-        // concussed/blinded aim penalty, thirst/frozen slow, …). Reset to
-        // identity for unafflicted actors so the effect never goes stale.
+        // ----- 4) Debuff projection: afflictions + mental-health → actor -----
+        // Fold each actor's aggregate affliction AND mental-health symptom
+        // modifiers onto the actor so the next sim step consumes them:
+        //   - additive aim-spread (Pain/concussed/blinded + withdrawal-shake /
+        //     anxiety −10% acc / addiction bypass-cost / PTSD flashback),
+        //   - multiplicative move-speed (Pain/frozen/thirst + depression ×0.85),
+        //   - the panic-attack stance freeze (`PanickedFreeze` + input/fire lock),
+        //   - the withdrawal per-tick HP drain (floored — never directly lethal).
+        // Everything resets to identity for the unafflicted so no effect goes
+        // stale once a condition resolves.
         let actor_ids: Vec<ActorId> = actor_world.world.actors.keys().copied().collect();
         for aid in actor_ids {
-            let (speed, spread) = match affliction_by_actor.get(&aid) {
+            let (mut speed, mut spread) = match affliction_by_actor.get(&aid) {
                 Some(aff) => (
                     cf_affliction::affliction_move_speed_multiplier(aff),
                     cf_affliction::affliction_aim_spread_bonus_radians(aff),
                 ),
                 None => (1.0, 0.0),
             };
+            let mut freeze_ticks = 0u32;
+            let mut hp_drain = 0.0f32;
+            if let Some(mh) = mh_map.get(&aid) {
+                speed *= cf_mental_health::condition_move_speed_multiplier(mh);
+                spread += cf_mental_health::condition_aim_spread_bonus_radians(mh);
+                freeze_ticks = cf_mental_health::condition_panic_freeze_ticks_remaining(mh, tick.0);
+                hp_drain = cf_mental_health::condition_hp_drain_per_tick(mh);
+            }
+            // Re-clamp the combined affliction × condition debuff to sane bounds.
+            speed = speed.clamp(COMBINED_MOVE_SPEED_FLOOR, 1.0);
+            spread = spread.clamp(0.0, COMBINED_AIM_SPREAD_CAP);
             if let Some(actor) = actor_world.world.actors.get_mut(&aid) {
                 actor.affliction_speed_multiplier = speed;
                 actor.affliction_aim_spread_bonus_rad = spread;
+                actor.panic_freeze_ticks_remaining = freeze_ticks;
+                // Withdrawal HP toll — non-lethal: drain only while HP sits above
+                // the floor, so withdrawal debilitates but never kills outright.
+                if hp_drain > 0.0
+                    && actor.hp > cf_mental_health::WITHDRAWAL_HP_DRAIN_FLOOR_FRAC * actor.hp_max
+                {
+                    let _ = actor.apply_damage(hp_drain);
+                }
             }
         }
     }
@@ -596,6 +626,48 @@ impl M0Engine {
             .and_then(|w| w.world.actors.get(&ActorId(actor_id)))
             .map(|a| a.m14i_long_term.traits.has(trait_id))
             .unwrap_or(false)
+    }
+
+    /// The actor's current derived [`cf_actor::Stance`] as a string — e.g.
+    /// `"panicked_freeze"` while a panic attack freezes them (scenario 5), or
+    /// `"stand"` otherwise. `None` when the actor is unknown.
+    pub fn m16c_actor_stance(&self, actor_id: u64) -> Option<String> {
+        let state = self.state.read().ok()?;
+        state
+            .actor_state
+            .as_ref()
+            .and_then(|w| w.world.actors.get(&ActorId(actor_id)))
+            .map(|a| a.stance().as_str().to_string())
+    }
+
+    /// The actor's remaining panic-attack freeze ticks (`0` = not frozen). For
+    /// the acceptance assertion that a panic attack incapacitates the actor.
+    pub fn m16c_actor_panic_freeze_ticks(&self, actor_id: u64) -> u32 {
+        let state = match self.state.read() {
+            Ok(s) => s,
+            Err(_) => return 0,
+        };
+        state
+            .actor_state
+            .as_ref()
+            .and_then(|w| w.world.actors.get(&ActorId(actor_id)))
+            .map(|a| a.panic_freeze_ticks_remaining)
+            .unwrap_or(0)
+    }
+
+    /// The actor's current HP — for the acceptance assertion on the withdrawal
+    /// per-tick HP drain. `0.0` when the actor is unknown.
+    pub fn m16c_actor_hp(&self, actor_id: u64) -> f32 {
+        let state = match self.state.read() {
+            Ok(s) => s,
+            Err(_) => return 0.0,
+        };
+        state
+            .actor_state
+            .as_ref()
+            .and_then(|w| w.world.actors.get(&ActorId(actor_id)))
+            .map(|a| a.hp)
+            .unwrap_or(0.0)
     }
 }
 

@@ -51,9 +51,15 @@ use serde::{Deserialize, Serialize};
 
 pub mod comorbidity;
 pub mod conditions;
+pub mod effects;
 pub mod treatment;
 
 pub use comorbidity::{ComorbidityLoadError, ComorbidityMatrix, ComorbidityPair};
+pub use effects::{
+    condition_aim_spread_bonus_radians, condition_hp_drain_per_tick,
+    condition_move_speed_multiplier, condition_panic_freeze_ticks_remaining,
+    WITHDRAWAL_HP_DRAIN_FLOOR_FRAC, WITHDRAWAL_HP_DRAIN_PER_TICK,
+};
 pub use conditions::{
     ActorCondition, ActorMentalHealth, AddictionDevelopedEvent, ComorbidityDetectedEvent,
     ConditionKind, ConditionLoadError, ConditionRegistry, ConditionSpec, ConditionStage,

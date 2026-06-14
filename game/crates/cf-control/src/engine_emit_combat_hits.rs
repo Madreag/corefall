@@ -107,6 +107,7 @@ impl M0Engine {
                             jet_active: a.jet_active,
                             knockdown_ticks_remaining: a.knockdown_ticks_remaining,
                             dying_ticks_remaining: a.dying_dwell_ticks_remaining,
+                            panic_freeze_ticks_remaining: a.panic_freeze_ticks_remaining,
                             ..cf_actor::StanceInputs::default()
                         };
                         let stance = cf_actor::derive_stance(inputs);
@@ -439,79 +440,19 @@ impl M0Engine {
                     );
                 }
             }
-            // band crossings (Clear → Mild → Moderate → Severe → KO_Imminent
-            // → KO) per concussion.band_changed schema. KO threshold (=100)
-            // emits ko_threshold_crossed. Dose scales with damage (cap at
-            // 100). Only fires for organic actors; robots are exempt.
-            if !target_kind_is_robot {
-                let new_dose: f32 = {
-                    let prev = self
-                        .state
-                        .read()
-                        .ok()
-                        .and_then(|s| s.m9_concussion_dose.get(&hit.target).copied())
-                        .unwrap_or(0.0);
-                    let dose = (prev + hit.damage * 0.6).clamp(0.0, 100.0);
-                    if let Ok(mut s) = self.state.write() {
-                        s.m9_concussion_dose.insert(hit.target, dose);
-                        s.m9_concussion_recovery_lockout_ticks
-                            .insert(hit.target, self.config.tick_rate_hz.max(1));
-                    }
-                    dose
-                };
-                let new_band = m9_concussion_band_for_dose(new_dose);
-                let prev_band = self
-                    .state
-                    .read()
-                    .ok()
-                    .and_then(|s| s.m9_concussion_band.get(&hit.target).copied())
-                    .unwrap_or("Clear");
-                let dose_event_id = self.recorder.record(
-                    tick,
-                    sim_time_ms,
-                    "concussion",
-                    "dose_changed",
-                    json!({
-                        "actor_id": hit.target.0,
-                        "from_dose": (new_dose - hit.damage * 0.6).clamp(0.0, 100.0),
-                        "to_dose": new_dose,
-                        "source_event_id": projectile_hit_event_id.clone(),
-                        "origin_id": "Human",
-                    }),
-                    Some(wound_event_id.clone()),
-                );
-                if prev_band != new_band {
-                    if let Ok(mut s) = self.state.write() {
-                        s.m9_concussion_band.insert(hit.target, new_band);
-                    }
-                    self.recorder.record(
-                        tick,
-                        sim_time_ms,
-                        "concussion",
-                        "band_changed",
-                        json!({
-                            "actor_id": hit.target.0,
-                            "from_band": prev_band,
-                            "to_band": new_band,
-                            "dose": new_dose,
-                        }),
-                        Some(dose_event_id.clone()),
-                    );
-                }
-                if (new_dose - 100.0).abs() < f32::EPSILON {
-                    self.recorder.record(
-                        tick,
-                        sim_time_ms,
-                        "concussion",
-                        "ko_threshold_crossed",
-                        json!({
-                            "actor_id": hit.target.0,
-                            "ko_duration_s": 5.5_f32,
-                        }),
-                        Some(dose_event_id),
-                    );
-                }
-            }
+            // M17 § origin reaction matrix — EVERY chassis-bearing hit emits
+            // origin.shot_force_feedback + the per-origin concussion /
+            // internal-shock / helmet-breach reaction (shared with the
+            // m17_inject_hit acceptance injector).
+            self.emit_m17_shot_reaction(
+                hit.target,
+                hit.damage,
+                hit.zone.as_str(),
+                &projectile_hit_event_id,
+                &wound_event_id,
+                tick,
+                sim_time_ms,
+            );
             // M1: hit-stop request (DR-055 placeholder). Triggers when damage
             // exceeds a critical threshold so the renderer can briefly freeze
             // the frame. Full hit-stop renderer effect lands at M5+ when the

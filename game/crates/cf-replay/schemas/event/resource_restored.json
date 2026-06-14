@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/resource.restored.v0.1",
+  "title": "resource.restored",
+  "description": "M17 § resource.* family — an actor resource pool was restored by an amount from a source for one kind. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "resource" },
+    "event_type": { "const": "restored" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "kind": { "type": "string", "enum": ["blood", "oil", "power", "caloric", "bio_fluid", "oxygen_supply", "battery_charge", "internal_shock", "stamina"] },
+        "amount": { "type": "number" },
+        "source": { "type": "string", "enum": ["medikit", "repair_tool", "food", "recharge", "transfusion", "battery_swap", "refill"] }
+      },
+      "required": ["actor_id", "kind", "amount", "source"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -9,6 +9,54 @@ use crate::defaults::{
 use crate::{ActorState, BodySilhouette, InventoryItem, LimbLossFlags};
 
 
+/// M17 per-origin resource projection for the observe envelope + HUD bridge.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct M17ResourceView {
+    pub origin: String,
+    pub blood: f32,
+    pub blood_max: f32,
+    pub oil: f32,
+    pub oil_max: f32,
+    pub power: f32,
+    pub power_max: f32,
+    pub caloric: f32,
+    pub oxygen_seconds: f32,
+    pub heat: f32,
+    pub concussion_dose: f32,
+    pub concussion_band: String,
+    pub internal_shock_dose: f32,
+    pub power_fire_locked: bool,
+    pub overclock_tier: u8,
+    pub throttled: bool,
+}
+
+impl M17ResourceView {
+    pub fn from_actor(actor: &ActorState) -> Self {
+        let profile = crate::origin::OriginProfile::canonical(actor.origin());
+        let r = &actor.resources;
+        Self {
+            origin: actor.origin_id.clone(),
+            blood: r.blood,
+            blood_max: profile.blood_max_ml,
+            oil: r.oil,
+            oil_max: profile.oil_max_ml,
+            power: r.power,
+            power_max: profile.power_max_kwh,
+            caloric: r.caloric_energy,
+            oxygen_seconds: r.oxygen_supply,
+            heat: r.heat,
+            concussion_dose: r.concussion_dose,
+            concussion_band: crate::concussion::ConcussionBand::from_dose(r.concussion_dose)
+                .as_str()
+                .to_string(),
+            internal_shock_dose: r.internal_shock_dose,
+            power_fire_locked: actor.power_fire_locked,
+            overclock_tier: actor.overclock.tier,
+            throttled: actor.overclock.throttled,
+        }
+    }
+}
+
 /// Public projection of an actor for the cf-control observe envelope.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActorObservation {
@@ -38,6 +86,9 @@ pub struct ActorObservation {
     pub chassis: Option<ChassisView>,
     #[serde(default = "default_origin_id")]
     pub origin_id: String,
+    /// M17 — per-origin survival resources + concussion / overclock state.
+    #[serde(default)]
+    pub m17: M17ResourceView,
     /// W1.3: stability scalar (0.0 = fully disrupted, 1.0 = stable).
     #[serde(default = "default_stability")]
     pub stability: f32,
@@ -291,6 +342,7 @@ impl ActorObservation {
             body_silhouette: actor.body_silhouette(),
             chassis: actor.chassis_view(),
             origin_id: actor.origin_id.clone(),
+            m17: M17ResourceView::from_actor(actor),
             stability: actor.stability,
             stability_recovery_rate: actor.stability_recovery_rate,
             mass_kg: actor.mass_kg,

@@ -183,6 +183,15 @@ pub struct ActorState {
     /// a schema bump.
     #[serde(default)]
     pub resources: ResourceAccumulators,
+    /// M17 — robot overclock / downclock state (action-speed boost + thermal
+    /// throttle). Identity (`tier=0`, not throttled) for organics.
+    #[serde(default)]
+    pub overclock: crate::overclock::OverclockState,
+    /// M17 — transient: power-survival origin is in reserve mode (power below
+    /// the fire threshold) so the firing path rejects heavy-weapon fire.
+    /// Derived each tick by the M17 pass; not serialized.
+    #[serde(skip)]
+    pub power_fire_locked: bool,
     /// state set populated by hazards (M5.7) + origin reactions (M5.8). Empty
     /// at M5 baseline; serde-default preserves backward compat.
     #[serde(default)]
@@ -203,6 +212,16 @@ pub struct ActorState {
     pub affliction_speed_multiplier: f32,
     #[serde(skip)]
     pub affliction_aim_spread_bonus_rad: f32,
+    /// M16C — transient panic-attack freeze counter (ticks remaining). The
+    /// mental-health pass projects it each tick from the active PanicDisorder /
+    /// PTSD / AcuteStressReaction panic attack (`panic_frozen_until_tick − tick`);
+    /// it drives [`stance`](Self::stance) → `Stance::PanickedFreeze` and locks
+    /// movement + fire input (`accepted_input`). `0` = not frozen. Like the
+    /// affliction fields above it is derived, not serialized, and not part of
+    /// `checksum_bytes` (the resulting position/fire-suppression is what the
+    /// checksum captures).
+    #[serde(skip)]
+    pub panic_freeze_ticks_remaining: u32,
     #[serde(default)]
     pub m14h_cardiac: cardiac::ActorCardiacComponent,
     /// trigger (spec § "Necrosis if not removed").
@@ -484,10 +503,13 @@ impl ActorState {
             walk_threshold: default_walk_threshold(),
             bloom_factor: default_bloom_factor(),
             resources: ResourceAccumulators::default(),
+            overclock: crate::overclock::OverclockState::default(),
+            power_fire_locked: false,
             afflictions: Vec::new(),
             m14g_wound_list: cf_wound::ActorWoundList::new(),
             affliction_speed_multiplier: 1.0,
             affliction_aim_spread_bonus_rad: 0.0,
+            panic_freeze_ticks_remaining: 0,
             m14h_cardiac: cardiac::ActorCardiacComponent::new(),
             m14h_tourniquets: std::collections::BTreeMap::new(),
             m14h_buffs: Vec::new(),
@@ -1050,6 +1072,12 @@ impl ActorState {
             if self.hp <= 0.0 {
                 return Status::Dead;
             }
+            // M17 — INERT (power depleted) is sticky while the chassis is
+            // intact; only a repair-tool revive (clears it explicitly) or
+            // destruction (hp=0 → DEAD above) leaves it.
+            if matches!(self.status, Status::Inert) {
+                return Status::Inert;
+            }
             return Status::Stable;
         }
         if self.hp <= 0.0 {
@@ -1070,6 +1098,24 @@ impl ActorState {
         matches!(self.origin_id.as_str(), "robot" | "synth")
     }
 
+    /// The actor's canonical M17 [`Origin`](crate::origin::Origin).
+    pub fn origin(&self) -> crate::origin::Origin {
+        crate::origin::Origin::from_str(&self.origin_id)
+    }
+
+    /// Seed this actor's survival resources from the canonical origin profile
+    /// (blood/oil/power/caloric/bio_fluid/oxygen). Used at spawn / origin swap.
+    pub fn seed_origin_resources_canonical(&mut self) {
+        let profile = crate::origin::OriginProfile::canonical(self.origin());
+        self.resources = profile.seed_resources();
+    }
+
+    /// True for power-survival origins whose body offlines (INERT, recoverable)
+    /// rather than dying when their primary resource (power) is exhausted.
+    pub fn is_power_survival_origin(&self) -> bool {
+        self.origin().is_power_survival()
+    }
+
     /// Derived stance for HUD + `cfctl observe`. M5 routes through
     /// [`Stance::from_chassis`] so crouch / climb / jet / eject signals propagate.
     ///
@@ -1077,6 +1123,13 @@ impl ActorState {
     pub fn stance(&self) -> Stance {
         if self.knockdown_ticks_remaining > 0 {
             return Stance::KnockedDown;
+        }
+        // M16C — a panic attack freezes the actor in place (paralysis). Mirrors
+        // the `derive_stance` priority: below knockdown, above the kinematic
+        // stances. `PanickedFreeze.locks_fire()` and the `accepted_input` gate
+        // suppress movement + fire for the freeze duration.
+        if self.panic_freeze_ticks_remaining > 0 {
+            return Stance::PanickedFreeze;
         }
         // kinematic stance derivation because they pin the actor's locomotion
         // mode independent of velocity / on_ground.
