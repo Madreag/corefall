@@ -132,6 +132,7 @@ fn auto_reload_when_empty_starts_after_dry_fire() {
             fire_pressed: false,
             reload_pressed: false,
             auto_reload_when_empty: true,
+            cadence_multiplier: 1.0,
         },
     );
     assert!(outcomes.reload_started);

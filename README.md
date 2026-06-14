@@ -18,7 +18,7 @@
 [![Windows](https://img.shields.io/badge/Windows-supported-0078D6?style=flat-square&logo=windows&logoColor=white)](#)
 
 [![Status](https://img.shields.io/badge/status-prealpha-orange?style=flat-square)](#project-status)
-[![Milestones](https://img.shields.io/badge/milestones-48%20done%20%2F%20126%20active-2EA043?style=flat-square)](#roadmap)
+[![Milestones](https://img.shields.io/badge/milestones-49%20done%20%2F%20126%20active-2EA043?style=flat-square)](#roadmap)
 [![Crates](https://img.shields.io/badge/crates-67-blueviolet?style=flat-square)](#workspace)
 [![Lib tests](https://img.shields.io/badge/lib%20tests-3593%20passing-2EA043?style=flat-square)](#ci)
 [![Ledger](https://img.shields.io/badge/ledger-7710%20fresh-2EA043?style=flat-square)](#asset-ledger)
@@ -36,7 +36,7 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 It's a **best-of-genre synthesis** that takes Cortex Command's command-core / dropship / chassis / digging fantasy and sets it on top of Stationeers-grade-or-better atmospherics, ONI-grade closed-loop life support, Noita-grade systemic materials, full collision physics, universal gravity, ACRE2-tier voice + radio simulation, and War Thunder-grade armor + spalling. AI bots are first-class teammates and rivals. Replay is deterministic. Modding is data-first. Accessibility is a floor, not an afterthought.
 
 > [!important]
-> **Where we are (2026-06-13).** 48 milestones closed (`M1`–`M16C`). The full **physics + damage train** is in (`M13` equipment/chassis/damage grammar → `M14` collision + impulse routing → `M14A`–`M14J`: limb-driven walking, gravity/wind producers, HEAT/APFSDS rounds, projectile-projectile CCD, per-pixel + lateral structural collapse, per-wound granularity, field-medic surgery, long-term scars/aging/veterans, advanced mobility). The **materials kernel** is in (`M15` Noita-grade per-pixel CA → `M15B` GPU kernel + precipitation, `M15C` 50+ material registry, `M15D` 55+ reaction matrix). The **hazard + affliction + biology layer** is in (`M16` hazards + 22 afflictions + anomalies + artifacts + swimming → `M16A` 11 environment-driven afflictions, `M16B` disease registry + lifecycle FSM + cure/vaccine/quarantine, **newest: `M16C` mental-health system** — Pain affliction + 8 conditions + PTSD + addiction + trauma + therapy, with the affliction→aim/move-speed combat consumer that closes the long-standing M5/M16 gap). 3,593 workspace lib tests pass; cross-OS determinism gate green. Next up: `M17` (Origin Reaction + Resource Model — the canonical no-HP-bar blood/oil/power/caloric/bio-fluid layer).
+> **Where we are (2026-06-14).** 49 milestones closed (`M1`–`M17`). The full **physics + damage train** is in (`M13` equipment/chassis/damage grammar → `M14` collision + impulse routing → `M14A`–`M14J`: limb-driven walking, gravity/wind producers, HEAT/APFSDS rounds, projectile-projectile CCD, per-pixel + lateral structural collapse, per-wound granularity, field-medic surgery, long-term scars/aging/veterans, advanced mobility). The **materials kernel** is in (`M15` Noita-grade per-pixel CA → `M15B` GPU kernel + precipitation, `M15C` 50+ material registry, `M15D` 55+ reaction matrix). The **hazard + affliction + biology layer** is in (`M16` hazards + 22 afflictions + anomalies + artifacts + swimming → `M16A` 11 environment-driven afflictions, `M16B` disease registry + lifecycle FSM + cure/vaccine/quarantine, `M16C` mental-health — Pain affliction + 8 conditions + PTSD + addiction + trauma + therapy). **Newest: `M17` Origin Reaction + Resource Model** — the canonical no-HP-bar survival layer: 11-race origin matrix, per-origin survival resources (blood / oil / power / caloric / bio-fluid / oxygen), per-origin shot-force-feedback + G-Force concussion bands (human full curve / android capped / robot internal-shock), helmet-breach + vacuum + oxygen-poisoning, robot overclock / downclock + INERT recovery, the per-damage-type × per-origin Time-To-Death table, and power/heat/vacuum-aware AI doctrine. 4,795 workspace tests pass; cross-OS determinism gate green. Next up: `M18`.
 
 ---
 
@@ -89,14 +89,14 @@ The pillars that make Corefall its own genre, not a clone of any of its inspirat
 
 ### What's shipped
 
-- **48 milestones closed** (`specs/done/`): the M1–M11A foundation + the M12/M12A–C aesthetic + audio + cinematic train + the full **M13–M14J physics / damage / wound / medic / long-term / mobility** train + the **M15–M15D materials kernel** (per-pixel CA + GPU + 50+ materials + 55+ reactions) + the **M16–M16C hazard / affliction / disease / mental-health layer**.
+- **49 milestones closed** (`specs/done/`): the M1–M11A foundation + the M12/M12A–C aesthetic + audio + cinematic train + the full **M13–M14J physics / damage / wound / medic / long-term / mobility** train + the **M15–M15D materials kernel** (per-pixel CA + GPU + 50+ materials + 55+ reactions) + the **M16–M16C hazard / affliction / disease / mental-health layer** + the **M17 origin reaction + per-origin resource model**.
 - **7,710 ledger entries** across all asset categories — every shipped asset is regenerable from prompt + seed via `cf-mod ledger regenerate <id>`.
-- **3,593 workspace lib tests passing.** Cross-OS determinism gate (Linux + macOS + Windows, 60/120 Hz) green; sim crates remain `f64`-free, `thread_rng`-free, and default-hash-free per the 7 determinism hard rules.
+- **4,795 workspace tests passing.** Cross-OS determinism gate (Linux + macOS + Windows, 60/120 Hz) green; sim crates remain `f64`-free, `thread_rng`-free, and default-hash-free per the 7 determinism hard rules.
 - **CI gates:** `cf-mod ledger verify --strict` reports `total=7710 fresh=7710`; `cf-mod validate content/` passes; schema-drift + run-bundle validators clean.
 
 ### Up next
 
-**`M17` — Origin Reaction + Resource Model.** The canonical no-HP-bar layer: blood / oil / power / caloric / bio-fluid per origin, damage routed to specific resources via specific organs/circuits, G-Force vision blackout scaling per origin. M16C's mental-health + affliction systems feed it (Pain morale-drain lands in M19H's accumulator; the affliction→aim/move-speed consumer is live).
+**`M17` — Origin Reaction + Resource Model is now CLOSED.** The canonical no-HP-bar layer shipped: 11-race origin matrix + per-origin survival resources (blood / oil / power / caloric / bio-fluid / oxygen), per-origin shot-force-feedback, G-Force concussion bands (human full curve / android capped at Moderate / robot internal-shock instead), helmet-breach + vacuum + oxygen-poisoning + dehydration, robot overclock / downclock + thermal throttle + INERT-and-recover, the per-damage-type × per-origin Time-To-Death table with difficulty multipliers + compound floor, `resource.*` event family, per-origin HUD bars + concussion vignette + heart-rate audio, per-origin death recap, and power/heat/vacuum-aware AI doctrine. Next milestone: **`M18`**.
 
 In parallel: the production-tier tracks remain in flight — **`M24A`** VFX, **`M25A`** narrative/codex, **`M32A`** ComfyUI portraits, **`M33A`** tutorial labs, **`M37A`** the remaining 81 music tracks, **`M48A`/`M48B`** Tier 3 polish + Steam store.
 
@@ -187,7 +187,7 @@ Remaining unfinished music tracks are documented per-file at `game/content/audio
 | M16A | ✅ | Atmospheric + Environmental Affliction Depth Layer | Per-condition consumer kernel between M16 roster + M19/M28/M9 environment events; 11 environment-driven afflictions (stuffiness / heatstroke / hypothermia / asphyxiation / refrigerant_inhalation / electrocution / illuminated / laceration / trench_foot / stamina_movement_cost / panic_freeze_env); accumulators + threshold transitions + race-aware TTD curves + per-affliction clear conditions |
 | M16B | ✅ | Disease Registry + Per-Disease Lifecycle + Cure Recipe + Vaccine + Quarantine | 17 launch diseases + per-disease cure recipe + vaccine + isolation class + R0 spread + per-origin susceptibility matrix |
 | M16C | ✅ | Mental Health Conditions + PTSD + Addiction + Trauma + Therapy + Pain Affliction | 8 mental-health conditions + Pain affliction + therapy NPC + 8 psych medications + comorbidity matrix |
-| M17 | ⏳ | Origin Reaction + Resource Model | No-HP-bar canonical, blood / oil / power / caloric / bio-fluid per origin, G-Force vision blackout |
+| M17 | ✅ | Origin Reaction + Resource Model | 11-race origin matrix + no-HP-bar survival resources (blood / oil / power / caloric / bio-fluid / oxygen) + per-origin shot-force-feedback + G-Force concussion bands + helmet-breach / vacuum / oxygen-poisoning + robot overclock/downclock + INERT recovery + per-damage-type TTD table + power/heat/vacuum AI doctrine |
 | M18 | ⏳ | Micro Sabotage Fun Slice | 60-90 s sabotage integrating collision + materials + hazards + origin |
 | M18A | ⏳ | Animation Production Tier 1 | 1100+ frame strips (walk / hit reactions / death) via AnimateDiff |
 | M19 | ⏳ | Atmospherics-Grade Kernel | PV=nRT, 10 gases, 6 combustion reactions, phase change, pipe networks, 6 launch worlds |
@@ -409,7 +409,7 @@ networking + server   cf-net · cf-server · cf-server-ops · cf-server-persiste
 tooling               cf-tools-editor · cf-tools-replay-viewer
 ```
 
-The **damage + biology** and **world systems** families are the M13–M16C buildout: typed wounds + field surgery + scars/aging/prosthetics/veterans (`cf-wound`/`cf-treatment`/`cf-scar`/`cf-aging`/`cf-prosthetic`/`cf-veteran`), the 28-affliction roster + Pain consumer (`cf-affliction`), the 17-disease lifecycle (`cf-disease`), the 8-condition mental-health FSM (`cf-mental-health`), plus hazards/anomalies/artifacts/swim/flasks and the trench + fortification authored-content engines.
+The **damage + biology** and **world systems** families are the M13–M17 buildout: typed wounds + field surgery + scars/aging/prosthetics/veterans (`cf-wound`/`cf-treatment`/`cf-scar`/`cf-aging`/`cf-prosthetic`/`cf-veteran`), the 28-affliction roster + Pain consumer (`cf-affliction`), the 17-disease lifecycle (`cf-disease`), the 8-condition mental-health FSM (`cf-mental-health`), the M17 per-origin reaction + resource model (`cf-actor::{origin,concussion,oxygen,power,internal_shock,overclock}` + `cf-control::m17_origin`), plus hazards/anomalies/artifacts/swim/flasks and the trench + fortification authored-content engines.
 
 ---
 

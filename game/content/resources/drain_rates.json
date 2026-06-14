@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "bleed_rate_ml_per_s_at_full": 10.0,
+  "oil_leak_rate_ml_per_s_at_full": 5.0,
+  "caloric_sustain_per_s": 0.005555555555555556,
+  "power_sustain_kwh_per_s": 0.005,
+  "vacuum_pressure_kpa": 11.0,
+  "power_reserve_fraction": 0.1,
+  "bleedout_hp_per_s": 3.0,
+  "thermal_critical_module_ticks": 1,
+  "power_action_cost_fire_kwh": 0.1,
+  "power_action_cost_move_kwh_per_s": 0.02,
+  "overclock_power_drain_kwh_per_s": 2.0,
+  "caloric_sprint_per_s": 0.5,
+  "oxygen_poisoning_hp_per_s": 5.0,
+  "dehydration_hp_per_s": 2.0,
+  "blood_critical_unstable_frac": 0.3,
+  "blood_critical_dying_frac": 0.1,
+  "power_degraded_frac": 0.3,
+  "oil_degraded_frac": 0.3
+}

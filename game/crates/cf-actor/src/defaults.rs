@@ -5,6 +5,11 @@ pub(crate) fn default_swim_breath_seconds() -> f32 {
     30.0
 }
 
+/// M17 — identity action-speed / mobility multiplier (1.0 = nominal).
+pub(crate) fn default_action_speed_factor() -> f32 {
+    1.0
+}
+
 pub(crate) fn default_swim_drain_multiplier() -> f32 {
     1.0
 }

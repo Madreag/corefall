@@ -20,6 +20,7 @@
 //! the state lock, mutates per-actor state, emits the matching replay event,
 //! and returns a value for cfctl + the acceptance tests.
 
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use cf_actor::concussion::{ConcussionBand};
@@ -51,6 +52,96 @@ const POWER_RESERVE_FRACTION: f32 = 0.10;
 const BLEEDOUT_HP_PER_S: f32 = 3.0;
 /// Ticks at the critical thermal band before a module is damaged.
 const THERMAL_CRITICAL_MODULE_TICKS: u32 = 1;
+
+/// M17 resource-drain tuning (loaded from `content/resources/drain_rates.json`;
+/// `Default` is the canonical boot fallback equal to the consts above).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(default)]
+pub struct M17TuningConfig {
+    pub bleed_rate_ml_per_s_at_full: f32,
+    pub oil_leak_rate_ml_per_s_at_full: f32,
+    pub caloric_sustain_per_s: f32,
+    pub power_sustain_kwh_per_s: f32,
+    pub vacuum_pressure_kpa: f32,
+    pub power_reserve_fraction: f32,
+    pub bleedout_hp_per_s: f32,
+    pub thermal_critical_module_ticks: u32,
+    pub power_action_cost_fire_kwh: f32,
+    pub power_action_cost_move_kwh_per_s: f32,
+    pub overclock_power_drain_kwh_per_s: f32,
+    pub caloric_sprint_per_s: f32,
+    pub oxygen_poisoning_hp_per_s: f32,
+    pub dehydration_hp_per_s: f32,
+    pub blood_critical_unstable_frac: f32,
+    pub blood_critical_dying_frac: f32,
+    pub power_degraded_frac: f32,
+    pub oil_degraded_frac: f32,
+}
+
+impl Default for M17TuningConfig {
+    fn default() -> Self {
+        Self {
+            bleed_rate_ml_per_s_at_full: BLEED_RATE_ML_PER_S_AT_FULL,
+            oil_leak_rate_ml_per_s_at_full: OIL_LEAK_RATE_ML_PER_S_AT_FULL,
+            caloric_sustain_per_s: CALORIC_SUSTAIN_PER_S,
+            power_sustain_kwh_per_s: POWER_SUSTAIN_KWH_PER_S,
+            vacuum_pressure_kpa: VACUUM_PRESSURE_KPA,
+            power_reserve_fraction: POWER_RESERVE_FRACTION,
+            bleedout_hp_per_s: BLEEDOUT_HP_PER_S,
+            thermal_critical_module_ticks: THERMAL_CRITICAL_MODULE_TICKS,
+            power_action_cost_fire_kwh: 0.1,
+            power_action_cost_move_kwh_per_s: 0.02,
+            overclock_power_drain_kwh_per_s: 2.0,
+            caloric_sprint_per_s: 0.5,
+            oxygen_poisoning_hp_per_s: 5.0,
+            dehydration_hp_per_s: 2.0,
+            blood_critical_unstable_frac: 0.30,
+            blood_critical_dying_frac: 0.10,
+            power_degraded_frac: 0.30,
+            oil_degraded_frac: 0.30,
+        }
+    }
+}
+
+impl M17TuningConfig {
+    /// Load from `content/resources/drain_rates.json`, probing the same
+    /// candidate roots as the m16 content loaders. `tracing::warn!`s and
+    /// returns [`Self::default`] on a missing/unreadable/malformed file.
+    pub fn load() -> Self {
+        let candidates = [
+            std::path::PathBuf::from("content/resources/drain_rates.json"),
+            std::path::PathBuf::from("game/content/resources/drain_rates.json"),
+            std::path::PathBuf::from("../content/resources/drain_rates.json"),
+            std::path::PathBuf::from("../../content/resources/drain_rates.json"),
+        ];
+        let Some(path) = candidates.into_iter().find(|p| p.exists()) else {
+            return Self::default();
+        };
+        match std::fs::read_to_string(&path) {
+            Ok(text) => match serde_json::from_str::<Self>(&text) {
+                Ok(cfg) => cfg,
+                Err(err) => {
+                    tracing::warn!(
+                        target: "cf_control::m17_origin",
+                        ?path,
+                        %err,
+                        "drain_rates.json parse failed; keeping canonical defaults"
+                    );
+                    Self::default()
+                }
+            },
+            Err(err) => {
+                tracing::warn!(
+                    target: "cf_control::m17_origin",
+                    ?path,
+                    %err,
+                    "drain_rates.json read failed; keeping canonical defaults"
+                );
+                Self::default()
+            }
+        }
+    }
+}
 
 /// Resource identity (drives the event `kind` field + the critical-band dedupe
 /// key). Discriminants are stable so the dedupe map survives reorders.
@@ -115,10 +206,25 @@ impl M0Engine {
             m17_oxygen_tank_by_actor: tank_map,
             m17_thermal_band: thermal_map,
             m17_death_cause: death_cause,
+            m17_drain_rate: drain_rate_map,
+            m17_doctrine_reason: doctrine_map,
+            m17_tuning,
+            settings,
             m9_concussion_dose: conc_dose_map,
             m9_concussion_band: conc_band_map,
             ..
         } = &mut *state;
+        let tuning = *m17_tuning;
+        // M17 § "Settings + configuration surface" — gate the sim on the
+        // PersonalPowerConfig + RaceConfig toggles.
+        let pp = settings.personal_power; // Copy
+        let enable_oxygen = pp.enable_oxygen_simulation;
+        let enable_thermal = pp.enable_robot_thermal;
+        let enable_battery = pp.enable_battery_management;
+        let battery_drain_mult = pp.battery_drain_multiplier.max(0.0);
+        let oxygen_consumption_mult = pp.oxygen_consumption_multiplier.max(0.0);
+        let enable_oxygen_poisoning = settings.race.enable_oxygen_poisoning;
+        let enable_dehydration = settings.race.enable_dehydration;
         let world = actor_state.as_mut().expect("checked actor_state is_some");
 
         let ids: Vec<ActorId> = world.world.actors.keys().copied().collect();
@@ -181,59 +287,95 @@ impl M0Engine {
                 )
             });
 
-            // ----- 2) Resource drain -----
+            // ----- 2) Resource drain (+ resource.drain_rate_changed) -----
             let mut events: Vec<ResourceDelta> = Vec::new();
-            if let Some(actor) = world.world.actors.get_mut(&aid) {
-                // Blood / bio-fluid bleed-out (minus natural clot).
-                if profile.has_blood() {
-                    let rate = (bleed_sev * BLEED_RATE_ML_PER_S_AT_FULL - profile.clot_rate_ml_per_s).max(0.0);
-                    drain_resource(&mut actor.resources.blood, rate * dt, &mut events, ResKind::Blood);
+            {
+                // Compute the per-resource drain RATE (per second) first so a
+                // transition (e.g. a new bleed, sprint start, movement) fires
+                // resource.drain_rate_changed.
+                let (vel_mag, sprint, oc_tier) = {
+                    let a = world.world.actors.get(&aid).unwrap();
+                    (
+                        (a.velocity.x * a.velocity.x + a.velocity.y * a.velocity.y).sqrt(),
+                        a.sprint_active,
+                        a.overclock.tier,
+                    )
+                };
+                let bleed = (bleed_sev * tuning.bleed_rate_ml_per_s_at_full - profile.clot_rate_ml_per_s).max(0.0);
+                let blood_rate = if profile.has_blood() { bleed } else { 0.0 };
+                let bio_rate = if profile.has_bio_fluid() { bleed } else { 0.0 };
+                let oil_rate = if profile.has_oil() {
+                    oil_leak_sev * tuning.oil_leak_rate_ml_per_s_at_full
+                } else {
+                    0.0
+                };
+                let caloric_rate = if profile.has_caloric() {
+                    tuning.caloric_sustain_per_s + if sprint { tuning.caloric_sprint_per_s } else { 0.0 }
+                } else {
+                    0.0
+                };
+                // Power: sustain + overclock + movement action cost (battery
+                // management can disable the whole drain for some PvP modes).
+                let power_rate = if profile.has_power() && enable_battery {
+                    let moving = if vel_mag > 1.0 { tuning.power_action_cost_move_kwh_per_s } else { 0.0 };
+                    (tuning.power_sustain_kwh_per_s
+                        + overclock::overclock_power_drain_per_s(oc_tier)
+                        + moving)
+                        * battery_drain_mult
+                } else {
+                    0.0
+                };
+                for (kind, rate) in [
+                    (ResKind::Blood, blood_rate),
+                    (ResKind::Oil, oil_rate),
+                    (ResKind::Power, power_rate),
+                    (ResKind::Caloric, caloric_rate),
+                    (ResKind::BioFluid, bio_rate),
+                ] {
+                    let prev = drain_rate_map.get(&(aid, kind.id())).copied().unwrap_or(0.0);
+                    if (prev - rate).abs() > 1e-4 {
+                        drain_rate_map.insert((aid, kind.id()), rate);
+                        let _ = recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "resource",
+                            "drain_rate_changed",
+                            json!({"actor_id": aid.0, "kind": kind.as_str(), "from_rate": prev, "to_rate": rate}),
+                            None,
+                        );
+                    }
                 }
-                if profile.has_bio_fluid() {
-                    let rate = (bleed_sev * BLEED_RATE_ML_PER_S_AT_FULL - profile.clot_rate_ml_per_s).max(0.0);
-                    drain_resource(&mut actor.resources.bio_fluid, rate * dt, &mut events, ResKind::BioFluid);
-                }
-                // Oil / coolant leak (no clot).
-                if profile.has_oil() {
-                    let rate = oil_leak_sev * OIL_LEAK_RATE_ML_PER_S_AT_FULL;
-                    drain_resource(&mut actor.resources.oil, rate * dt, &mut events, ResKind::Oil);
-                }
-                // Caloric sustain.
-                if profile.has_caloric() {
-                    let sprint = if actor.sprint_active { 0.5 } else { 0.0 };
+                if let Some(actor) = world.world.actors.get_mut(&aid) {
+                    drain_resource(&mut actor.resources.blood, blood_rate * dt, &mut events, ResKind::Blood);
+                    drain_resource(&mut actor.resources.bio_fluid, bio_rate * dt, &mut events, ResKind::BioFluid);
+                    drain_resource(&mut actor.resources.oil, oil_rate * dt, &mut events, ResKind::Oil);
                     drain_resource(
                         &mut actor.resources.caloric_energy,
-                        (CALORIC_SUSTAIN_PER_S + sprint) * dt,
+                        caloric_rate * dt,
                         &mut events,
                         ResKind::Caloric,
                     );
-                }
-                // Power sustain + overclock drain.
-                if profile.has_power() {
-                    let oc = overclock::overclock_power_drain_per_s(actor.overclock.tier);
-                    drain_resource(
-                        &mut actor.resources.power,
-                        (POWER_SUSTAIN_KWH_PER_S + oc) * dt,
-                        &mut events,
-                        ResKind::Power,
-                    );
+                    drain_resource(&mut actor.resources.power, power_rate * dt, &mut events, ResKind::Power);
                 }
             }
 
             // ----- 3) Oxygen / vacuum / helmet breach -----
             let mut o2_hp_drain = 0.0f32;
-            if profile.oxygen_required {
-                let (pressure_kpa, helmet_sealed, o2_now) = {
+            if profile.oxygen_required && enable_oxygen {
+                let (pressure_kpa, helmet_sealed, o2_now, in_combat) = {
                     let actor = world.world.actors.get(&aid).unwrap();
                     (
                         actor.atmosphere_sample.pressure_kpa,
                         actor.body_armor.helmet_seal_active() || actor.body_armor.dive_suit_equipped(),
                         actor.resources.oxygen_supply,
+                        actor.sprint_active,
                     )
                 };
-                let vacuum_exposed = pressure_kpa < VACUUM_PRESSURE_KPA;
+                let vacuum_exposed = pressure_kpa < tuning.vacuum_pressure_kpa;
                 let is_breached = breached.contains(&aid);
                 if vacuum_exposed {
+                    // Running / combat burns the reserve faster.
+                    let consume = oxygen_consumption_mult * if in_combat { 1.5 } else { 1.0 };
                     let res = tick_oxygen(
                         o2_now,
                         OxygenTickInput {
@@ -241,7 +383,7 @@ impl M0Engine {
                             helmet_sealed,
                             helmet_breached: is_breached,
                             vacuum_exposed: true,
-                            consumption_modifier: 1.0,
+                            consumption_modifier: consume,
                             dt_seconds: dt,
                         },
                     );
@@ -279,6 +421,69 @@ impl M0Engine {
                             format!("vacuum_hypoxia:{}", tick.0),
                         );
                     }
+                }
+            }
+
+            // ----- 3b) Special gas reactions per origin (M17 § "Special gas
+            // reactions"): oxygen is poison to methane breathers; aqueous bodies
+            // desiccate in dry air. M20 owns the full gas matrix; M17 declares
+            // the lethal reactions + reads the per-actor O2 partial pressure.
+            {
+                let (o2_kpa, pressure, submerged) = {
+                    let a = world.world.actors.get(&aid).unwrap();
+                    (
+                        a.atmosphere_sample.o2_partial_kpa,
+                        a.atmosphere_sample.pressure_kpa,
+                        a.swim_kind != cf_actor::SwimKind::None,
+                    )
+                };
+                if enable_oxygen_poisoning && profile.oxygen_toxic && o2_kpa > 5.0 {
+                    if let Some(actor) = world.world.actors.get_mut(&aid) {
+                        let _ = actor.apply_damage(tuning.oxygen_poisoning_hp_per_s * dt);
+                    }
+                    let _ = recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "affliction",
+                        "applied",
+                        json!({
+                            "actor_id": aid.0,
+                            "kind": "oxygen_poisoning",
+                            "source_event_id": format!("o2_toxic:{}", tick.0),
+                            "expected_duration_ticks": 1,
+                            "severity_0_1": (o2_kpa / 21.0).min(1.0),
+                        }),
+                        None,
+                    );
+                    death_cause
+                        .entry(aid)
+                        .or_insert_with(|| "Oxygen poisoning: O2 is lethal to this biochemistry.".to_string());
+                }
+                if enable_dehydration
+                    && profile.origin == Origin::Aqueous
+                    && !submerged
+                    && pressure >= tuning.vacuum_pressure_kpa
+                {
+                    if let Some(actor) = world.world.actors.get_mut(&aid) {
+                        let _ = actor.apply_damage(tuning.dehydration_hp_per_s * dt);
+                    }
+                    let _ = recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "affliction",
+                        "applied",
+                        json!({
+                            "actor_id": aid.0,
+                            "kind": "dehydration",
+                            "source_event_id": format!("dehydration:{}", tick.0),
+                            "expected_duration_ticks": 1,
+                            "severity_0_1": 0.5,
+                        }),
+                        None,
+                    );
+                    death_cause
+                        .entry(aid)
+                        .or_insert_with(|| "Dehydration: aqueous body desiccated in dry air.".to_string());
                 }
             }
 
@@ -323,11 +528,11 @@ impl M0Engine {
             }
 
             // ----- 6) Overclock / downclock + thermal band -----
-            if profile.uses_internal_shock {
+            if profile.uses_internal_shock && enable_thermal {
                 let (heat, oc_tier) = {
                     let actor = world.world.actors.get_mut(&aid).unwrap();
                     // Heat: overclock adds, passive dissipation removes.
-                    let in_vacuum = actor.atmosphere_sample.pressure_kpa < VACUUM_PRESSURE_KPA;
+                    let in_vacuum = actor.atmosphere_sample.pressure_kpa < tuning.vacuum_pressure_kpa;
                     let add = overclock::overclock_heat_per_s(actor.overclock.tier);
                     let diss = overclock::heat_dissipation_per_s(in_vacuum, false);
                     actor.resources.heat = (actor.resources.heat + (add - diss) * dt).clamp(0.0, 1.2);
@@ -370,7 +575,7 @@ impl M0Engine {
                         .get(&aid)
                         .map(|a| a.overclock.sustained_ticks)
                         .unwrap_or(0);
-                    if sustained >= THERMAL_CRITICAL_MODULE_TICKS && tick.0 % tick_rate_hz as u64 == 0 {
+                    if sustained >= tuning.thermal_critical_module_ticks && tick.0 % tick_rate_hz as u64 == 0 {
                         let _ = recorder.record(
                             tick,
                             sim_time_ms,
@@ -445,6 +650,7 @@ impl M0Engine {
                 &profile,
                 o2_hp_drain,
                 dt,
+                &tuning,
                 world,
                 breached,
                 death_cause,
@@ -452,6 +658,52 @@ impl M0Engine {
                 tick,
                 sim_time_ms,
             );
+
+            // ----- 9) AI doctrine — power/heat/vacuum-aware (M24 integration) -----
+            if let Some(actor) = world.world.actors.get(&aid) {
+                let power_frac = if profile.power_max_kwh > 0.0 {
+                    actor.resources.power / profile.power_max_kwh
+                } else {
+                    1.0
+                };
+                let inputs = cf_ai::m17_doctrine::M17DoctrineInputs {
+                    power_fraction: power_frac,
+                    heat_fraction: actor.resources.heat,
+                    throttled: actor.overclock.throttled,
+                    is_organic: profile.oxygen_required,
+                    helmet_sealed: actor.body_armor.helmet_seal_active()
+                        || actor.body_armor.dive_suit_equipped(),
+                    oxygen_seconds: actor.resources.oxygen_supply,
+                    vacuum_exposed: actor.atmosphere_sample.pressure_kpa < tuning.vacuum_pressure_kpa,
+                };
+                let reasons = cf_ai::m17_doctrine::evaluate_m17_doctrine(inputs);
+                let top = reasons.first().map(|r| r.as_str().to_string());
+                let prev = doctrine_map.get(&aid).cloned();
+                if top != prev {
+                    match &top {
+                        Some(reason) => {
+                            doctrine_map.insert(aid, reason.clone());
+                            let _ = recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "ai",
+                                "m17_doctrine",
+                                json!({
+                                    "actor_id": aid.0,
+                                    "reason": reason,
+                                    "all_reasons": reasons.iter().map(|r| r.as_str()).collect::<Vec<_>>(),
+                                    "power_fraction": power_frac,
+                                    "heat_fraction": actor.resources.heat,
+                                }),
+                                None,
+                            );
+                        }
+                        None => {
+                            doctrine_map.remove(&aid);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -465,6 +717,7 @@ impl M0Engine {
         profile: &OriginProfile,
         o2_hp_drain: f32,
         dt: f32,
+        tuning: &M17TuningConfig,
         world: &mut cf_actor::sim::ActorSimState,
         breached: &mut std::collections::BTreeSet<ActorId>,
         death_cause: &mut std::collections::BTreeMap<ActorId, String>,
@@ -483,79 +736,163 @@ impl M0Engine {
                 .or_insert_with(|| "Suffocated: oxygen supply exhausted in vacuum.".to_string());
         }
 
-        // Power-survival origin: INERT at power 0 (recoverable), reserve-mode
-        // fire lock below the reserve fraction.
-        if profile.has_power() && profile.origin.is_power_survival() {
-            let frac = if profile.power_max_kwh > 0.0 {
-                actor.resources.power / profile.power_max_kwh
-            } else {
-                0.0
-            };
+        // ---- Per-origin death triggers + resource degradation (spec tables) ----
+        // The resource-driven status is resolved into `desired_status` / `go_inert`
+        // and applied at the END, after every HP drain: `apply_damage` re-derives
+        // status from HP and would otherwise clobber the resource-driven status.
+        let origin = profile.origin;
+        let mut mobility = 1.0_f32;
+        let mut action_speed =
+            cf_actor::overclock::effective_action_speed(&actor.overclock, actor.resources.heat);
+        let mut fire_lock = false;
+        let mut desired_status: Option<Status> = None;
+        let mut go_inert = false;
+
+        if profile.has_power() && origin.is_power_survival() {
+            // Robot / drone / crystalline — power + oil survival.
+            let pmax = profile.power_max_kwh.max(1e-3);
+            let pfrac = actor.resources.power / pmax;
             if actor.resources.power <= 0.0 {
-                if !matches!(actor.status, Status::Inert | Status::Dead) {
-                    actor.status = Status::Inert;
-                    death_cause.insert(
-                        aid,
-                        "Went offline: power depleted (0 kWh). Recoverable via repair tool + battery.".to_string(),
-                    );
-                    let _ = recorder.record(
-                        tick,
-                        sim_time_ms,
-                        "resource",
-                        "cascade_offline",
-                        json!({
-                            "actor_id": aid.0,
-                            "kind": "power",
-                            "organ_id": "power_core",
-                            "reason": "circuit_destroyed",
-                        }),
-                        None,
-                    );
-                }
-                actor.power_fire_locked = true;
-            } else {
-                actor.power_fire_locked = frac < POWER_RESERVE_FRACTION;
+                go_inert = true;
+                fire_lock = true;
+                mobility = 0.0;
+            } else if pfrac < tuning.power_reserve_fraction {
+                // power < 10% — reserve mode: can't fire heavy weapons; mobility 50%.
+                fire_lock = true;
+                mobility *= 0.5;
+                action_speed *= 0.5;
+            } else if pfrac < tuning.power_degraded_frac {
+                // power < 30% — action cost: weapons 50% slower; mobility 75%.
+                mobility *= 0.75;
+                action_speed *= 0.5;
             }
-        } else {
-            actor.power_fire_locked = false;
+            if profile.has_oil() {
+                let omax = profile.oil_max_ml.max(1e-3);
+                let ofrac = actor.resources.oil / omax;
+                if actor.resources.oil <= 0.0 {
+                    mobility = 0.0; // joints seized
+                } else if ofrac < tuning.oil_degraded_frac {
+                    mobility *= 0.75; // -25% per the oil < 30% row
+                }
+            }
+        } else if origin == Origin::Android && profile.has_power() && profile.has_blood() {
+            // Android — hybrid: either side offlines independently; death when both fail.
+            let bmax = profile.blood_max_ml.max(1e-3);
+            let pmax = profile.power_max_kwh.max(1e-3);
+            let bfrac = actor.resources.blood / bmax;
+            let pfrac = actor.resources.power / pmax;
+            let blood_empty = actor.resources.blood <= 0.0;
+            let power_empty = actor.resources.power <= 0.0;
+            if blood_empty && power_empty {
+                desired_status = Some(worsen(desired_status, Status::Dying));
+                death_cause.insert(
+                    aid,
+                    "Shut down (hybrid): both blood and power reached 0 — full destruction.".to_string(),
+                );
+            } else if bfrac < 0.20 && pfrac < 0.20 {
+                desired_status = Some(worsen(desired_status, Status::Downed)); // hybrid critical
+                death_cause
+                    .entry(aid)
+                    .or_insert_with(|| "Hybrid critical: blood < 20% and power < 20%.".to_string());
+            }
+            if power_empty {
+                fire_lock = true; // synthetic side offline
+                action_speed *= 0.6;
+            } else if pfrac < 0.30 {
+                action_speed *= 0.7;
+            }
+            if blood_empty {
+                mobility *= 0.5; // organic side dead; robot side drags
+            } else if bfrac < tuning.blood_critical_dying_frac {
+                let _ = actor.apply_damage(tuning.bleedout_hp_per_s * 0.7 * dt);
+                mobility *= 0.6;
+            } else if bfrac < tuning.blood_critical_unstable_frac {
+                mobility *= 0.85;
+            }
+        } else if profile.has_bio_fluid() {
+            // Heavy biomech — bio_fluid + bio-energy: slow clot + self-repair.
+            let bmax = profile.bio_fluid_max_ml.max(1e-3);
+            let bfrac = actor.resources.bio_fluid / bmax;
+            if actor.resources.bio_fluid <= 0.0 {
+                desired_status = Some(worsen(desired_status, Status::Unstable));
+                // Slow death over ~60s (hp bleeds toward 0 → DYING via the hp machine).
+                let _ = actor.apply_damage((actor.hp_max / 60.0) * dt);
+                death_cause
+                    .entry(aid)
+                    .or_insert_with(|| "Bio-fluid depleted: slow bio-death (regeneration possible).".to_string());
+                mobility *= 0.5;
+            } else if bfrac < 0.20 {
+                desired_status = Some(worsen(desired_status, Status::Unstable));
+                // Self-repair: slow bio-fluid regeneration.
+                actor.resources.bio_fluid = (actor.resources.bio_fluid + 3.0 * dt).min(bmax);
+                mobility *= 0.9;
+            }
+        } else if profile.has_blood() {
+            // Organic blood origins (human/powered_organic/methane/insectoid/
+            // photosynthetic/aqueous). Status only ever worsens with blood loss.
+            let bmax = profile.blood_max_ml.max(1e-3);
+            let bfrac = actor.resources.blood / bmax;
+            if actor.resources.blood <= 0.0 {
+                desired_status = Some(worsen(desired_status, Status::Dying));
+                death_cause
+                    .entry(aid)
+                    .or_insert_with(|| "Bled out: blood volume reached 0 mL.".to_string());
+            } else if bfrac < tuning.blood_critical_dying_frac {
+                // blood < 10% — critical/savable: downed + bleeding + vision blur.
+                let _ = actor.apply_damage(tuning.bleedout_hp_per_s * dt);
+                desired_status = Some(worsen(desired_status, Status::Downed));
+                mobility *= 0.6;
+            } else if bfrac < tuning.blood_critical_unstable_frac {
+                // blood < 30% — unstable: slow movement + vision blur.
+                desired_status = Some(worsen(desired_status, Status::Unstable));
+                mobility *= 0.85;
+            }
         }
 
-        // Organic bleed-out: at blood/bio_fluid below the critical floor, HP
-        // drains; at zero, push to DYING.
-        let blood_like = if profile.has_blood() {
-            Some((actor.resources.blood, profile.blood_max_ml))
-        } else if profile.has_bio_fluid() {
-            Some((actor.resources.bio_fluid, profile.bio_fluid_max_ml))
-        } else {
-            None
-        };
-        if let Some((vol, max)) = blood_like {
-            if max > 0.0 {
-                let frac = vol / max;
-                if vol <= 0.0 {
-                    if !matches!(actor.status, Status::Dying | Status::Dead) {
-                        let _ = actor.apply_damage(actor.hp.max(1.0));
-                    }
-                    death_cause
-                        .entry(aid)
-                        .or_insert_with(|| "Bled out: blood volume reached 0 mL.".to_string());
-                } else if frac < 0.10 {
-                    let _ = actor.apply_damage(BLEEDOUT_HP_PER_S * dt);
+        // Apply the resolved status AFTER all HP drains (worsen-only).
+        if go_inert {
+            if !matches!(actor.status, Status::Inert | Status::Dead) {
+                actor.status = Status::Inert;
+                death_cause.insert(
+                    aid,
+                    "Went offline: power depleted (0 kWh). Recoverable via repair tool + battery.".to_string(),
+                );
+                let _ = recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "resource",
+                    "cascade_offline",
+                    json!({"actor_id": aid.0, "kind": "power", "organ_id": "power_core", "reason": "circuit_destroyed"}),
+                    None,
+                );
+            }
+        } else if let Some(ds) = desired_status {
+            if status_severity(ds) > status_severity(actor.status) {
+                actor.status = ds;
+                if matches!(ds, Status::Dying) && actor.dying_dwell_ticks_remaining == 0 {
+                    actor.dying_dwell_ticks_remaining = actor.dying_dwell_ticks_default;
                 }
             }
         }
+
+        // Commit the derived multipliers (consumed by the fire path + move sim).
+        actor.power_fire_locked = fire_lock || matches!(actor.status, Status::Inert);
+        actor.action_speed_factor = action_speed.clamp(0.1, 2.0);
+        actor.m17_mobility_mult = mobility.clamp(0.0, 1.0);
 
         // Reseal helmet once back in atmosphere (breach is a vacuum hazard).
-        if actor.atmosphere_sample.pressure_kpa >= VACUUM_PRESSURE_KPA {
+        if actor.atmosphere_sample.pressure_kpa >= tuning.vacuum_pressure_kpa {
             breached.remove(&aid);
         }
 
-        // Resource → move-speed coupling (multiplies the m16-set base, which is
-        // recomputed each tick so this never compounds).
-        let mult = cf_actor::resource_speed_mult(actor);
-        if mult < 1.0 {
-            actor.affliction_speed_multiplier = (actor.affliction_speed_multiplier * mult)
-                .clamp(crate::m16c_psych::COMBINED_MOVE_SPEED_FLOOR, 1.0);
+        // Resource → move-speed coupling: fold the M17 mobility multiplier (which
+        // can reach 0 for seized joints) plus the legacy resource_speed_mult onto
+        // the m16-set base. m16 recomputes the base each tick so this never
+        // compounds. Seize (0) is allowed to bypass the usual floor.
+        let legacy = cf_actor::resource_speed_mult(actor);
+        let combined = (actor.m17_mobility_mult * legacy).clamp(0.0, 1.0);
+        if combined < 1.0 {
+            actor.affliction_speed_multiplier = (actor.affliction_speed_multiplier * combined).clamp(0.0, 1.0);
         }
     }
 }
@@ -583,21 +920,28 @@ impl M0Engine {
         tick: Tick,
         sim_time_ms: f64,
     ) {
-        let (origin, helmet_sealed, reduced_blackout) = self
+        let (origin, profile, helmet_sealed, reduced_blackout) = self
             .state
             .read()
             .ok()
             .and_then(|s| {
                 let w = s.actor_state.as_ref()?;
                 let a = w.world.actors.get(&target)?;
+                let origin = a.origin();
+                // Use the engine's loaded registry so content/origins/*.json
+                // overrides are honored, not just the hardcoded canonical.
+                let profile = *s.m17_origin_registry.profile(origin);
                 Some((
-                    a.origin(),
+                    origin,
+                    profile,
                     a.body_armor.helmet_seal_active() || a.body_armor.dive_suit_equipped(),
                     s.settings.reduced_g_force_blackout,
                 ))
             })
-            .unwrap_or((Origin::Human, false, false));
-        let profile = OriginProfile::canonical(origin);
+            .unwrap_or_else(|| {
+                let p = OriginProfile::canonical(Origin::Human);
+                (Origin::Human, p, false, false)
+            });
         let is_synth = profile.uses_internal_shock;
 
         // Roll the internal module deterministically (synthetic only).
@@ -725,14 +1069,17 @@ impl M0Engine {
         tick: Tick,
         sim_time_ms: f64,
     ) {
-        let profile = OriginProfile::canonical(origin);
-        let susc = profile.concussion_susceptibility.max(0.0);
-        let prev = self
+        let (susc, prev) = self
             .state
             .read()
             .ok()
-            .and_then(|s| s.m9_concussion_dose.get(&target).copied())
-            .unwrap_or(0.0);
+            .map(|s| {
+                (
+                    s.m17_origin_registry.profile(origin).concussion_susceptibility.max(0.0),
+                    s.m9_concussion_dose.get(&target).copied().unwrap_or(0.0),
+                )
+            })
+            .unwrap_or((OriginProfile::canonical(origin).concussion_susceptibility.max(0.0), 0.0));
         let raw_dose = (prev + damage * 0.6 * susc).clamp(0.0, 100.0);
         let cap = cf_actor::concussion::band_cap(origin, reduced_blackout);
         let raw_band = ConcussionBand::from_dose(raw_dose);
@@ -783,6 +1130,17 @@ impl M0Engine {
             );
         }
         if matches!(band, ConcussionBand::Ko) {
+            // KO blackout actually incapacitates the actor for 5-10s — a
+            // knockdown window that locks input + fire (G-Force HUD blackout).
+            let ko_seconds = cf_actor::concussion::ko_duration_seconds(raw_dose);
+            let ko_ticks = (ko_seconds * self.config.tick_rate_hz.max(1) as f32).round() as u32;
+            if let Ok(mut s) = self.state.write() {
+                if let Some(w) = s.actor_state.as_mut() {
+                    if let Some(a) = w.world.actors.get_mut(&target) {
+                        a.knockdown_ticks_remaining = a.knockdown_ticks_remaining.max(ko_ticks);
+                    }
+                }
+            }
             self.recorder.record(
                 tick,
                 sim_time_ms,
@@ -790,7 +1148,7 @@ impl M0Engine {
                 "ko_threshold_crossed",
                 json!({
                     "actor_id": target.0,
-                    "ko_duration_s": cf_actor::concussion::ko_duration_seconds(raw_dose),
+                    "ko_duration_s": ko_seconds,
                 }),
                 Some(dose_event_id),
             );
@@ -874,7 +1232,19 @@ impl M0Engine {
             "power_fire_locked": actor.power_fire_locked,
             "overclock_tier": actor.overclock.tier,
             "throttled": actor.overclock.throttled,
+            "action_speed_factor": actor.action_speed_factor,
+            "mobility_mult": actor.m17_mobility_mult,
+            "knockdown_ticks_remaining": actor.knockdown_ticks_remaining,
         })
+    }
+
+    /// Toggle the PersonalPowerConfig oxygen / thermal / battery simulation
+    /// (acceptance driver for the settings-gating contract).
+    pub fn m17_set_power_sim(&self, oxygen: bool, thermal: bool, battery: bool) {
+        let mut state = self.state.write().expect("engine state poisoned");
+        state.settings.personal_power.enable_oxygen_simulation = oxygen;
+        state.settings.personal_power.enable_robot_thermal = thermal;
+        state.settings.personal_power.enable_battery_management = battery;
     }
 
     /// Directly set one survival resource (acceptance seeding). `kind` is one
@@ -1246,6 +1616,25 @@ impl ResourceDelta {
         } else {
             0.0
         }
+    }
+}
+
+/// Severity rank for the resource-driven status floor (worsen-only logic).
+fn status_severity(s: Status) -> u8 {
+    match s {
+        Status::Stable | Status::Inactive => 0,
+        Status::Unstable => 1,
+        Status::Downed | Status::Inert => 2,
+        Status::Dying => 3,
+        Status::Dead => 4,
+    }
+}
+
+/// Keep the worse of the current desired status and a new candidate.
+fn worsen(current: Option<Status>, candidate: Status) -> Status {
+    match current {
+        Some(c) if status_severity(c) >= status_severity(candidate) => c,
+        _ => candidate,
     }
 }
 

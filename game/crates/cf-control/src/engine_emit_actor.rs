@@ -473,6 +473,18 @@ impl M0Engine {
                     Some(intent_event_id.clone()),
                 );
                 weapon_fired_event_by_actor.insert(outcome.actor.0, weapon_fired_id.clone());
+                // M17 — firing drains a power-survival origin's battery (the
+                // per-shot action cost; spec § "Power drain: fire weapon = 0.1 kWh").
+                if let Ok(mut s) = self.state.write() {
+                    let cost = s.m17_tuning.power_action_cost_fire_kwh;
+                    if let Some(w) = s.actor_state.as_mut() {
+                        if let Some(a) = w.world.actors.get_mut(&outcome.actor) {
+                            if a.origin().is_power_survival() && a.resources.power > 0.0 {
+                                a.resources.power = (a.resources.power - cost).max(0.0);
+                            }
+                        }
+                    }
+                }
                 // `equipment.shell_ejected` for the casing on each fire.
                 if let Some(popped) = outcome.popped_round.as_ref() {
                     self.recorder.record(

@@ -149,6 +149,9 @@ pub struct RifleTickInputs {
     pub fire_pressed: bool,
     pub reload_pressed: bool,
     pub auto_reload_when_empty: bool,
+    /// M17 — action-speed multiplier (>1 = overclock boost → faster fire +
+    /// reload; <1 = power/thermal degradation → slower). `1.0` = nominal.
+    pub cadence_multiplier: f32,
 }
 
 impl Default for RifleTickInputs {
@@ -157,7 +160,18 @@ impl Default for RifleTickInputs {
             fire_pressed: false,
             reload_pressed: false,
             auto_reload_when_empty: false,
+            cadence_multiplier: 1.0,
         }
+    }
+}
+
+/// Scale a tick interval by an action-speed multiplier: faster (mult > 1) →
+/// fewer ticks, slower (mult < 1) → more ticks. Never returns 0.
+fn scale_interval(ticks: u32, cadence_multiplier: f32) -> u32 {
+    if cadence_multiplier > 0.0 && (cadence_multiplier - 1.0).abs() > f32::EPSILON {
+        (((ticks as f32) / cadence_multiplier).round() as u32).max(1)
+    } else {
+        ticks
     }
 }
 
@@ -211,7 +225,7 @@ pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcom
     let want_reload =
         inputs.reload_pressed || (inputs.auto_reload_when_empty && state.ammo_in_mag == 0 && !state.is_reloading());
     if want_reload && !state.is_reloading() && state.ammo_in_mag < state.spec.mag_capacity {
-        state.reload_remaining_ticks = state.reload_ticks();
+        state.reload_remaining_ticks = scale_interval(state.reload_ticks(), inputs.cadence_multiplier);
         // Cancel the pending fire cooldown; reloading takes over.
         state.fire_cooldown_ticks = 0;
         outcomes.reload_started = true;
@@ -231,7 +245,8 @@ pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcom
                 outcomes.fired_is_tracer = state.next_shot_is_tracer();
                 state.ammo_in_mag -= 1;
                 state.shot_index_in_mag = state.shot_index_in_mag.saturating_add(1);
-                state.fire_cooldown_ticks = state.fire_interval_ticks();
+                state.fire_cooldown_ticks =
+                    scale_interval(state.fire_interval_ticks(), inputs.cadence_multiplier);
                 outcomes.fired_this_tick = true;
                 outcomes.recoil_impulse_applied = state.spec.recoil_impulse;
                 if state.spec.fire_mode == FireMode::Semi {

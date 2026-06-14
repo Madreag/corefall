@@ -192,6 +192,16 @@ pub struct ActorState {
     /// Derived each tick by the M17 pass; not serialized.
     #[serde(skip)]
     pub power_fire_locked: bool,
+    /// M17 — transient action-speed multiplier for fire/reload cadence
+    /// (>1 = overclock boost, <1 = power/oil degradation or thermal throttle).
+    /// `1.0` = nominal. Derived each tick by the M17 pass; not serialized.
+    #[serde(skip, default = "crate::defaults::default_action_speed_factor")]
+    pub action_speed_factor: f32,
+    /// M17 — transient mobility multiplier from resource degradation
+    /// (robot power/oil low, seized joints). `1.0` = nominal. Folded into the
+    /// move-speed multiplier each tick; not serialized.
+    #[serde(skip, default = "crate::defaults::default_action_speed_factor")]
+    pub m17_mobility_mult: f32,
     /// state set populated by hazards (M5.7) + origin reactions (M5.8). Empty
     /// at M5 baseline; serde-default preserves backward compat.
     #[serde(default)]
@@ -505,6 +515,8 @@ impl ActorState {
             resources: ResourceAccumulators::default(),
             overclock: crate::overclock::OverclockState::default(),
             power_fire_locked: false,
+            action_speed_factor: 1.0,
+            m17_mobility_mult: 1.0,
             afflictions: Vec::new(),
             m14g_wound_list: cf_wound::ActorWoundList::new(),
             affliction_speed_multiplier: 1.0,

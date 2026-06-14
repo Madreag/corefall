@@ -812,6 +812,14 @@ pub(crate) struct EngineMutable {
     /// M17 § Per-origin death-recap cause string (the dominant lethal cause,
     /// origin-aware, surfaced by the M10 debrief).
     pub(crate) m17_death_cause: BTreeMap<ActorId, String>,
+    /// M17 § Last per-(actor, resource-kind) drain rate so `resource.
+    /// drain_rate_changed` only fires when the rate actually changes.
+    pub(crate) m17_drain_rate: BTreeMap<(ActorId, u8), f32>,
+    /// M17 § Last AI doctrine reason per actor (power/heat/vacuum-aware), so
+    /// `ai.m17_doctrine` only fires on a change. Read by the AI step + HUD.
+    pub(crate) m17_doctrine_reason: BTreeMap<ActorId, String>,
+    /// M17 § Resource-drain tuning (from `content/resources/drain_rates.json`).
+    pub(crate) m17_tuning: crate::m17_origin::M17TuningConfig,
 }
 
 /// `EngineState.m14f_lateral_chunks` keyed by chunk coord. Tracks the

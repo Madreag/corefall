@@ -572,7 +572,7 @@ pub const SUPPORTED_KEY_CODE_NAMES: &[&str] = &[
 /// M17 § "Settings + configuration surface" — per-origin personal-power +
 /// oxygen + robot-thermal toggles. PvE survival enables these; some PvP modes
 /// disable them.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(default)]
 pub struct PersonalPowerConfig {
     pub enable_battery_management: bool,
@@ -614,6 +614,9 @@ pub struct RaceConfig {
     pub enable_dormancy: bool,
     /// Per-world starter-race recommendations (world id → origin id).
     pub starter_race_recommendations_per_world: std::collections::BTreeMap<String, String>,
+    /// Cross-race relationship modifiers ("origin_a:origin_b" → affinity).
+    /// Methane breathers + humans default to hostile in content.
+    pub cross_race_relationships: std::collections::BTreeMap<String, f32>,
 }
 
 impl Default for RaceConfig {
@@ -626,6 +629,7 @@ impl Default for RaceConfig {
             enable_dehydration: true,
             enable_dormancy: true,
             starter_race_recommendations_per_world: std::collections::BTreeMap::new(),
+            cross_race_relationships: std::collections::BTreeMap::new(),
         }
     }
 }

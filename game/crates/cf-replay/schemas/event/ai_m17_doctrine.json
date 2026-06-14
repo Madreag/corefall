@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_m17_doctrine.v1",
+  "title": "ai.m17_doctrine",
+  "description": "M17 § 'AI doctrine — power + oxygen-aware'. Fires when a bot's power/heat/vacuum-aware doctrine changes: low_battery (power < 20% → retreat to charge), thermal_retreat (throttled / heat >= 70% → retreat from heat source), no_breathable_atmosphere (organic bot lacks sealed helmet / O2 in vacuum), power_shed (power < 40% → shed utility equipment, keep weapon).",
+  "type": "object",
+  "required": ["actor_id", "reason"],
+  "additionalProperties": true,
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "reason": {
+      "type": "string",
+      "enum": ["low_battery", "thermal_retreat", "no_breathable_atmosphere", "power_shed"]
+    },
+    "all_reasons": { "type": "array", "items": { "type": "string" } },
+    "power_fraction": { "type": "number" },
+    "heat_fraction": { "type": "number" }
+  }
+}

@@ -28,12 +28,31 @@ pub struct M17ResourceView {
     pub power_fire_locked: bool,
     pub overclock_tier: u8,
     pub throttled: bool,
+    // --- M20 EnvironmentSignal exposure slices (single source of truth the
+    // HUD / AI / replay / accessibility consume) ---
+    /// True when the actor is an oxygen-breathing organic (for AI O2 logic).
+    pub is_organic: bool,
+    /// True when ambient pressure is at / near vacuum.
+    pub is_vacuum_exposed: bool,
+    /// Sealed helmet (or dive suit) present.
+    pub helmet_sealed: bool,
+    /// Ambient O2 partial pressure (kPa).
+    pub ambient_o2_kpa: f32,
+    /// Robot chassis heat fraction is in the meltdown-imminent band.
+    pub meltdown_imminent: bool,
+    /// Thermal band label (nominal / throttle / critical / meltdown).
+    pub thermal_band: String,
+    /// Mobility multiplier from resource degradation (0 = seized).
+    pub mobility_mult: f32,
+    /// Action-speed multiplier (overclock boost / throttle).
+    pub action_speed_factor: f32,
 }
 
 impl M17ResourceView {
     pub fn from_actor(actor: &ActorState) -> Self {
         let profile = crate::origin::OriginProfile::canonical(actor.origin());
         let r = &actor.resources;
+        let band = crate::overclock::ThermalBand::from_heat(r.heat);
         Self {
             origin: actor.origin_id.clone(),
             blood: r.blood,
@@ -53,6 +72,17 @@ impl M17ResourceView {
             power_fire_locked: actor.power_fire_locked,
             overclock_tier: actor.overclock.tier,
             throttled: actor.overclock.throttled,
+            is_organic: profile.oxygen_required || profile.has_blood() || profile.has_bio_fluid(),
+            is_vacuum_exposed: actor.atmosphere_sample.pressure_kpa < 11.0,
+            helmet_sealed: actor.body_armor.helmet_seal_active() || actor.body_armor.dive_suit_equipped(),
+            ambient_o2_kpa: actor.atmosphere_sample.o2_partial_kpa,
+            meltdown_imminent: matches!(
+                band,
+                crate::overclock::ThermalBand::Critical | crate::overclock::ThermalBand::Meltdown
+            ),
+            thermal_band: band.as_str().to_string(),
+            mobility_mult: actor.m17_mobility_mult,
+            action_speed_factor: actor.action_speed_factor,
         }
     }
 }

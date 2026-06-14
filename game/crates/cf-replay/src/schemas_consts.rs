@@ -399,6 +399,7 @@ pub(crate) const SCHEMA_AI_REASON_LABEL_CHANGED: &str = include_str!("../schemas
 pub(crate) const SCHEMA_AI_THINKING_LAYER_INVOKED: &str =
     include_str!("../schemas/event/ai_thinking_layer_invoked.json");
 pub(crate) const SCHEMA_AI_ARCHETYPE_CHOSEN: &str = include_str!("../schemas/event/ai_archetype_chosen.json");
+pub(crate) const SCHEMA_AI_M17_DOCTRINE: &str = include_str!("../schemas/event/ai_m17_doctrine.json");
 pub(crate) const SCHEMA_AI_AUTO_TRIAGE_INITIATED: &str = include_str!("../schemas/event/ai_auto_triage_initiated.json");
 pub(crate) const SCHEMA_AI_AUTO_TRIAGE_APPLIED: &str = include_str!("../schemas/event/ai_auto_triage_applied.json");
 pub(crate) const SCHEMA_AI_AUTO_REPAIR_INITIATED: &str = include_str!("../schemas/event/ai_auto_repair_initiated.json");

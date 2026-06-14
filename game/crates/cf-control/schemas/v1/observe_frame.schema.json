@@ -1640,6 +1640,15 @@
       "description": "M17 § \"Configuration surface (per M38)\" — 10-race origin toggles.",
       "type": "object",
       "properties": {
+        "cross_race_relationships": {
+          "description": "Cross-race relationship modifiers (\"origin_a:origin_b\" → affinity).\nMethane breathers + humans default to hostile in content.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "format": "float"
+          },
+          "default": {}
+        },
         "enable_all_10_races": {
           "type": "boolean",
           "default": true
@@ -2036,6 +2045,7 @@
           "description": "M17 § 10-race origin toggles.",
           "$ref": "#/$defs/RaceConfig",
           "default": {
+            "cross_race_relationships": {},
             "enable_all_10_races": true,
             "enable_dehydration": true,
             "enable_dormancy": true,

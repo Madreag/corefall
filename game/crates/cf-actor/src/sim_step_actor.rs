@@ -322,6 +322,13 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
     };
     let can_fire = rifle_selected && !rifle_disabled_by_limb_loss && !weapon_jammed && !swap_in_progress;
     outcome.fire_denied_by_swap = swap_in_progress && (intent.fire || intent.fire_held);
+    // M17 — overclock boost / power-degradation / thermal throttle scales the
+    // fire + reload cadence.
+    let cadence_multiplier = state
+        .world
+        .actors
+        .get(&actor_id)
+        .map_or(1.0, |a| a.action_speed_factor);
     let rifle_outcomes = if let Some(rifle) = state.rifles.get_mut(&actor_id) {
         let inputs = RifleTickInputs {
             // Fire is honored on either the edge `intent.fire` or the sticky
@@ -330,6 +337,7 @@ pub(crate) fn step_one_actor<R: FnMut() -> u64>(
             fire_pressed: (intent.fire || intent.fire_held) && can_fire,
             reload_pressed: intent.reload && can_fire,
             auto_reload_when_empty: deps.auto_reload_when_empty && can_fire,
+            cadence_multiplier,
         };
         tick_rifle(rifle, inputs)
     } else {

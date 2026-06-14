@@ -323,6 +323,7 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ai", "reason_label_changed") => Some(SCHEMA_AI_REASON_LABEL_CHANGED),
         ("ai", "thinking_layer_invoked") => Some(SCHEMA_AI_THINKING_LAYER_INVOKED),
         ("ai", "archetype_chosen") => Some(SCHEMA_AI_ARCHETYPE_CHOSEN),
+        ("ai", "m17_doctrine") => Some(SCHEMA_AI_M17_DOCTRINE),
         ("ai", "auto_triage_initiated") => Some(SCHEMA_AI_AUTO_TRIAGE_INITIATED),
         ("ai", "auto_triage_applied") => Some(SCHEMA_AI_AUTO_TRIAGE_APPLIED),
         ("ai", "auto_repair_initiated") => Some(SCHEMA_AI_AUTO_REPAIR_INITIATED),
