@@ -37,4 +37,4 @@ cf-cinematic = { path = "../cf-cinematic" }
 cf-fortification = { path = "../cf-fortification" }
 cf-terrain = { path = "../cf-terrain", optional = true }
 cf-trench = { path = "../cf-trench" }
-tiny-skia = { version = "0.11", optional = true }
+tiny-skia = { version = "0.12", optional = true }
